@@ -1,0 +1,39 @@
+# zing 最近标签页切换器
+
+## 当前交互：参考 VS Code Ctrl+Tab（2026-10-15）
+
+独立 500×500 Chrome 扩展窗口承载列表，普通 HTTP(S) 页面额外预加载轻量修饰键监听。源窗口限定为启动时的普通浏览器窗口。
+
+1. Control+J 打开并高亮上一标签页；Control+Shift+J 反向高亮。
+2. Ctrl+N/P、上下方向键、重复 J/Shift+J 只改变高亮，不切页。
+3. 松开 Control、Enter 或点击候选项才激活最终目标、关闭切换器并返回源窗口。
+4. Esc、失焦或最小化取消，不切页、不抢回焦点；源窗口或源标签页关闭/移走时也取消。
+5. 候选按打开时的 MRU 排序，当前页在首项；导航不改变顺序，不写入搜索使用习惯。关闭/移走候选时移除该行；选中项消失则回到源页高亮，避免意外确认其邻居。
+
+确认前重新校验源标签页仍在原窗口且处于激活状态、候选仍在源窗口、切换器仍持有焦点。语言、主题和快捷键沿用现有设置。
+
+## 依据
+
+VS Code `QuickPick.registerQuickNavigation()` 在修饰键 KEY_UP 时执行 accept；`BaseEditorQuickAccessProvider` 的候选 `accept` 才调用 openEditor。移动高亮并不打开候选编辑器。此前“选择即预览”是另一种交互，本版已经移除。
+
+- https://github.com/microsoft/vscode/blob/main/src/vs/platform/quickinput/browser/quickInput.ts
+- https://github.com/microsoft/vscode/blob/main/src/vs/workbench/browser/parts/editor/editorQuickAccess.ts
+
+## 已知边界
+
+Chrome commands 不提供全局 keyup。普通网页通过 document_start 的隔离脚本观察真实 Control/Alt/Meta 状态，包含已聚焦且匹配 HTTP(S) 的子框架。后台先向网页建立本次会话，再创建尚未聚焦的小窗口；窗口安装监听并就绪后才接管焦点。后台开始前已经观察到松键时直接切页；加载期间松键会被缓冲，在接管后确认。没有计时猜测、持久化按键记录、文本读取或原生助手。
+
+现有网页在扩展更新后需刷新一次。地址栏、受限页面、未匹配的 iframe 或未注入页面仍用原独立窗口兜底，过早松键仍可能需要 Enter。内容脚本匹配权限不等于 Cookie API 主机授权；不添加全站 host_permissions，Cookie 继续逐站请求。
+
+独立窗口有系统边框。macOS 全屏入口已检查，多显示器/多 Spaces 未完整验收。自动化工具不能独立派发原生 Control 松开，松键逻辑由隔离 Chrome 真实扩展窗口的 CDP 键盘事件验证。
+
+## 测试
+
+```sh
+npm run typecheck
+npm run build
+npm run test:e2e -- --grep 'recent switcher|recent bridge'
+node tests/switcher-manual.mjs
+```
+
+切换器回归覆盖：打开/连续导航不切页、松键最终确认、Esc/失焦取消、关闭/移走候选、快速连续导航后松键、源窗口及源页关闭、工具栏行为保持不变。手工脚本只创建临时配置及 A/B/C 合成页面。

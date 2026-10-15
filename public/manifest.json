@@ -1,0 +1,86 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extensionName__",
+  "description": "__MSG_extensionDescription__",
+  "version": "0.1.0",
+  "minimum_chrome_version": "127",
+  "permissions": [
+    "activeTab",
+    "cookies",
+    "scripting",
+    "tabs",
+    "bookmarks",
+    "sessions",
+    "storage",
+    "userScripts",
+    "favicon"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "__MSG_openPalette__",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "128": "icon128.png"
+  },
+  "commands": {
+    "toggle-palette": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      },
+      "description": "__MSG_togglePalette__"
+    },
+    "switch-recent": {
+      "suggested_key": {
+        "default": "Ctrl+Comma",
+        "mac": "MacCtrl+J"
+      },
+      "description": "__MSG_recentSwitcher__"
+    },
+    "switch-recent-back": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Comma",
+        "mac": "MacCtrl+Shift+J"
+      },
+      "description": "__MSG_recentSwitcherBack__"
+    }
+  },
+  "default_locale": "en",
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "recent-keys.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "_favicon/*"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,611 @@
+{
+  "extensionName": {
+    "message": "zing"
+  },
+  "extensionDescription": {
+    "message": "A keyboard-first browser command palette. Search tabs in this window, open bookmarks, and run browser commands."
+  },
+  "openPalette": {
+    "message": "Open zing Command Palette"
+  },
+  "paletteLabel": {
+    "message": "zing browser command palette"
+  },
+  "togglePalette": {
+    "message": "Open / close command palette"
+  },
+  "languageTag": {
+    "message": "en"
+  },
+  "newTab": {
+    "message": "New Tab"
+  },
+  "close": {
+    "message": "Close Current Tab"
+  },
+  "closeTab": {
+    "message": "Close Tab"
+  },
+  "closeOthers": {
+    "message": "Close Other Tabs"
+  },
+  "closeRight": {
+    "message": "Close Tabs to the Right"
+  },
+  "restore": {
+    "message": "Reopen Closed Tab"
+  },
+  "reload": {
+    "message": "Reload Current Tab"
+  },
+  "reloadTab": {
+    "message": "Reload Tab"
+  },
+  "pin": {
+    "message": "Pin Tab"
+  },
+  "unpin": {
+    "message": "Unpin Tab"
+  },
+  "mute": {
+    "message": "Mute Tab"
+  },
+  "unmute": {
+    "message": "Unmute Tab"
+  },
+  "newTabHint": {
+    "message": "Open a new tab in this window"
+  },
+  "restoreHint": {
+    "message": "Restore the most recently closed tab or window"
+  },
+  "closeHint": {
+    "message": "Current window only · Keep pinned tabs"
+  },
+  "currentTab": {
+    "message": "Current tab"
+  },
+  "untitledTab": {
+    "message": "Untitled tab"
+  },
+  "openNewTab": {
+    "message": "Open in New Tab"
+  },
+  "switchTab": {
+    "message": "Switch to Tab"
+  },
+  "switchTabPrimary": {
+    "message": "Switch to Tab"
+  },
+  "openBookmark": {
+    "message": "Open Bookmark"
+  },
+  "runCommand": {
+    "message": "Run Command"
+  },
+  "searchLabel": {
+    "message": "Search commands, tabs, and bookmarks"
+  },
+  "closePalette": {
+    "message": "Close palette"
+  },
+  "closeTooltip": {
+    "message": "Close (Esc)"
+  },
+  "resultOne": {
+    "message": "$1 result"
+  },
+  "resultMany": {
+    "message": "$1 results"
+  },
+  "loading": {
+    "message": "Loading"
+  },
+  "preparing": {
+    "message": "Getting your browser ready…"
+  },
+  "resultsLabel": {
+    "message": "Search results"
+  },
+  "noResults": {
+    "message": "No results found"
+  },
+  "keepPinned": {
+    "message": "Keep pinned tabs"
+  },
+  "pinned": {
+    "message": "Pinned"
+  },
+  "muted": {
+    "message": "Muted"
+  },
+  "current": {
+    "message": "Current"
+  },
+  "bookmarkKind": {
+    "message": "Bookmark"
+  },
+  "tabKind": {
+    "message": "Tab"
+  },
+  "commandKind": {
+    "message": "Command"
+  },
+  "moreResults": {
+    "message": "Showing the first 100 results. Keep typing to narrow your search."
+  },
+  "backToResults": {
+    "message": "Back to search results"
+  },
+  "actionMenu": {
+    "message": "Actions"
+  },
+  "availableActions": {
+    "message": "Available actions"
+  },
+  "noActions": {
+    "message": "No matching actions"
+  },
+  "searchActionsPlaceholder": {
+    "message": "Search actions…"
+  },
+  "searchActions": {
+    "message": "Search actions"
+  },
+  "retry": {
+    "message": "Retry"
+  },
+  "running": {
+    "message": "Running…"
+  },
+  "closeCountOne": {
+    "message": "Will close $1 tab"
+  },
+  "closeCountMany": {
+    "message": "Will close $1 tabs"
+  },
+  "currentWindow": {
+    "message": "Current window"
+  },
+  "openActions": {
+    "message": "Open action menu"
+  },
+  "actions": {
+    "message": "Actions"
+  },
+  "shortcutNotice": {
+    "message": "No shortcut assigned. Set one at chrome://extensions/shortcuts"
+  },
+  "errorGeneric": {
+    "message": "Something went wrong. Please try again."
+  },
+  "errorClosedTab": {
+    "message": "This tab has closed. Choose another result."
+  },
+  "errorDisconnected": {
+    "message": "The extension disconnected. Please reopen the palette."
+  },
+  "errorNoCurrent": {
+    "message": "No current tab found. Please reopen the palette."
+  },
+  "errorWindow": {
+    "message": "Invalid window."
+  },
+  "errorRestore": {
+    "message": "No recently closed tabs to restore."
+  },
+  "errorBookmark": {
+    "message": "Invalid bookmark."
+  },
+  "errorBookmarkUrl": {
+    "message": "This bookmark is not a supported page URL. Script bookmarks cannot be opened."
+  },
+  "errorNoTab": {
+    "message": "No tab available for this action."
+  },
+  "errorMovedTab": {
+    "message": "This tab moved to another window. Search again."
+  },
+  "errorCommand": {
+    "message": "Unsupported command."
+  },
+  "settings": {
+    "message": "Settings"
+  },
+  "settingsHint": {
+    "message": "Language, appearance, and keyboard shortcuts"
+  },
+  "general": {
+    "message": "General"
+  },
+  "language": {
+    "message": "Language"
+  },
+  "followSystem": {
+    "message": "Follow System"
+  },
+  "languageHint": {
+    "message": "Choose the language used in zing."
+  },
+  "systemLanguage": {
+    "message": "System language: $1 (Chrome interface)"
+  },
+  "appearance": {
+    "message": "Appearance"
+  },
+  "theme": {
+    "message": "Theme"
+  },
+  "lightTheme": {
+    "message": "Light"
+  },
+  "darkTheme": {
+    "message": "Dark"
+  },
+  "themeHint": {
+    "message": "Use your system appearance or choose your own."
+  },
+  "keyboard": {
+    "message": "Keyboard"
+  },
+  "paletteHotkey": {
+    "message": "Open / Close zing"
+  },
+  "hotkeyHint": {
+    "message": "Change the shortcut for zing in Chrome’s extension shortcuts."
+  },
+  "changeHotkey": {
+    "message": "Change in Chrome"
+  },
+  "notAssigned": {
+    "message": "Not assigned"
+  },
+  "defaultHotkey": {
+    "message": "Default: $1"
+  },
+  "back": {
+    "message": "Back"
+  },
+  "savedLocally": {
+    "message": "Changes are saved automatically on this device."
+  },
+  "errorSaveSettings": {
+    "message": "Could not save settings. Please try again."
+  },
+  "searchPlaceholder": {
+    "message": "Search tabs, bookmarks, and commands…"
+  },
+  "noResultsHint": {
+    "message": "Try a page title, URL, bookmark, or command"
+  },
+  "searchRanking": {
+    "message": "Search Ranking"
+  },
+  "searchRankingHint": {
+    "message": "Learns your frequent commands and preferred results for each search. Saved only on this device."
+  },
+  "resetSearchRanking": {
+    "message": "Reset Ranking"
+  },
+  "rankingReset": {
+    "message": "Learned ranking cleared. Default ordering restored."
+  },
+  "navigate": {
+    "message": "Navigate"
+  },
+  "navigationHelp": {
+    "message": "Previous: ↑ or Ctrl+P. Next: ↓ or Ctrl+N."
+  },
+  "localStorage": {
+    "message": "View Local Storage"
+  },
+  "sessionStorage": {
+    "message": "View Session Storage"
+  },
+  "cookies": {
+    "message": "View Cookies"
+  },
+  "storageSearch": {
+    "message": "Search keys…"
+  },
+  "storageSearchLabel": {
+    "message": "Search storage keys"
+  },
+  "storageEntries": {
+    "message": "Storage entries"
+  },
+  "storageEmpty": {
+    "message": "No entries on this page"
+  },
+  "storageEmptyValue": {
+    "message": "(empty value)"
+  },
+  "storageEmptyName": {
+    "message": "(empty name)"
+  },
+  "copyValue": {
+    "message": "Copy Value"
+  },
+  "copyName": {
+    "message": "Copy Name"
+  },
+  "viewDetails": {
+    "message": "View Details"
+  },
+  "refreshStorage": {
+    "message": "Refresh"
+  },
+  "copiedValue": {
+    "message": "Value copied"
+  },
+  "copiedName": {
+    "message": "Name copied"
+  },
+  "storageValue": {
+    "message": "Value"
+  },
+  "storageJson": {
+    "message": "JSON preview · copies original value"
+  },
+  "cookieDomain": {
+    "message": "Domain"
+  },
+  "cookiePath": {
+    "message": "Path"
+  },
+  "cookieExpires": {
+    "message": "Expires"
+  },
+  "cookieSession": {
+    "message": "End of session"
+  },
+  "cookiePartition": {
+    "message": "Partition"
+  },
+  "cookieUnpartitioned": {
+    "message": "Unpartitioned"
+  },
+  "errorStorageTarget": {
+    "message": "Unable to identify the source page. Reopen zing on that page."
+  },
+  "errorStorageChanged": {
+    "message": "The page changed. Reopen zing to read its current data."
+  },
+  "errorStorageUnsupported": {
+    "message": "Open zing on an HTTP or HTTPS page to view its storage."
+  },
+  "errorStorageRead": {
+    "message": "Unable to read this page’s storage. Reopen zing using its hotkey or toolbar icon and retry."
+  },
+  "errorStorageCopy": {
+    "message": "Copy failed. Select the value in Details and copy it manually."
+  },
+  "errorStoragePermission": {
+    "message": "Allow access to this website to view its cookies."
+  },
+  "allowCookieAccess": {
+    "message": "Allow Website Access"
+  },
+  "cookieAccessTitle": {
+    "message": "View cookies on this website"
+  },
+  "cookieAccessHint": {
+    "message": "Chrome needs access to the listed website domains (HTTP and HTTPS) to read their cookies, including HttpOnly. You can revoke access in Chrome’s extension settings."
+  },
+  "cookieAccessConfirm": {
+    "message": "Continue to Chrome"
+  },
+  "cookieAccessDenied": {
+    "message": "Access was not granted. You can retry or go back."
+  },
+  "cookieAccessError": {
+    "message": "Unable to request access. Please reopen zing on the website."
+  },
+  "recentSwitcher": {
+    "message": "Switch Recent Tabs"
+  },
+  "recentSwitcherBack": {
+    "message": "Previous Recent Tab"
+  },
+  "recentCurrent": {
+    "message": "Current"
+  },
+  "recentRelease": {
+    "message": "Release $1 to switch"
+  },
+  "recentConfirm": {
+    "message": "Switch"
+  },
+  "recentCancel": {
+    "message": "Cancel"
+  },
+  "recentNavigate": {
+    "message": "Ctrl+N / Ctrl+P or ↑ ↓ to select · Esc to cancel"
+  },
+  "scriptLibrary": {
+    "message": "Script Library"
+  },
+  "scriptLibraryHint": {
+    "message": "Save scripts locally. Search their names to run on the current page; use Actions to copy code, edit, or delete."
+  },
+  "manageScripts": {
+    "message": "Manage Scripts"
+  },
+  "bindCtrlTab": {
+    "message": "Set Up Ctrl+Tab"
+  },
+  "bindingHint": {
+    "message": "Copy a setup snippet to bind Ctrl+Tab and Ctrl+Shift+Tab."
+  },
+  "bindingEffect": {
+    "message": "Uses Chrome’s internal settings API. Replaces the recent-tab shortcuts and Chrome’s default Ctrl+Tab navigation."
+  },
+  "bindingStepCopy": {
+    "message": "Copy the code below. It contains this installation’s extension ID."
+  },
+  "bindingStepOpen": {
+    "message": "Open Chrome’s extension shortcuts page with the button below."
+  },
+  "bindingStepConsole": {
+    "message": "On that page, press $1 to open Console. Paste the code and press Enter."
+  },
+  "openShortcutPage": {
+    "message": "Open Chrome Shortcuts"
+  },
+  "copyScript": {
+    "message": "Copy Code"
+  },
+  "scriptCopied": {
+    "message": "Code copied. Paste it into the intended execution environment."
+  },
+  "scriptCopyError": {
+    "message": "Could not copy code. Select the code and copy it manually."
+  },
+  "scriptRequired": {
+    "message": "Enter a name and code before saving."
+  },
+  "scriptSaved": {
+    "message": "Script saved"
+  },
+  "scriptDeleted": {
+    "message": "Script deleted"
+  },
+  "scriptName": {
+    "message": "Name"
+  },
+  "scriptCode": {
+    "message": "JavaScript code"
+  },
+  "editScript": {
+    "message": "Edit Script"
+  },
+  "newScript": {
+    "message": "New Script"
+  },
+  "saveScript": {
+    "message": "Save"
+  },
+  "deleteScript": {
+    "message": "Delete"
+  },
+  "confirmDeleteScript": {
+    "message": "Confirm Delete"
+  },
+  "searchScripts": {
+    "message": "Search scripts"
+  },
+  "builtInScript": {
+    "message": "Built-in"
+  },
+  "scriptKind": {
+    "message": "Script"
+  },
+  "scriptLocalOnly": {
+    "message": "Stored only on this device"
+  },
+  "viewScriptSetup": {
+    "message": "View Setup Instructions"
+  },
+  "scriptDeletePrompt": {
+    "message": "Delete “$1”? This cannot be undone."
+  },
+  "cancelScriptDelete": {
+    "message": "Cancel"
+  },
+  "changeLanguage": {
+    "message": "Change Language"
+  },
+  "changeTheme": {
+    "message": "Change Theme"
+  },
+  "keyboardShortcuts": {
+    "message": "Keyboard Shortcuts"
+  },
+  "runScript": {
+    "message": "Run Script"
+  },
+  "runCopyScript": {
+    "message": "Run and Copy Result"
+  },
+  "rerunScript": {
+    "message": "Run Again"
+  },
+  "copyScriptResult": {
+    "message": "Copy Result"
+  },
+  "scriptResult": {
+    "message": "Result"
+  },
+  "scriptRunFailed": {
+    "message": "Script failed"
+  },
+  "scriptExecuting": {
+    "message": "Running script…"
+  },
+  "scriptRunningBack": {
+    "message": "You can go back. A script already started may continue running."
+  },
+  "scriptRunTarget": {
+    "message": "Current page: $1"
+  },
+  "scriptResultsTemporary": {
+    "message": "Results stay in this panel only"
+  },
+  "scriptResultCopied": {
+    "message": "Result copied"
+  },
+  "scriptResultCopyFailed": {
+    "message": "The script finished. Copying failed; use Copy Result to retry."
+  },
+  "noRunnableScripts": {
+    "message": "No saved scripts yet. Search “New Script” to create one."
+  },
+  "enableUserScripts": {
+    "message": "Open Extension Details"
+  },
+  "scriptEnableHint": {
+    "message": "Turn on “Allow user scripts” for zing in Chrome, then return here and run again. On Chrome 135–137, enable Developer mode instead."
+  },
+  "errorScriptDisabled": {
+    "message": "Enable user scripts in Chrome to run saved JavaScript."
+  },
+  "errorScriptVersion": {
+    "message": "Running scripts requires Chrome 135 or later."
+  },
+  "errorScriptTarget": {
+    "message": "This script cannot run on that target. Reopen zing on the intended page."
+  },
+  "errorScriptChanged": {
+    "message": "The page changed or is no longer active. Reopen zing on the intended page."
+  },
+  "errorScriptUnsupported": {
+    "message": "Scripts can run only on ordinary HTTP or HTTPS pages. Chrome internal pages are not supported."
+  },
+  "errorScriptAccess": {
+    "message": "Chrome cannot access this page. Reopen zing with its shortcut or toolbar button on an ordinary webpage."
+  },
+  "errorScriptInterrupted": {
+    "message": "Execution was interrupted or returned no usable result. Check the page before running again."
+  },
+  "errorScriptMissing": {
+    "message": "The saved script is missing or empty."
+  },
+  "errorScriptBusy": {
+    "message": "A script is already running in this tab. Wait for it to finish."
+  },
+  "scriptExecutionHint": {
+    "message": "The last expression is the result, for example localStorage.getItem(\"token\"). Promises are awaited. Runs in an isolated user-script world with access to this page’s DOM and storage; page JavaScript variables and GM_* APIs are not available."
+  },
+  "categoryTab": {
+    "message": "Tab"
+  },
+  "categoryScript": {
+    "message": "Script"
+  },
+  "categoryStorage": {
+    "message": "Storage"
+  },
+  "categorySettings": {
+    "message": "Settings"
+  }
+}

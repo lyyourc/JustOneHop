@@ -1,0 +1,611 @@
+{
+  "extensionName": {
+    "message": "zing"
+  },
+  "extensionDescription": {
+    "message": "像使用 Raycast 一样操作浏览器。搜索当前窗口标签页、打开书签，用键盘执行常用命令。"
+  },
+  "openPalette": {
+    "message": "打开 zing 命令面板"
+  },
+  "paletteLabel": {
+    "message": "zing 浏览器命令面板"
+  },
+  "togglePalette": {
+    "message": "打开 / 关闭命令面板"
+  },
+  "languageTag": {
+    "message": "zh-CN"
+  },
+  "newTab": {
+    "message": "新建标签页"
+  },
+  "close": {
+    "message": "关闭当前标签页"
+  },
+  "closeTab": {
+    "message": "关闭标签页"
+  },
+  "closeOthers": {
+    "message": "关闭其他标签页"
+  },
+  "closeRight": {
+    "message": "关闭右侧标签页"
+  },
+  "restore": {
+    "message": "恢复关闭的标签页"
+  },
+  "reload": {
+    "message": "刷新当前标签页"
+  },
+  "reloadTab": {
+    "message": "刷新标签页"
+  },
+  "pin": {
+    "message": "固定标签页"
+  },
+  "unpin": {
+    "message": "取消固定标签页"
+  },
+  "mute": {
+    "message": "静音标签页"
+  },
+  "unmute": {
+    "message": "取消静音标签页"
+  },
+  "newTabHint": {
+    "message": "在当前窗口打开新标签页"
+  },
+  "restoreHint": {
+    "message": "恢复最近关闭的标签页或窗口"
+  },
+  "closeHint": {
+    "message": "仅当前窗口 · 保留固定标签页"
+  },
+  "currentTab": {
+    "message": "当前标签页"
+  },
+  "untitledTab": {
+    "message": "未命名标签页"
+  },
+  "openNewTab": {
+    "message": "在新标签页打开"
+  },
+  "switchTab": {
+    "message": "切换到标签页"
+  },
+  "switchTabPrimary": {
+    "message": "切换标签页"
+  },
+  "openBookmark": {
+    "message": "打开书签"
+  },
+  "runCommand": {
+    "message": "执行命令"
+  },
+  "searchLabel": {
+    "message": "搜索命令、标签页和书签"
+  },
+  "closePalette": {
+    "message": "关闭面板"
+  },
+  "closeTooltip": {
+    "message": "关闭 (Esc)"
+  },
+  "resultOne": {
+    "message": "$1 个结果"
+  },
+  "resultMany": {
+    "message": "$1 个结果"
+  },
+  "loading": {
+    "message": "正在加载"
+  },
+  "preparing": {
+    "message": "正在准备你的浏览器…"
+  },
+  "resultsLabel": {
+    "message": "搜索结果"
+  },
+  "noResults": {
+    "message": "没有找到匹配结果"
+  },
+  "keepPinned": {
+    "message": "保留固定标签页"
+  },
+  "pinned": {
+    "message": "已固定"
+  },
+  "muted": {
+    "message": "已静音"
+  },
+  "current": {
+    "message": "当前"
+  },
+  "bookmarkKind": {
+    "message": "书签"
+  },
+  "tabKind": {
+    "message": "标签页"
+  },
+  "commandKind": {
+    "message": "命令"
+  },
+  "moreResults": {
+    "message": "显示前 100 个结果，继续输入以缩小范围"
+  },
+  "backToResults": {
+    "message": "返回搜索结果"
+  },
+  "actionMenu": {
+    "message": "操作菜单"
+  },
+  "availableActions": {
+    "message": "可用操作"
+  },
+  "noActions": {
+    "message": "没有匹配的操作"
+  },
+  "searchActionsPlaceholder": {
+    "message": "搜索操作…"
+  },
+  "searchActions": {
+    "message": "搜索操作"
+  },
+  "retry": {
+    "message": "重试"
+  },
+  "running": {
+    "message": "执行中…"
+  },
+  "closeCountOne": {
+    "message": "将关闭 $1 个标签页"
+  },
+  "closeCountMany": {
+    "message": "将关闭 $1 个标签页"
+  },
+  "currentWindow": {
+    "message": "当前窗口"
+  },
+  "openActions": {
+    "message": "打开操作菜单"
+  },
+  "actions": {
+    "message": "操作"
+  },
+  "shortcutNotice": {
+    "message": "快捷键未绑定：请在 chrome://extensions/shortcuts 中设置"
+  },
+  "errorGeneric": {
+    "message": "操作失败，请重试。"
+  },
+  "errorClosedTab": {
+    "message": "这个标签页已关闭，请选择其他结果。"
+  },
+  "errorDisconnected": {
+    "message": "扩展连接已断开，请重新打开面板。"
+  },
+  "errorNoCurrent": {
+    "message": "未找到当前标签页，请重新打开面板。"
+  },
+  "errorWindow": {
+    "message": "无效的窗口。"
+  },
+  "errorRestore": {
+    "message": "没有可以恢复的标签页。"
+  },
+  "errorBookmark": {
+    "message": "无效的书签。"
+  },
+  "errorBookmarkUrl": {
+    "message": "此书签不是可打开的网页地址，暂不支持脚本书签。"
+  },
+  "errorNoTab": {
+    "message": "没有可操作的标签页。"
+  },
+  "errorMovedTab": {
+    "message": "标签页已移至其他窗口，请重新搜索。"
+  },
+  "errorCommand": {
+    "message": "不支持的命令。"
+  },
+  "settings": {
+    "message": "设置"
+  },
+  "settingsHint": {
+    "message": "语言、外观与快捷键"
+  },
+  "general": {
+    "message": "通用"
+  },
+  "language": {
+    "message": "语言"
+  },
+  "followSystem": {
+    "message": "跟随系统"
+  },
+  "languageHint": {
+    "message": "选择 zing 的界面语言。"
+  },
+  "systemLanguage": {
+    "message": "系统语言：$1（Chrome 界面语言）"
+  },
+  "appearance": {
+    "message": "外观"
+  },
+  "theme": {
+    "message": "主题"
+  },
+  "lightTheme": {
+    "message": "浅色"
+  },
+  "darkTheme": {
+    "message": "深色"
+  },
+  "themeHint": {
+    "message": "跟随系统外观，或选择喜欢的主题。"
+  },
+  "keyboard": {
+    "message": "键盘"
+  },
+  "paletteHotkey": {
+    "message": "打开 / 关闭 zing"
+  },
+  "hotkeyHint": {
+    "message": "在 Chrome 扩展快捷键页中修改 zing 的绑定。"
+  },
+  "changeHotkey": {
+    "message": "前往修改"
+  },
+  "notAssigned": {
+    "message": "未绑定"
+  },
+  "defaultHotkey": {
+    "message": "默认：$1"
+  },
+  "back": {
+    "message": "返回"
+  },
+  "savedLocally": {
+    "message": "更改会自动保存到本机。"
+  },
+  "errorSaveSettings": {
+    "message": "设置保存失败，请重试。"
+  },
+  "searchPlaceholder": {
+    "message": "搜索标签页、书签和命令…"
+  },
+  "noResultsHint": {
+    "message": "试试页面标题、网址、书签或命令名称"
+  },
+  "searchRanking": {
+    "message": "搜索排序"
+  },
+  "searchRankingHint": {
+    "message": "按使用习惯排列首页命令和同词搜索结果。习惯仅保存在本机。"
+  },
+  "resetSearchRanking": {
+    "message": "重置搜索排序"
+  },
+  "rankingReset": {
+    "message": "已清除学习记录，恢复默认排序。"
+  },
+  "navigate": {
+    "message": "选择"
+  },
+  "navigationHelp": {
+    "message": "上一项：↑ 或 Ctrl+P；下一项：↓ 或 Ctrl+N。"
+  },
+  "localStorage": {
+    "message": "查看 Local Storage"
+  },
+  "sessionStorage": {
+    "message": "查看 Session Storage"
+  },
+  "cookies": {
+    "message": "查看 Cookies"
+  },
+  "storageSearch": {
+    "message": "搜索名称…"
+  },
+  "storageSearchLabel": {
+    "message": "搜索存储名称"
+  },
+  "storageEntries": {
+    "message": "存储条目"
+  },
+  "storageEmpty": {
+    "message": "当前页面没有存储条目"
+  },
+  "storageEmptyValue": {
+    "message": "（空值）"
+  },
+  "storageEmptyName": {
+    "message": "（空名称）"
+  },
+  "copyValue": {
+    "message": "复制值"
+  },
+  "copyName": {
+    "message": "复制名称"
+  },
+  "viewDetails": {
+    "message": "查看详情"
+  },
+  "refreshStorage": {
+    "message": "刷新"
+  },
+  "copiedValue": {
+    "message": "已复制值"
+  },
+  "copiedName": {
+    "message": "已复制名称"
+  },
+  "storageValue": {
+    "message": "值"
+  },
+  "storageJson": {
+    "message": "JSON 预览 · 复制时保留原始值"
+  },
+  "cookieDomain": {
+    "message": "域名"
+  },
+  "cookiePath": {
+    "message": "路径"
+  },
+  "cookieExpires": {
+    "message": "到期时间"
+  },
+  "cookieSession": {
+    "message": "会话结束时"
+  },
+  "cookiePartition": {
+    "message": "分区"
+  },
+  "cookieUnpartitioned": {
+    "message": "未分区"
+  },
+  "errorStorageTarget": {
+    "message": "无法确定来源页面，请在目标页面重新打开 zing。"
+  },
+  "errorStorageChanged": {
+    "message": "页面已变化，请重新打开 zing 读取当前数据。"
+  },
+  "errorStorageUnsupported": {
+    "message": "请在 HTTP 或 HTTPS 网页中打开 zing 查看存储。"
+  },
+  "errorStorageRead": {
+    "message": "无法读取当前页面存储，请通过快捷键或工具栏图标重新打开 zing 后重试。"
+  },
+  "errorStorageCopy": {
+    "message": "复制失败，请在详情中选中值后手动复制。"
+  },
+  "errorStoragePermission": {
+    "message": "允许访问当前网站后，即可查看 Cookie。"
+  },
+  "allowCookieAccess": {
+    "message": "允许访问此网站"
+  },
+  "cookieAccessTitle": {
+    "message": "查看此网站的 Cookie"
+  },
+  "cookieAccessHint": {
+    "message": "Chrome 需要访问上方列出的网站域名（HTTP 和 HTTPS），才能读取其 Cookie（包含 HttpOnly）。可随时在 Chrome 扩展设置中撤销授权。"
+  },
+  "cookieAccessConfirm": {
+    "message": "继续授权"
+  },
+  "cookieAccessDenied": {
+    "message": "尚未获得授权，可以重试或返回。"
+  },
+  "cookieAccessError": {
+    "message": "无法申请访问权限，请在目标网站重新打开 zing。"
+  },
+  "recentSwitcher": {
+    "message": "切换最近标签页"
+  },
+  "recentSwitcherBack": {
+    "message": "反向选择最近标签页"
+  },
+  "recentCurrent": {
+    "message": "当前"
+  },
+  "recentRelease": {
+    "message": "松开 $1 切换"
+  },
+  "recentConfirm": {
+    "message": "切换"
+  },
+  "recentCancel": {
+    "message": "取消"
+  },
+  "recentNavigate": {
+    "message": "Ctrl+N / Ctrl+P 或 ↑ ↓ 选择 · Esc 取消"
+  },
+  "scriptLibrary": {
+    "message": "脚本收藏"
+  },
+  "scriptLibraryHint": {
+    "message": "脚本保存在本机。搜索名称即可在当前网页运行；操作菜单支持复制代码、编辑和删除。"
+  },
+  "manageScripts": {
+    "message": "管理脚本"
+  },
+  "bindCtrlTab": {
+    "message": "设置 Ctrl+Tab"
+  },
+  "bindingHint": {
+    "message": "复制配置代码，重新绑定 Ctrl+Tab 和 Ctrl+Shift+Tab。"
+  },
+  "bindingEffect": {
+    "message": "使用 Chrome 内部设置接口，替换最近标签页快捷键及 Chrome 原有的 Ctrl+Tab 切换行为。"
+  },
+  "bindingStepCopy": {
+    "message": "复制下方代码，已填入当前安装的扩展 ID。"
+  },
+  "bindingStepOpen": {
+    "message": "点击下方按钮，打开 Chrome 扩展快捷键页。"
+  },
+  "bindingStepConsole": {
+    "message": "在该页面按 $1 打开 Console，粘贴代码并按 Enter。"
+  },
+  "openShortcutPage": {
+    "message": "打开 Chrome 快捷键页"
+  },
+  "copyScript": {
+    "message": "复制代码"
+  },
+  "scriptCopied": {
+    "message": "代码已复制，请粘贴到目标执行环境。"
+  },
+  "scriptCopyError": {
+    "message": "复制失败，请选中代码手动复制。"
+  },
+  "scriptRequired": {
+    "message": "请填写名称和代码后再保存。"
+  },
+  "scriptSaved": {
+    "message": "脚本已保存"
+  },
+  "scriptDeleted": {
+    "message": "脚本已删除"
+  },
+  "scriptName": {
+    "message": "名称"
+  },
+  "scriptCode": {
+    "message": "JavaScript 代码"
+  },
+  "editScript": {
+    "message": "编辑脚本"
+  },
+  "newScript": {
+    "message": "新建脚本"
+  },
+  "saveScript": {
+    "message": "保存"
+  },
+  "deleteScript": {
+    "message": "删除"
+  },
+  "confirmDeleteScript": {
+    "message": "确认删除"
+  },
+  "searchScripts": {
+    "message": "搜索脚本"
+  },
+  "builtInScript": {
+    "message": "内置"
+  },
+  "scriptKind": {
+    "message": "脚本"
+  },
+  "scriptLocalOnly": {
+    "message": "仅保存在此设备"
+  },
+  "viewScriptSetup": {
+    "message": "查看设置说明"
+  },
+  "scriptDeletePrompt": {
+    "message": "删除“$1”？此操作无法撤销。"
+  },
+  "cancelScriptDelete": {
+    "message": "取消"
+  },
+  "changeLanguage": {
+    "message": "切换语言"
+  },
+  "changeTheme": {
+    "message": "切换主题"
+  },
+  "keyboardShortcuts": {
+    "message": "快捷键设置"
+  },
+  "runScript": {
+    "message": "运行脚本"
+  },
+  "runCopyScript": {
+    "message": "运行并复制结果"
+  },
+  "rerunScript": {
+    "message": "重新运行"
+  },
+  "copyScriptResult": {
+    "message": "复制结果"
+  },
+  "scriptResult": {
+    "message": "运行结果"
+  },
+  "scriptRunFailed": {
+    "message": "脚本运行失败"
+  },
+  "scriptExecuting": {
+    "message": "正在运行脚本…"
+  },
+  "scriptRunningBack": {
+    "message": "可以返回；已经启动的脚本可能继续运行。"
+  },
+  "scriptRunTarget": {
+    "message": "当前网页：$1"
+  },
+  "scriptResultsTemporary": {
+    "message": "结果仅保留在当前面板"
+  },
+  "scriptResultCopied": {
+    "message": "结果已复制"
+  },
+  "scriptResultCopyFailed": {
+    "message": "脚本已完成，复制失败；请点击“复制结果”重试。"
+  },
+  "noRunnableScripts": {
+    "message": "尚无可运行的脚本。搜索“新建脚本”即可创建。"
+  },
+  "enableUserScripts": {
+    "message": "打开扩展详情"
+  },
+  "scriptEnableHint": {
+    "message": "在 Chrome 的 zing 详情页开启“允许用户脚本”，然后返回并重新运行。Chrome 135–137 请开启开发者模式。"
+  },
+  "errorScriptDisabled": {
+    "message": "请先在 Chrome 中允许用户脚本，再运行保存的 JavaScript。"
+  },
+  "errorScriptVersion": {
+    "message": "运行脚本需要 Chrome 135 或更高版本。"
+  },
+  "errorScriptTarget": {
+    "message": "无法在该目标运行脚本，请在目标网页重新打开 zing。"
+  },
+  "errorScriptChanged": {
+    "message": "网页已变化或不再是当前标签页，请在目标网页重新打开 zing。"
+  },
+  "errorScriptUnsupported": {
+    "message": "脚本仅支持普通 HTTP 或 HTTPS 网页，不支持 Chrome 内置页面。"
+  },
+  "errorScriptAccess": {
+    "message": "Chrome 无法访问此页面，请在普通网页通过快捷键或工具栏按钮重新打开 zing。"
+  },
+  "errorScriptInterrupted": {
+    "message": "执行被中断或未能返回结果，请检查网页后再运行。"
+  },
+  "errorScriptMissing": {
+    "message": "保存的脚本已不存在或内容为空。"
+  },
+  "errorScriptBusy": {
+    "message": "此标签页已有脚本正在运行，请等待完成。"
+  },
+  "scriptExecutionHint": {
+    "message": "最后一个表达式作为结果，例如 localStorage.getItem(\"token\")。支持返回 Promise。脚本在隔离环境中运行，可访问当前网页 DOM 和存储；不提供网页自身的 JS 变量或 GM_* 接口。"
+  },
+  "categoryTab": {
+    "message": "标签页"
+  },
+  "categoryScript": {
+    "message": "脚本"
+  },
+  "categoryStorage": {
+    "message": "存储"
+  },
+  "categorySettings": {
+    "message": "设置"
+  }
+}

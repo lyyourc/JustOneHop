@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><title>zing · 手动验收工作台</title>
+<style>
+  body { font: 16px -apple-system,sans-serif; background: #f6f5f2; color: #242733; margin: 70px auto; max-width: 900px; }
+  h1 { font-size: 42px; margin-bottom: 12px; letter-spacing: -1px; } p { color:#777985; line-height: 1.7 }
+  input { font: inherit; border:1px solid #ccc; padding: 12px; border-radius: 8px; width: 400px; }
+  .cards { display:flex; gap:16px; margin-top:40px } article { border:1px solid #ddd; background:white; padding:24px; border-radius:12px; flex:1; }
+  /* These deliberately aggressive rules must not leak into the extension. */
+  dialog { display:none !important; } kbd { color: red !important; } button { font-family: serif !important; }
+</style>
+<h1>Keep your focus.</h1><p>zing · 浏览器命令面板验收工作台</p>
+<input autofocus aria-label="焦点恢复测试" placeholder="输入文字后打开面板，Esc 后继续输入">
+<div class="cards"><article><h3>标签页</h3><p>搜索仅限当前窗口，书签在同一个列表里。</p></article><article><h3>命令</h3><p>输入 &gt; 后搜索操作，回车执行。</p></article><article><h3>操作菜单</h3><p>选中结果后按 ⌘ K，直接操作目标标签页。</p></article></div>
+</html>

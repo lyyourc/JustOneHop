@@ -1,0 +1,207 @@
+import { categoryTerms, entrySearchQuery, entryTitle } from './entryPresentation';
+import { t } from './i18n';
+import Fuse, { type Expression } from 'fuse.js';
+import { termMatches } from './searchMatch';
+import { usageTarget } from './usage';
+import type { ActionId, Entry, Snapshot, TabItem } from './types';
+
+export function labelUrl(raw: string): string {
+  try { const url = new URL(raw); return (url.hostname || url.protocol.replace(':', '')) + (url.pathname === '/' ? '' : url.pathname); }
+  catch { return raw; }
+}
+
+export function commands(current?: TabItem): Entry[] {
+  const definitions: [ActionId, string, string, Entry['icon'], boolean?][] = [
+    ['newTab', t('newTab'), 'new tab create xinjian 新建标签页', 'plus'],
+    ['close', t('close'), 'close current tab guanbi 关闭当前标签页', 'close', true],
+    ['closeOthers', t('closeOthers'), 'close other tabs guanbi qita 关闭其他标签页', 'others', true],
+    ['closeRight', t('closeRight'), 'close tabs to the right guanbi youce 关闭右侧标签页', 'right', true],
+    ['restore', t('restore'), 'reopen restore undo closed tab huifu 恢复关闭的标签页', 'restore'],
+    ['reload', t('reload'), 'reload refresh shuaxin 刷新标签页', 'reload'],
+    ['pin', current?.pinned ? t('unpin') : t('pin'), 'pin unpin toggle guding 固定 取消固定 标签页', 'pin'],
+    ['mute', current?.muted ? t('unmute') : t('mute'), 'mute unmute sound audio jingyin 静音 取消静音 标签页', 'volume'],
+  ];
+  return definitions.map(([action, title, keywords, icon, danger]) => ({
+    id: `command:${action}`, kind: 'command', category: 'tab', title, keywords, icon, action, danger,
+    shortcut: ({ newTab: 'Mod+T', close: 'Mod+W', restore: 'Mod+Shift+T', reload: 'Mod+R' } as Partial<Record<ActionId, string>>)[action],
+    tabId: current?.id,
+    subtitle: action === 'newTab' ? t('newTabHint') : action === 'restore' ? t('restoreHint') :
+      action === 'closeOthers' || action === 'closeRight' ? t('closeHint') : current?.title || t('currentTab'),
+  }));
+}
+
+export function entries(snapshot: Snapshot): Entry[] {
+  return [
+    ...snapshot.tabs.map((tab): Entry => ({
+      id: `tab:${tab.id}`, kind: 'tab', title: tab.title, subtitle: labelUrl(tab.url),
+      keywords: tab.url, faviconPageUrl: tab.url, icon: 'tab', action: 'switch', tabId: tab.id,
+      active: tab.active, pinned: tab.pinned, muted: tab.muted,
+    })),
+    ...snapshot.bookmarks.map((bookmark): Entry => ({
+      id: `bookmark:${bookmark.id}`, kind: 'bookmark', title: bookmark.title,
+      subtitle: labelUrl(bookmark.url), faviconPageUrl: bookmark.url, keywords: `${bookmark.url} ${bookmark.folder}`,
+      icon: 'bookmark', action: 'openBookmark', bookmarkId: bookmark.id,
+    })),
+    ...commands(snapshot.tabs.find(tab => tab.id === snapshot.currentTabId)),
+    { id: 'command:runScript', kind: 'command', category: 'script', action: 'runScript', icon: 'script', title: t('runScript'), subtitle: '',
+      keywords: 'javascript js 执行 运行 脚本', aliases: ['run script', 'execute script', '执行脚本', '运行脚本'], searchOnly: true },
+    { id: 'command:runCopyScript', kind: 'command', category: 'script', action: 'runCopyScript', icon: 'script', title: t('runCopyScript'), subtitle: '',
+      keywords: 'javascript js result 结果', aliases: ['run and copy result', 'run copy script', '运行并复制结果', '执行并复制'], searchOnly: true },
+    { id: 'command:newScript', kind: 'command', category: 'script', action: 'newScript', icon: 'plus', title: t('newScript'), subtitle: '',
+      keywords: 'javascript js snippet 脚本 代码 新增 添加', aliases: ['new script', 'create script', 'add script', '新建脚本', '添加脚本'], searchOnly: true },
+    { id: 'command:scriptLibrary', kind: 'command', category: 'script', action: 'scriptLibrary', icon: 'script', title: t('manageScripts'), subtitle: '',
+      keywords: 'scripts snippets javascript js 收藏 脚本', aliases: ['scripts', 'script library', 'manage scripts', '脚本', '脚本收藏', '管理脚本'], searchOnly: true },
+    ...([
+      ['language', 'changeLanguage', ['language', 'change language', '语言', '切换语言', '语言设置']],
+      ['theme', 'changeTheme', ['theme', 'appearance', 'change theme', '主题', '外观', '切换主题']],
+      ['keyboard', 'keyboardShortcuts', ['hotkey', 'shortcut', 'keyboard shortcuts', '快捷键', '快捷键设置']],
+      ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '使用习惯']],
+    ] as const).map(([settingsSection, title, aliases]): Entry => ({
+      id: `command:settings:${settingsSection}`, kind: 'command', category: 'settings', action: 'settings', settingsSection, icon: 'settings',
+      title: t(title), subtitle: '', keywords: '', aliases: [...aliases], searchOnly: true,
+    })),
+    ...(['localStorage', 'sessionStorage', 'cookies'] as const).map((action): Entry => ({
+      id: `command:${action}`, kind: 'command', category: 'storage', action, icon: action === 'cookies' ? 'cookie' : 'database',
+      title: t(action), subtitle: '', keywords: action === 'localStorage' ? 'local storage 本地存储' : action === 'sessionStorage' ? 'session storage 会话存储' : 'cookie cookies 浏览器 网站',
+    })),
+    {
+      id: 'command:settings', kind: 'command', shortcut: 'Mod+,', action: 'settings', icon: 'settings',
+      title: t('settings'), subtitle: t('settingsHint'), keywords: 'settings preferences language theme hotkey 设置 偏好 语言 主题 快捷键 shezhi',
+    },
+  ];
+}
+
+export function homeEntries(items: Entry[], usageScores: ReadonlyMap<string, number> = new Map()): Entry[] {
+  return [
+    ...items.filter(item => item.kind === 'tab').slice(0, 6),
+    ...items.filter(item => item.kind === 'command' && !item.danger && !item.searchOnly)
+      .sort((a, b) => (usageScores.get(usageTarget(b)) || 0) - (usageScores.get(usageTarget(a)) || 0)),
+  ];
+}
+
+// Intent aliases are phrases, not the loose keyword bag. Keep them independent
+// of the display language so an English command works equally well in Chinese.
+const commandAliases: Partial<Record<Entry['action'], string[]>> = {
+  newTab: ['new tab', 'open new tab', 'create tab', '新建标签页', '新建', 'xinjian'],
+  close: ['close tab', 'close current tab', '关闭标签页', '关闭当前标签页', 'guanbi'],
+  closeOthers: ['close others', 'close other tabs', '关闭其他标签页', 'guanbi qita'],
+  closeRight: ['close right', 'close tabs to the right', '关闭右侧标签页', 'guanbi youce'],
+  restore: ['restore tab', 'reopen tab', 'reopen closed tab', 'restore', 'reopen', '恢复关闭的标签页', '恢复', 'huifu'],
+  reload: ['reload', 'refresh', 'reload tab', 'refresh tab', '刷新标签页', '刷新', 'shuaxin'],
+  pin: ['pin', 'unpin', 'pin tab', 'unpin tab', '固定标签页', '取消固定标签页', '固定', '取消固定', 'guding'],
+  mute: ['mute', 'unmute', 'mute tab', 'unmute tab', '静音标签页', '取消静音标签页', '静音', '取消静音', 'jingyin'],
+  localStorage: ['local storage', 'localstorage', '查看本地存储', '本地存储'],
+  sessionStorage: ['session storage', 'sessionstorage', '查看会话存储', '会话存储'],
+  cookies: ['cookies', 'cookie', '查看 cookie', '查看 cookies'],
+  settings: ['settings', 'preferences', '设置', '偏好设置', 'shezhi'],
+};
+
+const normalizeSearch = (value: string) => entrySearchQuery(value).trim().toLowerCase().replace(/\s+/g, ' ');
+const pinyinAliases = new Set(['xinjian', 'guanbi', 'guanbi qita', 'guanbi youce', 'huifu', 'shuaxin', 'guding', 'jingyin', 'shezhi']);
+
+/** Show a matching alias when the translated command title cannot explain the hit. */
+export function matchingAlias(item: Entry, query: string): string {
+  const normalized = normalizeSearch(query);
+  if (item.kind !== 'command' || !normalized || normalizeSearch(entryTitle(item)).includes(normalized)) return '';
+  const intent = entrySearchQuery(query) === query ? normalized : normalizeSearch(query.replace(/^[^:：]*[:：]\s*/, ''));
+  return intent ? (item.aliases ?? commandAliases[item.action])?.find(alias => alias.includes(intent)) || '' : '';
+}
+
+// Reuse the normalized documents and Fuse index while the candidate array is
+// unchanged. A language switch invalidates translated category labels too.
+function buildSearchIndex(items: Entry[]) {
+  // A command's subtitle names its target, not its intent. Searching a page title
+  // must not surface every command that happens to act on that page.
+  const index = items.map(item => {
+    const title = normalizeSearch(item.title);
+    const label = normalizeSearch(entryTitle(item));
+    const aliases = item.kind === 'command' ? item.aliases ?? commandAliases[item.action] ?? [] : [];
+    const names = [title, label, ...aliases];
+    return {
+      kind: item.kind, action: item.action, danger: item.danger, title, label, aliases, names,
+      wordNames: names.map(name => name.split(/[^\p{L}\p{N}]+/u).join(' ')),
+      categoryText: categoryTerms(item.category), keywords: normalizeSearch(item.keywords),
+      subtitle: item.kind === 'command' ? '' : normalizeSearch(item.subtitle),
+    };
+  });
+  const fuse = new Fuse(index, {
+    keys: [{ name: 'title', weight: 3 }, { name: 'label', weight: 3 }, { name: 'categoryText', weight: 1 }, { name: 'aliases', weight: 3 }, { name: 'keywords', weight: 1 }, { name: 'subtitle', weight: 0.5 }],
+    threshold: 0.35, ignoreLocation: true, minMatchCharLength: 1, includeScore: true,
+  });
+  return { language: t('languageTag'), index, fuse };
+}
+const searchIndexes = new WeakMap<Entry[], ReturnType<typeof buildSearchIndex>>();
+
+export function search(items: Entry[], query: string, usageScores: ReadonlyMap<string, number> = new Map()): Entry[] {
+  const normalized = normalizeSearch(query);
+  if (!normalized) return items;
+  const terms = normalized.split(/\s+/);
+  let prepared = searchIndexes.get(items);
+  if (!prepared || prepared.language !== t('languageTag')) {
+    prepared = buildSearchIndex(items);
+    searchIndexes.set(items, prepared);
+  }
+  const { index, fuse } = prepared;
+  const matches = fuse.search(terms.length === 1 ? terms[0] : {
+    $and: terms.map((term): Expression => ({ $or: [{ title: term }, { label: term }, { categoryText: term }, { aliases: term }, { keywords: term }, { subtitle: term }] })),
+  });
+  const explicitClose = /\b(?:close|guanbi)\b|关闭/i.test(normalized);
+  const tier = (item: typeof index[number]) => {
+    const names = item.names;
+    // Exact command intent beats even a web page with the same title. A longer
+    // page query stops receiving this boost: "new tab guide" still finds its page.
+    if (item.kind === 'command' && names.includes(normalized)) return 0;
+    if (item.title === normalized) return 1;
+    if (names.some(name => name.startsWith(normalized))) return 2;
+    // Prefer a contiguous phrase at a word boundary to scattered substrings.
+    if (item.wordNames.some(name => name.startsWith(normalized) || name.includes(` ${normalized}`))) return 3;
+    if (names.some(name => terms.every(term => name.includes(term)))) return 4;
+    if (terms.every(term => [...names, item.categoryText, item.keywords, item.subtitle].some(field => field.includes(term)))) return 5;
+    return 6;
+  };
+  const kindOrder = { tab: 0, bookmark: 1, command: 2, script: 3 };
+  return matches.filter(({ item }) => (!item.danger || item.action === 'deleteScript' || explicitClose) && terms.every(term =>
+    // Metadata is searchable, but must not manufacture typo matches. Only
+    // visible names and natural-language command aliases receive typo tolerance.
+    item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||
+    item.title.includes(term) || termMatches(item.title, term).length > 0 || item.aliases.some(alias =>
+      termMatches(alias, term, !pinyinAliases.has(alias)).length > 0)))
+    .map(result => ({ ...result, tier: tier(result.item), usage: usageScores.get(usageTarget(items[result.refIndex])) || 0 }))
+    // Learning breaks ties before text ranking. With equal usage and exact names,
+    // ignore incidental URL scores and preserve the tab-first / MRU fallback.
+    .sort((a, b) => rankGroup(a.tier) - rankGroup(b.tier) || b.usage - a.usage ||
+      a.tier - b.tier || (a.tier > 1 ? (a.score ?? 1) - (b.score ?? 1) : 0) ||
+      kindOrder[a.item.kind] - kindOrder[b.item.kind] || a.refIndex - b.refIndex)
+    .map(result => items[result.refIndex]);
+}
+
+// Keep exact command intent, complete titles and literal matches protected.
+// Within each group, learned choices can overtake ordinary textual ranking.
+function rankGroup(tier: number): number { return tier < 2 ? tier : tier === 6 ? 3 : 2; }
+
+export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
+  if (entry.kind === 'script') {
+    const builtin = entry.scriptId === 'builtin-ctrl-tab';
+    return [
+      ...(!builtin ? [
+        { ...entry, action: 'runScript' as const, title: t('runScript'), subtitle: '', keywords: 'run execute 运行 执行' },
+        { ...entry, id: `${entry.id}:runCopy`, action: 'runCopyScript' as const, title: t('runCopyScript'), subtitle: '', keywords: 'run copy result 运行 复制 结果' },
+      ] : []),
+      { ...entry, id: `${entry.id}:copy`, action: 'copyScript', title: t('copyScript'), subtitle: '', keywords: 'copy code 复制代码' },
+      { ...entry, id: `${entry.id}:edit`, action: 'editScript', icon: 'edit', title: t(builtin ? 'viewScriptSetup' : 'editScript'), subtitle: '', keywords: builtin ? 'view setup 设置 说明' : 'edit 修改 编辑' },
+      ...(!builtin ? [{ ...entry, id: `${entry.id}:delete`, action: 'deleteScript' as const, icon: 'close' as const, title: t('deleteScript'), subtitle: '', keywords: 'delete remove 删除', danger: true }] : []),
+    ];
+  }
+  if (entry.kind === 'command') return [entry];
+  if (entry.kind === 'bookmark') return [{ ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }];
+  const tab = snapshot.tabs.find(item => item.id === entry.tabId);
+  const available = commands(tab).filter(command => ['close', 'pin', 'mute', 'reload', 'closeOthers', 'closeRight'].includes(command.action));
+  return [{ ...entry, title: t('switchTab'), subtitle: entry.title, keywords: `${entry.keywords} switch tab 切换标签页` }, ...available.map(command => ({
+    ...command, shortcut: tab?.id === snapshot.currentTabId ? command.shortcut : undefined, title: command.title.replace(t('current'), ''), id: `action:${command.action}`, tabId: entry.tabId,
+  }))];
+}
+
+export function closeTargets(tabs: TabItem[], target: TabItem, action: 'closeOthers' | 'closeRight'): TabItem[] {
+  return tabs.filter(tab => tab.windowId === target.windowId && tab.id !== target.id && !tab.pinned &&
+    (action === 'closeOthers' || tab.index > target.index));
+}

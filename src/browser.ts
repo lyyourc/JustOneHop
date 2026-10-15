@@ -1,0 +1,116 @@
+import { t } from './i18n';
+import { closeTargets } from './model';
+import { recordUsage } from './usageStorage';
+import type { BookmarkItem, Execution, Snapshot, TabItem } from './types';
+
+export function toTab(tab: chrome.tabs.Tab): TabItem {
+  return {
+    id: tab.id!, windowId: tab.windowId, index: tab.index,
+    title: tab.title || tab.url || t('untitledTab'), url: tab.url || '',
+    active: tab.active, pinned: tab.pinned, muted: tab.mutedInfo?.muted || false,
+    audible: tab.audible || false,
+  };
+}
+
+function flattenBookmarks(nodes: chrome.bookmarks.BookmarkTreeNode[], folder = ''): BookmarkItem[] {
+  return nodes.flatMap(node => node.url
+    ? [{ id: node.id, title: node.title || node.url, url: node.url, folder }]
+    : flattenBookmarks(node.children || [], [folder, node.title].filter(Boolean).join(' / ')));
+}
+
+// The bookmark tree is shared by every window. Reuse it until Chrome reports a
+// change; tabs and command bindings are always read live for each snapshot.
+const bookmarkCaches = new WeakMap<typeof chrome.bookmarks, { pending?: Promise<BookmarkItem[]> }>();
+function getBookmarks(): Promise<BookmarkItem[]> {
+  const source = chrome.bookmarks;
+  let cache = bookmarkCaches.get(source);
+  if (!cache) {
+    cache = {};
+    bookmarkCaches.set(source, cache);
+    const invalidate = () => { cache!.pending = undefined; };
+    for (const event of [source.onCreated, source.onRemoved, source.onChanged, source.onMoved, source.onChildrenReordered, source.onImportEnded]) {
+      event?.addListener(invalidate);
+    }
+  }
+  if (!cache.pending) {
+    const pending: Promise<BookmarkItem[]> = source.getTree().then(nodes => {
+      // A change during the read must not publish the superseded tree.
+      return cache!.pending === pending ? flattenBookmarks(nodes) : getBookmarks();
+    }).catch(error => {
+      if (cache!.pending === pending) cache!.pending = undefined;
+      throw error;
+    });
+    cache.pending = pending;
+  }
+  return cache.pending;
+}
+
+export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
+  const active = senderTab?.id !== undefined ? await chrome.tabs.get(senderTab.id)
+    : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+  if (!active?.id) throw new Error(t('errorNoCurrent'));
+  const [tabs, bookmarks, bindings] = await Promise.all([
+    chrome.tabs.query({ windowId: active.windowId }), getBookmarks(), chrome.commands.getAll(),
+  ]);
+  return {
+    currentTabId: active.id, windowId: active.windowId,
+    tabs: tabs.sort((a, b) => Number(a.id === active.id) - Number(b.id === active.id) ||
+      (b.lastAccessed || 0) - (a.lastAccessed || 0) || a.index - b.index).map(toTab), bookmarks,
+    shortcut: bindings.find(binding => binding.name === 'toggle-palette')?.shortcut || '',
+  };
+}
+
+export async function perform(payload: Execution, onPerformed?: () => void): Promise<void> {
+  const target = await performAction(payload);
+  // Let the panel dismiss as soon as Chrome finishes the action, while this
+  // promise still owns the queued persistence work in the service worker.
+  onPerformed?.();
+  if (target) {
+    // Learning is secondary: a storage failure must not turn a successful browser
+    // action into an error or encourage the user to execute it a second time.
+    await recordUsage(typeof payload.query === 'string' ? payload.query : '', target).catch(() => {});
+  }
+}
+
+async function performAction(payload: Execution): Promise<string> {
+  if (!payload || !Number.isInteger(payload.windowId)) throw new Error(t('errorWindow'));
+  const { action, windowId, tabId, bookmarkId } = payload;
+  // Validate the original window even when the command does not target a tab.
+  const window = await chrome.windows.get(windowId);
+  const target = (key: string) => window.incognito ? '' : key;
+  if (action === 'settings') return target('command:settings');
+  if (action === 'newTab') { await chrome.tabs.create({ windowId }); return target('command:newTab'); }
+  if (action === 'restore') {
+    const recent = await chrome.sessions.getRecentlyClosed({ maxResults: 1 });
+    const id = recent[0]?.tab?.sessionId || recent[0]?.window?.sessionId;
+    if (!id) throw new Error(t('errorRestore'));
+    await chrome.sessions.restore(id); return target('command:restore');
+  }
+  if (action === 'openBookmark') {
+    if (typeof bookmarkId !== 'string') throw new Error(t('errorBookmark'));
+    const [bookmark] = await chrome.bookmarks.get(bookmarkId);
+    if (!bookmark?.url || !['http:', 'https:', 'file:', 'ftp:', 'chrome:'].includes(new URL(bookmark.url).protocol)) {
+      throw new Error(t('errorBookmarkUrl'));
+    }
+    await chrome.tabs.create({ windowId, url: bookmark.url }); return target(`bookmark:${bookmarkId}`);
+  }
+  if (!Number.isInteger(tabId)) throw new Error(t('errorNoTab'));
+  const tab = await chrome.tabs.get(tabId!);
+  if (tab.windowId !== windowId) throw new Error(t('errorMovedTab'));
+  switch (action) {
+    case 'switch': await chrome.tabs.update(tab.id!, { active: true }); break;
+    case 'reload': await chrome.tabs.reload(tab.id!); break;
+    case 'close': await chrome.tabs.remove(tab.id!); break;
+    case 'pin': await chrome.tabs.update(tab.id!, { pinned: !tab.pinned }); break;
+    case 'mute': await chrome.tabs.update(tab.id!, { muted: !tab.mutedInfo?.muted }); break;
+    case 'closeOthers':
+    case 'closeRight': {
+      const tabs = (await chrome.tabs.query({ windowId })).map(toTab);
+      const ids = closeTargets(tabs, toTab(tab), action).map(target => target.id);
+      if (ids.length) await chrome.tabs.remove(ids);
+      break;
+    }
+    default: throw new Error(t('errorCommand'));
+  }
+  return target(action === 'switch' ? (tab.url ? `tab:${tab.url}` : '') : `command:${action}`);
+}
