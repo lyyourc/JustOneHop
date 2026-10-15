@@ -1,6 +1,8 @@
 # zing 最近标签页切换器
 
-## 当前交互：参考 VS Code Ctrl+Tab（2026-10-15）
+本文描述当前实现与测试边界。使用方法见 [使用指南](USAGE.md#最近标签页切换)，选择此方案的原因见 [ADR 0006](adr/0006-recent-tab-switcher.md)。
+
+## 当前交互
 
 独立 500×500 Chrome 扩展窗口承载列表，普通 HTTP(S) 页面额外预加载轻量修饰键监听。源窗口限定为启动时的普通浏览器窗口。
 
@@ -11,13 +13,6 @@
 5. 候选按打开时的 MRU 排序，当前页在首项；导航不改变顺序，不写入搜索使用习惯。关闭/移走候选时移除该行；选中项消失则回到源页高亮，避免意外确认其邻居。
 
 确认前重新校验源标签页仍在原窗口且处于激活状态、候选仍在源窗口、切换器仍持有焦点。语言、主题和快捷键沿用现有设置。
-
-## 依据
-
-VS Code `QuickPick.registerQuickNavigation()` 在修饰键 KEY_UP 时执行 accept；`BaseEditorQuickAccessProvider` 的候选 `accept` 才调用 openEditor。移动高亮并不打开候选编辑器。此前“选择即预览”是另一种交互，本版已经移除。
-
-- https://github.com/microsoft/vscode/blob/main/src/vs/platform/quickinput/browser/quickInput.ts
-- https://github.com/microsoft/vscode/blob/main/src/vs/workbench/browser/parts/editor/editorQuickAccess.ts
 
 ## 已知边界
 
