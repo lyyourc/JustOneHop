@@ -12,11 +12,11 @@
 
 后台由 esbuild 打包为单文件 IIFE，使用 classic Service Worker，不声明 module。源代码仍可使用 TypeScript 模块，但运行时无模块依赖，因此无需额外的模块加载路径；这也规避了实机观察到的 Chromium installed module worker 加载错误所在路径。初始故障的底层触发条件未复现，验证边界见验收记录。
 
-普通网页通过 activeTab 按需注入，以 Shadow DOM、原生 modal dialog 和空白沙箱 iframe 隔离布局与键盘事件；Chrome 内部页等受限场景回退到 action popup。启动必须收到面板明确的就绪回复，不能只凭 sendMessage 未报错判断已安装。
+普通网页通过 activeTab 按需注入，以 Shadow DOM、原生 modal dialog 和空白沙箱 iframe 隔离布局与键盘事件；Chrome 原生页使用相对来源浏览器窗口居中的独立窗口，后台保存来源上下文，复用同一界面。其他受限场景回退到 action popup。2026-10-16 补充：地址栏仍持有键盘焦点时，网页虽能创建浮层，却不能保证接收输入；启动时检查 `document.hasFocus()`，无法接收键盘输入则沿用同一 popup 兜底。启动必须收到面板明确的就绪回复，不能只凭 sendMessage 未报错判断已安装。
 
 ## 取舍与影响
 
-统一入口保留，但工具栏 popup 的位置受 Chrome 控制，无法保证所有页面都居中。隔离框架使焦点与键盘监听必须使用实际 UI 所在的 document/window，而非代码执行环境的全局 window。
+独立窗口可在原生页居中，但保留系统标题栏，需要显式维护来源上下文和失焦关闭。普通网页地址栏兜底按用户确认保持 action popup，其位置受 Chrome 控制。隔离框架使焦点与键盘监听必须使用实际 UI 所在的 document/window，而非代码执行环境的全局 window。
 
 ## 未采用的方案
 

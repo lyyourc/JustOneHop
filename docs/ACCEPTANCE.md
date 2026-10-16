@@ -402,6 +402,21 @@ Computer Use 已直接点击 chrome://extensions 中 zing 的 Reload，观察到
 
 最终构建已由 Computer Use 再次重载，观察到 Reloaded；第三次从地址栏唤起后直接输入 settings 成功并显示 6 个结果，Esc 关闭正常。类型检查、构建与 git diff --check 通过。
 
+## Chrome 原生页居中窗口（2026-10-16）
+
+按用户确认，仅 Chrome 原生页改为独立居中窗口；普通网页地址栏与其他禁止注入页面保持 action popup 兜底。复用同一 App，按来源窗口位置计算中心；session storage 记录随机令牌、来源标签和窗口，消息解析后恢复来源上下文，避免命令操作新浮窗自身。主层 Esc、重复快捷键、失焦或来源关闭时关闭窗口；子层 Esc 仍只返回一层。没有新增权限。
+
+84 项逻辑测试、类型检查、构建与 diff 检查通过。2 项有界面 Chrome 窗口测试通过：中心坐标误差小于 3px、初始输入焦点、设置返回、Pin Tab 操作来源标签、执行后关闭，以及 Esc / 重复快捷键 / 真实窗口焦点转移关闭。5 项回归通过：设置键盘导航、普通网页居中、失焦网页拒绝浮层及恢复、Undo Tuck 在 popup 与 iframe 中恢复输入（含底栏和 Cmd+K）。
+
+窗口测试采用有界面模式、禁用 Playwright viewport 尺寸覆盖。无界面 Chrome 可能同时报告两个窗口 focused=true，不能验收真实失焦关闭；默认 viewport 还会覆盖新窗口尺寸。没有用模拟焦点掩盖失败。
+
+已通过 Computer Use 点击日常 Chrome 扩展管理页 Reload，观察到 Reloaded。原生 Extensions 页快捷键打开新窗口，直接输入 settings 得到 6 项结果；切换到另一 Chrome 窗口后，Window 菜单确认 zing 窗口已关闭。普通网页地址栏再次唤起确认仍为 popup.html 工具栏弹窗，无 window 令牌；此轮直接输入检查因用户开始操作 Chrome 而停止，未将其计为通过。独立窗口保留系统标题栏。
+
+
+## 面板尺寸与留白（2026-10-16）
+
+统一切换器和原生页 Command Palette 的独立窗口尺寸/中心，收紧搜索栏，切换器改为同密度单行列表与同色底栏。类型检查、构建、diff 检查通过；7 项浏览器用例通过，覆盖真实窗口尺寸/坐标一致、56px 搜索栏、390×440 切换器无横向溢出且底部按钮可见、窄屏组页面、普通页居中、鼠标操作与修饰键松开。检查隔离测试截图及日常 Chrome 两种面板实机截图；通过 Computer Use Reload 后确认新尺寸与间距生效，Esc 返回原页面。无接口/权限/存储变更。
+
 ## 后台脚本加载错误的规避（2026-10-16）
 
 日常 Chrome 原始错误记录：`Failed to load the script unexpectedly`，Context `background.js`，Stack `background.js:0 (anonymous function)`，没有业务代码调用栈。Chromium 的 InstalledServiceWorkerModuleScriptFetcher 在已安装脚本数据缺失或 MIME 不符时发出该文本；仅凭这条日志无法区分底层原因。

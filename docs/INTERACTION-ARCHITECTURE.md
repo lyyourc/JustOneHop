@@ -24,7 +24,9 @@
 
 位置由 `content.tsx` 和 `.zing-app.overlay` / `.palette` 统一控制；子页面不能决定自己是右上角弹窗还是居中浮层。普通网页为内容区水平居中、偏上的浮层，新建/编辑切换时沿用相同坐标。
 
-Chrome 内置页等禁止注入的页面使用原生 action popup。该窗口位置由 Chrome 决定，不能通过页面 CSS 改成网页中央。
+Chrome 原生页（chrome / chrome-search / chrome-untrusted / devtools）使用相对来源浏览器窗口居中的独立窗口，复用同一 App、底栏与返回层级；主层 Esc、重复启动快捷键或失焦关闭。后台在 session storage 保存窗口令牌、来源窗口和标签页，解析该窗口消息时恢复来源上下文，并核对来源仍为原窗口的活动标签页。来源关闭时面板也关闭。
+
+普通网页地址栏仍持有焦点、网页 `document.hasFocus()` 为 false 时，以及 Web Store 等其他禁止注入的页面，仍使用 action popup。该弹窗位置由 Chrome 决定，地址栏兜底行为不变。
 
 后台启动握手必须收到面板的明确 `true` 回复。页面可能只有最近标签切换的轻量监听器；`sendMessage` 没有抛异常，或返回 `undefined`，不能说明面板已安装。需要补注入后再打开浮层。成功打开应清除旧的每标签页 popup 设置，恢复工具栏的正常启动路径。
 

@@ -87,7 +87,7 @@ test.beforeEach(async ({}, testInfo) => {
   const vimium = testInfo.title.includes('storage') && !testInfo.title.includes('closed storage') ? undefined : process.env.ZING_VIMIUM_PATH;
   context = await chromium.launchPersistentContext(profile, {
     ignoreDefaultArgs: process.platform === 'darwin' ? ['about:blank'] : [],
-    locale, headless: true, reducedMotion: 'reduce', executablePath, viewport: { width: 1100, height: 760 },
+    locale, headless: !testInfo.title.includes('palette launch native'), reducedMotion: 'reduce', executablePath, viewport: testInfo.title.includes('palette launch native') ? null : { width: 1100, height: 760 },
     args: [`--lang=${locale}`, `--disable-extensions-except=${[extension, vimium].filter(Boolean).join(',')}`, `--load-extension=${[extension, vimium].filter(Boolean).join(',')}`],
   });
   worker = context.serviceWorkers().find(worker => worker.url().endsWith('/background.js')) || await context.waitForEvent('serviceworker', worker => worker.url().endsWith('/background.js'));
@@ -2915,4 +2915,81 @@ test('English storage overlay refuses an unfocused page and opens after focus re
   await expect(search).toHaveValue('settings');
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+async function openNativePalette() {
+  const source = await worker.evaluate(async () => {
+    const tab = await chrome.tabs.create({ url: 'chrome://version/', active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    return { tabId: tab.id!, windowId: tab.windowId };
+  });
+  await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
+  const palette = context.pages().find(page => page.url().includes('popup.html#window='))!;
+  await expect(palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeFocused();
+  return { source, palette };
+}
+
+test('English palette launch native page centers a separate window and executes against the source', async () => {
+  const { source, palette } = await openNativePalette();
+  const bounds = await palette.evaluate(async sourceId => {
+    const current = await chrome.windows.getCurrent();
+    const owner = await chrome.windows.get(sourceId);
+    const reply = await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' });
+    return { current, owner, snapshot: reply.data };
+  }, source.windowId);
+  expect(bounds.current.type).toBe('popup');
+  expect(bounds.snapshot.windowId).toBe(source.windowId);
+  expect(bounds.snapshot.currentTabId).toBe(source.tabId);
+  expect(Math.abs(bounds.current.left! + bounds.current.width! / 2 - bounds.owner.left! - bounds.owner.width! / 2)).toBeLessThan(3);
+  expect(Math.abs(bounds.current.top! + bounds.current.height! / 2 - bounds.owner.top! - bounds.owner.height! / 2)).toBeLessThan(3);
+  const input = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  await input.fill('settings'); await input.press('Enter');
+  await expect(palette.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await palette.keyboard.press('Escape'); await expect(input).toBeFocused();
+  await input.fill('pin tab');
+  await input.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
+  await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).pinned, source.tabId)).toBe(true);
+  await expect.poll(() => palette.isClosed()).toBe(true);
+  expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
+});
+
+test('English palette launch native window closes on Escape shortcut and focus loss', async () => {
+  let opened = await openNativePalette();
+  await opened.palette.keyboard.press('Escape').catch(error => { if (!opened.palette.isClosed()) throw error; });
+  await expect.poll(() => opened.palette.isClosed()).toBe(true);
+  opened = await openNativePalette();
+  await worker.evaluate(async () => {
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+  });
+  await expect.poll(() => opened.palette.isClosed()).toBe(true);
+  opened = await openNativePalette();
+  await worker.evaluate(id => chrome.windows.update(id, { focused: true }), opened.source.windowId);
+  await expect.poll(() => opened.palette.isClosed()).toBe(true);
+});
+
+test('English palette launch native visual sizing matches the recent switcher and stays compact', async () => {
+  const { source, palette } = await openNativePalette();
+  const bounds = await palette.evaluate(() => chrome.windows.getCurrent());
+  expect((await palette.locator('.search-bar').boundingBox())!.height).toBe(56);
+  await palette.keyboard.press('Escape').catch(error => { if (!palette.isClosed()) throw error; });
+  await expect.poll(() => palette.isClosed()).toBe(true);
+  await worker.evaluate(async () => {
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('switch-recent')));
+  });
+  await expect.poll(() => context.pages().some(page => page.url().includes('switcher.html?'))).toBe(true);
+  const switcher = context.pages().find(page => page.url().includes('switcher.html?'))!;
+  await expect(switcher.getByRole('option').first()).toBeVisible();
+  const actual = await switcher.evaluate(() => chrome.windows.getCurrent());
+  for (const key of ['width', 'height', 'left', 'top'] as const) expect(actual[key]).toBe(bounds[key]);
+  await switcher.screenshot({ path: '/private/tmp/zing-switcher-polish.png' });
+  await switcher.setViewportSize({ width: 390, height: 440 });
+  expect(await switcher.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(390);
+  const footer = await switcher.locator('footer').boundingBox();
+  expect(footer!.y + footer!.height).toBeLessThanOrEqual(440);
+  await expect(switcher.locator('footer').getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, source.tabId)).toBe(true);
 });

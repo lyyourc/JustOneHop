@@ -283,3 +283,9 @@ body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: light-d
 }
 @keyframes recent-reveal { from { opacity: 0; } to { opacity: 1; } }
 .recent-overlay[data-closing='true'] { animation: none; opacity: 0; }
+
+body.centered-palette { width: 100%; height: 100dvh; }
+.centered-palette .zing-app.popup { min-height: 0; height: 100dvh; }
+.centered-palette .palette { display: flex; flex-direction: column; height: 100dvh; max-height: 100dvh; }
+.centered-palette .main-surface { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.centered-palette .results { min-height: 0; flex: 1; }

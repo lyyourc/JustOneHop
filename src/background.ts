@@ -1,3 +1,4 @@
+import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut } from './paletteWindow';
 import { runSavedScript } from './scriptExecution';
 import { openRecentSwitcher } from './recentTabs';
 import { readPageStorage, openCookieAccess } from './pageStorage';
@@ -10,6 +11,11 @@ import type { Request, Snapshot, PageStorage, ScriptResult } from './types';
 const opening = new Set<number>();
 async function launch(tab: chrome.tabs.Tab) {
   if (tab.id === undefined || opening.has(tab.id)) return;
+  if (await closePaletteWindowForShortcut(tab)) return;
+  if (isNativePage(tab)) {
+    await chrome.action.setPopup({ tabId: tab.id, popup: '' });
+    await togglePaletteWindow(tab); return;
+  }
   opening.add(tab.id);
   try {
     // Other content listeners can accept a message without answering it. Only
@@ -20,7 +26,7 @@ async function launch(tab: chrome.tabs.Tab) {
     if (!shown) throw new Error('Unable to show page overlay');
     await chrome.action.setPopup({ tabId: tab.id, popup: '' });
   } catch {
-    // Chrome-owned pages, the Web Store, PDF viewer, and denied file access.
+    // Restricted pages and overlays that cannot receive browser keyboard focus.
     await chrome.action.setPopup({ tabId: tab.id, popup: 'popup.html' });
     try { await chrome.action.openPopup({ windowId: tab.windowId }); }
     catch (error) { console.warn('zing: click the toolbar icon to open the fallback.', error); }
@@ -48,9 +54,10 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     // must not interrupt the successful action's queued usage write.
     try { respond({ ok: true, data }); } catch { /* Caller already gone. */ }
   };
-  const result = preferencesReady.then<void | Snapshot | PageStorage | ScriptResult>(() => {
+  const result = preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | ScriptResult> => {
+    sender = await paletteSender(sender);
     if (request.type === 'run-saved-script') return runSavedScript(request.payload, sender);
-    if (request.type === 'open-script-settings') return chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` }).then(() => undefined);
+    if (request.type === 'open-script-settings') return chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}`, ...(sender.tab ? { windowId: sender.tab.windowId } : {}) }).then(() => undefined);
     if (request.type === 'open-cookie-access') return openCookieAccess(request.payload, sender);
     if (request.type === 'read-page-storage') return readPageStorage(request.payload, sender);
     if (request.type === 'snapshot') return snapshot(sender.tab);
