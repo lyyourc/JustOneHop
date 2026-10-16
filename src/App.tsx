@@ -1,3 +1,5 @@
+import { TabGroupView } from './TabGroupView';
+import { TuckRecoveryView } from './TuckRecoveryView';
 import { entrySearchQuery, entryTitle } from './entryPresentation';
 import { Favicon } from './Favicon';
 import { Shortcut } from './Shortcut';
@@ -7,7 +9,7 @@ import { ActionMenu } from './ActionMenu';
 import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import {
-  Code, Pencil, Database, Cookie, ArrowRight, Bookmark, ChevronRight,
+  Code, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark, ChevronRight,
   Layers, LoaderCircle, Pin, Plus, RotateCcw,
   Settings2, Search, Volume2, VolumeX, X, PanelTop, AlertCircle,
 } from 'lucide-react';
@@ -26,7 +28,7 @@ import { actionsFor, closeTargets, entries, homeEntries, matchingAlias, search }
 import type { Entry, IconName, Snapshot, StorageRead, SettingsSection, ScriptRun } from './types';
 
 const icons = { tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
-  others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, script: Code, edit: Pencil };
+  others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, script: Code, edit: Pencil, tuck: ArrowDownToLine };
 function Glyph({ name, size = 18 }: { name: IconName; size?: number }) {
   const Icon = icons[name]; return <Icon size={size} strokeWidth={1.7} aria-hidden="true" />;
 }
@@ -36,6 +38,8 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
   const scripts = useSyncExternalStore(subscribeScripts, getScripts);
   const [notice, setNotice] = useState('');
+  const [groupId, setGroupId] = useState<number>();
+  const [recoveryId, setRecoveryId] = useState<string>();
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
   const [scriptRun, setScriptRun] = useState<{ target: Omit<ScriptRun, 'scriptId'>; initialScriptId?: string; autoCopy: boolean } | null>(null);
   const [storage, setStorage] = useState<StorageRead | null>(null);
@@ -105,10 +109,10 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [selected?.id, settingsOpen]);
   useLayoutEffect(() => {
-    if (settingsOpen || scriptEditor || scriptLibraryOpen || scriptRun) return;
+    if (busy || settingsOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
     if (deleteTarget) { cancelDelete.current?.focus(); return; }
     if (!actionTarget) { input.current?.focus(); input.current?.setSelectionRange(...savedCaret.current); }
-  }, [actionTarget, settingsOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun]);
+  }, [actionTarget, settingsOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun, recoveryId, groupId, busy]);
 
   function openSettings(section?: SettingsSection) {
     if (busy || settingsOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
@@ -125,6 +129,14 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   }
   async function run(entry?: Entry) {
     if (!entry || !data || busy) return;
+    if (entry.action === 'manageGroup') {
+      savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+      closeActions(); setGroupId(entry.groupId); return;
+    }
+    if (entry.action === 'reviewTuck') {
+      savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+      closeActions(); setRecoveryId(entry.recoveryId); return;
+    }
     if (entry.action === 'runScript' || entry.action === 'runCopyScript') {
       const tab = data.tabs.find(tab => tab.id === data.currentTabId);
       if (!tab) return;
@@ -165,10 +177,15 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
     }
     const execution = { action: entry.action, tabId: entry.tabId, bookmarkId: entry.bookmarkId, windowId: data.windowId, query: learningQuery };
     if (entry.action === 'settings') { openSettings(entry.settingsSection); void execute(execution).catch(() => {}); return; }
+    if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     setBusy(true); setError('');
     try {
       await execute(execution);
-      onClose();
+      if (entry.action === 'undoTuck' || (entry.action === 'tuck' && entry.tabId !== data.currentTabId)) {
+        setData(await getSnapshot());
+        setBusy(false); closeActions();
+        setNotice(t(entry.action === 'tuck' ? 'tabTucked' : 'tuckUndone'));
+      } else onClose();
     } catch (reason) {
       setError(errorMessage(reason));
       setBusy(false);
@@ -191,7 +208,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   }
   function keyboard(event: KeyboardEvent) {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-    if ((scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) && event.key !== 'Tab') return;
+    if ((scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
     const modifier = isMac ? event.metaKey : event.ctrlKey;
     if (modifier && !event.altKey && !event.shiftKey && event.key === ',') {
       event.preventDefault(); openSettings(); return;
@@ -235,7 +252,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
     } else if (event.key === 'Tab') {
       // Trap keyboard focus inside the palette, including the non-modal popup.
       const scope = event.currentTarget as HTMLElement;
-      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, textarea, button:not(:disabled)'))
+      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, textarea, select, button:not(:disabled)'))
         .filter(node => node.offsetParent !== null && !node.closest('[inert]') && !node.hasAttribute('disabled') && node.tabIndex >= 0 && (!actionTarget || node.closest('.action-menu')));
       const at = nodes.indexOf(event.target as HTMLElement);
       event.preventDefault();
@@ -256,7 +273,9 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   return <NavigationRoot><BackLayer onBack={onClose}><div className={`zing-app ${mode}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else onClose(); }
   }}>
-    {scriptRun ? <ScriptRunner {...scriptRun} onBack={() => setScriptRun(null)} /> : scriptLibraryOpen ? <ScriptLibrary isMac={isMac} onBack={() => setScriptLibraryOpen(false)} onClose={onClose} /> : scriptEditor ? <ScriptLibrary initialScript={scriptEditor} isMac={isMac} onBack={() => setScriptEditor(null)} onClose={onClose}
+    {groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
+      onRefresh={async () => setData(await getSnapshot())} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
+      onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : scriptRun ? <ScriptRunner {...scriptRun} onBack={() => setScriptRun(null)} /> : scriptLibraryOpen ? <ScriptLibrary isMac={isMac} onBack={() => setScriptLibraryOpen(false)} onClose={onClose} /> : scriptEditor ? <ScriptLibrary initialScript={scriptEditor} isMac={isMac} onBack={() => setScriptEditor(null)} onClose={onClose}
       onComplete={message => { setScriptEditor(null); setNotice(message); }} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} isMac={isMac}
       onBack={() => setSettingsOpen(false)} onClose={onClose} /> : <section tabIndex={-1} className="palette" aria-label="zing" aria-busy={busy}>
       <span className="sr-only" id="zing-navigation">{t('navigationHelp')}</span>
@@ -279,7 +298,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
           {visible.map((item, index) => <div className={`result-group ${grouped && index > 0 && item.kind !== visible[index - 1].kind ? 'section-start' : ''}`} key={item.id}>
             <div id={`zing-${item.id}`} role="option" aria-selected={selected?.id === item.id}
             className={`result ${item.kind} ${item.danger ? 'danger' : ''}`} title={`${entryTitle(item)} — ${item.subtitle}`} onMouseMove={event => hover(event, item.id)} onClick={() => void run(item)}>
-            <span className={`entry-icon ${item.kind}`}><Favicon pageUrl={item.faviconPageUrl} fallback={<Glyph name={item.icon} />} /></span>
+            <span className={`entry-icon ${item.kind}`} data-color={item.groupColor}><Favicon pageUrl={item.faviconPageUrl} fallback={<Glyph name={item.icon} />} /></span>
             <span className="entry-copy"><span className="entry-title"><HighlightedText text={entryTitle(item)} query={entrySearchQuery(query)} /></span><span className="entry-subtitle">
               {item.kind === 'command' ? (matchingAlias(item, query)
                 ? <><HighlightedText text={matchingAlias(item, query)} query={entrySearchQuery(query)} allowTypos={false} />{item.action === 'closeOthers' || item.action === 'closeRight' ? ` · ${t('keepPinned')}` : ''}</>
@@ -288,9 +307,12 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
             </span></span>
             <span className="entry-meta">
               {visibleShortcut(item) ? <Shortcut binding={visibleShortcut(item)!} isMac={isMac} /> : null}
+              {item.groupCount !== undefined ? <span className="kind-label">{countMessage('groupTabOne', 'groupTabCount', item.groupCount)}</span> : null}
+              {item.groupTitle ? <span className="tab-group-badge" data-color={item.groupColor}><HighlightedText text={item.groupTitle} query={query} /></span> : null}
               {item.pinned ? <Pin size={12} aria-label={t('pinned')} /> : null}
               {item.muted ? <VolumeX size={13} aria-label={t('muted')} /> : null}
               {item.active ? <span className="current-badge">{t('current')}</span> : null}
+              {item.tucked && !item.groupTitle ? <span className="tucked-badge">{t('tucked')}</span> : null}
               {!grouped && ['tab', 'bookmark'].includes(item.kind) ? <span className="kind-label">{t(item.kind === 'tab' ? 'tabKind' : 'bookmarkKind')}</span> : null}
             </span>
           </div></div>)}

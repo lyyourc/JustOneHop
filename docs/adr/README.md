@@ -15,6 +15,7 @@ ADR 解释“为什么这样做”，保留背景、决策、备选方案和接�
 | 0005 | [主动运行保存的脚本并隔离结果](0005-explicit-user-script-execution.md) | 已采纳 |
 | 0006 | [标签切换浮层与独立窗口兜底](0006-recent-tab-switcher.md) | 已采纳 |
 | 0007 | [实时快照、局部复用与延迟加载提示](0007-refresh-and-loading.md) | 已采纳 |
+| 0008 | [原生标签组收起与持久恢复](0008-native-tab-tucking.md) | 已采纳 |
 
 ## 维护方式
 

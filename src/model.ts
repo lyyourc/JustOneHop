@@ -21,28 +21,44 @@ export function commands(current?: TabItem): Entry[] {
     ['pin', current?.pinned ? t('unpin') : t('pin'), 'pin unpin toggle guding 固定 取消固定 标签页', 'pin'],
     ['mute', current?.muted ? t('unmute') : t('mute'), 'mute unmute sound audio jingyin 静音 取消静音 标签页', 'volume'],
   ];
+  if (current?.canTuck) definitions.push(['tuck', t('tuck'), 'tuck away tab 收起 标签页', 'tuck']);
   return definitions.map(([action, title, keywords, icon, danger]) => ({
     id: `command:${action}`, kind: 'command', category: 'tab', title, keywords, icon, action, danger,
     shortcut: ({ newTab: 'Mod+T', close: 'Mod+W', restore: 'Mod+Shift+T', reload: 'Mod+R' } as Partial<Record<ActionId, string>>)[action],
     tabId: current?.id,
+    searchOnly: action === 'tuck' || undefined,
     subtitle: action === 'newTab' ? t('newTabHint') : action === 'restore' ? t('restoreHint') :
       action === 'closeOthers' || action === 'closeRight' ? t('closeHint') : current?.title || t('currentTab'),
   }));
 }
 
 export function entries(snapshot: Snapshot): Entry[] {
+  const groups = new Map((snapshot.groups || []).map(group => [group.id, group]));
   return [
+    ...(snapshot.groups || []).map((group): Entry => ({
+      id: `group:${group.id}`, kind: 'command', category: 'tabGroup', title: group.title, groupCount: snapshot.tabs.filter(tab => tab.groupId === group.id).length,
+      subtitle: '', keywords: 'tab group 标签组', icon: 'others', action: 'manageGroup', searchOnly: true,
+      groupId: group.id, groupColor: group.color,
+    })),
     ...snapshot.tabs.map((tab): Entry => ({
       id: `tab:${tab.id}`, kind: 'tab', title: tab.title, subtitle: labelUrl(tab.url),
-      keywords: tab.url, faviconPageUrl: tab.url, icon: 'tab', action: 'switch', tabId: tab.id,
-      active: tab.active, pinned: tab.pinned, muted: tab.muted,
+      groupTitle: groups.get(tab.groupId!)?.title, groupColor: groups.get(tab.groupId!)?.color,
+      keywords: `${tab.url}${tab.tucked ? ' tucked away 已收起' : ''}`, faviconPageUrl: tab.url, icon: 'tab', action: 'switch', tabId: tab.id,
+      active: tab.active, pinned: tab.pinned, muted: tab.muted, tucked: tab.tucked, canTuck: tab.canTuck,
     })),
     ...snapshot.bookmarks.map((bookmark): Entry => ({
       id: `bookmark:${bookmark.id}`, kind: 'bookmark', title: bookmark.title,
       subtitle: labelUrl(bookmark.url), faviconPageUrl: bookmark.url, keywords: `${bookmark.url} ${bookmark.folder}`,
       icon: 'bookmark', action: 'openBookmark', bookmarkId: bookmark.id,
     })),
+    ...(snapshot.tuckRecoveries || []).map((item): Entry => ({
+      id: `recovery:${item.id}`, kind: 'command', category: 'tab', action: 'reviewTuck', icon: 'tuck',
+      title: t('reviewTuck'), subtitle: `${item.title} — ${item.urls.length}`, recoveryId: item.id,
+      keywords: '恢复 收起 继续管理 检查 分组 recover resume tuck group', aliases: ['recover tucked tabs', 'resume tuck', '继续管理', '恢复收起组'],
+    })),
     ...commands(snapshot.tabs.find(tab => tab.id === snapshot.currentTabId)),
+    ...(snapshot.canUndoTuck ? [{ id: 'command:undoTuck', kind: 'command' as const, category: 'tab' as const, action: 'undoTuck' as const,
+      icon: 'restore' as const, title: t('undoTuck'), subtitle: '', keywords: 'undo tuck away 撤销 收起' }] : []),
     { id: 'command:runScript', kind: 'command', category: 'script', action: 'runScript', icon: 'script', title: t('runScript'), subtitle: '',
       keywords: 'javascript js 执行 运行 脚本', aliases: ['run script', 'execute script', '执行脚本', '运行脚本'], searchOnly: true },
     { id: 'command:runCopyScript', kind: 'command', category: 'script', action: 'runCopyScript', icon: 'script', title: t('runCopyScript'), subtitle: '',
@@ -56,6 +72,7 @@ export function entries(snapshot: Snapshot): Entry[] {
       ['theme', 'changeTheme', ['theme', 'appearance', 'change theme', '主题', '外观', '切换主题']],
       ['keyboard', 'keyboardShortcuts', ['hotkey', 'shortcut', 'keyboard shortcuts', '快捷键', '快捷键设置']],
       ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '使用习惯']],
+      ['tabs', 'autoTuck', ['auto tuck tabs', 'auto tuck', 'automatic tuck', '自动收起闲置标签页', '自动收起', '收起设置']],
     ] as const).map(([settingsSection, title, aliases]): Entry => ({
       id: `command:settings:${settingsSection}`, kind: 'command', category: 'settings', action: 'settings', settingsSection, icon: 'settings',
       title: t(title), subtitle: '', keywords: '', aliases: [...aliases], searchOnly: true,
@@ -90,6 +107,8 @@ const commandAliases: Partial<Record<Entry['action'], string[]>> = {
   reload: ['reload', 'refresh', 'reload tab', 'refresh tab', '刷新标签页', '刷新', 'shuaxin'],
   pin: ['pin', 'unpin', 'pin tab', 'unpin tab', '固定标签页', '取消固定标签页', '固定', '取消固定', 'guding'],
   mute: ['mute', 'unmute', 'mute tab', 'unmute tab', '静音标签页', '取消静音标签页', '静音', '取消静音', 'jingyin'],
+  tuck: ['tuck away tab', 'tuck tab', '收起标签页', '收起'],
+  undoTuck: ['undo tuck away', 'undo tuck', '撤销收起'],
   localStorage: ['local storage', 'localstorage', '查看本地存储', '本地存储'],
   sessionStorage: ['session storage', 'sessionstorage', '查看会话存储', '会话存储'],
   cookies: ['cookies', 'cookie', '查看 cookie', '查看 cookies'],
@@ -127,7 +146,7 @@ function buildSearchIndex(items: Entry[]) {
     return {
       kind: item.kind, pinned: item.kind === 'tab' && !!item.pinned, action: item.action, danger: item.danger, title, label, aliases, names,
       wordNames: names.map(name => name.split(/[^\p{L}\p{N}]+/u).join(' ')),
-      categoryText: categoryTerms(item.category), keywords: normalizeSearch(item.keywords),
+      categoryText: categoryTerms(item.category), keywords: normalizeSearch(`${item.keywords} ${item.groupTitle || ''}`),
       subtitle: item.kind === 'command' ? '' : normalizeSearch(item.subtitle),
     };
   });
@@ -205,7 +224,7 @@ export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
   if (entry.kind === 'command') return [entry];
   if (entry.kind === 'bookmark') return [{ ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }];
   const tab = snapshot.tabs.find(item => item.id === entry.tabId);
-  const available = commands(tab).filter(command => ['close', 'pin', 'mute', 'reload', 'closeOthers', 'closeRight'].includes(command.action));
+  const available = commands(tab).filter(command => ['close', 'pin', 'mute', 'reload', 'closeOthers', 'closeRight', 'tuck'].includes(command.action));
   return [{ ...entry, title: t('switchTab'), subtitle: entry.title, keywords: `${entry.keywords} switch tab 切换标签页` }, ...available.map(command => ({
     ...command, shortcut: tab?.id === snapshot.currentTabId ? command.shortcut : undefined, title: command.title.replace(t('current'), ''), id: `action:${command.action}`, tabId: entry.tabId,
   }))];

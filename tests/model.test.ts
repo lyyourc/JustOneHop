@@ -14,8 +14,8 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one index contains tabs, bookmarks and commands; home prioritizes recent tabs', () => {
   const items = entries(data);
-  assert.equal(items.length, 24);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 20);
+  assert.equal(items.length, 25);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 21);
   const home = homeEntries(items);
   assert.deepEqual(home.slice(0, 3).map(entry => entry.kind), ['tab', 'tab', 'tab']);
   assert.ok(home.slice(3).every(entry => entry.kind === 'command' && !entry.danger));
@@ -180,8 +180,39 @@ test('feature commands are discoverable by intent without changing the empty-sea
     ['theme', 'command:settings:theme'], ['主题', 'command:settings:theme'],
     ['hotkey', 'command:settings:keyboard'], ['快捷键', 'command:settings:keyboard'],
     ['reset search ranking', 'command:settings:ranking'], ['重置搜索排序', 'command:settings:ranking'],
+    ['auto tuck', 'command:settings:tabs'], ['自动收起', 'command:settings:tabs'],
   ]) assert.equal(search(items, query)[0]?.id, id, query);
   assert.equal(homeEntries(items).filter(item => item.kind === 'command').length, 9);
+});
+
+test('tucking appears only for eligible targets and stays out of the empty-search home', () => {
+  const snapshot = { ...data, tabs: data.tabs.map(item => ({ ...item, canTuck: !item.pinned })) };
+  const items = entries(snapshot);
+  for (const query of ['tuck tab', 'Tab: Tuck Away Tab', '收起标签页']) {
+    assert.equal(search(items, query)[0]?.action, 'tuck', query);
+  }
+  assert.equal(items.find(item => item.action === 'tuck')?.tabId, snapshot.currentTabId);
+  assert.equal(homeEntries(items).filter(item => item.kind === 'command').length, 9);
+  assert.ok(!homeEntries(items).some(item => item.action === 'tuck'));
+  const pinned = items.find(item => item.id === 'tab:1')!;
+  const eligible = items.find(item => item.id === 'tab:3')!;
+  assert.ok(!actionsFor(pinned, snapshot).some(item => item.action === 'tuck'));
+  assert.equal(actionsFor(eligible, snapshot).find(item => item.action === 'tuck')?.tabId, 3);
+});
+
+test('tucked pages keep their titles, favicons and switch action; undo exists only for an available batch', () => {
+  const snapshot = { ...data, canUndoTuck: true, tabs: data.tabs.map(item => item.id === 3 ? { ...item, tucked: true, canTuck: false } : item) };
+  const items = entries(snapshot);
+  const tucked = items.find(item => item.id === 'tab:3')!;
+  assert.equal(tucked.title, 'Page 3');
+  assert.equal(tucked.faviconPageUrl, data.tabs[2].url);
+  assert.equal(tucked.tucked, true);
+  assert.equal(tucked.action, 'switch');
+  assert.ok(search(items, '已收起').some(item => item.id === tucked.id));
+  assert.ok(!actionsFor(tucked, snapshot).some(item => item.action === 'tuck'));
+  assert.equal(search(items, 'undo tuck')[0]?.action, 'undoTuck');
+  assert.ok(homeEntries(items).some(item => item.action === 'undoTuck'));
+  assert.ok(!entries({ ...snapshot, canUndoTuck: false }).some(item => item.action === 'undoTuck'));
 });
 
 test('category prefixes are searchable without changing titles, IDs or exact command intent', () => {
@@ -208,6 +239,18 @@ test('tab action shortcuts are only advertised for the active target', () => {
   assert.equal(inactive.find(item => item.action === 'reload')?.shortcut, undefined);
   assert.equal(active.find(item => item.action === 'close')?.shortcut, 'Mod+W');
   assert.equal(active.find(item => item.action === 'reload')?.shortcut, 'Mod+R');
+});
+
+test('tab groups are searchable entries and their names find member tabs', () => {
+  const items = entries({ ...data, groups: [{ id: 9, windowId: 1, title: 'Research', color: 'blue', collapsed: true }],
+    tabs: [{ ...tab(1, 0), groupId: 9 }, tab(2, 1)] });
+  const found = search(items, 'Research');
+  assert.equal(found[0].action, 'manageGroup');
+  assert.equal(found[0].category, 'tabGroup');
+  assert.ok(found.some(entry => entry.tabId === 1));
+  assert.ok(!found.some(entry => entry.tabId === 2));
+  assert.equal(items.find(entry => entry.tabId === 1)?.groupTitle, 'Research');
+  assert.equal(search(items, 'Tab Group: Research')[0].groupId, 9);
 });
 
 test('pinned service tab outranks prefix bookmarks when the service name matches its hostname', () => {

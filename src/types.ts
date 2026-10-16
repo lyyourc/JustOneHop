@@ -1,4 +1,4 @@
-export type ActionId = 'switch' | 'openBookmark' | 'newTab' | 'reload' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute';
+export type ActionId = 'switch' | 'openBookmark' | 'newTab' | 'reload' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
 
 export interface TabItem {
   id: number;
@@ -10,14 +10,26 @@ export interface TabItem {
   pinned: boolean;
   muted: boolean;
   audible: boolean;
+  tucked?: boolean;
+  canTuck?: boolean;
+  groupId?: number;
 }
 export interface BookmarkItem { id: string; title: string; url: string; folder: string }
+export interface TuckRecoveryItem {
+  id: string; title: string; urls: string[];
+  candidates: { id: number; windowId: number; title: string; fingerprint: string;
+    tabs: { id: number; title: string; url: string }[] }[];
+}
+export interface TabGroupItem { id: number; windowId: number; title: string; color: chrome.tabGroups.TabGroup['color']; collapsed: boolean }
 export interface Snapshot {
+  groups?: TabGroupItem[];
   windowId: number;
   currentTabId: number;
   tabs: TabItem[];
   bookmarks: BookmarkItem[];
   shortcut: string;
+  canUndoTuck?: boolean;
+  tuckRecoveries?: TuckRecoveryItem[];
 }
 export interface Execution {
   action: ActionId | 'settings';
@@ -25,6 +37,10 @@ export interface Execution {
   tabId?: number;
   bookmarkId?: string;
   query?: string;
+  recoveryId?: string;
+  groupId?: number;
+  fingerprint?: string;
+  groupChanges?: { title?: string; color?: chrome.tabGroups.TabGroup['color']; collapsed?: boolean };
 }
 export type StorageKind = 'local' | 'session' | 'cookies';
 export type StorageAction = 'localStorage' | 'sessionStorage' | 'cookies';
@@ -49,10 +65,10 @@ export type Request =
   | { source: 'zing'; type: 'reset-usage' }
   | { source: 'zing'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
-export type IconName = 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit';
-export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'ranking';
+export type IconName = 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
+export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'ranking' | 'tabs';
 export interface Entry {
-  category?: 'tab' | 'script' | 'storage' | 'settings';
+  category?: 'tabGroup' | 'tab' | 'script' | 'storage' | 'settings';
   shortcut?: string;
   faviconPageUrl?: string;
   id: string;
@@ -61,8 +77,13 @@ export interface Entry {
   subtitle: string;
   keywords: string;
   icon: IconName;
-  action: ActionId | 'settings' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript';
+  action: ActionId | 'settings' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
   settingsSection?: SettingsSection;
+  recoveryId?: string;
+  groupId?: number;
+  groupTitle?: string;
+  groupCount?: number;
+  groupColor?: chrome.tabGroups.TabGroup['color'];
   aliases?: string[];
   searchOnly?: boolean;
   scriptId?: string;
@@ -71,5 +92,7 @@ export interface Entry {
   pinned?: boolean;
   muted?: boolean;
   active?: boolean;
+  tucked?: boolean;
+  canTuck?: boolean;
   danger?: boolean;
 }

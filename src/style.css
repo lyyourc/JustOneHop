@@ -61,6 +61,7 @@
 .entry-meta { display: flex; gap: 8px; align-items: center; color: var(--muted); margin-left: 6px; }
 .kind-label { font-size: 11px; white-space: nowrap; }
 .current-badge { font-size: 10px; padding: 1px 5px; background: var(--key); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; }
+.tucked-badge { font-size: 11px; white-space: nowrap; color: var(--muted); }
 .footer { position: relative; z-index: 4; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--footer); border-top: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 6px; color: var(--muted); flex-shrink: 0; }
 .brand-mark { display: flex; align-items: center; color: var(--accent); }
@@ -129,6 +130,10 @@ body.zing-popup { margin: 0; width: 750px; height: 516px; overflow: hidden; back
 .settings-body h2:first-child { margin-top: 0; }
 .settings-group { border: 1px solid var(--line); border-radius: 9px; background: var(--footer); padding: 14px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.setting-toggle { display: flex; align-items: center; flex: 0 0 34px; width: 34px; height: 20px; padding: 2px !important; border: 1px solid var(--border) !important; border-radius: 12px; background: var(--key) !important; transition: background .15s; }
+.setting-toggle span { width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s; }
+.setting-toggle[aria-checked="true"] { background: var(--accent) !important; border-color: transparent !important; }
+.setting-toggle[aria-checked="true"] span { transform: translateX(14px); background: #fff; }
 .setting-copy { min-width: 0; }
 .setting-copy label { font-size: 13px; font-weight: 500; }
 .setting-copy p, .setting-note { color: var(--muted); font-size: 11px; margin: 4px 0 0; line-height: 1.6; }
@@ -263,6 +268,37 @@ body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: light-d
 /* Result actions take priority over the secondary retention note on narrow panels. */
 .script-runner .footer-actions { flex-shrink: 0; }
 
+.tuck-recovery .setting-note { overflow-wrap: anywhere; }
+.recovery-explanation { margin-top: 0; }
+.recovery-candidate { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
+.recovery-candidate.selected { background: var(--selected); }
+.recovery-candidate ul { padding-left: 18px; margin-bottom: 0; }
+.recovery-candidate li { margin-top: 8px; overflow-wrap: anywhere; }
+.recovery-candidate small { display: block; color: var(--muted); }
+
+.group-view { display: flex; flex-direction: column; }
+.group-view .settings-header h1 { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.group-surface .results { flex: 1; }
+.group-field { display: flex; flex-direction: column; gap: 12px; }
+.group-field input, .group-field select { color: inherit; background: var(--bg); font: inherit; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.tab-group-badge { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid currentColor; padding: 2px 6px; border-radius: 4px; }
+.zing-app [data-color="grey"] { color: #80868b; }
+.zing-app [data-color="blue"] { color: #4285f4; }
+.zing-app [data-color="red"] { color: #d93025; }
+.zing-app [data-color="yellow"] { color: #a87800; }
+.zing-app [data-color="green"] { color: #188038; }
+.zing-app [data-color="pink"] { color: #c63c83; }
+.zing-app [data-color="purple"] { color: #9334e6; }
+.zing-app [data-color="cyan"] { color: #007b83; }
+.zing-app [data-color="orange"] { color: #c65d00; }
+
+body.centered-palette { width: 100%; height: 100dvh; }
+.centered-palette .zing-app.popup { min-height: 0; height: 100dvh; }
+.centered-palette .palette { display: flex; flex-direction: column; height: 100dvh; max-height: 100dvh; }
+.centered-palette .main-surface { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.centered-palette .results { min-height: 0; flex: 1; }
+
 /* Hover previews clickability without changing the keyboard's release target. */
 .recent-list .result { cursor: pointer; }
 .recent-list .result:hover:not([aria-selected='true']) { background: var(--raised); box-shadow: inset 0 0 0 1px var(--border); }
@@ -283,9 +319,3 @@ body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: light-d
 }
 @keyframes recent-reveal { from { opacity: 0; } to { opacity: 1; } }
 .recent-overlay[data-closing='true'] { animation: none; opacity: 0; }
-
-body.centered-palette { width: 100%; height: 100dvh; }
-.centered-palette .zing-app.popup { min-height: 0; height: 100dvh; }
-.centered-palette .palette { display: flex; flex-direction: column; height: 100dvh; max-height: 100dvh; }
-.centered-palette .main-surface { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.centered-palette .results { min-height: 0; flex: 1; }

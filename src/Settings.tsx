@@ -1,6 +1,6 @@
 import { BackLayer } from './Navigation';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeft, Check, ChevronDown, ExternalLink, Code, Globe2, Keyboard, Monitor, Search } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ExternalLink, Code, Globe2, Keyboard, Monitor, Search, PanelsTopLeft } from 'lucide-react';
 import type { SettingsSection } from './types';
 import { ScriptLibrary } from './ScriptLibrary';
 import { systemLanguage, t } from './i18n';
@@ -78,12 +78,16 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
   const [library, setLibrary] = useState<'all' | 'binding' | null>(null);
   const [error, setError] = useState(false);
   const [rankingReset, setRankingReset] = useState<'idle' | 'busy' | 'done'>('idle');
+  const [tuckSaving, setTuckSaving] = useState(false);
+  const tuckHint = useId();
+  const tuckToggle = useId();
   const back = useRef<HTMLButtonElement>(null);
   const body = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (library) return;
-    const target = initialSection && body.current?.querySelector<HTMLElement>(`[data-setting="${initialSection}"] button`);
-    if (target) { target.scrollIntoView({ block: 'nearest' }); target.focus(); }
+    const section = initialSection && body.current?.querySelector<HTMLElement>(`[data-setting="${initialSection}"]`);
+    const target = section && section.querySelector<HTMLElement>('button');
+    if (target) { section.scrollIntoView({ block: 'nearest' }); target.focus({ preventScroll: true }); }
     else back.current?.focus();
   }, [library, initialSection]);
   async function change(patch: Partial<Preferences>) {
@@ -92,6 +96,12 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
   }
   async function changeHotkey() {
     try { await openShortcuts(); onClose(); } catch { setError(true); }
+  }
+  async function toggleAutoTuck() {
+    if (tuckSaving) return;
+    setTuckSaving(true);
+    try { await change({ autoTuck: !preferences.autoTuck }); }
+    finally { setTuckSaving(false); }
   }
   async function resetRanking() {
     if (rankingReset === 'busy') return;
@@ -121,6 +131,15 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
           <Choice label={t('theme')} value={preferences.theme} onChange={theme => void change({ theme })}
             options={[{ value: 'system', label: t('followSystem') }, { value: 'light', label: t('lightTheme') }, { value: 'dark', label: t('darkTheme') }]} />
         </div>
+      </div>
+      <h2><PanelsTopLeft size={15} />{t('tabManagement')}</h2>
+      <div className="settings-group" data-setting="tabs">
+        <div className="setting-row">
+          <div className="setting-copy"><label htmlFor={tuckToggle}>{t('autoTuck')}</label><p id={tuckHint}>{t('autoTuckHint')}</p></div>
+          <button id={tuckToggle} className="setting-toggle" role="switch" aria-label={t('autoTuck')} aria-checked={preferences.autoTuck}
+            aria-describedby={tuckHint} disabled={tuckSaving} onClick={() => void toggleAutoTuck()}><span /></button>
+        </div>
+        <p className="setting-note">{t('autoTuckOffHint')}</p>
       </div>
       <h2><Search size={15} />{t('searchRanking')}</h2>
       <div className="settings-group" data-setting="ranking">

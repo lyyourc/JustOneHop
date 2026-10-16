@@ -607,5 +607,146 @@
   },
   "categorySettings": {
     "message": "Settings"
+  },
+  "tabManagement": {
+    "message": "Tabs"
+  },
+  "autoTuck": {
+    "message": "Auto Tuck Idle Tabs"
+  },
+  "autoTuckHint": {
+    "message": "After 7 days without use, move idle tabs into a collapsed Tucked Away group. Pages stay open."
+  },
+  "autoTuckOffHint": {
+    "message": "Turning this off returns managed tabs to the tab strip. After restarting, matching groups reconnect automatically; uncertain groups wait for your confirmation."
+  },
+  "tuck": {
+    "message": "Tuck Away Tab"
+  },
+  "undoTuck": {
+    "message": "Undo Tuck Away"
+  },
+  "tucked": {
+    "message": "Tucked Away"
+  },
+  "tuckGroupTitle": {
+    "message": "Tucked Away"
+  },
+  "tabTucked": {
+    "message": "Tab tucked away. Find it anytime in search."
+  },
+  "tuckUndone": {
+    "message": "Tucked tabs brought back to the tab strip."
+  },
+  "errorTuckTab": {
+    "message": "This tab cannot be tucked away. Keep at least one tab available; pinned tabs and existing tab groups stay in place."
+  },
+  "errorUndoTuck": {
+    "message": "There are no tabs left to undo in the last tuck-away batch."
+  },
+  "reviewTuck": {
+    "message": "Review Tucked Away Groups"
+  },
+  "resumeTuck": {
+    "message": "Continue Managing This Group"
+  },
+  "forgetTuckRecovery": {
+    "message": "Stop Recovering This Record"
+  },
+  "tuckRecoveryLater": {
+    "message": "Decide Later"
+  },
+  "tuckRecoveryHint": {
+    "message": "zing could not uniquely identify a previous group. Check the pages below, then confirm the group to continue managing."
+  },
+  "tuckRecoveryGroups": {
+    "message": "Groups in this window"
+  },
+  "tuckRecoveryMissing": {
+    "message": "No matching group in this window yet. Open the original window and try again. Until this is resolved, zing will not create another tuck-away group."
+  },
+  "tuckRecoveryResolved": {
+    "message": "This record has already been resolved. Return to search to see the current groups."
+  },
+  "tuckRecoveryForgetHint": {
+    "message": "Actions → Stop Recovering This Record leaves every page and group in place."
+  },
+  "errorTuckRecoveryChanged": {
+    "message": "This group has changed. Return to search and review it again."
+  },
+  "errorTuckRecoveryPending": {
+    "message": "Review the previous tucked-away group first. Search for “recover tucked tabs”."
+  },
+  "categoryTabGroup": {
+    "message": "Tab Group"
+  },
+  "unnamedGroup": {
+    "message": "Unnamed Group"
+  },
+  "groupSearch": {
+    "message": "Search tabs in this group…"
+  },
+  "groupMissing": {
+    "message": "This tab group is no longer in this window."
+  },
+  "groupExpand": {
+    "message": "Expand Group"
+  },
+  "groupCollapse": {
+    "message": "Collapse Group"
+  },
+  "groupRename": {
+    "message": "Rename Group"
+  },
+  "groupColor": {
+    "message": "Change Group Color"
+  },
+  "groupRemoveTab": {
+    "message": "Remove Tab from Group"
+  },
+  "groupName": {
+    "message": "Group Name"
+  },
+  "groupSave": {
+    "message": "Save"
+  },
+  "groupEmpty": {
+    "message": "No matching tabs"
+  },
+  "errorGroup": {
+    "message": "The tab group changed or is no longer available."
+  },
+  "colorGrey": {
+    "message": "Grey"
+  },
+  "colorBlue": {
+    "message": "Blue"
+  },
+  "colorRed": {
+    "message": "Red"
+  },
+  "colorYellow": {
+    "message": "Yellow"
+  },
+  "colorGreen": {
+    "message": "Green"
+  },
+  "colorPink": {
+    "message": "Pink"
+  },
+  "colorPurple": {
+    "message": "Purple"
+  },
+  "colorCyan": {
+    "message": "Cyan"
+  },
+  "colorOrange": {
+    "message": "Orange"
+  },
+  "groupTabCount": {
+    "message": "$1 tabs"
+  },
+  "groupTabOne": {
+    "message": "$1 tab"
   }
 }

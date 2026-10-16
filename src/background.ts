@@ -1,4 +1,5 @@
 import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut } from './paletteWindow';
+import { startTabTucking } from './tabTuck';
 import { runSavedScript } from './scriptExecution';
 import { openRecentSwitcher } from './recentTabs';
 import { readPageStorage, openCookieAccess } from './pageStorage';
@@ -71,7 +72,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   return true;
 });
 
-// Only visible palettes keep a port open. No background polling or broad host access.
+// Only visible palettes keep a port open; tab lifecycle checks use Chrome alarms.
 const clients = new Set<chrome.runtime.Port>();
 chrome.runtime.onConnect.addListener(port => {
   if (port.name !== 'zing' || port.sender?.id !== chrome.runtime.id) return;
@@ -95,3 +96,9 @@ chrome.bookmarks.onCreated.addListener(changed);
 chrome.bookmarks.onRemoved.addListener(changed);
 chrome.bookmarks.onChanged.addListener(changed);
 chrome.bookmarks.onMoved.addListener(changed);
+
+chrome.tabGroups.onCreated.addListener(changed);
+chrome.tabGroups.onUpdated.addListener(changed);
+chrome.tabGroups.onRemoved.addListener(changed);
+chrome.tabGroups.onMoved.addListener(changed);
+startTabTucking(changed);

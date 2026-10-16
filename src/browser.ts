@@ -1,3 +1,4 @@
+import { tuckFlags, canUndoTuck, tabTuckingReady, tuckTab, undoTuck, tuckRecoveries, resumeTuck, forgetTuckRecovery, updateManagedGroup } from './tabTuck';
 import { t } from './i18n';
 import { closeTargets } from './model';
 import { recordUsage } from './usageStorage';
@@ -5,10 +6,10 @@ import type { BookmarkItem, Execution, Snapshot, TabItem } from './types';
 
 export function toTab(tab: chrome.tabs.Tab): TabItem {
   return {
-    id: tab.id!, windowId: tab.windowId, index: tab.index,
+    id: tab.id!, groupId: tab.groupId === -1 ? undefined : tab.groupId, windowId: tab.windowId, index: tab.index,
     title: tab.title || tab.url || t('untitledTab'), url: tab.url || '',
     active: tab.active, pinned: tab.pinned, muted: tab.mutedInfo?.muted || false,
-    audible: tab.audible || false,
+    audible: tab.audible || false, ...tuckFlags(tab),
   };
 }
 
@@ -49,11 +50,13 @@ export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
   const active = senderTab?.id !== undefined ? await chrome.tabs.get(senderTab.id)
     : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
   if (!active?.id) throw new Error(t('errorNoCurrent'));
-  const [tabs, bookmarks, bindings] = await Promise.all([
-    chrome.tabs.query({ windowId: active.windowId }), getBookmarks(), chrome.commands.getAll(),
+  await tabTuckingReady();
+  const [tabs, bookmarks, bindings, groups] = await Promise.all([
+    chrome.tabs.query({ windowId: active.windowId }), getBookmarks(), chrome.commands.getAll(), chrome.tabGroups.query({ windowId: active.windowId }),
   ]);
   return {
-    currentTabId: active.id, windowId: active.windowId,
+    groups: groups.map(group => ({ ...group, title: group.title || t('unnamedGroup') })),
+    currentTabId: active.id, windowId: active.windowId, canUndoTuck: canUndoTuck(active.windowId), tuckRecoveries: tuckRecoveries(),
     tabs: tabs.sort((a, b) => Number(a.id === active.id) - Number(b.id === active.id) ||
       (b.lastAccessed || 0) - (a.lastAccessed || 0) || a.index - b.index).map(toTab), bookmarks,
     shortcut: bindings.find(binding => binding.name === 'toggle-palette')?.shortcut || '',
@@ -78,7 +81,24 @@ async function performAction(payload: Execution): Promise<string> {
   // Validate the original window even when the command does not target a tab.
   const window = await chrome.windows.get(windowId);
   const target = (key: string) => window.incognito ? '' : key;
+  if (action === 'updateGroup') {
+    if (!Number.isInteger(payload.groupId) || !payload.groupChanges) throw new Error(t('errorGroup'));
+    const changes = payload.groupChanges;
+    if ((changes.title !== undefined && typeof changes.title !== 'string') ||
+        (changes.collapsed !== undefined && typeof changes.collapsed !== 'boolean') ||
+        (changes.color !== undefined && !['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'].includes(changes.color))) throw new Error(t('errorGroup'));
+    await updateManagedGroup(windowId, payload.groupId!, changes); return '';
+  }
+  if (action === 'ungroupTab') {
+    if (!Number.isInteger(tabId) || !Number.isInteger(payload.groupId) || payload.groupId! < 0) throw new Error(t('errorGroup'));
+    const tab = await chrome.tabs.get(tabId!);
+    if (tab.windowId !== windowId || tab.groupId !== payload.groupId) throw new Error(t('errorGroup'));
+    await chrome.tabs.ungroup(tab.id!); return '';
+  }
   if (action === 'settings') return target('command:settings');
+  if (action === 'resumeTuck') { await resumeTuck(windowId, payload.recoveryId!, payload.groupId!, payload.fingerprint!); return ''; }
+  if (action === 'forgetTuckRecovery') { await forgetTuckRecovery(payload.recoveryId!); return ''; }
+  if (action === 'undoTuck') { await undoTuck(windowId); return target('command:undoTuck'); }
   if (action === 'newTab') { await chrome.tabs.create({ windowId }); return target('command:newTab'); }
   if (action === 'restore') {
     const recent = await chrome.sessions.getRecentlyClosed({ maxResults: 1 });
@@ -97,7 +117,9 @@ async function performAction(payload: Execution): Promise<string> {
   if (!Number.isInteger(tabId)) throw new Error(t('errorNoTab'));
   const tab = await chrome.tabs.get(tabId!);
   if (tab.windowId !== windowId) throw new Error(t('errorMovedTab'));
+  if (payload.groupId !== undefined && tab.groupId !== payload.groupId) throw new Error(t('errorGroup'));
   switch (action) {
+    case 'tuck': await tuckTab(tab.id!, windowId); break;
     case 'switch': await chrome.tabs.update(tab.id!, { active: true }); break;
     case 'reload': await chrome.tabs.reload(tab.id!); break;
     case 'close': await chrome.tabs.remove(tab.id!); break;

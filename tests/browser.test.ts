@@ -28,6 +28,7 @@ beforeEach(() => {
       update: record('update'), remove: record('remove'), create: record('create'), reload: record('reload'),
     },
     bookmarks: { get: async () => [{ id: 'b', title: 'Bookmark', url: bookmarkUrl }], getTree: async () => [{ title: 'Folder', children: [{ id: 'b', title: 'Bookmark', url: bookmarkUrl }] }] },
+    tabGroups: { query: async () => [] },
     commands: { getAll: async () => [{ name: 'toggle-palette', shortcut: '⌘⇧P' }] },
     sessions: { getRecentlyClosed: async () => [{ tab: { sessionId: 'session' } }], restore: record('restore') },
   } as unknown as typeof chrome;
@@ -169,4 +170,25 @@ test('operation acknowledgement does not wait for learning but the worker promis
   let failedAcknowledgement = false;
   await assert.rejects(perform({ action: 'switch', windowId: 10, tabId: 99 }, () => { failedAcknowledgement = true; }));
   assert.equal(failedAcknowledgement, false);
+});
+
+test('group snapshot is scoped to the source window and includes membership', async () => {
+  tabs[0].groupId = 7;
+  chrome.tabGroups.query = (async query => {
+    assert.deepEqual(query, { windowId: 10 });
+    return [{ id: 7, windowId: 10, title: 'Work', color: 'blue', collapsed: true, shared: false }];
+  }) as typeof chrome.tabGroups.query;
+  const data = await snapshot(tabs[1]);
+  assert.equal(data.tabs.find(tab => tab.id === 1)?.groupId, 7);
+  assert.equal(data.groups?.[0].title, 'Work');
+});
+
+test('group actions reject moved members and groups from another window', async () => {
+  tabs[2].groupId = 8;
+  for (const action of ['close', 'switch', 'ungroupTab'] as const) {
+    await assert.rejects(perform({ action, tabId: 3, groupId: 7, windowId: 10 }));
+  }
+  chrome.tabGroups.get = (async () => ({ id: 7, windowId: 20, color: 'blue' as const, collapsed: false, shared: false })) as typeof chrome.tabGroups.get;
+  await assert.rejects(perform({ action: 'updateGroup', groupId: 7, windowId: 10, groupChanges: { title: 'Changed' } }));
+  assert.equal(calls.length, 0);
 });

@@ -1,19 +1,20 @@
 export type Language = 'system' | 'zh' | 'en';
 export type Theme = 'system' | 'light' | 'dark';
-export interface Preferences { language: Language; theme: Theme }
+export interface Preferences { language: Language; theme: Theme; autoTuck: boolean }
 
 export function normalizePreferences(value: unknown): Preferences {
   const data = value as Partial<Preferences> | null;
   return {
     language: data?.language === 'zh' || data?.language === 'en' ? data.language : 'system',
     theme: data?.theme === 'light' || data?.theme === 'dark' ? data.theme : 'system',
+    autoTuck: data?.autoTuck === true,
   };
 }
 let current = normalizePreferences(null);
 const listeners = new Set<() => void>();
 function update(value: unknown) {
   const next = normalizePreferences(value);
-  if (current.language === next.language && current.theme === next.theme) return;
+  if (current.language === next.language && current.theme === next.theme && current.autoTuck === next.autoTuck) return;
   current = next;
   listeners.forEach(listener => listener());
 }

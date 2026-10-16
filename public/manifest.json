@@ -13,7 +13,10 @@
     "sessions",
     "storage",
     "userScripts",
-    "favicon"
+    "favicon",
+    "tabGroups",
+    "alarms",
+    "idle"
   ],
   "background": {
     "service_worker": "background.js"

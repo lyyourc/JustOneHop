@@ -486,7 +486,7 @@ test('overlay settings keyboard navigation and preferences work in the isolated 
   await page.keyboard.press('Enter');
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
-  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences)).toEqual({ language: 'en', theme: 'dark' });
+  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences)).toEqual({ language: 'en', theme: 'dark', autoTuck: false });
   await page.screenshot({ path: 'test-results/settings-overlay.png' });
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await ax()).find(n => n.role?.value === 'combobox')?.value?.value).toBe('reload');
@@ -2992,4 +2992,149 @@ test('English palette launch native visual sizing matches the recent switcher an
   expect(footer!.y + footer!.height).toBeLessThanOrEqual(440);
   await expect(switcher.locator('footer').getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
   expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, source.tabId)).toBe(true);
+});
+
+test('English Tab Group search management and nested keyboard navigation', async () => {
+  const setup = await worker.evaluate(async origin => {
+    const a = await chrome.tabs.create({ url: `${origin}/Group-Alpha`, active: false });
+    const b = await chrome.tabs.create({ url: `${origin}/Group-Beta`, active: false });
+    const id = await chrome.tabs.group({ tabIds: [a.id!, b.id!] });
+    await chrome.tabGroups.update(id, { title: 'Research', color: 'blue', collapsed: true });
+    return { id, a: a.id!, b: b.id! };
+  }, origin);
+  const root = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  await root.fill('Research');
+  await expect(ui.getByRole('option').filter({ hasText: 'Tab Group: Research' })).toBeVisible();
+  await expect(ui.locator('.tab-group-badge')).toHaveCount(2);
+  await ui.getByRole('option').filter({ hasText: 'Tab Group: Research' }).click();
+  const search = ui.getByRole('combobox', { name: 'Search tabs in this group…' });
+  await expect(search).toBeFocused();
+  await expect(ui.getByRole('option')).toHaveCount(2);
+  await search.press('Control+n'); await search.press('Control+p');
+  async function action(text: string) {
+    await ui.keyboard.press('Meta+k');
+    await ui.getByRole('combobox', { name: 'Search actions' }).fill(text);
+    await ui.keyboard.press('Enter');
+  }
+  await action('Rename Group');
+  const name = ui.getByLabel('Group Name', { exact: true });
+  await expect(name).toBeFocused();
+  await name.fill('Reading');
+  await ui.keyboard.press('Meta+k'); await ui.keyboard.press('Escape');
+  await expect(name).toBeFocused();
+  await ui.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(ui.getByRole('heading')).toHaveText('Tab Group: Reading');
+  await action('Change Group Color');
+  await ui.getByLabel('Change Group Color', { exact: true }).selectOption('purple');
+  await ui.getByRole('button', { name: 'Save', exact: true }).click();
+  expect(await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).toMatchObject({ title: 'Reading', color: 'purple' });
+  await ui.locator('.palette').screenshot({ path: '/private/tmp/zing-tab-group-en.png' });
+  await action('Expand Group');
+  expect((await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).collapsed).toBe(false);
+  await search.fill('Beta');
+  await action('Remove Tab from Group');
+  await expect(ui.getByRole('option')).toHaveCount(0);
+  expect((await worker.evaluate(id => chrome.tabs.get(id), setup.b)).groupId).toBe(-1);
+  await search.fill('');
+  await action('Rename Group');
+  await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
+  await search.press('Backspace'); await expect(root).toBeFocused();
+  await expect(root).toHaveValue('Research');
+  await root.fill('Reading'); await ui.getByRole('option').filter({ hasText: 'Tab Group: Reading' }).click();
+  await action('Close Tab');
+  await expect(ui.getByText('This tab group is no longer in this window.')).toBeVisible();
+  await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
+});
+
+test('Chinese Tab Group labels and compact footer stay usable', async () => {
+  const group = await worker.evaluate(async origin => {
+    const tab = await chrome.tabs.create({ url: `${origin}/中文资料`, active: false });
+    const id = await chrome.tabs.group({ tabIds: [tab.id!] });
+    await chrome.tabGroups.update(id, { title: '资料', color: 'green' }); return id;
+  }, origin);
+  const root = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  await root.fill('资料');
+  await ui.getByRole('option').filter({ hasText: '标签组: 资料' }).click();
+  await ui.setViewportSize({ width: 750, height: 516 });
+  await expect(ui.locator('.palette-footer .primary-action')).toBeInViewport();
+  await ui.getByRole('button', { name: '打开操作菜单' }).click();
+  await ui.getByRole('combobox', { name: '搜索操作' }).fill('重命名');
+  await ui.keyboard.press('Enter');
+  await expect(ui.getByLabel('标签组名称')).toBeFocused();
+  await ui.getByLabel('标签组名称').fill('阅读资料');
+  await ui.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(ui.getByRole('heading')).toHaveText('标签组: 阅读资料');
+  await ui.locator('.palette').screenshot({ path: '/private/tmp/zing-tab-group-zh.png' });
+  await worker.evaluate(id => chrome.tabGroups.update(id, { title: '外部改名' }), group);
+  // This headless Chrome does not reliably emit tabGroups.onUpdated for API edits.
+  // Exercise the existing refresh-on-focus path used when returning to zing.
+  await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(ui.getByRole('heading')).toHaveText('标签组: 外部改名');
+  await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
+});
+
+test('English palette launch storage overlay Tab Group fits a narrow viewport', async () => {
+  const page = await context.newPage(); await page.goto(`${origin}/Group-host`);
+  await page.setViewportSize({ width: 390, height: 440 });
+  await worker.evaluate(async origin => {
+    const a = await chrome.tabs.create({ url: `${origin}/Group-member`, active: false });
+    const id = await chrome.tabs.group({ tabIds: [a.id!] });
+    await chrome.tabGroups.update(id, { title: 'Narrow', color: 'blue' });
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+  }, origin);
+  const surface = page.frameLocator('.zing-frame');
+  await surface.getByRole('combobox').fill('Narrow');
+  await surface.getByRole('option').filter({ hasText: 'Tab Group: Narrow' }).click();
+  const primary = surface.locator('.palette-footer .primary-action');
+  await expect(primary).toBeInViewport();
+  expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-tab-group-narrow.png' });
+  await page.keyboard.press('Meta+k'); await page.keyboard.press('Escape');
+  await expect(surface.getByRole('combobox', { name: 'Search tabs in this group…' })).toBeFocused();
+  await page.keyboard.press('Escape'); await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeFocused();
+});
+
+test('English Undo Tuck restores keyboard focus after a command keeps the palette open', async () => {
+  const target = await worker.evaluate(async origin => {
+    const tab = await chrome.tabs.create({ url: `${origin}/Undo-focus`, active: false });
+    return { tabId: tab.id!, windowId: tab.windowId };
+  }, origin);
+  expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  await input.fill('undo tuck');
+  await expect(ui.getByRole('option').first()).toContainText('Undo');
+  await input.press('Enter');
+  await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).groupId, target.tabId)).toBe(-1);
+  await expect(input).toBeEnabled();
+  await expect(input).toBeFocused();
+  await ui.keyboard.press('Meta+a'); await ui.keyboard.type('settings');
+  await expect(input).toHaveValue('settings');
+});
+
+test('English palette launch storage overlay Undo Tuck restores typing after footer and menu actions', async () => {
+  const page = await context.newPage(); await page.goto(`${origin}/Undo-overlay-host`);
+  const target = await worker.evaluate(async origin => {
+    const tab = await chrome.tabs.create({ url: `${origin}/Undo-overlay-target`, active: false });
+    return { tabId: tab.id!, windowId: tab.windowId };
+  }, origin);
+  await worker.evaluate(async () => {
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+  });
+  const surface = page.frameLocator('.zing-frame');
+  const input = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  for (const menu of [false, true]) {
+    expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
+    await input.fill('undo tuck');
+    await expect(surface.getByRole('option').first()).toContainText('Undo');
+    if (menu) { await input.press('Meta+k'); await page.keyboard.press('Enter'); }
+    else await surface.locator('.palette-footer .primary-action').click();
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).groupId, target.tabId)).toBe(-1);
+    await expect(input).toBeFocused();
+    await page.keyboard.press('Meta+a'); await page.keyboard.type('settings');
+    await expect(input).toHaveValue('settings');
+    await page.keyboard.press('Control+n');
+    await expect(input).toBeFocused();
+  }
 });

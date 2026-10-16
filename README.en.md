@@ -16,6 +16,10 @@ Find tabs, bookmarks, and browser commands in one place. Matching text is highli
 
 Switch between tabs in the current window in order of recent use. Hold the shortcut to browse, release to confirm, and quickly return to your previous tab.
 
+### Auto Tuck
+
+Automatically move tabs unused for 7 days into a collapsed Tucked Away group, leaving room for what you are working on. Pages stay open; search or click to bring one back. Off by default, with manual tuck and undo actions available too.
+
 ## Interaction principles
 
 **Human first**: use familiar shortcuts, use the mouse, or switch between them whenever you like. Using zing should not require memorizing shortcuts.
@@ -64,6 +68,8 @@ On Windows/Linux, menu and settings shortcuts use Ctrl instead of Command; the d
 Regular webpages use a centered overlay. Restricted pages, such as Chrome's internal pages, use a toolbar popup. A quick tap of the recent-tab shortcut from the address bar or another area without a key listener may require Enter to confirm.
 
 Preferences, saved scripts, and search usage history stay on your device. Website storage values and script results are held only in the current panel.
+
+Tucking does not close or explicitly discard pages. After a browser restart or extension reload, zing reconciles groups with locally saved records. If a group cannot be uniquely identified, search “recover tucked tabs”, review its pages, and choose “Continue Managing This Group”. Pending recovery prevents duplicate tuck-away groups. Records stay on your device and exclude incognito pages. See [tucking tabs (Chinese)](docs/USAGE.md#收起标签页).
 
 See the [usage guide (Chinese)](docs/USAGE.md) for other features, permissions, limitations, and manual Ctrl+Tab configuration.
 
