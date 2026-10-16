@@ -17,9 +17,9 @@ export function NavigationRoot({ children }: { children: ReactNode }) {
     const views = new Set([view, ...(parentView ? [parentView] : [])]);
     const navigateBack = (event: KeyboardEvent) => {
       const backspace = event.key === 'Backspace';
-      if ((!backspace && event.key !== 'Escape') || event.isComposing) return;
+      if ((!backspace && event.key !== 'Escape') || event.isComposing || event.keyCode === 229) return;
       if (backspace) {
-        if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.keyCode === 229) return;
+        if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
         // Window events are retargeted outside the closed shadow tree. Resolve
         // focus from our own root, not event.target (which can be iframe body).
         const root = surface.current!.getRootNode() as Document | ShadowRoot;

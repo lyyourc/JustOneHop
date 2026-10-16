@@ -404,6 +404,12 @@
   "recentSwitcher": {
     "message": "切换最近标签页"
   },
+  "recentSearch": {
+    "message": "搜索最近标签页…"
+  },
+  "recentSearchHelp": {
+    "message": "点击或按 Ctrl/Cmd+F 开始搜索，然后松开快捷键并输入。"
+  },
   "recentSwitcherBack": {
     "message": "反向选择最近标签页"
   },

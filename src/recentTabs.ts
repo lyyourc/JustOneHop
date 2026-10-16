@@ -1,4 +1,5 @@
 import { errorMessage, t } from './i18n';
+import { nativePanelBounds } from './panelGeometry';
 // The page owns key-up until the independent window has installed its listeners.
 // An actual observed release is buffered; elapsed time never implies a release.
 interface Session {
@@ -90,15 +91,12 @@ export async function openRecentSwitcher(command: string) {
       } catch { /* Retain the existing independent-window fallback. */ }
       session.overlay = false;
     }
+    const zoom = await chrome.tabs.getZoom(source.id!);
     if (!await sourceStillFocused(session)) { clear(session); return; }
     const params = new URLSearchParams({ tab: String(source.id), window: String(owner.id), direction: String(direction), session: session.id, modifier });
-    const width = Math.min(750, owner.width || 750);
-    const height = Math.min(560, owner.height || 560);
     const popup = await chrome.windows.create({
       url: `switcher.html?${params}`, type: 'popup', state: 'normal', focused: false,
-      width, height,
-      left: Math.round((owner.left || 0) + ((owner.width || width) - width) / 2),
-      top: Math.round((owner.top || 0) + ((owner.height || height) - height) / 2),
+      ...nativePanelBounds(owner, source, undefined, zoom),
     });
     if (current !== session) { if (popup?.id !== undefined) await chrome.windows.remove(popup.id); return; }
     session.popup = popup?.id;

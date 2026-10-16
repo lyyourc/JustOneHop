@@ -404,6 +404,12 @@
   "recentSwitcher": {
     "message": "Switch Recent Tabs"
   },
+  "recentSearch": {
+    "message": "Search recent tabs…"
+  },
+  "recentSearchHelp": {
+    "message": "Click to search, or press Ctrl/Cmd+F. Then release the shortcut key and type."
+  },
   "recentSwitcherBack": {
     "message": "Previous Recent Tab"
   },

@@ -16,6 +16,8 @@ ADR 解释“为什么这样做”，保留背景、决策、备选方案和接�
 | 0006 | [标签切换浮层与独立窗口兜底](0006-recent-tab-switcher.md) | 已采纳 |
 | 0007 | [实时快照、局部复用与延迟加载提示](0007-refresh-and-loading.md) | 已采纳 |
 | 0008 | [原生标签组收起与持久恢复](0008-native-tab-tucking.md) | 已采纳 |
+| 0009 | [列表型二级页取消标题栏，层名与返回移到底栏左侧](0009-list-page-footer-breadcrumb.md) | 已采纳 |
+| 0010 | [内容区锚定与原生窗口边框校准](0010-content-anchor-panel-geometry.md) | 已采纳；更新 0001 的独立窗口几何策略 |
 
 ## 维护方式
 

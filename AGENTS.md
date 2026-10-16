@@ -21,12 +21,14 @@
 - **静止指针防抢焦点**：列表项的 `onMouseMove` 必须比对物理屏幕坐标（`event.screenX / event.screenY`），防止键盘滚动列表时静止的鼠标指针意外覆盖键盘选中项。在 Tab Switcher 中，鼠标悬停仅展示可点击描边，不改变松开修饰键的确认目标。
 
 ### ② 共用底栏与跨语言操作菜单（`PaletteFooter` & `ActionMenu`）
-- **统一底栏呈现**：业务页面复用 `PaletteFooter`（固定高度、不随正文滚动），不在滚动区末尾私自堆砌提交按钮。
+- **统一底栏呈现**：业务页面复用 `PaletteFooter`，固定 44px、不随正文滚动，不在滚动区末尾私自堆砌提交按钮；常规面板总高 516px、候选行 40px，切层保持搜索框与底栏位置。主搜索和二级列表页左侧统一为「控件 + 位置 + `·` 补充信息／状态」。API 为 `navigation?: { kind: 'settings' | 'back'; label: string; tooltip: string; disabled?: boolean; onAction: () => void }`、`title?: string`、`context?: ReactNode`、`status?: ReactNode`：组件自己渲染唯一的 26px 单色图标按钮，统一尺寸、圆角、悬浮态；主搜索是设置齿轮 + `zing`，二级页是返回箭头 + 存储类型名称（如 `Local Storage`）或 `groupLabel`。位置名称统一为 11.5px / 500 的弱化只读文字，旁边不得叠加品牌装饰、类型图标或组色图标；不用 `leading` / `title.onBack` 拼装控件，不把标题做成返回按钮。
+- **补充信息与窄屏**：站点来源、成员数量一律走 `context`；左侧补充信息显式使用 11px 字号、400 字重、16px 行高的弱化文字，主搜索 `App` 与 Tab Switcher 的 `RecentSwitcherView` 均传 `context={<NavigationHint />}`，共用本地化「选择 / Navigate」与 `↑ Ctrl P ↓ Ctrl N`，悬浮提示共用 `navigationHelp`，继承这一排版；二级列表页仍显示自己的站点来源或成员数量。导航键保留一个语义 `kbd` 对应一个按键，继承相同字体与颜色，无边框、背景、内边距或最小宽度，宽度自动、高度 16px，不显示键帽框；右侧主操作与 Actions 的键帽保持 20px 高及原有边框、背景。短暂 `status` 在同一位置替换 `context`，不得增加独立槽位。宽度 ≤520px 时仅隐藏补充信息 `.palette-footer-context`（包括主搜索与 Tab Switcher 的导航提示）；`status` 仍然可见，保留复制成功、执行中及危险操作等反馈，必要时可截断。导航按钮、位置名称及右侧操作始终保留，按钮不收缩，长名称先于操作控件截断。右侧主操作与操作菜单契约保持一致。
+- **Tab Switcher 共用底栏**：网页浮层与独立窗口共用 `RecentSwitcherView`，必须复用 `PaletteFooter`，不得手写底栏或另加底部帮助行。搜索框默认使用原生 `disabled` 且聚焦候选列表，不显示光标或编辑蓝框；点击搜索图标、输入区域或 Ctrl/Cmd+F 后才启用并聚焦输入，并暂停本次松键确认。`title` 在默认快速切换时放本地化松键提示（如「松开 Ctrl 切换」），进入搜索后改为切换器名称，保证窄屏仍可见；`context` 与主搜索一样传 `<NavigationHint />`，使用同一套本地化文案、按键及 `navigationHelp` 悬浮提示，沿用 11px / 400 / 16px 排版；实际启动快捷键放在切换器 `header` 的 `title` 属性，未绑定时不提供该提示。右侧 `primary` 为「切换 ↵」，可选 `secondary?: { label: string; keys: string[]; disabled?: boolean; onAction: () => void }` 为「取消 esc」，与主操作共用按钮规则，均文字在前、键帽在后；`actions` 仍可选，`isMac?: boolean` 默认为 `false`，仅供 Actions 快捷键显示。搜索栏右侧保留取消入口。浮层 `.recent-overlay .recent-switcher` 使用 `flex: 1; min-height: 0; height: auto` 填满父 `.palette`，不得独立硬编码 516px／最大高度；独立窗口仍用 `100vh`。
 - **主按钮实时联动与危险态**：打开 `ActionMenu` 时，`PaletteFooter` 的 `primary` 按钮文案与行为应跟随菜单当前高亮动作；若当前动作为破坏性操作（`danger: true`，如关闭、删除、放弃恢复），必须向 `PaletteFooter` 传入 `danger: true` 以保持视觉警示一致。
 - **菜单双语检索与图标**：传给 `ActionMenu` 的每个动作都必须包含图标（`icon`）与**中英文双语 `keywords`**，过滤逻辑必须同时匹配 `title` 与 `keywords`，确保在中文界面输入英文（如 `rename`、`close`、`copy`）或在英文界面输入中文均能命中。
 
 ### ③ 统一返回路由与上下文恢复（`NavigationRoot` & `BackLayer`）
-- **禁止私自监听 `Escape`**：所有层级（子页面、`ActionMenu`、下拉框、删除确认框）必须通过 `<BackLayer>` 接入 `NavigationRoot`，按 React 渲染树深度每次只退出最深一层。
+- **禁止私自监听 `Escape`**：所有层级（子页面、`ActionMenu`、下拉框、删除确认框）必须通过 `<BackLayer>` 接入 `NavigationRoot`，按 React 渲染树深度每次只退出最深一层。底栏返回按钮的 `navigation.onAction` 调用页面现有返回回调，与 Esc 逐层返回语义一致，匹配最深活动 `BackLayer` 的返回行为，不得直接跳回主搜索；`label` / `tooltip` 说明返回行为，`disabled` 必须与键盘返回的可用性一致，不能只因业务忙碌而阻断鼠标返回。
 - **空搜索框退格返回**：二级页面的搜索框应标记 `data-back-on-empty`，使空输入时按 `Backspace` 自然返回上一层，有内容时正常删字。
 - **完整恢复编辑上下文**：从 `ActionMenu`、详情页或内嵌编辑态（如重命名、换色、脚本编辑）返回列表搜索框时，**必须恢复原搜索词、列表选中项以及输入框的光标/选区位置（`setSelectionRange(...caret.current)`）**。
 
@@ -36,6 +38,7 @@
 - **输入法与修饰键保护**：`isComposing` 或 `keyCode === 229` 期间的 `Enter` / `Escape` / `Backspace` 绝不触发业务执行或返回；带修饰键（除明确定义的 `Cmd/Ctrl+Enter` 保存外）或 `event.repeat` 的 `Enter` 不得误执行。
 
 ### ⑤ 承载容器、焦点边界与延迟反馈
+- **内容区锚定与原生窗口边界**：网页浮层 CSS 与 `src/panelGeometry.ts` 的 `panelRect` 保持一致：宽度为 `min(750, 视口宽度 - 48)`，视口宽度 ≤520 时减 20；顶部 inset 为 `clamp(28, 视口高度 × 16%, 150)`，窄屏为 24；高度为 `min(516, 视口高度 - inset - 24)`，极小视口至少保留 1px。Command Palette 与 Tab Switcher 的独立窗口共用 `nativePanelBounds`，以来源 `tab.width/height` 和来源窗口 `left/top/width/height`（均为 DIP）估算水平居中、底边对齐的内容区；先按 `chrome.tabs.getZoom` 换成 CSS 视口应用同一规则，再乘回缩放比例计算屏幕坐标，不以整个浏览器外框居中。创建时暂估 44px 原生框架高度，`popup.tsx` / `switcher.tsx` 在 UI 渲染／切换器就绪交接前调用 `alignPanelWindow`，popup 用 automatic / per-tab 缩放跟随来源，边框由 Chrome API 的 popup 外框减 popup 标签页内容尺寸计算，禁止把缩放后的 DOM inner 尺寸与原生窗口尺寸混减。来源原生页内容区的屏幕原点不可直接测量，侧栏、停靠 DevTools 及系统边框可能造成偏差，不承诺像素级对齐。独立窗口保留系统标题栏；工具栏 action popup 的位置仍由 Chrome 控制。决策见 `docs/adr/0010-content-anchor-panel-geometry.md`。
 - **闭合 Shadow DOM 与焦点解析**：面板可能运行在普通网页的闭合 Shadow DOM + 沙箱 iframe、独立居中窗口或原生 popup 中。解析当前焦点必须使用面板自身的 `getRootNode()` / `ownerDocument`，不得依赖全局 `window`。
 - **150ms 防闪烁原则**：首屏 Loading 与快速切换浮层遵循 150ms 延迟展示，快操作直接完成不闪白屏/蒙层，已有数据刷新时不清空现有列表。
 

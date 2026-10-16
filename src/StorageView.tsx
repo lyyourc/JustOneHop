@@ -2,7 +2,7 @@ import { BackLayer } from './Navigation';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeft, Copy, Database, Cookie, Search, RotateCcw, FileText, LoaderCircle } from 'lucide-react';
+import { Copy, Database, Cookie, Search, RotateCcw, FileText, LoaderCircle } from 'lucide-react';
 import { readPageStorage, openCookieAccess } from './api';
 import { copyText } from './clipboard';
 import { t, errorMessage } from './i18n';
@@ -151,10 +151,6 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
   return <BackLayer onBack={onBack}><BackLayer active={!!detail} onBack={() => setDetail(null)}><section tabIndex={-1} className="palette storage-view" aria-label={title} aria-busy={busy} onKeyDown={keyboard}>
     <span className="sr-only" id="storage-navigation">{t('navigationHelp')}</span>
     <div className={`storage-surface ${menu ? 'subdued' : ''}`} inert={menu ? true : undefined}>
-      <header className="storage-header">
-        <button className="settings-back" onClick={back} aria-label={t('back')}><ArrowLeft size={18} /></button>
-        <strong>{title}</strong><span className="storage-origin" title={request.expectedUrl}>{request.expectedUrl.replace(/^https?:\/\//, '').split('/')[0] || request.expectedUrl}</span><kbd>esc</kbd>
-      </header>
       {detail ? <div className="storage-detail" ref={detailBody} tabIndex={0} aria-label={t('viewDetails')}>
         <h1>{detail.name || t('storageEmptyName')}</h1>
         {cookie ? <dl className="cookie-metadata">
@@ -166,7 +162,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
         <p className="storage-value-label">{json ? t('storageJson') : t('storageValue')}</p>
         <pre className="storage-value">{formatted || t('storageEmptyValue')}</pre>
       </div> : <>
-        <div className="storage-search"><Search size={18} /><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setNotice(''); }}
+        <div className="storage-search"><span className="search-icon"><Search size={20} /></span><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setNotice(''); }}
           placeholder={t('storageSearch')} aria-label={t('storageSearchLabel')} role="combobox" aria-expanded="true" aria-controls="storage-results" aria-autocomplete="list"
           aria-activedescendant={selected ? `storage-row-${rows.indexOf(selected)}` : undefined} aria-describedby="storage-navigation" autoComplete="off" spellCheck={false} /></div>
         <div className="storage-results" id="storage-results" role="listbox" aria-label={t('storageEntries')} ref={list}>
@@ -183,8 +179,8 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
                 setSelection(row.id); setMenu(true); setActionQuery(''); setActionSelection(''); setError('');
               }}>
               <span className="entry-icon command">{row.cookie ? <Cookie size={18} /> : <Database size={18} />}</span>
-              <span className="storage-copy"><span className="entry-title"><HighlightedText text={row.name || t('storageEmptyName')} query={query} allowTypos={false} /></span>
-                <span className="storage-summary">{row.value.slice(0, 180) || t('storageEmptyValue')}</span></span>
+              <span className="entry-copy"><span className="entry-title"><HighlightedText text={row.name || t('storageEmptyName')} query={query} allowTypos={false} /></span>
+                <span className="entry-subtitle storage-summary">{row.value.slice(0, 180) || t('storageEmptyValue')}</span></span>
               {row.cookie ? <span className="storage-cookie-scope">{row.cookie.domain}<span>{row.cookie.path}{row.cookie.partitionKey ? ` · ${t('cookiePartition')}` : ''}</span></span> : null}
             </div>)}
         </div>
@@ -196,7 +192,10 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       selectedId={activeAction?.id} onSelectionChange={setActionSelection} onAction={id => void act(id)} onClose={() => setMenu(false)} /> : null}
     {error && data ? <div className="error-banner" role="alert">{error}</div> : null}
     <PaletteFooter isMac={isMac}
-      status={notice ? <span className="storage-notice" role="status">{notice}</span> : <span className="navigation-hint" title={t('navigationHelp')}><span className="navigation-label">{t('navigate')}</span><span className="navigation-key"><span className="navigation-arrow">↑</span><kbd>Ctrl P</kbd></span><span className="navigation-key"><span className="navigation-arrow">↓</span><kbd>Ctrl N</kbd></span></span>}
+      navigation={{ kind: 'back', label: `${t('back')} · ${title}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
+      title={title}
+      context={<span className="storage-origin" title={request.expectedUrl}>{request.expectedUrl.replace(/^https?:\/\//, '').split('/')[0] || request.expectedUrl}</span>}
+      status={notice ? <span className="storage-notice" role="status">{notice}</span> : undefined}
       primary={{ label: menu ? activeAction?.title || t('copyValue') : t('copyValue'), keys: ['↵'], disabled: busy || (menu ? !activeAction : !current), onAction: () => void act(menu ? activeAction?.id || '' : 'value') }}
       actions={{ open: menu, disabled: busy, onToggle: openMenu }} />
   </section></BackLayer></BackLayer>;

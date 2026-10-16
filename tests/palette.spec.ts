@@ -1,5 +1,5 @@
 import { test, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
-import { mkdtemp, rm, readdir, access, cp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readdir, access, cp, readFile, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { createServer, type Server } from 'node:http';
@@ -42,6 +42,11 @@ test.beforeAll(async () => {
 test.afterAll(async () => { server.close(); });
 test.beforeEach(async ({}, testInfo) => {
   profile = await mkdtemp(join(tmpdir(), 'zing-e2e-'));
+  const verticalTabs = testInfo.title.includes('vertical tabs');
+  if (verticalTabs) {
+    await mkdir(join(profile, 'Default'));
+    await writeFile(join(profile, 'Default/Preferences'), JSON.stringify({ vertical_tabs: { enabled: true } }));
+  }
   let extension = resolve('dist');
   testExtension = undefined;
   if ((testInfo.title.includes('overlay') || testInfo.title.includes('storage'))) {
@@ -88,7 +93,7 @@ test.beforeEach(async ({}, testInfo) => {
   context = await chromium.launchPersistentContext(profile, {
     ignoreDefaultArgs: process.platform === 'darwin' ? ['about:blank'] : [],
     locale, headless: !testInfo.title.includes('palette launch native'), reducedMotion: 'reduce', executablePath, viewport: testInfo.title.includes('palette launch native') ? null : { width: 1100, height: 760 },
-    args: [`--lang=${locale}`, `--disable-extensions-except=${[extension, vimium].filter(Boolean).join(',')}`, `--load-extension=${[extension, vimium].filter(Boolean).join(',')}`],
+    args: [...(verticalTabs ? ['--enable-features=VerticalTabs'] : []), `--lang=${locale}`, `--disable-extensions-except=${[extension, vimium].filter(Boolean).join(',')}`, `--load-extension=${[extension, vimium].filter(Boolean).join(',')}`],
   });
   worker = context.serviceWorkers().find(worker => worker.url().endsWith('/background.js')) || await context.waitForEvent('serviceworker', worker => worker.url().endsWith('/background.js'));
   popupUrl = worker.url().replace('background.js', 'popup.html');
@@ -122,7 +127,7 @@ test('unified bilingual search, action menu, Esc and empty results', async () =>
   await input.press('Backspace');
   await expect(input).toHaveValue('');
   await expect(ui.getByText('快捷访问', { exact: true })).toHaveCount(0);
-  await expect(ui.locator('.navigation-hint')).toContainText('Ctrl P');
+  await expect(ui.locator('.navigation-hint .navigation-key').first().locator('kbd')).toHaveText(['Ctrl', 'P']);
   await expect(ui.locator('.mode-button')).toHaveCount(0);
   await input.fill('zzzz-no-such-result');
   await expect(ui.getByText('没有找到匹配结果')).toBeVisible();
@@ -808,8 +813,20 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await expect(ui.locator('.result.tab .entry-title')).toContainText(['Navigation fixture']);
   await expect(ui.locator('.list-heading, .section-heading, .context-hint, .kind-label')).toHaveCount(0);
   await expect(ui.locator('.section-start')).toHaveCount(1);
-  await expect(ui.locator('.navigation-hint')).toContainText('Ctrl P');
-  await expect(ui.locator('.navigation-hint')).toContainText('Ctrl N');
+  const hintChords = ui.locator('.navigation-hint .key-chord');
+  await expect(hintChords.nth(0).locator('kbd')).toHaveText(['Ctrl', 'P']);
+  await expect(hintChords.nth(1).locator('kbd')).toHaveText(['Ctrl', 'N']);
+  // Supporting shortcuts use the same text metrics as other footer context.
+  const hintKey = await hintChords.first().locator('kbd').first().evaluate(node => {
+    const key = getComputedStyle(node), context = getComputedStyle(node.closest('.palette-footer-context')!);
+    return { size: key.fontSize, weight: key.fontWeight, lineHeight: key.lineHeight, color: key.color,
+      contextSize: context.fontSize, contextWeight: context.fontWeight, contextLineHeight: context.lineHeight, contextColor: context.color,
+      border: key.borderTopWidth, background: key.backgroundColor, height: node.getBoundingClientRect().height };
+  });
+  expect(hintKey.size).toBe(hintKey.contextSize); expect(hintKey.weight).toBe(hintKey.contextWeight);
+  expect(hintKey.lineHeight).toBe(hintKey.contextLineHeight); expect(hintKey.color).toBe(hintKey.contextColor);
+  expect(hintKey.border).toBe('0px'); expect(hintKey.background).toBe('rgba(0, 0, 0, 0)'); expect(hintKey.height).toBe(16);
+  await expect(ui.locator('.footer-actions .key-chord').first().locator('kbd')).toHaveText(['↵']);
   const rows = ui.locator('.result');
   await input.press('Control+n');
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
@@ -837,11 +854,12 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   }
   await ui.setViewportSize({ width: 390, height: 600 });
   await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
-  const hint = ui.locator('.navigation-hint');
-  await expect(hint).toBeVisible();
+  await expect(ui.locator('.navigation-hint')).toBeHidden();
+  await expect(ui.locator('.palette-footer-title')).toHaveText('zing');
+  await expect(ui.locator('.footer-navigation')).toHaveAccessibleName(chinese ? '设置' : 'Settings');
   expect(await ui.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  const hintBox = await hint.boundingBox(), actionsBox = await ui.locator('.footer-actions').boundingBox();
-  expect(hintBox!.x + hintBox!.width).toBeLessThanOrEqual(actionsBox!.x);
+  const locationBox = await ui.locator('.palette-footer-location').boundingBox(), actionsBox = await ui.locator('.footer-actions').boundingBox();
+  expect(locationBox!.x + locationBox!.width).toBeLessThanOrEqual(actionsBox!.x);
   await input.press('Control+n');
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
   await ui.locator('.palette').screenshot({ path: `test-results/quiet-${language.toLowerCase()}-narrow.png` });
@@ -858,6 +876,73 @@ async function openStorageOverlay(page: Page) {
   await expect(surface.locator('.result.command')).toHaveCount(9);
   return surface;
 }
+
+for (const language of ['English', 'Chinese']) test(`${language} storage and Tab Group layers preserve main palette geometry`, async () => {
+  const page = await context.newPage(); await page.goto(`${origin}/Layout-host`);
+  await page.evaluate(() => { localStorage.setItem('layout.key', 'preview value'); });
+  await worker.evaluate(async origin => {
+    const tab = await chrome.tabs.create({ url: `${origin}/Layout-member`, active: false });
+    const id = await chrome.tabs.group({ tabIds: [tab.id!] });
+    await chrome.tabGroups.update(id, { title: 'Layout Group Unique', color: 'blue' });
+  }, origin);
+  const surface = await openStorageOverlay(page);
+  const root = surface.locator('.search-bar input');
+  async function geometry() {
+    return surface.locator('.palette').evaluate(panel => {
+      const box = (selector: string) => {
+        const rect = panel.querySelector(selector)!.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      };
+      const rect = panel.getBoundingClientRect();
+      const title = box('.result .entry-title');
+      const footerTitle = box('.palette-footer-title');
+      const footerType = getComputedStyle(panel.querySelector('.palette-footer-title')!);
+      const contextType = getComputedStyle(panel.querySelector('.palette-footer-context')!);
+      return {
+        panel: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        footer: box('.palette-footer'), search: box('.search-bar, .storage-search'),
+        input: box('.search-bar input, .storage-search input'), row: box('.result'),
+        icon: box('.result .entry-icon'), title: { x: title.x, y: title.y, height: title.height },
+        navigation: box('.footer-navigation'), footerTitle: { x: footerTitle.x, y: footerTitle.y, height: footerTitle.height },
+        footerType: { size: footerType.fontSize, weight: footerType.fontWeight, color: footerType.color },
+        contextType: { size: contextType.fontSize, weight: contextType.fontWeight, lineHeight: contextType.lineHeight, color: contextType.color },
+      };
+    });
+  }
+  for (const size of [{ width: 750, height: 760 }, { width: 390, height: 600 }, { width: 390, height: 440 }]) {
+    await page.setViewportSize(size);
+    await root.fill('local storage');
+    await expect(surface.getByRole('option').first()).toBeVisible();
+    const main = await geometry();
+    await surface.locator('.palette-footer').screenshot({ path: `test-results/footer-main-${language}-${size.width}x${size.height}.png` });
+    expect(main.footer.height).toBe(44);
+    expect(main.search.height).toBe(56);
+    expect(main.row.height).toBe(40);
+    expect(main.panel.height).toBeLessThanOrEqual(516);
+    await root.press('Enter');
+    await expect(surface.locator('.storage-row')).toHaveCount(1);
+    const storage = await geometry();
+    await surface.locator('.palette-footer').screenshot({ path: `test-results/footer-storage-${language}-${size.width}x${size.height}.png` });
+    for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(storage[key]).toEqual(main[key]);
+    expect(storage.input.x).toBe(main.input.x);
+    expect(storage.input.y).toBe(main.input.y);
+    await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport();
+    expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await surface.locator('.footer-back').click();
+    await expect(root).toBeFocused(); await expect(root).toHaveValue('local storage');
+    await root.fill('Layout Group Unique');
+    await expect(surface.getByRole('option').filter({ hasText: 'Layout Group Unique' }).first()).toBeVisible();
+    const groupMain = await geometry();
+    await surface.getByRole('option').filter({ hasText: 'Layout Group Unique' }).first().click();
+    await expect(surface.locator('.group-view .result')).toHaveCount(1);
+    const group = await geometry();
+    for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(group[key]).toEqual(groupMain[key]);
+    expect(group.input.x).toBe(groupMain.input.x);
+    expect(group.input.y).toBe(groupMain.input.y);
+    await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport();
+    await page.keyboard.press('Escape'); await expect(root).toBeFocused();
+  }
+});
 
 for (const language of ['English', 'Chinese']) test(`${language} storage list copies exact values, details, names and restores navigation`, async () => {
   const chinese = language === 'Chinese';
@@ -903,6 +988,11 @@ for (const language of ['English', 'Chinese']) test(`${language} storage list co
   await surface.locator('.palette').screenshot({ path: `test-results/storage-detail-${language}.png` });
   await page.keyboard.press('Escape');
   await expect(input).toHaveValue('config'); await expect(input).toBeFocused();
+  // The footer chevron is the mouse path out of the deepest layer: one click, same as Escape.
+  await input.press('Meta+k'); await actionInput.fill('details'); await actionInput.press('Enter');
+  await expect(surface.locator('.storage-detail')).toBeFocused();
+  await surface.locator('.palette-footer .footer-back').click();
+  await expect(input).toHaveValue('config'); await expect(input).toBeFocused();
   await input.fill('markup'); await input.press('Enter');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('<img src=x onerror=alert(1)>');
   await expect(surface.locator('.storage-row img')).toHaveCount(0);
@@ -911,6 +1001,7 @@ for (const language of ['English', 'Chinese']) test(`${language} storage list co
   await page.emulateMedia({ colorScheme: 'dark' });
   await surface.locator('.palette').screenshot({ path: `test-results/storage-dark-${language}.png` });
   await page.emulateMedia({ colorScheme: 'light' });
+  await surface.locator('.palette').screenshot({ path: `test-results/storage-light-${language}.png` });
   await page.setViewportSize({ width: 390, height: 600 });
 
   expect(await surface.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
@@ -1159,6 +1250,154 @@ test('English recent switcher keeps the source active while selecting and switch
   await expect.poll(() => worker.evaluate(async () => (await chrome.windows.getLastFocused()).id)).toBe(popup.target.windowId);
 });
 
+test('English recent switcher keeps search disabled and neutral during ordinary typing and navigation', async () => {
+  const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
+  const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
+  const popup = await recentPopup(a);
+  const input = popup.page.getByRole('combobox');
+  const list = popup.page.getByRole('listbox');
+  const capsule = () => popup.page.locator('.search-bar').evaluate(node => {
+    const style = getComputedStyle(node, '::before');
+    return { border: style.borderColor, shadow: style.boxShadow };
+  });
+  await expect(input).toBeDisabled(); await expect(input).not.toBeFocused();
+  await expect(list).toBeFocused(); await expect(list).toHaveAttribute('tabindex', '0');
+  await expect(input).not.toHaveAttribute('aria-activedescendant');
+  const selected = await popup.selected();
+  const count = await popup.page.getByRole('option').count();
+  await expect(list).toHaveAttribute('aria-activedescendant', selected);
+  await expect.poll(capsule).toEqual({ border: 'rgba(0, 0, 0, 0)', shadow: 'none' });
+  await expect(input).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+  await input.evaluate(node => node.focus());
+  await expect(input).not.toBeFocused(); await expect(list).toBeFocused();
+  await popup.page.keyboard.type('Filter-One');
+  await expect(input).toHaveValue(''); await expect(input).toBeDisabled();
+  await expect(popup.page.getByRole('option')).toHaveCount(count);
+  await popup.page.keyboard.press('ArrowDown');
+  await expect(list).not.toHaveAttribute('aria-activedescendant', selected);
+  await popup.page.keyboard.press('ArrowUp');
+  await expect(list).toHaveAttribute('aria-activedescendant', selected);
+  await expect(list).toBeFocused(); await expect(input).not.toBeFocused();
+  await expect.poll(capsule).toEqual({ border: 'rgba(0, 0, 0, 0)', shadow: 'none' });
+  await expect(input).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+  await popup.key('keyDown', 'Escape', 'Escape', 27);
+  await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(popup.target.id);
+});
+
+for (const confirm of ['Enter', 'row', 'footer'] as const) {
+  test(`English recent switcher search filters visible targets and confirms with ${confirm}`, async () => {
+    const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
+    const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
+    const c = await context.newPage(); await c.goto(`${origin}/Filter-Two`);
+    const popup = await recentPopup(a);
+    const input = popup.page.getByRole('combobox');
+    await expect(popup.page.getByRole('listbox')).toBeFocused();
+    await expect(input).toBeDisabled(); await expect(input).toHaveValue('');
+    await expect(input).toHaveAttribute('placeholder', 'Search recent tabs…');
+    expect(await popup.page.locator('.search-bar').evaluate(node => node.getBoundingClientRect().height)).toBe(56);
+    const original = await popup.page.getByRole('option').evaluateAll(rows => rows.map(row => ({ id: row.id, text: row.textContent })));
+    await popup.page.locator('button.search-icon').click();
+    await expect(input).toBeEnabled(); await expect(input).toBeFocused();
+    await input.pressSequentially('Filter');
+    const expected = original.filter(row => row.text?.includes('Filter')).map(row => row.id);
+    await expect(popup.page.getByRole('option')).toHaveCount(2);
+    expect(await popup.page.getByRole('option').evaluateAll(rows => rows.map(row => row.id))).toEqual(expected);
+    await expect(popup.page.locator('.entry-title mark')).toHaveText(['Filter', 'Filter']);
+    await popup.page.keyboard.press('ArrowDown');
+    const target = Number((await popup.selected()).replace('recent-', ''));
+    await expect(input).toHaveAttribute('aria-activedescendant', `recent-${target}`);
+    expect(await popup.active()).toBe(popup.target.id);
+    if (confirm === 'Enter') await popup.key('keyDown', 'Enter', 'Enter', 13);
+    else if (confirm === 'row') await popup.page.locator(`#recent-${target}`).click();
+    else await popup.page.locator('.primary-action').click();
+    await expect.poll(popup.closed).toBe(true);
+    expect(await popup.active()).toBe(target);
+  });
+}
+
+for (const method of ['wrapper', 'icon', 'Control+f', 'Meta+f'] as const) test(`English recent switcher search accepts ordinary typing after ${method} and modifier release`, async () => {
+  const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
+  const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
+  const popup = await recentPopup(a);
+  const input = popup.page.getByRole('combobox');
+  const list = popup.page.getByRole('listbox');
+  await expect(list).toBeFocused(); await expect(input).toBeDisabled();
+  const modifier = method === 'Meta+f' ? 'Meta' : 'Control';
+  await popup.page.keyboard.down(modifier);
+  if (method === 'wrapper') await popup.page.locator('.recent-search-field').click();
+  else if (method === 'icon') await popup.page.locator('button.search-icon.recent-search-activate').click();
+  else await popup.page.keyboard.press('f');
+  await expect(popup.page.locator('.palette-footer-title')).toHaveText('Switch Recent Tabs');
+  await popup.page.keyboard.up(modifier);
+  await expect(input).toBeEnabled(); await expect(input).toBeFocused();
+  await expect(list).not.toHaveAttribute('aria-activedescendant');
+  await expect(input).toHaveAttribute('aria-activedescendant', await popup.selected());
+  expect(await popup.closed()).toBe(false); expect(await popup.active()).toBe(popup.target.id);
+  await list.click({ position: { x: 10, y: 240 } });
+  await expect(list).toBeFocused();
+  if (method === 'wrapper') await popup.page.locator('.recent-search-field').click();
+  else if (method === 'icon') await popup.page.locator('button.search-icon.recent-search-activate').click();
+  else await popup.page.keyboard.press(method);
+  await expect(input).toBeFocused();
+  await input.pressSequentially('Filter-One');
+  await expect(popup.page.getByRole('option')).toHaveCount(1);
+  const target = Number((await popup.selected()).replace('recent-', ''));
+  await popup.key('keyDown', 'Enter', 'Enter', 13);
+  await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(target);
+});
+
+test('English recent switcher search handles empty results, composition and removed filtered selection safely', async () => {
+  const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
+  const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
+  const c = await context.newPage(); await c.goto(`${origin}/Filter-Two`);
+  const popup = await recentPopup(a);
+  const input = popup.page.getByRole('combobox');
+  const originalCount = await popup.page.getByRole('option').count();
+  await popup.page.locator('button.search-icon').click();
+  await expect(input).toBeEnabled(); await expect(input).toBeFocused();
+  await input.fill('127.0.0.1');
+  await expect(popup.page.getByRole('option')).toHaveCount(3);
+  await expect(popup.page.locator('.entry-subtitle mark')).toHaveCount(3);
+  await input.fill('no-such-tab');
+  await expect(popup.page.getByRole('option')).toHaveCount(0);
+  await expect(input).not.toHaveAttribute('aria-activedescendant');
+  await expect(popup.page.locator('.primary-action')).toBeDisabled();
+  await popup.key('keyDown', 'Enter', 'Enter', 13);
+  await popup.key('keyUp', 'Control', 'ControlLeft', 17);
+  expect(await popup.closed()).toBe(false); expect(await popup.active()).toBe(popup.target.id);
+  await input.fill(''); await expect(popup.page.getByRole('option')).toHaveCount(originalCount);
+  await input.fill('Filter');
+  await input.dispatchEvent('compositionstart');
+  await popup.key('keyDown', 'Enter', 'Enter', 13);
+  await popup.key('keyUp', 'Control', 'ControlLeft', 17);
+  expect(await popup.closed()).toBe(false);
+  await input.dispatchEvent('keydown', { key: 'Escape', keyCode: 229 });
+  expect(await popup.closed()).toBe(false);
+  await input.dispatchEvent('compositionend');
+  await popup.key('keyDown', 'Enter', 'Enter', 13, 8);
+  expect(await popup.closed()).toBe(false);
+  await popup.key('keyDown', 'Enter', 'Enter', 13, 2);
+  expect(await popup.closed()).toBe(false);
+  const browser = await context.newCDPSession(popup.page);
+  await browser.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, autoRepeat: true });
+  expect(await popup.closed()).toBe(false);
+  await popup.page.keyboard.press('Meta+ArrowDown');
+  expect(await popup.selected()).toBe(await popup.page.getByRole('option').last().getAttribute('id'));
+  await popup.page.keyboard.press('PageUp');
+  expect(await popup.selected()).toBe(await popup.page.getByRole('option').first().getAttribute('id'));
+  const selected = Number((await popup.selected()).replace('recent-', ''));
+  await worker.evaluate(id => chrome.tabs.remove(id), selected);
+  await expect(popup.page.getByRole('option')).toHaveCount(1);
+  await expect(input).not.toHaveAttribute('aria-activedescendant');
+  await expect(popup.page.locator('.primary-action')).toBeDisabled();
+  await popup.key('keyUp', 'Control', 'ControlLeft', 17);
+  expect(await popup.closed()).toBe(false); expect(await popup.active()).toBe(popup.target.id);
+  await popup.page.keyboard.press('ArrowDown');
+  const remaining = Number((await popup.selected()).replace('recent-', ''));
+  await popup.page.locator('.primary-action').click();
+  await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(remaining);
+});
+
 test('English recent switcher missed release keeps the original tab and Enter confirms the reverse selection', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
@@ -1307,6 +1546,86 @@ test('English recent bridge hands held Control to the window for navigation and 
   await next.keyboard.up('Control');
   await expect.poll(f.active).toBe(Number(selected!.replace('recent-', '')));
   await expect.poll(() => next.isClosed()).toBe(true);
+});
+
+test('English recent bridge Escape cancels the independent switcher during asynchronous startup', async () => {
+  const f = await bridgeFixture();
+  const script = await readFile(resolve('dist/switcher.js'), 'utf8');
+  await context.route('**/switcher.js', async route => {
+    await route.fulfill({ contentType: 'text/javascript', body: `const originalCommands = chrome.commands.getAll.bind(chrome.commands);\nchrome.commands.getAll = () => new Promise(resolve => { window.__resumeSwitcherCommands = () => originalCommands().then(resolve); });\n${script}` });
+  });
+  await f.a.keyboard.down('Control');
+  const created = context.waitForEvent('page');
+  await worker.evaluate(ids => chrome.windows.create({ url: `switcher.html?tab=${ids.source}&window=${ids.window}&direction=1`, type: 'popup', focused: true }), f.ids);
+  const popup = await created;
+  await popup.waitForFunction(() => typeof (window as any).__resumeSwitcherCommands === 'function');
+  await popup.bringToFront();
+  await popup.keyboard.press('Escape').catch(error => { if (!popup.isClosed()) throw error; });
+  await expect.poll(() => popup.isClosed()).toBe(true);
+  expect(await f.active()).toBe(f.ids.source);
+});
+
+test('English recent bridge replays paging, jumps and command steps in order after asynchronous startup', async () => {
+  const f = await bridgeFixture();
+  await worker.evaluate(async ({ windowId, base }) => {
+    for (let at = 0; at < 20; at++) await chrome.tabs.create({ windowId, url: `${base}/Startup-${at}`, active: false });
+  }, { windowId: f.ids.window, base: origin });
+  const script = await readFile(resolve('dist/switcher.js'), 'utf8');
+  await context.route('**/switcher.js', async route => {
+    await route.fulfill({ contentType: 'text/javascript', body: `const originalCommands = chrome.commands.getAll.bind(chrome.commands);\nchrome.commands.getAll = () => new Promise(resolve => { window.__resumeSwitcherCommands = () => originalCommands().then(resolve); });\nconst originalAddCommand = chrome.commands.onCommand.addListener.bind(chrome.commands.onCommand);\nchrome.commands.onCommand.addListener = callback => { window.__stepSwitcher = callback; originalAddCommand(callback); };\n${script}` });
+  });
+  const created = context.waitForEvent('page');
+  await worker.evaluate(ids => chrome.windows.create({ url: `switcher.html?tab=${ids.source}&window=${ids.window}&direction=1`, type: 'popup', focused: true }), f.ids);
+  const popup = await created;
+  await popup.waitForFunction(() => typeof (window as any).__resumeSwitcherCommands === 'function');
+  await popup.bringToFront();
+  await popup.setViewportSize({ width: 750, height: 316 });
+  const cdp = await context.newCDPSession(popup);
+  const key = (key: string, code: string, windowsVirtualKeyCode: number, modifiers = 0) => cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode, modifiers });
+  await key('PageUp', 'PageUp', 33);
+  await key('ArrowDown', 'ArrowDown', 40, 2);
+  await key('PageUp', 'PageUp', 33);
+  await key('ArrowUp', 'ArrowUp', 38, 1);
+  await key('Tab', 'Tab', 9, 8);
+  await popup.evaluate(() => (window as any).__stepSwitcher('switch-recent'));
+  await key('PageDown', 'PageDown', 34);
+  await popup.evaluate(() => (window as any).__resumeSwitcherCommands());
+  const rows = popup.getByRole('option');
+  await expect(rows.first()).toBeVisible();
+  expect(await rows.count()).toBeGreaterThan(20);
+  const pageSize = await popup.locator('.recent-list').evaluate(node => Math.max(1, Math.floor(node.clientHeight / 40)));
+  expect(pageSize).toBeLessThan(10);
+  const target = await rows.nth(await rows.count() - 1 - pageSize).getAttribute('id');
+  await expect(popup.getByRole('listbox')).toHaveAttribute('aria-activedescendant', target!);
+  expect(await f.active()).toBe(f.ids.source);
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Control', code: 'ControlLeft', windowsVirtualKeyCode: 17 });
+  await expect.poll(() => popup.isClosed()).toBe(true);
+  await expect.poll(f.active).toBe(Number(target!.replace('recent-', '')));
+});
+
+test('English recent bridge search during asynchronous startup supersedes buffered release', async () => {
+  const f = await bridgeFixture();
+  const script = await readFile(resolve('dist/switcher.js'), 'utf8');
+  await context.route('**/switcher.js', async route => {
+    await route.fulfill({ contentType: 'text/javascript', body: `const originalCommands = chrome.commands.getAll.bind(chrome.commands);\nchrome.commands.getAll = () => new Promise(resolve => { window.__resumeSwitcherCommands = () => originalCommands().then(resolve); });\n${script}` });
+  });
+  await f.a.keyboard.down('Control');
+  const created = context.waitForEvent('page');
+  await worker.evaluate(ids => chrome.windows.create({ url: `switcher.html?tab=${ids.source}&window=${ids.window}&direction=1`, type: 'popup', focused: true }), f.ids);
+  const popup = await created;
+  await popup.waitForFunction(() => typeof (window as any).__resumeSwitcherCommands === 'function');
+  await popup.bringToFront();
+  const cdp = await context.newCDPSession(popup);
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Control', code: 'ControlLeft', windowsVirtualKeyCode: 17 });
+  await popup.keyboard.press('Control+f');
+  await popup.evaluate(() => (window as any).__resumeSwitcherCommands());
+  const input = popup.getByRole('combobox'); await expect(input).toBeFocused();
+  await expect(popup.locator('.palette-footer-title')).toHaveText('Switch Recent Tabs');
+  expect(await f.active()).toBe(f.ids.source);
+  await input.pressSequentially('Bridge-B');
+  await expect(popup.getByRole('option')).toHaveCount(1);
+  await popup.locator('.primary-action').click();
+  await expect.poll(() => popup.isClosed()).toBe(true); await expect.poll(f.active).toBe(f.ids.previous);
 });
 
 test('English recent bridge cancels when focus is lost before the window becomes ready', async () => {
@@ -1956,7 +2275,7 @@ test('English palette launch storage overlay Escape returns after clicking non-f
   await expect(surface.getByLabel('Name', { exact: true })).toBeFocused();
   await page.keyboard.press('Escape'); await expect(search).toBeFocused();
   await search.fill('local storage'); await page.keyboard.press('Enter');
-  await surface.locator('.storage-header strong').click(); await page.keyboard.press('Escape');
+  await surface.locator('.palette-footer-context').click(); await page.keyboard.press('Escape');
   await expect(search).toBeFocused();
   await search.fill('settings'); await page.keyboard.press('Enter');
   await surface.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
@@ -2469,9 +2788,17 @@ test('English interaction polish storage shares menu footer highlighting and foc
   const surface = await openStorageOverlay(page);
   await surface.locator('.search-bar input').fill('local storage'); await page.keyboard.press('Enter');
   const search = surface.locator('.storage-search input');
+  // A secondary list names its layer at the left of the footer and spends nothing on the ↑↓ hint.
+  await expect(surface.locator('.palette-footer .navigation-hint')).toHaveCount(0);
+  await expect(surface.locator('.palette-footer-title')).toHaveText('Local Storage');
   await expect(surface.locator('.storage-row')).toHaveCount(1);
+  const locationTitle = await surface.locator('.palette-footer-title').boundingBox();
+  const contextBox = await surface.locator('.palette-footer-context').boundingBox();
   await surface.locator('.storage-row').first().click();
   await expect(surface.locator('.storage-notice')).toContainText('Value copied');
+  await expect(surface.locator('.palette-footer-context')).toHaveCount(0);
+  expect(await surface.locator('.palette-footer-title').boundingBox()).toEqual(locationTitle);
+  expect((await surface.locator('.palette-footer-status').boundingBox())!.x).toBe(contextBox!.x);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('value');
   await search.fill('polish');
   await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 3));
@@ -2596,7 +2923,7 @@ test('Chinese result footer guards busy and failed runs and supports retry and m
   await expect(picker).toBeFocused(); await expect(ui.locator('.script-output')).toHaveCount(0);
 });
 
-test('English recent bridge storage overlay shares palette geometry and accepts held navigation on release', async () => {
+test('English recent bridge storage overlay shares palette geometry and focuses its capsule only after search activation', async () => {
   const f = await bridgeFixture();
   await worker.evaluate(async () => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
@@ -2605,22 +2932,147 @@ test('English recent bridge storage overlay shares palette geometry and accepts 
   const surface = f.a.frameLocator('.zing-frame');
   await expect(surface.getByRole('combobox')).toBeFocused();
   const paletteBounds = await surface.locator('.palette').boundingBox();
+  const paletteFooter = await surface.locator('.palette-footer').boundingBox();
+  const navigationHint = await surface.locator('.navigation-hint').innerHTML();
+  const searchGeometry = () => surface.locator('.search-bar').evaluate(node => {
+    const input = node.querySelector('input')!;
+    const icon = node.querySelector('.search-icon')!;
+    const close = node.querySelector('.close-button')!;
+    const rect = (element: Element) => { const { x, y, width, height } = element.getBoundingClientRect(); return { x, y, width, height }; };
+    const pill = getComputedStyle(node, '::before');
+    return { bar: rect(node), input: rect(input), icon: rect(icon), close: rect(close), border: pill.borderColor, radius: pill.borderRadius, background: pill.backgroundColor, font: getComputedStyle(input).fontSize };
+  });
+  await expect.poll(async () => (await searchGeometry()).border).toBe('rgb(11, 87, 208)');
+  await expect.poll(async () => (await searchGeometry()).background).toBe('rgb(255, 255, 255)');
+  const mainSearch = await searchGeometry();
   await f.a.keyboard.press('Escape');
   await f.a.keyboard.down('Control'); await f.open();
   await expect(f.a.locator('#zing-command-palette')).toBeAttached();
   await expect(surface.getByRole('listbox')).toBeFocused();
+  await expect(surface.getByRole('combobox')).toBeDisabled();
   expect(await f.windows()).toBe(0);
   const switcherBounds = await surface.locator('.palette').boundingBox();
   expect(switcherBounds).toEqual(paletteBounds);
+  expect(await surface.locator('.palette-footer').boundingBox()).toEqual(paletteFooter);
+  expect(await surface.locator('.navigation-hint').innerHTML()).toBe(navigationHint);
+  await expect.poll(async () => {
+    const { bar, input, icon, close } = await searchGeometry();
+    return { bar, input, icon, close };
+  }).toEqual({ bar: mainSearch.bar, input: mainSearch.input, icon: mainSearch.icon, close: mainSearch.close });
+  await expect.poll(async () => (await searchGeometry()).border).toBe('rgba(0, 0, 0, 0)');
+  await expect(surface.getByRole('combobox')).toHaveValue('');
+  await expect(surface.getByRole('combobox')).toHaveAttribute('placeholder', 'Search recent tabs…');
+  await expect(surface.locator('.recent-help')).toHaveCount(0);
+  await expect(surface.locator('.palette-footer-title')).toHaveText('Release Ctrl to switch');
+  await expect(surface.locator('.primary-action')).toHaveText('Switch↵');
+  await expect(surface.locator('.secondary-action')).toHaveText('Cancelesc');
+  expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
+  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-shared-footer.png' });
   const initial = await surface.locator('[aria-selected=true]').getAttribute('id');
   await f.a.keyboard.press('n');
   expect(await surface.locator('[aria-selected=true]').getAttribute('id')).not.toBe(initial);
   await f.a.keyboard.press('p');
   expect(await surface.locator('[aria-selected=true]').getAttribute('id')).toBe(initial);
   expect(await f.active()).toBe(f.ids.source);
+  await surface.locator('button.search-icon').click();
+  await expect(surface.getByRole('combobox')).toBeEnabled();
+  await expect(surface.getByRole('combobox')).toBeFocused();
+  await expect.poll(searchGeometry).toEqual(mainSearch);
+  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-activated.png' });
   await f.a.keyboard.up('Control');
+  await expect(surface.getByRole('combobox')).toBeFocused();
+  expect(await f.active()).toBe(f.ids.source);
+  await surface.locator('.primary-action').click();
   await expect.poll(f.active).toBe(Number(initial!.replace('recent-', '')));
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+test('English recent bridge storage overlay held search activation ignores release and confirms filtered results with Enter', async () => {
+  const f = await bridgeFixture();
+  const extra = await context.newPage(); await extra.goto(`${origin}/Bridge-C`);
+  await f.a.bringToFront();
+  await f.a.keyboard.down('Control'); await f.open();
+  const surface = f.a.frameLocator('.zing-frame');
+  const input = surface.getByRole('combobox');
+  await expect(surface.getByRole('listbox')).toBeFocused(); await expect(input).toBeDisabled();
+  await f.a.keyboard.press('f');
+  await expect(input).toBeEnabled(); await expect(input).toBeFocused();
+  await input.fill('Bridge');
+  await expect(surface.getByRole('option')).toHaveCount(3);
+  const selected = await input.getAttribute('aria-activedescendant');
+  await f.a.keyboard.press('n');
+  await expect(input).not.toHaveAttribute('aria-activedescendant', selected!);
+  await f.a.keyboard.press('p');
+  await expect(input).toHaveAttribute('aria-activedescendant', selected!);
+  await expect(input).toHaveValue('Bridge');
+  expect(await f.active()).toBe(f.ids.source);
+  await input.fill('Bridge C');
+  await expect(surface.getByRole('option')).toHaveCount(1);
+  await expect(surface.locator('.entry-title mark')).toHaveText(['Bridge', 'C']);
+  await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
+  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-filtered.png' });
+  const target = Number((await input.getAttribute('aria-activedescendant'))!.replace('recent-', ''));
+  await f.a.keyboard.up('Control');
+  await expect(input).toBeFocused(); await expect(input).toHaveValue('Bridge C');
+  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  expect(await f.active()).toBe(f.ids.source);
+  await f.a.keyboard.press('Enter');
+  await expect.poll(f.active).toBe(target);
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+for (const method of ['wrapper', 'icon', 'keyboard'] as const) test(`English recent bridge storage overlay search accepts typing after ${method} and release`, async () => {
+  const f = await bridgeFixture();
+  await f.a.keyboard.down('Control'); await f.open();
+  const surface = f.a.frameLocator('.zing-frame');
+  const input = surface.getByRole('combobox');
+  await expect(surface.getByRole('listbox')).toBeFocused(); await expect(input).toBeDisabled();
+  if (method === 'wrapper') await surface.locator('.recent-search-field').click();
+  else if (method === 'icon') await surface.locator('button.search-icon.recent-search-activate').click();
+  else await f.a.keyboard.press('f');
+  await expect(input).toBeEnabled();
+  await expect(surface.locator('.palette-footer-title')).toHaveText('Switch Recent Tabs');
+  await f.a.keyboard.up('Control');
+  await expect(input).toBeFocused(); expect(await f.active()).toBe(f.ids.source);
+  const list = surface.getByRole('listbox');
+  await list.click({ position: { x: 10, y: 240 } });
+  await expect(list).toBeFocused();
+  if (method === 'wrapper') await surface.locator('.recent-search-field').click();
+  else if (method === 'icon') await surface.locator('button.search-icon.recent-search-activate').click();
+  else await f.a.keyboard.press('Control+f');
+  await expect(input).toBeFocused();
+  await input.pressSequentially('Bridge-B');
+  await expect(surface.getByRole('option')).toHaveCount(1);
+  await surface.locator('.palette').screenshot({ path: `/private/tmp/zing-switcher-search-${method}.png` });
+  await f.a.keyboard.press('Enter');
+  await expect.poll(f.active).toBe(f.ids.previous);
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+test('English recent bridge storage overlay search with no matches stays open until a visible choice', async () => {
+  const f = await bridgeFixture();
+  await f.a.keyboard.down('Control'); await f.open();
+  const surface = f.a.frameLocator('.zing-frame');
+  const input = surface.getByRole('combobox');
+  await expect(surface.getByRole('listbox')).toBeFocused(); await expect(input).toBeDisabled();
+  await surface.locator('button.search-icon').click();
+  await expect(input).toBeEnabled(); await expect(input).toBeFocused();
+  await input.fill('no-such-tab');
+  await expect(surface.getByRole('option')).toHaveCount(0);
+  await expect(input).not.toHaveAttribute('aria-activedescendant');
+  await expect(surface.locator('.primary-action')).toBeDisabled();
+  await f.a.keyboard.press('Enter');
+  await f.a.keyboard.up('Control');
+  expect(await f.active()).toBe(f.ids.source);
+  await expect(input).toBeFocused();
+  await input.fill(`${origin}/Bridge-B`);
+  await expect(surface.getByRole('option')).toHaveCount(1);
+  await f.a.keyboard.press('Shift+Enter');
+  await expect(input).toBeFocused(); expect(await f.active()).toBe(f.ids.source);
+  await input.press('ArrowDown');
+  await surface.getByRole('option').click();
+  await expect.poll(f.active).toBe(f.ids.previous);
 });
 
 test('English recent bridge storage overlay quick taps alternate without creating a window', async () => {
@@ -2726,15 +3178,33 @@ test('English recent bridge storage overlay rejects unfocused pages and retains 
   await expect.poll(() => popup.isClosed()).toBe(true);
 });
 
-test('English recent bridge storage overlay mouse selection and narrow geometry match palette', async () => {
+for (const language of ['English', 'Chinese']) test(`${language} recent bridge storage overlay mouse selection and narrow geometry match palette`, async () => {
   const f = await bridgeFixture(); await f.a.setViewportSize({ width: 390, height: 440 });
   await f.open();
   const surface = f.a.frameLocator('.zing-frame');
   await expect(surface.getByRole('listbox')).toBeFocused();
+  await expect(surface.getByRole('combobox')).toBeDisabled();
   const before = await surface.locator('.palette').boundingBox();
   expect(before!.x).toBe(10); expect(before!.y).toBe(24);
   expect(before!.x + before!.width).toBeLessThanOrEqual(380);
   expect(before!.y + before!.height).toBeLessThanOrEqual(416);
+  const footer = await surface.locator('.palette-footer').boundingBox();
+  expect(footer!.height).toBe(44);
+  expect(footer!.y + footer!.height).toBe(before!.y + before!.height - 1);
+  await expect(surface.locator('.palette-footer-context')).toBeHidden();
+  await expect(surface.locator('.palette-footer-title')).toHaveText(language === 'Chinese' ? '松开 Ctrl 切换' : 'Release Ctrl to switch');
+  await expect(surface.getByRole('combobox')).toHaveAttribute('placeholder', language === 'Chinese' ? '搜索最近标签页…' : 'Search recent tabs…');
+  expect((await surface.locator('.search-bar').boundingBox())!.height).toBe(56);
+  await surface.locator('button.search-icon').click();
+  await expect(surface.getByRole('combobox')).toBeEnabled();
+  await expect(surface.getByRole('combobox')).toBeFocused();
+  await surface.getByRole('combobox').fill('Bridge');
+  await expect(surface.getByRole('option')).toHaveCount(2);
+  await expect(surface.locator('.primary-action')).toBeInViewport({ ratio: 1 });
+  await expect(surface.locator('.secondary-action')).toBeInViewport({ ratio: 1 });
+  expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await expect.poll(() => surface.locator('.recent-overlay').evaluate(node => getComputedStyle(node).opacity)).toBe('1');
+  await surface.locator('.palette').screenshot({ path: `/private/tmp/zing-switcher-shared-footer-narrow-${language}.png` });
   await surface.getByRole('option').filter({ hasText: 'Bridge B' }).click();
   await expect.poll(f.active).toBe(f.ids.previous);
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
@@ -2746,6 +3216,33 @@ test('English recent bridge storage overlay closes safely when its worker stops'
   const monitor = await context.newCDPSession(f.a);
   await monitor.send('ServiceWorker.enable'); await monitor.send('ServiceWorker.stopAllWorkers');
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+for (const action of ['header cancel', 'footer cancel', 'search', 'switch'] as const) test(`English recent bridge closed storage overlay Enter belongs to focused ${action} button`, async () => {
+  const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
+  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  const cdp = await context.newCDPSession(f.a);
+  const { frameTree } = await cdp.send('Page.getFrameTree');
+  const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+  const name = action.includes('cancel') ? 'Cancel' : action === 'search' ? 'Search recent tabs…' : 'Switch';
+  const buttons = async () => (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes.filter(node => node.role?.value === 'button' && node.name?.value === name);
+  await expect.poll(async () => (await buttons()).length).toBe(action.includes('cancel') ? 2 : 1);
+  const node = (await buttons())[action === 'footer cancel' ? 1 : 0];
+  const { object } = await cdp.send('DOM.resolveNode', { backendNodeId: node.backendDOMNodeId });
+  // Focus through the accessibility node without opening either production shadow
+  // root. The window key listener receives a retargeted body, not this button.
+  await cdp.send('Runtime.callFunctionOn', { objectId: object.objectId, functionDeclaration: 'function() { this.focus(); }' });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+  if (action === 'search') {
+    await f.a.keyboard.up('Control');
+    const focusedInput = async () => (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes.some(node =>
+      node.role?.value === 'combobox' && node.properties?.some(property => property.name === 'focused' && property.value?.value === true));
+    await expect.poll(focusedInput).toBe(true);
+    expect(await f.active()).toBe(f.ids.source);
+    await f.a.keyboard.press('Escape');
+  }
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  expect(await f.active()).toBe(action === 'switch' ? f.ids.previous : f.ids.source);
 });
 
 test('English recent bridge closed storage overlay preserves Vimium navigation and release', async () => {
@@ -2811,12 +3308,22 @@ test('English recent bridge storage overlay held shortcut reveals and navigates 
   await f.a.keyboard.down('Control'); await f.open();
   const surface = f.a.frameLocator('.zing-frame');
   await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
-  await expect(surface.getByRole('listbox')).toBeFocused();
-  const selected = await surface.getByRole('listbox').getAttribute('aria-activedescendant');
+  const list = surface.getByRole('listbox');
+  const input = surface.getByRole('combobox');
+  await expect(list).toBeFocused(); await expect(input).toBeDisabled();
+  await expect(input).not.toBeFocused(); await expect(input).not.toHaveAttribute('aria-activedescendant');
+  const selected = await list.getAttribute('aria-activedescendant');
   await f.a.keyboard.press('n');
-  await expect(surface.getByRole('listbox')).not.toHaveAttribute('aria-activedescendant', selected!);
+  await expect(list).not.toHaveAttribute('aria-activedescendant', selected!);
   await f.a.keyboard.press('p');
-  await expect(surface.getByRole('listbox')).toHaveAttribute('aria-activedescendant', selected!);
+  await expect(list).toHaveAttribute('aria-activedescendant', selected!);
+  await expect(list).toBeFocused(); await expect(input).toBeDisabled();
+  await expect(input).toHaveValue(''); await expect(input).toHaveCSS('caret-color', 'rgba(0, 0, 0, 0)');
+  await expect.poll(() => surface.locator('.search-bar').evaluate(node => {
+    const style = getComputedStyle(node, '::before');
+    return { border: style.borderColor, shadow: style.boxShadow };
+  })).toEqual({ border: 'rgba(0, 0, 0, 0)', shadow: 'none' });
+  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-disabled.png' });
   await f.a.keyboard.up('Control');
   await expect.poll(f.active).toBe(f.ids.previous);
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
@@ -2936,19 +3443,27 @@ async function openNativePalette() {
   return { source, palette };
 }
 
-test('English palette launch native page centers a separate window and executes against the source', async () => {
+test('English palette launch native page aligns a separate window with the content viewport and executes against the source', async () => {
   const { source, palette } = await openNativePalette();
   const bounds = await palette.evaluate(async sourceId => {
     const current = await chrome.windows.getCurrent();
     const owner = await chrome.windows.get(sourceId);
     const reply = await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' });
-    return { current, owner, snapshot: reply.data };
+    const tab = await chrome.tabs.get(reply.data.currentTabId);
+    return { current, owner, tab, snapshot: reply.data, screenX, screenY, outerWidth, outerHeight, innerWidth, innerHeight };
   }, source.windowId);
   expect(bounds.current.type).toBe('popup');
   expect(bounds.snapshot.windowId).toBe(source.windowId);
   expect(bounds.snapshot.currentTabId).toBe(source.tabId);
-  expect(Math.abs(bounds.current.left! + bounds.current.width! / 2 - bounds.owner.left! - bounds.owner.width! / 2)).toBeLessThan(3);
-  expect(Math.abs(bounds.current.top! + bounds.current.height! / 2 - bounds.owner.top! - bounds.owner.height! / 2)).toBeLessThan(3);
+  const viewportWidth = bounds.tab.width!, viewportHeight = bounds.tab.height!;
+  const expectedWidth = Math.min(750, viewportWidth - (viewportWidth <= 520 ? 20 : 48));
+  const topInset = viewportWidth <= 520 ? 24 : Math.min(150, Math.max(28, viewportHeight * .16));
+  const expectedTop = bounds.owner.top! + bounds.owner.height! - viewportHeight + topInset;
+  const contentTop = bounds.screenY + bounds.outerHeight - bounds.innerHeight - (bounds.outerWidth - bounds.innerWidth) / 2;
+  expect(Math.abs(contentTop - expectedTop)).toBeLessThan(3);
+  expect(Math.abs(bounds.screenX + bounds.outerWidth / 2 - bounds.owner.left! - bounds.owner.width! / 2)).toBeLessThan(3);
+  expect(bounds.innerWidth).toBe(expectedWidth);
+  expect(Math.abs(bounds.innerHeight - Math.min(516, viewportHeight - topInset - 24))).toBeLessThanOrEqual(1);
   const input = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await input.fill('settings'); await input.press('Enter');
   await expect(palette.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
@@ -2957,6 +3472,86 @@ test('English palette launch native page centers a separate window and executes 
   await input.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).pinned, source.tabId)).toBe(true);
   await expect.poll(() => palette.isClosed()).toBe(true);
+  expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
+});
+
+// Chrome forbids tabs.setZoom on chrome:// pages. Exercise the real standalone
+// controllers with a zoomable HTTP source by changing only its launch-time URL
+// classification in the test worker; all geometry APIs still read the real tab.
+async function launchStandaloneForGeometry(tabId: number, command = 'toggle-palette') {
+  await worker.evaluate(async ({ tabId, command }) => {
+    const source = await chrome.tabs.get(tabId);
+    await chrome.tabs.update(tabId, { active: true });
+    await chrome.windows.update(source.windowId, { focused: true });
+    const query = chrome.tabs.query, send = chrome.tabs.sendMessage;
+    Object.defineProperty(chrome.tabs, 'query', { configurable: true, value: async (options: chrome.tabs.QueryInfo) =>
+      (await query(options)).map(tab => tab.id === tabId ? { ...tab, url: 'chrome://version/', pendingUrl: undefined } : tab) });
+    Object.defineProperty(chrome.tabs, 'sendMessage', { configurable: true, value: (id: number, message: { source?: string; type?: string }, options?: chrome.tabs.MessageSendOptions) =>
+      id === tabId && message.source === 'zing-recent' && message.type === 'arm' ? Promise.resolve({ held: true }) : send(id, message, options) });
+    try {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback(command)));
+    } finally {
+      Object.defineProperty(chrome.tabs, 'query', { configurable: true, value: query });
+      Object.defineProperty(chrome.tabs, 'sendMessage', { configurable: true, value: send });
+    }
+  }, { tabId, command });
+}
+
+async function pointerViewport(page: Page, zoom: number) {
+  await page.evaluate(zoom => {
+    (window as any).__contentOrigin = undefined;
+    document.addEventListener('pointermove', event => {
+      if (event.isTrusted) (window as any).__contentOrigin = {
+        left: event.screenX - event.clientX * zoom, top: event.screenY - event.clientY * zoom,
+      };
+    }, { once: true });
+  }, zoom);
+  await page.mouse.move(101, 103);
+  await page.waitForFunction(() => Boolean((window as any).__contentOrigin));
+  return page.evaluate(() => (window as any).__contentOrigin as { left: number; top: number });
+}
+
+for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1, 1.25, .8]) test(`English palette launch native storage panel matches the overlay screen position with ${layout} at ${zoom * 100}% zoom`, async () => {
+  const page = await context.newPage(); await page.goto(`${origin}/Screen-alignment`); await page.bringToFront();
+  const source = await worker.evaluate(async ({ url, zoom }) => {
+    const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+    await chrome.tabs.setZoom(tab.id!, zoom);
+    return { tabId: tab.id!, windowId: tab.windowId };
+  }, { url: page.url(), zoom });
+  const viewport = await pointerViewport(page, zoom);
+  if (layout === 'vertical tabs') expect(viewport.left - await page.evaluate(() => screenX)).toBeGreaterThan(200);
+  await worker.evaluate(async () => {
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+  });
+  const surface = page.frameLocator('.zing-frame');
+  await expect(surface.getByRole('combobox')).toBeFocused();
+  // Read CSS geometry from the actual rendered overlay, then convert to screen
+  // DIPs. Playwright's cross-frame boundingBox already includes browser zoom.
+  const box = await surface.locator('.palette').evaluate(node => {
+    const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
+  await page.keyboard.press('Escape');
+  // Start with a different extension-origin zoom. Temporary panels must copy
+  // their source's zoom without changing this other extension page.
+  await ui.evaluate(async () => { const tab = await chrome.tabs.getCurrent(); await chrome.tabs.setZoom(tab!.id!, 1.5); });
+  await launchStandaloneForGeometry(source.tabId);
+  await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
+  const popup = context.pages().find(page => page.url().includes('popup.html#window='))!;
+  await expect(popup.getByRole('combobox')).toBeFocused();
+  const native = await popup.locator('.palette').evaluate(async node => {
+    const tab = await chrome.tabs.getCurrent(), own = await chrome.windows.getCurrent(), zoom = await chrome.tabs.getZoom(tab!.id!);
+    const rect = node.getBoundingClientRect(), frameWidth = own.width! - tab!.width!, frameHeight = own.height! - tab!.height!;
+    return { left: own.left! + frameWidth / 2 + rect.x * zoom,
+      top: own.top! + frameHeight - frameWidth / 2 + rect.y * zoom, width: rect.width * zoom, height: rect.height * zoom, zoom };
+  });
+  expect(native.zoom).toBe(zoom);
+  expect(Math.abs(native.left - viewport.left - box.x * zoom)).toBeLessThan(3);
+  expect(Math.abs(native.top - viewport.top - box.y * zoom)).toBeLessThan(3);
+  expect(Math.abs(native.width - box.width * zoom)).toBeLessThanOrEqual(1);
+  expect(Math.abs(native.height - box.height * zoom)).toBeLessThanOrEqual(1);
+  expect(await ui.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(1.5);
   expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
 });
 
@@ -2975,26 +3570,63 @@ test('English palette launch native window closes on Escape shortcut and focus l
   await expect.poll(() => opened.palette.isClosed()).toBe(true);
 });
 
-test('English palette launch native visual sizing matches the recent switcher and stays compact', async () => {
-  const { source, palette } = await openNativePalette();
+for (const zoom of [1, 1.25, .8]) test(`English palette launch native visual sizing matches the recent switcher at ${zoom * 100}% zoom and stays compact`, async () => {
+  const page = await context.newPage(); await page.goto(`${origin}/Switcher-screen-alignment`); await page.bringToFront();
+  const source = await worker.evaluate(async ({ url, zoom }) => {
+    const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+    await chrome.tabs.setZoom(tab.id!, zoom); return { tabId: tab.id!, windowId: tab.windowId };
+  }, { url: page.url(), zoom });
+  await launchStandaloneForGeometry(source.tabId);
+  await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
+  const palette = context.pages().find(page => page.url().includes('popup.html#window='))!;
+  await expect(palette.getByRole('combobox')).toBeFocused();
   const bounds = await palette.evaluate(() => chrome.windows.getCurrent());
-  expect((await palette.locator('.search-bar').boundingBox())!.height).toBe(56);
+  expect(await palette.locator('.search-bar').evaluate(node => node.getBoundingClientRect().height)).toBeCloseTo(56, 1);
   await palette.keyboard.press('Escape').catch(error => { if (!palette.isClosed()) throw error; });
   await expect.poll(() => palette.isClosed()).toBe(true);
-  await worker.evaluate(async () => {
-    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
-    await Promise.all(callbacks.map(callback => callback('switch-recent')));
-  });
+  await page.bringToFront();
+  await launchStandaloneForGeometry(source.tabId, 'switch-recent');
   await expect.poll(() => context.pages().some(page => page.url().includes('switcher.html?'))).toBe(true);
   const switcher = context.pages().find(page => page.url().includes('switcher.html?'))!;
   await expect(switcher.getByRole('option').first()).toBeVisible();
+  await expect(switcher.getByRole('listbox')).toBeFocused();
+  await expect(switcher.getByRole('combobox')).toBeDisabled();
+  expect(await switcher.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(zoom);
+  expect(await switcher.locator('.search-bar').evaluate(node => node.getBoundingClientRect().height)).toBeCloseTo(56, 1);
   const actual = await switcher.evaluate(() => chrome.windows.getCurrent());
   for (const key of ['width', 'height', 'left', 'top'] as const) expect(actual[key]).toBe(bounds[key]);
-  await switcher.screenshot({ path: '/private/tmp/zing-switcher-polish.png' });
+  const rendered = await switcher.evaluate(async () => {
+    const tab = (await chrome.tabs.getCurrent())!;
+    const rect = (selector: string) => { const box = document.querySelector(selector)!.getBoundingClientRect();
+      return { x: box.x, y: box.y, right: box.right, bottom: box.bottom, width: box.width, height: box.height }; };
+    return { innerWidth, innerHeight, tabWidth: tab.width!, tabHeight: tab.height!,
+      bodyWidth: document.body.scrollWidth, bodyHeight: document.body.scrollHeight,
+      footer: rect('.palette-footer'), close: rect('.close-button') };
+  });
+  expect(Math.abs(rendered.innerWidth * zoom - rendered.tabWidth)).toBeLessThanOrEqual(zoom);
+  expect(Math.abs(rendered.innerHeight * zoom - rendered.tabHeight)).toBeLessThanOrEqual(zoom);
+  expect(rendered.bodyWidth).toBeLessThanOrEqual(rendered.innerWidth);
+  expect(rendered.bodyHeight).toBeLessThanOrEqual(rendered.innerHeight);
+  for (const box of [rendered.footer, rendered.close]) {
+    expect(box.x).toBeGreaterThanOrEqual(0); expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(rendered.innerWidth + 1); expect(box.bottom).toBeLessThanOrEqual(rendered.innerHeight + 1);
+  }
+  expect(Math.abs(rendered.footer.bottom - rendered.innerHeight)).toBeLessThanOrEqual(1);
+  // Capture the native content rectangle in screen DIPs. CSS viewport dimensions
+  // crop the image at browser zoom because the capture surface uses native units.
+  const capture = await context.newCDPSession(switcher);
+  const screenshot = await capture.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
+    clip: { x: 0, y: 0, width: rendered.tabWidth, height: rendered.tabHeight, scale: 1 } });
+  await writeFile(`/private/tmp/zing-switcher-polish-${zoom * 100}.png`, Buffer.from(screenshot.data, 'base64'));
+  await capture.detach();
+  await switcher.evaluate(async () => chrome.tabs.setZoom((await chrome.tabs.getCurrent())!.id!, 1));
   await switcher.setViewportSize({ width: 390, height: 440 });
   expect(await switcher.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(390);
-  const footer = await switcher.locator('footer').boundingBox();
-  expect(footer!.y + footer!.height).toBeLessThanOrEqual(440);
+  const footer = await switcher.locator('.palette-footer').boundingBox();
+  expect(footer!.height).toBe(44);
+  expect(footer!.y + footer!.height).toBe(440);
+  await expect(switcher.locator('.recent-help')).toHaveCount(0);
+  expect(await switcher.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await expect(switcher.locator('footer').getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
   expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, source.tabId)).toBe(true);
 });
@@ -3007,14 +3639,20 @@ test('English Tab Group search management and nested keyboard navigation', async
     await chrome.tabGroups.update(id, { title: 'Research', color: 'blue', collapsed: true });
     return { id, a: a.id!, b: b.id! };
   }, origin);
+  await ui.setViewportSize({ width: 750, height: 516 });
   const root = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await root.fill('Research');
   await expect(ui.getByRole('option').filter({ hasText: 'Tab Group: Research' })).toBeVisible();
+  const mainPanel = await ui.locator('.palette').boundingBox();
+  const mainFooter = await ui.locator('.palette-footer').boundingBox();
   await expect(ui.locator('.tab-group-badge')).toHaveCount(2);
   await ui.getByRole('option').filter({ hasText: 'Tab Group: Research' }).click();
   const search = ui.getByRole('combobox', { name: 'Search tabs in this group…' });
   await expect(search).toBeFocused();
   await expect(ui.getByRole('option')).toHaveCount(2);
+  expect(await ui.locator('.palette').boundingBox()).toEqual(mainPanel);
+  expect(await ui.locator('.palette-footer').boundingBox()).toEqual(mainFooter);
+  expect(mainPanel!.height).toBe(516); expect(mainFooter!.height).toBe(44);
   await search.press('Control+n'); await search.press('Control+p');
   async function action(text: string) {
     await ui.keyboard.press('Meta+k');
@@ -3028,7 +3666,7 @@ test('English Tab Group search management and nested keyboard navigation', async
   await ui.keyboard.press('Meta+k'); await ui.keyboard.press('Escape');
   await expect(name).toBeFocused();
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(ui.getByRole('heading')).toHaveText('Tab Group: Reading');
+  await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('Tab Group: Reading');
   await action('Change Group Color');
   await ui.getByLabel('Change Group Color', { exact: true }).selectOption('purple');
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
@@ -3045,6 +3683,10 @@ test('English Tab Group search management and nested keyboard navigation', async
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
   await search.press('Backspace'); await expect(root).toBeFocused();
   await expect(root).toHaveValue('Research');
+  await root.fill('Reading'); await ui.getByRole('option').filter({ hasText: 'Tab Group: Reading' }).click();
+  // The footer chevron is the mouse path out of a layer: one click returns to the search that opened it.
+  await ui.locator('.palette-footer .footer-back').click();
+  await expect(root).toBeFocused(); await expect(root).toHaveValue('Reading');
   await root.fill('Reading'); await ui.getByRole('option').filter({ hasText: 'Tab Group: Reading' }).click();
   await action('Close Tab');
   await expect(ui.getByText('This tab group is no longer in this window.')).toBeVisible();
@@ -3081,13 +3723,13 @@ test('Chinese Tab Group labels and compact footer stay usable', async () => {
   await expect(ui.getByLabel('标签组名称')).toBeFocused();
   await ui.getByLabel('标签组名称').fill('阅读资料');
   await ui.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(ui.getByRole('heading')).toHaveText('标签组: 阅读资料');
+  await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('标签组: 阅读资料');
   await ui.locator('.palette').screenshot({ path: '/private/tmp/zing-tab-group-zh.png' });
   await worker.evaluate(id => chrome.tabGroups.update(id, { title: '外部改名' }), group);
   // This headless Chrome does not reliably emit tabGroups.onUpdated for API edits.
   // Exercise the existing refresh-on-focus path used when returning to zing.
   await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await expect(ui.getByRole('heading')).toHaveText('标签组: 外部改名');
+  await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('标签组: 外部改名');
   await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
 });
 

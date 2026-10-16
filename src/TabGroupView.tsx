@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, Layers, Palette, PanelTop, Pencil, Save, X } from 'lucide-react';
+import { Layers, Palette, PanelTop, Pencil, Save, Search, X } from 'lucide-react';
 import { BackLayer } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
@@ -61,6 +61,12 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
   function toggleMenu() {
     if (!busy) { rememberCaret(); setMenu(!menu); setActionQuery(''); setActionId(''); }
   }
+  /** The footer breadcrumb mirrors Escape: it leaves exactly the deepest layer. */
+  function back() {
+    if (menu) { setMenu(false); return; }
+    if (editor) { setEditor(undefined); return; }
+    onBack();
+  }
   async function run(id: string) {
     if (busy || !group) return;
     if (id === 'name' || id === 'color') { rememberCaret(); setName(group.title); setColor(group.color); setEditor(id); setMenu(false); setError(''); return; }
@@ -79,17 +85,17 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
     finally { setBusy(false); }
   }
   const primary: { id: string; title: string; danger?: boolean } | undefined = menu ? chosen : editor ? { id: 'save', title: t('groupSave') } : selected ? { id: 'switch', title: t('switchTabPrimary') } : undefined;
+  const groupLabel = `${t('categoryTabGroup')}: ${group?.title || t('unnamedGroup')}`;
   const body = <>
-    <header className="settings-header"><button className="settings-back" aria-label={t('back')} onClick={() => editor ? setEditor(undefined) : onBack()}><ArrowLeft size={18} /></button>
-      <h1><Layers size={18} data-color={group?.color} /> {editor ? t(editor === 'name' ? 'groupRename' : 'groupColor') : `${t('categoryTabGroup')}: ${group?.title || t('unnamedGroup')}`}</h1><kbd>esc</kbd></header>
     <div className="group-surface" inert={menu ? true : undefined}>
       {!group ? <p className="empty">{t('groupMissing')}</p> : editor ? <div className="settings-body">
+        <h2>{t(editor === 'name' ? 'groupRename' : 'groupColor')}</h2>
         {editor === 'name' ? <label className="group-field">{t('groupName')}<input ref={nameInput} value={name} onChange={event => setName(event.target.value)} disabled={busy} /></label>
           : <label className="group-field">{t('groupColor')}<select aria-label={t('groupColor')} ref={colorInput} value={color} onChange={event => setColor(event.target.value as chrome.tabGroups.TabGroup['color'])} disabled={busy}>
             {colors.map(value => <option key={value} value={value}>{t(`color${value[0].toUpperCase()}${value.slice(1)}` as MessageKey)}</option>)}
           </select></label>}
       </div> : <>
-        <div className="search-bar"><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
+        <div className="search-bar"><span className="search-icon"><Search size={20} /></span><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('groupSearch')} aria-label={t('groupSearch')} role="combobox" aria-expanded="true" aria-controls="zing-group-tabs" aria-activedescendant={selected ? `group-${selected.id}` : undefined} disabled={busy} /></div>
         <div ref={list} className="results" id="zing-group-tabs" role="listbox" aria-label={t('resultsLabel')}>
           {results.map(entry => <div key={entry.id} id={`group-${entry.id}`} role="option" aria-selected={entry.id === selected?.id} className="result tab"
@@ -112,13 +118,16 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
       </>}
     </div>
     {error ? <div className="error-banner" role="alert">{error}</div> : null}
-    <PaletteFooter isMac={isMac} status={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
+    <PaletteFooter isMac={isMac}
+      navigation={{ kind: 'back', label: `${t('back')} · ${groupLabel}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
+      title={groupLabel}
+      context={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
       primary={primary ? { label: primary.title, keys: ['↵'], disabled: busy || !group, danger: !!primary.danger, onAction: () => void run(primary.id) } : undefined}
       actions={{ open: menu, disabled: busy || !group, onToggle: toggleMenu }} />
     {menu ? <ActionMenu id="group-actions" title={editor ? t(editor === 'name' ? 'groupRename' : 'groupColor') : group?.title} actions={actions} query={actionQuery} onQueryChange={setActionQuery}
       selectedId={chosen?.id} onSelectionChange={setActionId} onAction={id => void run(id)} onClose={() => setMenu(false)} isMac={isMac} /> : null}
   </>;
-  return <BackLayer onBack={onBack}><section className="palette group-view" aria-busy={busy} onKeyDown={event => {
+  return <BackLayer onBack={onBack}><section className="palette group-view" aria-label={groupLabel} aria-busy={busy} onKeyDown={event => {
     if (event.nativeEvent.isComposing || event.keyCode === 229 || menu) return;
     const mod = isMac ? event.metaKey : event.ctrlKey;
     if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') { event.preventDefault(); toggleMenu(); return; }

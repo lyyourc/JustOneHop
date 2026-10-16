@@ -14,7 +14,7 @@ Find tabs, bookmarks, and browser commands in one place. Matching text is highli
 
 ### Tab Switcher
 
-Switch between tabs in the current window in order of recent use. Hold the shortcut to browse, release to confirm, and quickly return to your previous tab.
+Switch between tabs in the current window in order of recent use, or type a title or URL to filter them. Hold the shortcut to browse, release to confirm, and quickly return to your previous tab.
 
 ### Auto Tuck
 
@@ -51,21 +51,33 @@ Type to search, without a mode prefix. Try a tab title, a website domain, `new t
 
 In the main search, click a result to run it, or select it with the arrow keys and press Enter. The primary action and Actions buttons in the footer are clickable too.
 
+The main search and secondary lists share one footer: a monochrome icon button, the current location name, and additional context separated by `·` on the left. The main search shows a settings gear and `zing`; secondary pages such as Local Storage and Tab Groups show a back arrow and the storage type or group name, without a separate title bar. Clicking the back arrow works like Esc, leaving the deepest active layer each time. Location names share the same muted text style, without brand decoration, a type icon, or a group-colored icon beside them. The primary action and Actions menu remain on the right.
+
+Navigation hints in the main search and Tab Switcher, website origins, and group member counts share the context position and the same quiet 11px supporting text style. Navigation keys appear without boxes; the primary action and Actions keycaps on the right retain their borders and backgrounds. Transient status feedback replaces that context in the same position. At widths of 520px or less, only supplemental context is hidden, including the main search and Tab Switcher hints. Status feedback, such as copy success, work in progress, or a dangerous action, remains visible in that position and can truncate as needed. The icon button and location name remain visible; long names truncate before action controls, which retain their size. The regular panel is 516px tall, with a 44px footer and 40px list rows. The footer and search field keep their positions between layers; Storage names and value previews appear side by side.
+
 | Action | Mouse control | macOS shortcut |
 | --- | --- | --- |
 | Run a search result | Click the result or footer primary action | Select with ↑ / ↓ or Ctrl+P / Ctrl+N, then Enter |
 | More actions for the selected result | Click Actions in the footer, then a menu item | Cmd+K |
 | Open settings | Settings button in the footer | Cmd+, |
-| Go back one level | Page back button | Esc; Backspace also works in an empty search field |
+| Go back one level | Click the back arrow at the left of the footer | Esc; Backspace also works in an empty search field |
 | Close the main palette | Close button beside the search field | Esc |
 
 To browse recent tabs, hold Control+J, select with N/P, and release Control to confirm.
+
+Tab Switcher uses the main palette’s search capsule and list layout in both the webpage overlay and separate window. The search field starts empty and disabled, with focus on the candidate list and “Search recent tabs…” as its placeholder. Click the search icon or field area, or press Cmd+F (Ctrl+F on Windows/Linux) to search; releasing the launch modifier then leaves the switcher open so you can type normally. Confirm with plain Enter, a result click, or the footer’s Switch button. Quick switching still confirms on modifier release until you enter search. Filtering matches titles and URLs without regard to case; every whitespace-separated term must match. Results keep their recent-use order and highlight matching text. Editing the query keeps the selected tab if it remains visible, otherwise selects the first result; no matches means no tab activation.
+
+Tab Switcher shares the same 44px footer: “Release Ctrl to switch” during quick switching, or “Switch Recent Tabs” after entering search, followed by exactly the same “Navigate ↑ Ctrl P ↓ Ctrl N” hint as the main search (“选择 ↑ Ctrl P ↓ Ctrl N” in Chinese). Hovering over the hint explains arrow keys, Ctrl+P/N, and clicking to select. Clickable “Switch ↵” and “Cancel esc” buttons appear on the right, each showing its label before its keycap. Narrow layouts hide only the navigation hint, keeping the release instruction or search-state title; hover over the search header to see the actual launch shortcut. The webpage switcher fills the available panel space, with no separate help row below the footer.
 
 On Windows/Linux, menu and settings shortcuts use Ctrl instead of Command; the default recent-tab shortcut is Ctrl+,. See the [usage guide (Chinese)](docs/USAGE.md) for nested navigation, text editing, and platform differences.
 
 ## Limits and data
 
-Regular webpages use a centered overlay. Restricted pages, such as Chrome's internal pages, use a toolbar popup. A quick tap of the recent-tab shortcut from the address bar or another area without a key listener may require Enter to confirm.
+Regular webpages use an overlay centered horizontally near the top of the page viewport, up to 750×516px and reduced to fit smaller viewports. The command palette on Chrome's internal pages, and Tab Switcher whenever its webpage overlay is unavailable, use a separate window whose position is estimated from the source content area and zoom. It follows the source tab's zoom and corrects its own native frame using window and tab dimensions from the Chrome API before rendering the UI, while retaining the system title bar.
+
+Separate windows use the source tab's content dimensions and browser outer bounds reported by Chrome in device-independent pixels (DIP). They estimate the content area as horizontally symmetric and bottom-aligned, then apply the source page's zoom to calculate position and size. The source content area's screen origin cannot be measured directly, so vertical tabs, docked DevTools, and system borders may cause offsets; pixel-perfect alignment is not guaranteed.
+
+The command palette still uses a toolbar popup when the address bar holds focus on a regular webpage and in other restricted cases such as the Web Store; Chrome controls that popup's position. A quick tap of the recent-tab shortcut from the address bar or another area without a key listener may require Enter to confirm.
 
 Preferences, saved scripts, and search usage history stay on your device. Website storage values and script results are held only in the current panel.
 

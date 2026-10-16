@@ -1,4 +1,5 @@
 import { t } from './i18n';
+import { nativePanelBounds } from './panelGeometry';
 
 const KEY = 'zingPaletteWindow';
 interface Session { token: string; sourceTabId: number; sourceWindowId: number; popupWindowId?: number }
@@ -24,16 +25,13 @@ export async function togglePaletteWindow(source: chrome.tabs.Tab) {
   if (source.id === undefined) return;
   opening = true;
   try {
-    const owner = await chrome.windows.get(source.windowId);
+    const [owner, zoom] = await Promise.all([chrome.windows.get(source.windowId), chrome.tabs.getZoom(source.id)]);
     if (!owner.focused || owner.type !== 'normal') return;
-    const width = Math.min(750, owner.width || 750);
-    const height = Math.min(560, owner.height || 560);
+    const bounds = nativePanelBounds(owner, source, undefined, zoom);
     const current = { token: crypto.randomUUID(), sourceTabId: source.id, sourceWindowId: source.windowId } as Session;
     session = current;
     await chrome.storage.session.set({ [KEY]: current });
-    const popup = await chrome.windows.create({ url: urlFor(current.token), type: 'popup', focused: false,
-      width, height, left: Math.round((owner.left || 0) + ((owner.width || width) - width) / 2),
-      top: Math.round((owner.top || 0) + ((owner.height || height) - height) / 2) });
+    const popup = await chrome.windows.create({ url: `${urlFor(current.token)}&tab=${source.id}&owner=${source.windowId}`, type: 'popup', focused: false, ...bounds });
     if (popup?.id === undefined) throw new Error(t('errorWindow'));
     if (session !== current) { await chrome.windows.remove(popup.id); return; }
     current.popupWindowId = popup.id;
@@ -50,7 +48,7 @@ export async function paletteSender(sender: chrome.runtime.MessageSender): Promi
   if (!sender.url?.startsWith(chrome.runtime.getURL('popup.html#window='))) return sender;
   await ready;
   const current = session;
-  if (!current || sender.url !== urlFor(current.token) || !sender.tab ||
+  if (!current || new URLSearchParams(new URL(sender.url).hash.slice(1)).get('window') !== current.token || !sender.tab ||
       (current.popupWindowId !== undefined && sender.tab.windowId !== current.popupWindowId)) throw new Error(t('errorWindow'));
   const source = await chrome.tabs.get(current.sourceTabId);
   if (source.windowId !== current.sourceWindowId || !source.active) throw new Error(t('errorMovedTab'));

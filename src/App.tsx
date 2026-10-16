@@ -2,14 +2,14 @@ import { TabGroupView } from './TabGroupView';
 import { TuckRecoveryView } from './TuckRecoveryView';
 import { entrySearchQuery, entryTitle } from './entryPresentation';
 import { Favicon } from './Favicon';
-import { Shortcut } from './Shortcut';
+import { NavigationHint, Shortcut } from './Shortcut';
 import { NavigationRoot, BackLayer } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import {
-  Code, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark, ChevronRight,
+  Code, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
   Layers, LoaderCircle, Pin, Plus, RotateCcw,
   Settings2, Search, Volume2, VolumeX, X, PanelTop, AlertCircle,
 } from 'lucide-react';
@@ -351,14 +351,11 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
       {error ? <div className="error-banner" role="alert"><AlertCircle size={15} /><span>{errorMessage(new Error(error))}</span>
         {!data ? <button onClick={() => { setError(''); void getSnapshot().then(setData).catch(reason => setError(errorMessage(reason))); }}>{t('retry')}</button> : null}</div> : null}
       <PaletteFooter isMac={isMac}
-        leading={<div className="brand"><span className="brand-mark" aria-hidden="true"><ChevronRight size={14} /><span /></span><button className="settings-button" aria-label={t('settings')} title={`${t('settings')} (${mod},)`} onClick={() => openSettings()} disabled={busy}><Settings2 size={15} /></button></div>}
+        navigation={{ kind: 'settings', label: t('settings'), tooltip: `${t('settings')} (${mod},)`, disabled: busy, onAction: () => openSettings() }}
+        title="zing" context={<NavigationHint />}
         status={busy ? <span className="footer-status"><LoaderCircle className="spinner" size={13} />{t('running')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
-          : <span className="navigation-hint" title={t('navigationHelp')}>
-            <span className="navigation-label">{t('navigate')}</span>
-            <span className="navigation-key"><span className="navigation-arrow">↑</span><Key>Ctrl P</Key></span>
-            <span className="navigation-key"><span className="navigation-arrow">↓</span><Key>Ctrl N</Key></span>
-          </span>}
+          : undefined}
         primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || busy || !!deleteTarget, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
         actions={{ open: !!actionTarget, disabled: !selected || busy || !!deleteTarget, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
