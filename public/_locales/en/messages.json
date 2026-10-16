@@ -3,7 +3,7 @@
     "message": "zing"
   },
   "extensionDescription": {
-    "message": "A keyboard-first browser command palette. Search tabs in this window, open bookmarks, and run browser commands."
+    "message": "A human-first browser command palette. Search tabs and bookmarks with ease, and run commands naturally with keyboard or mouse."
   },
   "openPalette": {
     "message": "Open zing Command Palette"
@@ -213,7 +213,7 @@
     "message": "Settings"
   },
   "settingsHint": {
-    "message": "Language, appearance, and keyboard shortcuts"
+    "message": "Language, appearance, tab management, and shortcuts"
   },
   "general": {
     "message": "General"
@@ -282,7 +282,7 @@
     "message": "Search Ranking"
   },
   "searchRankingHint": {
-    "message": "Learns your frequent commands and preferred results for each search. Saved only on this device."
+    "message": "Prioritizes your frequent commands and preferred search results based on use. Saved only on this device."
   },
   "resetSearchRanking": {
     "message": "Reset Ranking"
@@ -294,7 +294,7 @@
     "message": "Navigate"
   },
   "navigationHelp": {
-    "message": "Previous: ↑ or Ctrl+P. Next: ↓ or Ctrl+N."
+    "message": "Use ↑/↓, Ctrl+P/N, or click to select."
   },
   "localStorage": {
     "message": "View Local Storage"
@@ -420,7 +420,7 @@
     "message": "Cancel"
   },
   "recentNavigate": {
-    "message": "Ctrl+N / Ctrl+P or ↑ ↓ to select · Esc to cancel"
+    "message": "Use ↑/↓, Ctrl+N/P, or click to select · Esc to cancel"
   },
   "scriptLibrary": {
     "message": "Script Library"
@@ -438,16 +438,16 @@
     "message": "Copy a setup snippet to bind Ctrl+Tab and Ctrl+Shift+Tab."
   },
   "bindingEffect": {
-    "message": "Uses Chrome’s internal settings API. Replaces the recent-tab shortcuts and Chrome’s default Ctrl+Tab navigation."
+    "message": "Uses Chrome’s internal settings API to bind Ctrl+Tab and Ctrl+Shift+Tab to zing’s recent tab switcher."
   },
   "bindingStepCopy": {
-    "message": "Copy the code below. It contains this installation’s extension ID."
+    "message": "Copy the snippet below (your extension ID is already included)."
   },
   "bindingStepOpen": {
-    "message": "Open Chrome’s extension shortcuts page with the button below."
+    "message": "Click below to open Chrome’s extension shortcuts page."
   },
   "bindingStepConsole": {
-    "message": "On that page, press $1 to open Console. Paste the code and press Enter."
+    "message": "On that page, press $1 to open Console, then paste the code and press Enter."
   },
   "openShortcutPage": {
     "message": "Open Chrome Shortcuts"
@@ -543,7 +543,7 @@
     "message": "Running script…"
   },
   "scriptRunningBack": {
-    "message": "You can go back. A script already started may continue running."
+    "message": "You can go back anytime; the running script will continue in the background."
   },
   "scriptRunTarget": {
     "message": "Current page: $1"
@@ -615,10 +615,10 @@
     "message": "Auto Tuck Idle Tabs"
   },
   "autoTuckHint": {
-    "message": "After 7 days without use, move idle tabs into a collapsed Tucked Away group. Pages stay open."
+    "message": "Organizes tabs idle for 7 days into a collapsed Tucked Away group. Pages remain open and can be restored anytime."
   },
   "autoTuckOffHint": {
-    "message": "Turning this off returns managed tabs to the tab strip. After restarting, matching groups reconnect automatically; uncertain groups wait for your confirmation."
+    "message": "Turning this off returns managed tabs to the tab strip. After restart, matching groups reconnect automatically; uncertain groups wait for your review."
   },
   "tuck": {
     "message": "Tuck Away Tab"

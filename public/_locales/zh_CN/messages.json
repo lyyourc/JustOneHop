@@ -3,7 +3,7 @@
     "message": "zing"
   },
   "extensionDescription": {
-    "message": "像使用 Raycast 一样操作浏览器。搜索当前窗口标签页、打开书签，用键盘执行常用命令。"
+    "message": "一个让日常浏览器操作更顺手的命令面板。轻松搜索标签页与书签，随时用快捷键或鼠标执行常用操作。"
   },
   "openPalette": {
     "message": "打开 zing 命令面板"
@@ -174,7 +174,7 @@
     "message": "操作"
   },
   "shortcutNotice": {
-    "message": "快捷键未绑定：请在 chrome://extensions/shortcuts 中设置"
+    "message": "快捷键未绑定：请前往 chrome://extensions/shortcuts 进行设置"
   },
   "errorGeneric": {
     "message": "操作失败，请重试。"
@@ -189,13 +189,13 @@
     "message": "未找到当前标签页，请重新打开面板。"
   },
   "errorWindow": {
-    "message": "无效的窗口。"
+    "message": "未找到对应的浏览器窗口，请重试。"
   },
   "errorRestore": {
     "message": "没有可以恢复的标签页。"
   },
   "errorBookmark": {
-    "message": "无效的书签。"
+    "message": "未找到该书签，可能已被移除。"
   },
   "errorBookmarkUrl": {
     "message": "此书签不是可打开的网页地址，暂不支持脚本书签。"
@@ -204,16 +204,16 @@
     "message": "没有可操作的标签页。"
   },
   "errorMovedTab": {
-    "message": "标签页已移至其他窗口，请重新搜索。"
+    "message": "标签页已移动到其他窗口，请重新搜索。"
   },
   "errorCommand": {
-    "message": "不支持的命令。"
+    "message": "当前环境暂不支持此命令。"
   },
   "settings": {
     "message": "设置"
   },
   "settingsHint": {
-    "message": "语言、外观与快捷键"
+    "message": "语言、外观、标签页管理与快捷键"
   },
   "general": {
     "message": "通用"
@@ -252,7 +252,7 @@
     "message": "打开 / 关闭 zing"
   },
   "hotkeyHint": {
-    "message": "在 Chrome 扩展快捷键页中修改 zing 的绑定。"
+    "message": "如需自定义快捷键，可在 Chrome 扩展快捷键设置页中修改。"
   },
   "changeHotkey": {
     "message": "前往修改"
@@ -276,25 +276,25 @@
     "message": "搜索标签页、书签和命令…"
   },
   "noResultsHint": {
-    "message": "试试页面标题、网址、书签或命令名称"
+    "message": "试试网页标题、网址域名、书签或命令名称"
   },
   "searchRanking": {
     "message": "搜索排序"
   },
   "searchRankingHint": {
-    "message": "按使用习惯排列首页命令和同词搜索结果。习惯仅保存在本机。"
+    "message": "根据你的使用习惯优先呈现常用命令与搜索结果。偏好记录仅保存在本机。"
   },
   "resetSearchRanking": {
     "message": "重置搜索排序"
   },
   "rankingReset": {
-    "message": "已清除学习记录，恢复默认排序。"
+    "message": "已重置使用偏好，恢复默认排序。"
   },
   "navigate": {
     "message": "选择"
   },
   "navigationHelp": {
-    "message": "上一项：↑ 或 Ctrl+P；下一项：↓ 或 Ctrl+N。"
+    "message": "上下方向键或 Ctrl+P / Ctrl+N 选择，也可直接点击。"
   },
   "localStorage": {
     "message": "查看 Local Storage"
@@ -315,7 +315,7 @@
     "message": "存储条目"
   },
   "storageEmpty": {
-    "message": "当前页面没有存储条目"
+    "message": "当前页面没有存储数据"
   },
   "storageEmptyValue": {
     "message": "（空值）"
@@ -345,7 +345,7 @@
     "message": "值"
   },
   "storageJson": {
-    "message": "JSON 预览 · 复制时保留原始值"
+    "message": "JSON 格式化预览 · 复制时完整保留原始字符串"
   },
   "cookieDomain": {
     "message": "域名"
@@ -375,7 +375,7 @@
     "message": "请在 HTTP 或 HTTPS 网页中打开 zing 查看存储。"
   },
   "errorStorageRead": {
-    "message": "无法读取当前页面存储，请通过快捷键或工具栏图标重新打开 zing 后重试。"
+    "message": "无法读取当前页面的存储数据，请重新打开 zing 重试。"
   },
   "errorStorageCopy": {
     "message": "复制失败，请在详情中选中值后手动复制。"
@@ -396,10 +396,10 @@
     "message": "继续授权"
   },
   "cookieAccessDenied": {
-    "message": "尚未获得授权，可以重试或返回。"
+    "message": "未获得访问授权，你可以重试授权或返回。"
   },
   "cookieAccessError": {
-    "message": "无法申请访问权限，请在目标网站重新打开 zing。"
+    "message": "申请访问权限失败，请在目标网站重新打开 zing。"
   },
   "recentSwitcher": {
     "message": "切换最近标签页"
@@ -420,13 +420,13 @@
     "message": "取消"
   },
   "recentNavigate": {
-    "message": "Ctrl+N / Ctrl+P 或 ↑ ↓ 选择 · Esc 取消"
+    "message": "方向键、Ctrl+N / Ctrl+P 或点击选择 · Esc 取消"
   },
   "scriptLibrary": {
     "message": "脚本收藏"
   },
   "scriptLibraryHint": {
-    "message": "脚本保存在本机。搜索名称即可在当前网页运行；操作菜单支持复制代码、编辑和删除。"
+    "message": "脚本安全保存在本机。搜索名称即可在当前网页运行；操作菜单支持复制代码、编辑或删除。"
   },
   "manageScripts": {
     "message": "管理脚本"
@@ -438,16 +438,16 @@
     "message": "复制配置代码，重新绑定 Ctrl+Tab 和 Ctrl+Shift+Tab。"
   },
   "bindingEffect": {
-    "message": "使用 Chrome 内部设置接口，替换最近标签页快捷键及 Chrome 原有的 Ctrl+Tab 切换行为。"
+    "message": "借助 Chrome 内部设置接口，将 Ctrl+Tab 和 Ctrl+Shift+Tab 绑定到 zing 的最近标签页切换。"
   },
   "bindingStepCopy": {
-    "message": "复制下方代码，已填入当前安装的扩展 ID。"
+    "message": "复制下方配置代码（已自动填入当前扩展 ID）。"
   },
   "bindingStepOpen": {
-    "message": "点击下方按钮，打开 Chrome 扩展快捷键页。"
+    "message": "点击下方按钮，前往 Chrome 扩展快捷键设置页。"
   },
   "bindingStepConsole": {
-    "message": "在该页面按 $1 打开 Console，粘贴代码并按 Enter。"
+    "message": "在该页面按 $1 打开控制台 (Console)，粘贴代码并回车执行。"
   },
   "openShortcutPage": {
     "message": "打开 Chrome 快捷键页"
@@ -456,7 +456,7 @@
     "message": "复制代码"
   },
   "scriptCopied": {
-    "message": "代码已复制，请粘贴到目标执行环境。"
+    "message": "代码已复制到剪贴板。"
   },
   "scriptCopyError": {
     "message": "复制失败，请选中代码手动复制。"
@@ -543,22 +543,22 @@
     "message": "正在运行脚本…"
   },
   "scriptRunningBack": {
-    "message": "可以返回；已经启动的脚本可能继续运行。"
+    "message": "你可以随时返回，已启动的脚本会在后台继续执行。"
   },
   "scriptRunTarget": {
     "message": "当前网页：$1"
   },
   "scriptResultsTemporary": {
-    "message": "结果仅保留在当前面板"
+    "message": "结果仅在当前面板展示，不会上传或永久保存"
   },
   "scriptResultCopied": {
     "message": "结果已复制"
   },
   "scriptResultCopyFailed": {
-    "message": "脚本已完成，复制失败；请点击“复制结果”重试。"
+    "message": "脚本执行完成但复制失败，请点击下方“复制结果”重试。"
   },
   "noRunnableScripts": {
-    "message": "尚无可运行的脚本。搜索“新建脚本”即可创建。"
+    "message": "还没有保存的脚本。搜索“新建脚本”即可创建并运行。"
   },
   "enableUserScripts": {
     "message": "打开扩展详情"
@@ -573,28 +573,28 @@
     "message": "运行脚本需要 Chrome 135 或更高版本。"
   },
   "errorScriptTarget": {
-    "message": "无法在该目标运行脚本，请在目标网页重新打开 zing。"
+    "message": "无法在此页面运行脚本，请切换到目标网页后重新打开 zing。"
   },
   "errorScriptChanged": {
-    "message": "网页已变化或不再是当前标签页，请在目标网页重新打开 zing。"
+    "message": "网页已更新或不再是当前标签页，请在目标网页重新打开 zing。"
   },
   "errorScriptUnsupported": {
-    "message": "脚本仅支持普通 HTTP 或 HTTPS 网页，不支持 Chrome 内置页面。"
+    "message": "脚本仅支持在普通 HTTP 或 HTTPS 网页运行，不支持 Chrome 系统内置页面。"
   },
   "errorScriptAccess": {
     "message": "Chrome 无法访问此页面，请在普通网页通过快捷键或工具栏按钮重新打开 zing。"
   },
   "errorScriptInterrupted": {
-    "message": "执行被中断或未能返回结果，请检查网页后再运行。"
+    "message": "脚本执行被中断或未能返回结果，请检查网页后重试。"
   },
   "errorScriptMissing": {
-    "message": "保存的脚本已不存在或内容为空。"
+    "message": "未找到所选脚本，或脚本代码为空。"
   },
   "errorScriptBusy": {
-    "message": "此标签页已有脚本正在运行，请等待完成。"
+    "message": "当前标签页已有脚本正在运行，请稍候再试。"
   },
   "scriptExecutionHint": {
-    "message": "最后一个表达式作为结果，例如 localStorage.getItem(\"token\")。支持返回 Promise。脚本在隔离环境中运行，可访问当前网页 DOM 和存储；不提供网页自身的 JS 变量或 GM_* 接口。"
+    "message": "代码最后一行表达式的求值将作为返回结果（支持 Promise），例如 localStorage.getItem(\"token\")。脚本在独立沙箱中运行，可安全访问当前页面的 DOM 与存储；不侵入网页原生的 JS 变量环境。"
   },
   "categoryTab": {
     "message": "标签页"
@@ -615,10 +615,10 @@
     "message": "自动收起闲置标签页"
   },
   "autoTuckHint": {
-    "message": "7 天未使用的标签页会移入折叠的「已收起」组，页面保持打开。"
+    "message": "将 7 天未使用的标签页整理到折叠的「已收起」标签组中，页面始终保持打开，随时可以找回。"
   },
   "autoTuckOffHint": {
-    "message": "关闭后，将已管理的标签页移回标签栏。重启后自动恢复匹配的组；无法确认的组会等待你核对。"
+    "message": "关闭后，已收起的标签页会移回标签栏。浏览器重启后，zing 会自动恢复匹配的分组；若无法确认则交由你核对。"
   },
   "tuck": {
     "message": "收起标签页"
@@ -639,10 +639,10 @@
     "message": "已收起的标签页已回到标签栏。"
   },
   "errorTuckTab": {
-    "message": "无法收起此标签页。至少保留一个可用标签页；固定标签页和已有分组会留在原处。"
+    "message": "无法收起此标签页。窗口中需保留至少一个未收起标签页；固定标签页和已有分组不会被收起。"
   },
   "errorUndoTuck": {
-    "message": "上一次收起已没有可撤销的标签页。"
+    "message": "最近一次收起的分组中已没有可撤销的标签页。"
   },
   "reviewTuck": {
     "message": "检查待恢复的收起组"
@@ -657,19 +657,19 @@
     "message": "稍后再说"
   },
   "tuckRecoveryHint": {
-    "message": "zing 无法唯一确认上次收起的组。请核对下面的页面，再确认要继续管理的组。"
+    "message": "未能自动确认上次收起的分组。请核对下方页面，选出希望继续管理的分组。"
   },
   "tuckRecoveryGroups": {
     "message": "当前窗口的候选分组"
   },
   "tuckRecoveryMissing": {
-    "message": "当前窗口暂未找到对应分组。可以打开原窗口再试；确认前，zing 不会再创建新的收起组。"
+    "message": "当前窗口未找到对应分组。你可以切换到原窗口重试；确认前，zing 不会创建新的收起组。"
   },
   "tuckRecoveryResolved": {
-    "message": "这份记录已处理，可以返回搜索查看当前分组。"
+    "message": "此记录已处理完成，可以返回搜索查看当前分组。"
   },
   "tuckRecoveryForgetHint": {
-    "message": "操作菜单中的「停止恢复这条记录」只放弃恢复，页面和分组保持原样。"
+    "message": "「停止恢复这条记录」仅取消后续管理，不会关闭任何页面或解散分组。"
   },
   "errorTuckRecoveryChanged": {
     "message": "这个分组已经变化，请返回搜索重新核对。"
@@ -714,7 +714,7 @@
     "message": "没有匹配的标签页"
   },
   "errorGroup": {
-    "message": "标签组已变化或不再可用。"
+    "message": "标签组已更新或不再可用，请返回刷新。"
   },
   "colorGrey": {
     "message": "灰色"

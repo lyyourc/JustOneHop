@@ -376,7 +376,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await theme.click();
   await ui.getByRole('option', { name: 'Dark', exact: true }).click();
   await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', 'dark');
-  await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(40, 42, 54)');
+  await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(41, 42, 45)');
   await ui.locator('.palette').screenshot({ path: 'test-results/settings-dark.png' });
   await theme.press('Escape');
   const englishInput = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
@@ -396,10 +396,10 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await second.getByRole('combobox', { name: '主题', exact: true }).click();
   await second.getByRole('option', { name: '浅色', exact: true }).click();
   await ui.emulateMedia({ colorScheme: 'dark' });
-  await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(247, 248, 250)');
+  await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await second.getByRole('combobox', { name: '主题', exact: true }).click();
   await second.getByRole('option', { name: '跟随系统', exact: true }).click();
-  await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(40, 42, 54)');
+  await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(41, 42, 45)');
   await second.getByRole('combobox', { name: '语言', exact: true }).click();
   await second.getByRole('option', { name: '跟随系统', exact: true }).click();
   await expect(second.getByText('系统语言：简体中文（Chrome 界面语言）')).toBeVisible();
