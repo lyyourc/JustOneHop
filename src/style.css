@@ -39,11 +39,11 @@
 .zing-app svg { flex-shrink: 0; display: inline-block; vertical-align: middle; }
 .main-surface { transition: opacity 100ms ease; }
 .main-surface.subdued { opacity: .82; }
-.search-bar { position: relative; display: flex; align-items: center; gap: 12px; height: 66px; padding: 0 20px; border-bottom: 1px solid var(--line); }
+.search-bar { position: relative; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--line); }
 .search-icon { color: var(--muted); width: 22px; display: flex; align-items: center; }
-.search-bar input { flex: 1; font-size: 20px; font-weight: 400; height: 100%; caret-color: var(--text); }
+.search-bar input { flex: 1; font-size: 18px; font-weight: 400; height: 100%; caret-color: var(--text); }
 .icon-button { display: flex; align-items: center; justify-content: center; border-radius: 5px; }
-.results { height: 406px; overflow-y: auto; overscroll-behavior: contain; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.results { height: 416px; overflow-y: auto; overscroll-behavior: contain; padding: 8px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .result-group.section-start { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .result { display: flex; align-items: center; gap: 11px; height: 40px; padding: 0 12px; border-radius: 7px; cursor: default; }
 .result[aria-selected='true'] { background: var(--selected); }
@@ -194,16 +194,16 @@ body.zing-popup { margin: 0; width: 750px; height: 516px; overflow: hidden; back
 
 body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: light-dark(#f7f8fa, #282a36); color-scheme: light dark; }
 .recent-switcher { background: var(--bg); height: 100vh; display: flex; flex-direction: column; }
-.recent-switcher header { display: flex; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid var(--line); }
+.recent-switcher header { display: flex; align-items: center; gap: 10px; height: 56px; flex-shrink: 0; padding: 0 16px; border-bottom: 1px solid var(--line); }
 .recent-switcher header > svg { color: var(--tab-icon); }
 .recent-switcher header > span { margin-left: auto; color: var(--faint); font-size: 11px; }
-.recent-list { flex: 1; min-height: 80px; overflow-y: auto; padding: 6px; outline: none; }
-.recent-list .result { height: 55px; }
-.recent-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
-.recent-url { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; color: var(--muted); }
-.recent-switcher footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.recent-list { flex: 1; min-height: 40px; overflow-y: auto; overscroll-behavior: contain; padding: 8px; outline: none; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.recent-list .result { height: 40px; }
+.recent-copy { min-width: 0; flex: 1; display: flex; align-items: baseline; gap: 12px; }
+.recent-url { min-width: 0; max-width: 44%; flex: 0 2 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--muted); }
+.recent-switcher footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 44px; flex-shrink: 0; padding: 0 12px; background: var(--footer); border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .recent-switcher footer > span:last-child { display: flex; align-items: center; gap: 5px; }
-.recent-help { font-size: 10px; color: var(--faint); padding: 0 14px 12px; }
+.recent-help { font-size: 10px; color: var(--faint); padding: 0 16px 8px; background: var(--footer); }
 .recent-error { color: var(--danger); padding: 0 14px; }
 
 .binding-row { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 14px; }
@@ -262,3 +262,24 @@ body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: light-d
 
 /* Result actions take priority over the secondary retention note on narrow panels. */
 .script-runner .footer-actions { flex-shrink: 0; }
+
+/* Hover previews clickability without changing the keyboard's release target. */
+.recent-list .result { cursor: pointer; }
+.recent-list .result:hover:not([aria-selected='true']) { background: var(--raised); box-shadow: inset 0 0 0 1px var(--border); }
+.recent-switcher footer button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border-radius: 5px; }
+.recent-switcher footer button:hover:not(:disabled) { background: var(--selected); }
+.recent-switcher header button { min-width: 28px; min-height: 28px; border-radius: 5px; }
+.recent-switcher header button:hover { background: var(--selected); }
+
+/* Both page surfaces share .overlay and .palette as their positioning owner. */
+.recent-overlay .recent-switcher { height: 516px; max-height: calc(100dvh - var(--top) - 26px); }
+/* Listen immediately, but paint only for a held shortcut. Keep the scrim in
+   the same surface so it cannot flash ahead of the list. This never delays
+   accepting a real key release, including while the background is responding. */
+.zing-dialog.recent-dialog::backdrop { background: transparent; }
+.recent-overlay { background: rgb(0 0 0 / .12); animation: recent-reveal 150ms step-end both; }
+@media (prefers-color-scheme: dark) {
+  .recent-overlay { background: rgb(0 0 0 / .2); }
+}
+@keyframes recent-reveal { from { opacity: 0; } to { opacity: 1; } }
+.recent-overlay[data-closing='true'] { animation: none; opacity: 0; }

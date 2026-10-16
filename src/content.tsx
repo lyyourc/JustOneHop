@@ -3,6 +3,8 @@ import { usageReady } from './usageState';
 import { t } from './i18n';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from './App';
+import { flushSync } from 'react-dom';
+import { RecentOverlay, type RecentOverlaySession } from './RecentOverlay';
 import styles from './style.css';
 
 const marker = '__zingInstalled';
@@ -12,8 +14,13 @@ if (!scope[marker]) {
   let host: HTMLDivElement | null = null;
   let dialog: HTMLDialogElement | null = null;
   let root: Root | null = null;
+  let recentSession: string | undefined;
   let previousFocus: HTMLElement | null = null;
   const close = () => {
+    try {
+      if (recentSession) void chrome.runtime.sendMessage({ source: 'zing-recent', type: 'cancel-overlay', session: recentSession }).catch(() => {});
+    } catch { /* Extension reload invalidates the old content-script context. */ }
+    recentSession = undefined;
     root?.unmount();
     dialog?.close();
     host?.remove();
@@ -24,7 +31,8 @@ if (!scope[marker]) {
       previousFocus.focus({ preventScroll: true });
     }
   };
-  const open = () => {
+  const open = (recent?: RecentOverlaySession) => {
+    recentSession = recent?.session;
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     // Remove an inert host left behind if the extension was reloaded in chrome://extensions.
     document.getElementById('zing-command-palette')?.remove();
@@ -35,7 +43,7 @@ if (!scope[marker]) {
     sheet.replaceSync(styles);
     shadow.adoptedStyleSheets = [sheet];
     dialog = document.createElement('dialog');
-    dialog.className = 'zing-dialog';
+    dialog.className = recent ? 'zing-dialog recent-dialog' : 'zing-dialog';
     dialog.setAttribute('aria-label', t('paletteLabel'));
     shadow.append(dialog);
     document.documentElement.append(host);
@@ -62,14 +70,28 @@ if (!scope[marker]) {
     surface.contentEditable = 'false';
     frameShadow.append(surface);
     root = createRoot(surface);
-    root.render(<App mode="overlay" onClose={close} />);
     dialog.showModal();
+    flushSync(() => root!.render(recent ? <RecentOverlay initial={recent} onClose={close} /> : <App mode="overlay" onClose={close} />));
     dialog.addEventListener('cancel', event => event.preventDefault());
     // React handles keys first; then prevent page-level bubbling shortcuts.
     dialog.addEventListener('keydown', event => event.stopPropagation());
     dialog.addEventListener('keyup', event => event.stopPropagation());
   };
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+    if (_sender.id !== chrome.runtime.id) return;
+    if (message?.source === 'zing-recent') {
+      if (message.type === 'disarm' && recentSession === message.session) { close(); return; }
+      if (message.type !== 'open-overlay') return;
+      void preferencesReady.then(() => {
+        try {
+          if (!document.hidden && !document.hasFocus()) window.focus();
+          if (document.hidden || !document.hasFocus() || !message.tabs?.length) { respond(false); return; }
+          if (host) close();
+          open(message); respond(true);
+        } catch { close(); respond(false); }
+      });
+      return true;
+    }
     if (message?.source !== 'zing') return;
     if (message.type === 'ping') { respond(true); return; }
     if (message.type === 'toggle') {

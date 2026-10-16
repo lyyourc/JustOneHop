@@ -2590,3 +2590,258 @@ test('Chinese result footer guards busy and failed runs and supports retry and m
   await finish(true, 'Late result');
   await expect(picker).toBeFocused(); await expect(ui.locator('.script-output')).toHaveCount(0);
 });
+
+test('English recent bridge storage overlay shares palette geometry and accepts held navigation on release', async () => {
+  const f = await bridgeFixture();
+  await worker.evaluate(async () => {
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+  });
+  const surface = f.a.frameLocator('.zing-frame');
+  await expect(surface.getByRole('combobox')).toBeFocused();
+  const paletteBounds = await surface.locator('.palette').boundingBox();
+  await f.a.keyboard.press('Escape');
+  await f.a.keyboard.down('Control'); await f.open();
+  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  await expect(surface.getByRole('listbox')).toBeFocused();
+  expect(await f.windows()).toBe(0);
+  const switcherBounds = await surface.locator('.palette').boundingBox();
+  expect(switcherBounds).toEqual(paletteBounds);
+  const initial = await surface.locator('[aria-selected=true]').getAttribute('id');
+  await f.a.keyboard.press('n');
+  expect(await surface.locator('[aria-selected=true]').getAttribute('id')).not.toBe(initial);
+  await f.a.keyboard.press('p');
+  expect(await surface.locator('[aria-selected=true]').getAttribute('id')).toBe(initial);
+  expect(await f.active()).toBe(f.ids.source);
+  await f.a.keyboard.up('Control');
+  await expect.poll(f.active).toBe(Number(initial!.replace('recent-', '')));
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+test('English recent bridge storage overlay quick taps alternate without creating a window', async () => {
+  const f = await bridgeFixture();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const page = attempt % 2 ? f.b : f.a;
+    await page.keyboard.down('Control'); await page.keyboard.up('Control'); await f.open();
+    await expect.poll(f.active).toBe(attempt % 2 ? f.ids.source : f.ids.previous);
+    expect(await f.windows()).toBe(0);
+    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  }
+});
+
+async function delayRecentOverlay() {
+  await worker.evaluate(() => {
+    const state = globalThis as unknown as { __resumeOverlay?: () => void; __overlayPending?: boolean };
+    const original = chrome.tabs.sendMessage.bind(chrome.tabs);
+    chrome.tabs.sendMessage = (async (id: number, message: any, options: any) => {
+      if (message?.type === 'open-overlay') {
+        state.__overlayPending = true;
+        await new Promise<void>(resolve => { state.__resumeOverlay = resolve; });
+      }
+      return original(id, message, options);
+    }) as typeof chrome.tabs.sendMessage;
+  });
+}
+async function resumeRecentOverlay() {
+  await worker.evaluate(() => (globalThis as unknown as { __resumeOverlay: () => void }).__resumeOverlay());
+}
+
+test('English recent bridge storage overlay buffers release and repeated shortcuts while opening', async () => {
+  const f = await bridgeFixture();
+  await delayRecentOverlay();
+  await f.a.keyboard.down('Control');
+  const opening = f.open();
+  await expect.poll(() => worker.evaluate(() => !!(globalThis as unknown as { __overlayPending: boolean }).__overlayPending)).toBe(true);
+  await f.open(); await f.open();
+  const order = await worker.evaluate(async id => (await chrome.tabs.query({ windowId: id }))
+    .sort((a, b) => Number(b.active) - Number(a.active) || (b.lastAccessed || 0) - (a.lastAccessed || 0) || a.index - b.index).map(tab => tab.id), f.ids.window);
+  await f.a.keyboard.up('Control');
+  await resumeRecentOverlay(); await opening;
+  await expect.poll(f.active).toBe(order[3 % order.length]);
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  expect(await f.windows()).toBe(0);
+});
+
+for (const reason of ['Escape', 'outside click', 'another window', 'another tab', 'opening interrupted']) {
+  test(`English recent bridge storage overlay cancels on ${reason} without accepting a tab`, async () => {
+    const f = await bridgeFixture();
+    await f.a.getByRole('textbox').fill('keep my text'); await f.a.getByRole('textbox').focus();
+    if (reason === 'opening interrupted') await delayRecentOverlay();
+    await f.a.keyboard.down('Control');
+    const opening = f.open();
+    if (reason === 'opening interrupted') {
+      await expect.poll(() => worker.evaluate(() => !!(globalThis as unknown as { __overlayPending: boolean }).__overlayPending)).toBe(true);
+      const other = await worker.evaluate(() => chrome.windows.create({ url: 'about:blank', focused: true }));
+      await resumeRecentOverlay(); await opening;
+      expect(await worker.evaluate(async () => (await chrome.windows.getLastFocused()).id)).toBe(other!.id);
+    } else {
+      await opening;
+      const surface = f.a.frameLocator('.zing-frame');
+      await expect(surface.getByRole('listbox')).toBeFocused();
+      if (reason === 'Escape') await f.a.keyboard.press('Escape');
+      if (reason === 'outside click') await surface.locator('.recent-overlay').click({ position: { x: 5, y: 5 } });
+      if (reason === 'another window') await worker.evaluate(() => chrome.windows.create({ url: 'about:blank', focused: true }));
+      if (reason === 'another tab') await worker.evaluate(id => chrome.tabs.update(id, { active: true }), f.ids.previous);
+    }
+    await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+    expect(await f.active()).toBe(reason === 'another tab' ? f.ids.previous : f.ids.source);
+    expect(await f.windows()).toBe(0);
+    await expect(f.a.getByRole('textbox')).toHaveValue('keep my text');
+    if (reason === 'Escape' || reason === 'outside click') {
+      await expect(f.a.getByRole('textbox')).toBeFocused();
+      await f.a.keyboard.up('Control');
+      expect(await f.active()).toBe(f.ids.source);
+    }
+  });
+}
+
+test('English recent bridge storage overlay keeps source selected when a candidate closes', async () => {
+  const f = await bridgeFixture();
+  await f.a.keyboard.down('Control'); await f.open();
+  const surface = f.a.frameLocator('.zing-frame');
+  await expect(surface.getByRole('listbox')).toBeFocused();
+  await worker.evaluate(id => chrome.tabs.remove(id), f.ids.previous);
+  await expect(surface.locator('[aria-selected=true]')).toHaveAttribute('id', `recent-${f.ids.source}`);
+  await f.a.keyboard.up('Control');
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  expect(await f.active()).toBe(f.ids.source);
+});
+
+test('English recent bridge storage overlay rejects unfocused pages and retains window fallback', async () => {
+  const f = await bridgeFixture();
+  await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
+    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
+  } }), f.ids.source);
+  const created = context.waitForEvent('page', page => page.url().includes('switcher.html'));
+  await f.open(); const popup = await created;
+  await expect(popup.getByRole('listbox')).toBeFocused();
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  expect(await f.active()).toBe(f.ids.source);
+  await popup.keyboard.press('Escape').catch(error => { if (!popup.isClosed()) throw error; });
+  await expect.poll(() => popup.isClosed()).toBe(true);
+});
+
+test('English recent bridge storage overlay mouse selection and narrow geometry match palette', async () => {
+  const f = await bridgeFixture(); await f.a.setViewportSize({ width: 390, height: 440 });
+  await f.open();
+  const surface = f.a.frameLocator('.zing-frame');
+  await expect(surface.getByRole('listbox')).toBeFocused();
+  const before = await surface.locator('.palette').boundingBox();
+  expect(before!.x).toBe(10); expect(before!.y).toBe(24);
+  expect(before!.x + before!.width).toBeLessThanOrEqual(380);
+  expect(before!.y + before!.height).toBeLessThanOrEqual(416);
+  await surface.getByRole('option').filter({ hasText: 'Bridge B' }).click();
+  await expect.poll(f.active).toBe(f.ids.previous);
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+test('English recent bridge storage overlay closes safely when its worker stops', async () => {
+  const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
+  await expect(f.a.frameLocator('.zing-frame').getByRole('listbox')).toBeFocused();
+  const monitor = await context.newCDPSession(f.a);
+  await monitor.send('ServiceWorker.enable'); await monitor.send('ServiceWorker.stopAllWorkers');
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+test('English recent bridge closed storage overlay preserves Vimium navigation and release', async () => {
+  const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
+  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  const cdp = await context.newCDPSession(f.a);
+  const selectedName = async () => {
+    const { frameTree } = await cdp.send('Page.getFrameTree');
+    const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree', { frameId });
+    return nodes.find(node => node.role?.value === 'option' && node.properties?.some(property => property.name === 'selected' && property.value?.value === true))?.name?.value;
+  };
+  await expect.poll(selectedName).toContain('Bridge B');
+  await f.a.keyboard.press('n');
+  await expect.poll(selectedName).not.toContain('Bridge B');
+  await f.a.keyboard.press('p');
+  await expect.poll(selectedName).toContain('Bridge B');
+  expect(await f.active()).toBe(f.ids.source);
+  await f.a.keyboard.up('Control');
+  await expect.poll(f.active).toBe(f.ids.previous);
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  expect(await f.windows()).toBe(0);
+});
+
+for (const acceptDelay of [0, 250]) test(`English recent bridge storage overlay quick release never paints the scrim or panel (${acceptDelay}ms accept)`, async () => {
+  const f = await bridgeFixture();
+  if (acceptDelay) await worker.evaluate(delay => {
+    const update = chrome.tabs.update.bind(chrome.tabs);
+    chrome.tabs.update = (async (...args: any[]) => {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return (update as any)(...args);
+    }) as typeof chrome.tabs.update;
+  }, acceptDelay);
+  await f.a.evaluate(() => {
+    const samples: number[] = [];
+    (window as any).__switcherPaint = samples;
+    const sample = () => {
+      const dialog = document.querySelector('#zing-command-palette')?.shadowRoot?.querySelector('dialog');
+      if (dialog) {
+        const surface = dialog.querySelector('iframe')?.contentDocument?.body.shadowRoot?.querySelector('.recent-overlay');
+        if (surface) {
+          const backdrop = getComputedStyle(dialog, '::backdrop');
+          const scrimVisible = backdrop.backgroundColor !== 'rgba(0, 0, 0, 0)' && Number(backdrop.opacity) > 0;
+          samples.push(scrimVisible ? 1 : Number(getComputedStyle(surface).opacity));
+        }
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await f.a.keyboard.down('Control'); await f.open();
+  // Release after one painted frame, rather than before the background starts.
+  await f.a.waitForFunction(() => (window as any).__switcherPaint.length > 0, undefined, { polling: 'raf' });
+  await f.a.keyboard.up('Control');
+  await expect.poll(f.active).toBe(f.ids.previous);
+  const samples = await f.a.evaluate(() => (window as any).__switcherPaint as number[]);
+  expect(samples.length).toBeGreaterThan(0);
+  expect(samples.every(opacity => opacity === 0)).toBe(true);
+});
+
+test('English recent bridge storage overlay held shortcut reveals and navigates normally', async () => {
+  const f = await bridgeFixture();
+  await f.a.keyboard.down('Control'); await f.open();
+  const surface = f.a.frameLocator('.zing-frame');
+  await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
+  await expect(surface.getByRole('listbox')).toBeFocused();
+  const selected = await surface.getByRole('listbox').getAttribute('aria-activedescendant');
+  await f.a.keyboard.press('n');
+  await expect(surface.getByRole('listbox')).not.toHaveAttribute('aria-activedescendant', selected!);
+  await f.a.keyboard.press('p');
+  await expect(surface.getByRole('listbox')).toHaveAttribute('aria-activedescendant', selected!);
+  await f.a.keyboard.up('Control');
+  await expect.poll(f.active).toBe(f.ids.previous);
+  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+});
+
+test('English human first recent switcher exposes clickable confirm and respects focused cancel', async () => {
+  const a = await context.newPage(); await a.goto(`${origin}/Mouse-A`);
+  const b = await context.newPage(); await b.goto(`${origin}/Mouse-B`);
+  let popup = await recentPopup(a);
+  const selected = Number((await popup.selected()).replace('recent-', ''));
+  await popup.page.getByRole('button', { name: 'Switch', exact: true }).click();
+  await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(selected);
+  popup = await recentPopup(a);
+  const cancel = popup.page.locator('footer').getByRole('button', { name: 'Cancel', exact: true });
+  await cancel.press('Enter').catch(error => { if (!popup.page.isClosed()) throw error; });
+  await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(popup.target.id);
+});
+
+test('English human first recent switcher mouse hover preserves release selection and row click switches', async () => {
+  const a = await context.newPage(); await a.goto(`${origin}/Mouse-A`);
+  const b = await context.newPage(); await b.goto(`${origin}/Mouse-B`);
+  const c = await context.newPage(); await c.goto(`${origin}/Mouse-C`);
+  const popup = await recentPopup(a);
+  const initial = await popup.selected();
+  const row = popup.page.getByRole('option').filter({ hasText: 'Mouse B' });
+  await row.hover();
+  expect(await popup.selected()).toBe(initial);
+  await popup.key('keyDown', 'n', 'KeyN', 78, 2);
+  expect(await popup.selected()).not.toBe(initial);
+  const target = Number((await row.getAttribute('id'))!.replace('recent-', ''));
+  await row.click();
+  await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(target);
+});

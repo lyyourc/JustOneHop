@@ -13,7 +13,7 @@ ADR 解释“为什么这样做”，保留背景、决策、备选方案和接�
 | 0003 | [统一搜索、相关性优先与本机学习](0003-unified-search-and-local-learning.md) | 已采纳 |
 | 0004 | [只读页面存储与逐网站 Cookie 授权](0004-page-storage-permissions.md) | 已采纳 |
 | 0005 | [主动运行保存的脚本并隔离结果](0005-explicit-user-script-execution.md) | 已采纳 |
-| 0006 | [独立切换窗口与网页松键监听](0006-recent-tab-switcher.md) | 已采纳 |
+| 0006 | [标签切换浮层与独立窗口兜底](0006-recent-tab-switcher.md) | 已采纳 |
 | 0007 | [实时快照、局部复用与延迟加载提示](0007-refresh-and-loading.md) | 已采纳 |
 
 ## 维护方式

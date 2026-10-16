@@ -62,9 +62,9 @@ localStorage.getItem("token")
 
 ## 最近标签页切换
 
-遵循 VS Code Ctrl+Tab 的“选择后确认”交互。macOS 按 **Control+J** 打开独立小窗口，默认高亮上一个标签页，页面暂不切换。保持 Control，使用 **N/P**、↑/↓ 或重复 J 移动高亮；Shift+J 反向。**松开 Control 才切换到选中页并收起窗口**；Enter 或点击选中项同样确认。Esc、失焦或起始页被关闭/移走均取消，选择期间不激活候选标签页，列表顺序固定。
+遵循 VS Code Ctrl+Tab 的“选择后确认”交互。macOS 默认按 **Control+J**（已设置 Ctrl+Tab 时使用该绑定）打开切换器，默认高亮上一个标签页，页面暂不切换。保持 Control，使用 **N/P**、↑/↓ 或重复快捷键移动高亮；反向快捷键反向选择。**松开 Control 才切换到选中页并关闭切换器**；Enter 或点击候选项同样确认。Esc、失焦或起始页被关闭/移走均取消，选择期间不激活候选标签页，列表顺序固定。
 
-普通 HTTP(S) 网页预加载轻量修饰键监听，快速点按可直接切到上一页，无需 Enter；按住时仍打开独立窗口。窗口准备好后才接管焦点，加载期间的松键会被缓冲。扩展更新前已打开的网页需刷新一次才能启用监听。地址栏、Chrome 内置页、Web Store 等受限页面仍使用独立窗口兜底，极短点按可能需要 Enter；不以定时器猜测松键。原来的 Cmd+Shift+P 保持不变。Windows/Linux 默认 Ctrl+, 与 Ctrl+Shift+,，尚未做对应系统原生输入验收。详见 [切换器说明](RECENT-TABS.md)。
+普通 HTTP(S) 网页预加载轻量修饰键监听，快速点按可直接切到上一页，无需 Enter；按住时显示与 Command Palette 同位置、同尺寸的网页浮层。加载期间的松键会被缓冲。扩展更新前已打开的网页需刷新一次才能启用监听。无法聚焦网页、Chrome 内置页、Web Store 等受限页面仍使用独立窗口兜底，极短点按可能需要 Enter；不以定时器猜测松键。原来的 Cmd+Shift+P 保持不变。Windows/Linux 默认 Ctrl+, 与 Ctrl+Shift+,，尚未做对应系统原生输入验收。详见 [切换器说明](RECENT-TABS.md)。
 
 ## 页面存储
 

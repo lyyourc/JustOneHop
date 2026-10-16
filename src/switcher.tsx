@@ -1,7 +1,6 @@
-import { Favicon } from './Favicon';
+import { RecentSwitcherView } from './RecentSwitcherView';
 import { createRoot } from 'react-dom/client';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
-import { ArrowLeftRight, Pin } from 'lucide-react';
 import { getPreferences, preferencesReady } from './preferences';
 import { t, errorMessage } from './i18n';
 import './style.css';
@@ -66,7 +65,12 @@ window.addEventListener('keydown', event => {
     event.preventDefault();
     dismiss();
   }
-  else if (event.key === 'Enter' && !event.repeat) { event.preventDefault(); void finish(); }
+  else if (event.key === 'Enter') {
+    // A focused button owns Enter, just as it owns a mouse click.
+    if ((event.target as HTMLElement).closest('button')) return;
+    event.preventDefault();
+    if (!event.repeat && !event.metaKey && !event.altKey && !event.shiftKey) void finish();
+  }
   else if (event.ctrlKey && !event.metaKey && !event.altKey && ['n', 'p'].includes(event.key.toLowerCase())) {
     event.preventDefault(); move(event.key.toLowerCase() === 'p' ? -1 : 1);
   }
@@ -113,19 +117,9 @@ function Switcher() {
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => { list.current?.focus(); }, []);
   useEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [index, loaded]);
-  return <main className="zing-app recent-switcher" data-theme={getPreferences().theme}>
-    <header><ArrowLeftRight size={18} /><strong>{t('recentSwitcher')}</strong><span>zing</span><button onClick={dismiss} aria-label={t('recentCancel')}><kbd>esc</kbd></button></header>
-    <div className="recent-list" ref={list} tabIndex={0} role="listbox" aria-label={t('recentSwitcher')} aria-activedescendant={tabs[index] ? `recent-${tabs[index].id}` : undefined} aria-busy={!loaded}>
-      {!loaded ? <p className="empty">{t('loading')}</p> : !tabs.length ? <p className="empty">{t('noResults')}</p> : tabs.map((tab, at) => <div className="result" role="option" id={`recent-${tab.id}`} key={tab.id} aria-selected={at === index}
-        onClick={() => { if (closing) return; index = at; changed(); void finish(); }}>
-        <span className="entry-icon tab"><Favicon pageUrl={tab.url} fallback={<ArrowLeftRight size={18} />} /></span><span className="recent-copy"><span className="entry-title">{tab.title || tab.url || t('untitledTab')}</span><span className="recent-url">{tab.url?.replace(/^https?:\/\//, '')}</span></span>
-        {tab.pinned ? <Pin size={13} /> : null}{tab.id === sourceId ? <span className="current-badge">{t('recentCurrent')}</span> : null}
-      </div>)}
-    </div>
-    {error ? <p role="alert" className="recent-error">{error}</p> : null}
-    <footer><span>{t('recentRelease', releaseKey === 'Meta' ? '⌘' : releaseKey === 'Alt' ? '⌥' : 'Ctrl')}</span><span><kbd>↵</kbd> {t('recentConfirm')}<kbd>esc</kbd> {t('recentCancel')}</span></footer>
-    <div className="recent-help">{shortcut} · {t('recentNavigate')}</div>
-  </main>;
+  return <RecentSwitcherView tabs={tabs} index={index} sourceId={sourceId} loaded={loaded} closing={closing}
+    error={error} shortcut={shortcut} releaseKey={releaseKey} theme={getPreferences().theme} listRef={list}
+    onSelect={at => { if (closing) return; index = at; changed(); void finish(); }} onConfirm={() => void finish()} onCancel={dismiss} />;
 }
 void Promise.all([
   // A managed session already has the ordered source-window tabs in its

@@ -1,3 +1,4 @@
+import { errorMessage, t } from './i18n';
 // The page owns key-up until the independent window has installed its listeners.
 // An actual observed release is buffered; elapsed time never implies a release.
 interface Session {
@@ -10,9 +11,15 @@ interface Session {
   ready: boolean;
   handingOff: boolean;
   frame?: number;
+  overlay?: boolean;
 }
 let current: Session | undefined;
-const send = (message: object) => chrome.runtime.sendMessage({ source: 'zing-recent', ...message }).catch(() => {});
+const send = (message: object) => {
+  const payload = { source: 'zing-recent', ...message };
+  return (current?.overlay && current.source?.id !== undefined
+    ? chrome.tabs.sendMessage(current.source.id, payload, { frameId: 0 })
+    : chrome.runtime.sendMessage(payload)).catch(() => {});
+};
 function clear(session: Session, close = true) {
   if (current !== session) return;
   current = undefined;
@@ -59,12 +66,39 @@ export async function openRecentSwitcher(command: string) {
       }
       clear(session); return;
     }
+    // The source page retains focus for the whole selection. Native pages,
+    // missing activeTab access, and Chrome UI focus keep the window fallback.
+    if (/^https?:/.test(source.url || '')) {
+      try {
+        const installed = await chrome.tabs.sendMessage(source.id!, { source: 'zing', type: 'ping' }, { frameId: 0 }).catch(() => false);
+        if (installed !== true) await chrome.scripting.executeScript({ target: { tabId: source.id! }, files: ['content.js'] });
+        if (!await sourceStillFocused(session)) { clear(session); return; }
+        const initialOffset = session.offset;
+        session.overlay = true;
+        const shown = await chrome.tabs.sendMessage(source.id!, { source: 'zing-recent', type: 'open-overlay',
+          session: session.id, tabs: session.tabs, sourceId: source.id, offset: initialOffset, modifier, shortcut }, { frameId: 0 });
+        if (current !== session) {
+          if (shown === true) await chrome.tabs.sendMessage(source.id!, { source: 'zing-recent', type: 'disarm', session: session.id }, { frameId: 0 }).catch(() => {});
+          return;
+        }
+        if (shown === true) {
+          session.ready = true;
+          if (session.offset !== initialOffset) await send({ type: 'step', session: session.id, direction: session.offset - initialOffset });
+          if (session.released) await send({ type: 'released', session: session.id });
+          return;
+        }
+      } catch { /* Retain the existing independent-window fallback. */ }
+      session.overlay = false;
+    }
+    if (!await sourceStillFocused(session)) { clear(session); return; }
     const params = new URLSearchParams({ tab: String(source.id), window: String(owner.id), direction: String(direction), session: session.id, modifier });
+    const width = Math.min(750, owner.width || 750);
+    const height = Math.min(560, owner.height || 560);
     const popup = await chrome.windows.create({
       url: `switcher.html?${params}`, type: 'popup', state: 'normal', focused: false,
-      width: 500, height: 500,
-      left: Math.round((owner.left || 0) + Math.max(0, ((owner.width || 1000) - 500) / 2)),
-      top: Math.round((owner.top || 0) + Math.max(0, ((owner.height || 800) - 500) / 3)),
+      width, height,
+      left: Math.round((owner.left || 0) + ((owner.width || width) - width) / 2),
+      top: Math.round((owner.top || 0) + ((owner.height || height) - height) / 2),
     });
     if (current !== session) { if (popup?.id !== undefined) await chrome.windows.remove(popup.id); return; }
     session.popup = popup?.id;
@@ -73,6 +107,24 @@ export async function openRecentSwitcher(command: string) {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const session = current;
   if (sender.id !== chrome.runtime.id || message?.source !== 'zing-recent' || !session || message.session !== session.id) return;
+  if (['accept-overlay', 'cancel-overlay'].includes(message.type)) {
+    if (!session.overlay || sender.tab?.id !== session.source?.id || sender.frameId !== 0) return;
+    if (message.type === 'cancel-overlay') { clear(session); respond({ ok: true }); return; }
+    void (async () => {
+      if (!session.tabs.some(tab => tab.id === message.tabId) || !await sourceStillFocused(session)) {
+        clear(session); respond({ ok: false, error: t('errorMovedTab') }); return;
+      }
+      const target = await chrome.tabs.get(message.tabId);
+      if (target.windowId !== session.source!.windowId) throw new Error(t('errorMovedTab'));
+      // Recheck after the asynchronous lookup so an interrupted accept cannot
+      // activate a tab in a background window.
+      if (!await sourceStillFocused(session)) { clear(session); respond({ ok: false, error: t('errorMovedTab') }); return; }
+      session.handingOff = true;
+      await chrome.tabs.update(target.id!, { active: true });
+      clear(session); respond({ ok: true });
+    })().catch(error => { respond({ ok: false, error: errorMessage(error) }); });
+    return true;
+  }
   if (message.type === 'release' && sender.tab?.id === session.source?.id) {
     // Only the focused frame arms itself; accept its trusted key-up relay.
     if (session.frame !== undefined && session.frame !== sender.frameId) return;
@@ -100,8 +152,15 @@ chrome.windows.onRemoved.addListener(id => {
   if (current && id === current.popup) clear(current, false);
   else if (current && id === current.source?.windowId) clear(current);
 });
-chrome.tabs.onRemoved.addListener(id => { if (current?.source?.id === id) clear(current); });
-chrome.tabs.onDetached.addListener(id => { if (current?.source?.id === id) clear(current); });
+function removed(id: number) {
+  if (current?.source?.id === id) clear(current);
+  else if (current?.overlay) {
+    current.tabs = current.tabs.filter(tab => tab.id !== id);
+    void send({ type: 'removed', session: current.id, tabId: id });
+  }
+}
+chrome.tabs.onRemoved.addListener(removed);
+chrome.tabs.onDetached.addListener(removed);
 chrome.tabs.onUpdated.addListener((id, change) => { if (current?.source?.id === id && change.status === 'loading') clear(current); });
 chrome.tabs.onActivated.addListener(info => {
   if (current?.source && !current.handingOff && info.windowId === current.source.windowId && info.tabId !== current.source.id) clear(current);
