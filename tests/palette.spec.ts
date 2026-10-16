@@ -2845,3 +2845,24 @@ test('English human first recent switcher mouse hover preserves release selectio
   await row.click();
   await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(target);
 });
+
+test('English pinned hostname result outranks bookmark prefixes and switches without opening a duplicate', async () => {
+  const target = await context.newPage(); await target.goto(`${origin}/Service-Console`);
+  const targetId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, target.url());
+  await worker.evaluate(async ({ id, base }) => {
+    await chrome.tabs.update(id, { pinned: true });
+    for (const name of ['api', 'dev', 'prod']) await chrome.bookmarks.create({ title: `127 ${name}`, url: `${base}/${name}` });
+  }, { id: targetId, base: origin });
+  await ui.bringToFront(); await ui.reload();
+  const input = ui.getByRole('combobox');
+  await input.fill('127');
+  await expect(ui.getByRole('option').first()).toContainText('Service Console');
+  await input.fill('127 api');
+  await expect(ui.getByRole('option').first()).toContainText('127 api');
+  await input.fill('127');
+  await expect(ui.getByRole('option').first()).toContainText('Service Console');
+  await input.press('Enter');
+  await expect.poll(() => ui.isClosed()).toBe(true);
+  await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, targetId)).toBe(true);
+  expect(await worker.evaluate(async url => (await chrome.tabs.query({})).filter(tab => tab.url === url).length, target.url())).toBe(1);
+});

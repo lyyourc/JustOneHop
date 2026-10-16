@@ -87,7 +87,7 @@ test('history is bounded and repeated targets do not create duplicate records', 
 test('learned choices move ahead for the same query while exact commands and strict filtering remain protected', () => {
   const items = entries({ currentTabId: 1, windowId: 1, shortcut: '', tabs: [{
     id: 1, windowId: 1, index: 0, active: true, pinned: false, muted: false, audible: false,
-    title: 'EchoTech IAM', url: 'https://iam.example/Guide',
+    title: 'EchoTech IAM', url: 'https://auth.example/Guide',
   }, { id: 2, windowId: 1, index: 1, active: false, pinned: false, muted: false, audible: false,
     title: 'New Tab', url: 'chrome://newtab/' }],
   bookmarks: [{ id: 'iam', title: 'IAM Handbook', url: 'https://handbook.example', folder: '' }] });
@@ -101,5 +101,5 @@ test('learned choices move ahead for the same query while exact commands and str
   assert.equal(search(items, 'new tab', new Map([['tab:chrome://newtab/', 100]]))[0].action, 'newTab');
   const restored = { ...items[0], id: 'tab:99', tabId: 99 };
   assert.equal(usageTarget(restored), target); // Browser restart changes tab IDs, not the learned URL.
-  assert.equal(usageTarget({ ...restored, keywords: 'https://iam.example/Other' }) === target, false);
+  assert.equal(usageTarget({ ...restored, keywords: 'https://auth.example/Other' }) === target, false);
 });

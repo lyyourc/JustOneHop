@@ -209,3 +209,37 @@ test('tab action shortcuts are only advertised for the active target', () => {
   assert.equal(active.find(item => item.action === 'close')?.shortcut, 'Mod+W');
   assert.equal(active.find(item => item.action === 'reload')?.shortcut, 'Mod+R');
 });
+
+test('pinned service tab outranks prefix bookmarks when the service name matches its hostname', () => {
+  const items = entries({ ...data, tabs: [{ ...tab(1, 0, true), title: '日志服务-阿里云控制台', url: 'https://sls.console.aliyun.com/lognext/project/k8s-log' }],
+    bookmarks: ['api', 'dev', 'k8s prod'].map((name, index) => ({ id: String(index), title: `sls ${name}`, url: `https://sls.console.aliyun.com/lognext/project/${index}`, folder: '' })) });
+  assert.equal(search(items, 'sls')[0].id, 'tab:1');
+});
+
+test('pin and open-tab preference break relevance ties without overriding precise intent or learned choices', () => {
+  const items = entries({ ...data, tabs: [
+    { ...tab(1, 0), title: 'Service dashboard', url: 'https://sls.console.aliyun.com/short' },
+    { ...tab(2, 1, true), title: 'Localized dashboard', url: 'https://sls.console.aliyun.com/longer/path' },
+    { ...tab(3, 2, true), title: 'Unrelated', url: 'https://unrelated.example/path/sls' },
+    { ...tab(4, 3, true), title: 'Settings guide', url: 'https://other.example' },
+  ], bookmarks: [
+    { id: 'service', title: 'sls dev', url: 'https://sls.console.aliyun.com/dev', folder: '' },
+    { id: 'precise', title: 'sls api', url: 'https://api.example', folder: '' },
+  ] });
+  assert.deepEqual(search(items, 'sls').slice(0, 3).map(item => item.id), ['tab:2', 'tab:1', 'bookmark:service']);
+  assert.equal(search(items, 'sls api')[0].id, 'bookmark:precise');
+  assert.equal(search(items, 'sls', new Map([['bookmark:service', 4]]))[0].id, 'bookmark:service');
+  assert.equal(search(items, 'settings')[0].action, 'settings');
+  assert.ok(!search(items, 'iam').some(item => item.pinned));
+  assert.ok(!search(items, 'slx').some(item => item.id === 'tab:2'));
+  assert.equal(search(items, 'sls missing').length, 0);
+});
+
+test('hostname ranking handles www and inner domain labels without promoting path-only pinned hits', () => {
+  const items = entries({ ...data, tabs: [
+    { ...tab(1, 0, true), title: 'Console', url: 'https://tools.example/sls' },
+    { ...tab(2, 1), title: 'Console', url: 'https://www.sls.example' },
+    { ...tab(3, 2, true), title: 'Console', url: 'https://console.sls.example' },
+  ], bookmarks: [] });
+  assert.deepEqual(search(items, 'sls').map(item => item.id), ['tab:2', 'tab:3', 'tab:1']);
+});

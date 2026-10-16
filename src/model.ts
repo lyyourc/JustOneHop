@@ -116,9 +116,16 @@ function buildSearchIndex(items: Entry[]) {
     const title = normalizeSearch(item.title);
     const label = normalizeSearch(entryTitle(item));
     const aliases = item.kind === 'command' ? item.aliases ?? commandAliases[item.action] ?? [] : [];
-    const names = [title, label, ...aliases];
+    // A service is often named by its domain while its page title is localized.
+    // Rank that identity like a name; paths, query strings and folders remain
+    // auxiliary metadata and still receive no typo tolerance.
+    let hostname = '';
+    if ((item.kind === 'tab' || item.kind === 'bookmark') && item.faviconPageUrl) {
+      try { hostname = new URL(item.faviconPageUrl).hostname.toLowerCase().replace(/^www\./, ''); } catch { /* No domain identity. */ }
+    }
+    const names = [title, label, ...aliases, ...(hostname ? [hostname] : [])];
     return {
-      kind: item.kind, action: item.action, danger: item.danger, title, label, aliases, names,
+      kind: item.kind, pinned: item.kind === 'tab' && !!item.pinned, action: item.action, danger: item.danger, title, label, aliases, names,
       wordNames: names.map(name => name.split(/[^\p{L}\p{N}]+/u).join(' ')),
       categoryText: categoryTerms(item.category), keywords: normalizeSearch(item.keywords),
       subtitle: item.kind === 'command' ? '' : normalizeSearch(item.subtitle),
@@ -167,11 +174,14 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     item.title.includes(term) || termMatches(item.title, term).length > 0 || item.aliases.some(alias =>
       termMatches(alias, term, !pinyinAliases.has(alias)).length > 0)))
     .map(result => ({ ...result, tier: tier(result.item), usage: usageScores.get(usageTarget(items[result.refIndex])) || 0 }))
-    // Learning breaks ties before text ranking. With equal usage and exact names,
-    // ignore incidental URL scores and preserve the tab-first / MRU fallback.
+    // Explicit intent and learned choices stay protected. At equal relevance,
+    // prefer a pinned/open tab before incidental Fuse scores from URL length or
+    // duplicate title/URL hits. Preserve MRU order when those signals also tie.
     .sort((a, b) => rankGroup(a.tier) - rankGroup(b.tier) || b.usage - a.usage ||
-      a.tier - b.tier || (a.tier > 1 ? (a.score ?? 1) - (b.score ?? 1) : 0) ||
-      kindOrder[a.item.kind] - kindOrder[b.item.kind] || a.refIndex - b.refIndex)
+      a.tier - b.tier || Number(b.item.kind === 'command') - Number(a.item.kind === 'command') ||
+      Number(b.item.pinned) - Number(a.item.pinned) ||
+      kindOrder[a.item.kind] - kindOrder[b.item.kind] ||
+      (a.tier > 1 ? (a.score ?? 1) - (b.score ?? 1) : 0) || a.refIndex - b.refIndex)
     .map(result => items[result.refIndex]);
 }
 
