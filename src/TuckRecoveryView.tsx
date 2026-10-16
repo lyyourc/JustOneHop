@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, RotateCcw, X } from 'lucide-react';
 import { BackLayer } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
@@ -20,12 +20,12 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
   const list = useRef<HTMLDivElement>(null);
   const candidates = item?.candidates.filter(group => group.windowId === windowId) || [];
   const selected = candidates.find(group => group.id === selectedId) || candidates[0];
-  const actions = [
-    ...(selected ? [{ id: 'resume', title: t('resumeTuck') }] : []),
-    ...(item ? [{ id: 'forget', title: t('forgetTuckRecovery') }] : []),
-    { id: 'back', title: t('tuckRecoveryLater') },
-  ].filter(action => !query || action.title.toLowerCase().includes(query.toLowerCase()));
-  const action = menu ? actions.find(action => action.id === actionId) || actions[0]
+  const actions: { id: string; title: string; keywords: string; icon: React.ReactNode; danger?: boolean }[] = [
+    ...(selected ? [{ id: 'resume', title: t('resumeTuck'), keywords: 'resume continue 恢复 继续管理', icon: <RotateCcw size={16} /> }] : []),
+    ...(item ? [{ id: 'forget', title: t('forgetTuckRecovery'), keywords: 'stop forget delete 停止 放弃 删除', icon: <X size={16} />, danger: true }] : []),
+    { id: 'back', title: t('tuckRecoveryLater'), keywords: 'later back 稍后 返回', icon: <ArrowLeft size={16} /> },
+  ].filter(action => !query || `${action.title} ${action.keywords}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const action: { id: string; title: string; danger?: boolean } | undefined = menu ? actions.find(action => action.id === actionId) || actions[0]
     : { id: selected ? 'resume' : 'back', title: selected ? t('resumeTuck') : t('tuckRecoveryLater') };
   useLayoutEffect(() => { if (!menu) (selected ? list.current : back.current)?.focus(); }, [menu]);
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
@@ -69,7 +69,12 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
       {item && !candidates.length ? <p>{t('tuckRecoveryMissing')}</p> : null}
       <div ref={list} role="listbox" aria-label={t('tuckRecoveryGroups')} tabIndex={0} aria-activedescendant={selected ? `recover-group-${selected.id}` : undefined}>
         {candidates.map(group => <div id={`recover-group-${group.id}`} key={group.id} role="option" aria-selected={group.id === selected?.id}
-          className={`recovery-candidate ${group.id === selected?.id ? 'selected' : ''}`} onClick={() => { setSelectedId(group.id); list.current?.focus(); }}>
+          className={`recovery-candidate ${group.id === selected?.id ? 'selected' : ''}`} onClick={() => { setSelectedId(group.id); list.current?.focus(); }}
+          onContextMenu={event => {
+            event.preventDefault();
+            if (busy) return;
+            setSelectedId(group.id); setMenu(true); setQuery(''); setActionId('resume');
+          }}>
           <strong>{group.title || `${t('tuckGroupTitle')} · ${group.tabs.length}`}</strong>
           <ul>{group.tabs.map(tab => <li key={tab.id}><span>{tab.title}</span><small>{tab.url}</small></li>)}</ul>
         </div>)}
@@ -77,7 +82,7 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
       <p className="setting-note">{t('tuckRecoveryForgetHint')}</p>
     </div>
     {error ? <div className="error-banner" role="alert">{error}</div> : null}
-    <PaletteFooter isMac={isMac} primary={{ label: action?.title || t('runCommand'), keys: ['↵'], disabled: busy || !action, onAction: () => void run(action?.id || 'back') }}
+    <PaletteFooter isMac={isMac} primary={{ label: action?.title || t('runCommand'), keys: ['↵'], disabled: busy || !action, danger: !!action?.danger, onAction: () => void run(action?.id || 'back') }}
       actions={{ open: menu, disabled: busy, onToggle: toggleMenu }} />
     {menu ? <ActionMenu id="tuck-recovery-actions" title={t('reviewTuck')} actions={actions} query={query} onQueryChange={setQuery}
       selectedId={action?.id} onSelectionChange={setActionId} onAction={id => void run(id)} onClose={() => setMenu(false)} isMac={isMac} /> : null}

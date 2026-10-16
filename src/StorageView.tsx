@@ -84,16 +84,16 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
     setMenu(!menu); setActionQuery(''); setActionSelection('');
   }
   function back() { if (menu) setMenu(false); else if (detail) setDetail(null); else onBack(); }
-  async function act(id: string) {
-    if (busy || (id !== 'refresh' && !current)) return;
+  async function act(id: string, targetEntry = current) {
+    if (busy || (id !== 'refresh' && !targetEntry)) return;
     setMenu(false); setNotice(''); setError('');
     if (id === 'refresh') { void refresh(); return; }
-    if (!current) return;
+    if (!targetEntry) return;
     if (!detail) caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-    if (id === 'detail') { setDetail(current); return; }
+    if (id === 'detail') { setDetail(targetEntry); return; }
     const anchor = detail ? detailBody.current : input.current;
     if (!anchor) return;
-    try { await copyText(id === 'name' ? current.name : current.value, anchor); setNotice(t(id === 'name' ? 'copiedName' : 'copiedValue')); }
+    try { await copyText(id === 'name' ? targetEntry.name : targetEntry.value, anchor); setNotice(t(id === 'name' ? 'copiedName' : 'copiedValue')); }
     catch { setError(t('errorStorageCopy')); }
   }
   function keyboard(event: KeyboardEvent) {
@@ -166,7 +166,15 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
           {busy ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void refresh(); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
             : !rows.length ? <div className="empty"><Database size={26} /><strong>{query ? t('noResults') : t('storageEmpty')}</strong></div>
             : rows.map((row, index) => <div key={row.id} id={`storage-row-${index}`} className="result storage-row" role="option" aria-selected={row.id === selected?.id}
-              onMouseMove={event => hover(event, () => setSelection(row.id))} onClick={() => { setSelection(row.id); input.current?.focus(); }} onDoubleClick={() => { setSelection(row.id); setDetail(row); }}>
+              onMouseMove={event => hover(event, () => setSelection(row.id))}
+              onClick={() => { setSelection(row.id); void act('value', row); input.current?.focus(); }}
+              onDoubleClick={() => { setSelection(row.id); setDetail(row); }}
+              onContextMenu={event => {
+                event.preventDefault();
+                if (busy) return;
+                caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+                setSelection(row.id); setMenu(true); setActionQuery(''); setActionSelection(''); setError('');
+              }}>
               <span className="entry-icon command">{row.cookie ? <Cookie size={18} /> : <Database size={18} />}</span>
               <span className="storage-copy"><span className="entry-title"><HighlightedText text={row.name || t('storageEmptyName')} query={query} allowTypos={false} /></span>
                 <span className="storage-summary">{row.value.slice(0, 180) || t('storageEmptyValue')}</span></span>

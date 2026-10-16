@@ -7,6 +7,7 @@ import { copyText } from './clipboard';
 import { openShortcuts } from './api';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
+import { HighlightedText } from './HighlightedText';
 
 export function ScriptLibrary({ initialBinding = false, initialScript, onComplete, onBack, onClose, isMac }: {
   initialBinding?: boolean; initialScript?: SavedScript; onComplete?: (notice: string) => void; onBack: () => void; onClose: () => void; isMac: boolean;
@@ -36,7 +37,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
   const mod = isMac ? '⌘' : 'Ctrl';
   const results = [bindingScript(), ...scripts].filter(script => script.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const selected = Math.min(index, Math.max(0, results.length - 1));
-  const availableActions = [
+  const availableActions: { id: string; title: string; shortcut?: string; keywords: string; icon: React.ReactNode; danger?: boolean }[] = [
     { id: 'save', title: t('saveScript'), shortcut: 'Mod+Enter', keywords: 'save 保存', icon: <Save size={16} /> },
     { id: 'copy', title: t('copyScript'), keywords: 'copy code 复制代码', icon: <Copy size={16} /> },
     ...(draft && scripts.some(script => script.id === draft.id) ? [{ id: 'delete', title: t('deleteScript'), keywords: 'delete 删除', icon: <Trash2 size={16} />, danger: true }] : []),
@@ -147,7 +148,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
           <div className="script-search"><Search size={16} /><input data-back-on-empty ref={search} aria-label={t('searchScripts')} placeholder={t('searchScripts')} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} />
             <button className="ranking-reset" disabled={!ready} onClick={() => edit({ id: crypto.randomUUID(), title: '', code: '' })}><Plus size={14} />{t('newScript')}</button></div>
           <div className="script-list" ref={list}>{results.map((script, at) => <button key={script.id} className={`script-item ${at === selected ? 'selected' : ''}`} onClick={() => { setIndex(at); edit(script); }}>
-            <span>{script.title}</span><span>{t(script.id === 'builtin-ctrl-tab' ? 'builtInScript' : 'editScript')}</span></button>)}</div>
+            <span><HighlightedText text={script.title} query={query} allowTypos={false} /></span><span>{t(script.id === 'builtin-ctrl-tab' ? 'builtInScript' : 'editScript')}</span></button>)}</div>
           {!results.length ? <p className="empty">{t('noResults')}</p> : null}
         </>}
       </div>
@@ -168,7 +169,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
       </div>
     </BackLayer> : null}
     <PaletteFooter isMac={isMac} status={<span className="footer-note">{t('scriptLocalOnly')}</span>}
-      primary={draft && !builtin ? { label: menu ? activeAction?.title || t('saveScript') : t('saveScript'), keys: menu ? ['↵'] : [mod, '↵'], disabled: busy || !ready || deleting || (menu && !activeAction), onAction: () => { if (menu) { if (activeAction) act(activeAction.id); } else void save(); } }
+      primary={draft && !builtin ? { label: menu ? activeAction?.title || t('saveScript') : t('saveScript'), keys: menu ? ['↵'] : [mod, '↵'], disabled: busy || !ready || deleting || (menu && !activeAction), danger: !!(menu && activeAction?.danger), onAction: () => { if (menu) { if (activeAction) act(activeAction.id); } else void save(); } }
         : { label: t('back'), keys: ['esc'], onAction: leave }}
       actions={draft && !builtin ? { open: menu, disabled: busy || !ready || deleting, onToggle: toggleMenu } : undefined} />
   </section></BackLayer></BackLayer>;

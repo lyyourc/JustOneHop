@@ -2429,6 +2429,7 @@ test('English interaction polish script navigation scrolls and returns to the sa
   const search = ui.getByRole('textbox', { name: 'Search scripts' });
   await search.fill('Polish');
   await expect(ui.locator('.script-item')).toHaveCount(35);
+  await expect(ui.locator('.script-item mark').first()).toHaveText('Polish');
   await search.press('Shift+Enter'); await expect(search).toBeVisible();
   await search.press('Control+Shift+n');
   await expect(ui.locator('.script-item.selected')).toContainText('Polish 00');
@@ -2462,15 +2463,19 @@ test('English interaction polish settings choices accept Control navigation with
 });
 
 test('English interaction polish storage shares menu footer highlighting and focus restoration', async () => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const page = await context.newPage(); await page.goto(`${origin}/Interaction-polish`);
   await page.evaluate(() => localStorage.setItem('polish.key', 'value'));
   const surface = await openStorageOverlay(page);
   await surface.locator('.search-bar input').fill('local storage'); await page.keyboard.press('Enter');
   const search = surface.locator('.storage-search input');
   await expect(surface.locator('.storage-row')).toHaveCount(1);
+  await surface.locator('.storage-row').first().click();
+  await expect(surface.locator('.storage-notice')).toContainText('Value copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('value');
   await search.fill('polish');
   await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 3));
-  await search.press('Meta+k');
+  await surface.locator('.storage-row').first().click({ button: 'right' });
   const actions = surface.getByRole('combobox', { name: 'Search actions' });
   await expect(actions).toBeFocused(); await actions.fill('copy');
   await expect(surface.locator('.action-row mark')).toHaveCount(2);
@@ -3056,6 +3061,19 @@ test('Chinese Tab Group labels and compact footer stay usable', async () => {
   await root.fill('资料');
   await ui.getByRole('option').filter({ hasText: '标签组: 资料' }).click();
   await ui.setViewportSize({ width: 750, height: 516 });
+  const groupSearch = ui.getByRole('combobox', { name: '搜索组内标签页…' });
+  await groupSearch.fill('127');
+  await groupSearch.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 2));
+  await ui.getByRole('option').first().click({ button: 'right' });
+  await ui.getByRole('combobox', { name: '搜索操作' }).fill('close');
+  await expect(ui.locator('.palette-footer .primary-action')).toHaveClass(/danger/);
+  await ui.getByRole('combobox', { name: '搜索操作' }).fill('rename');
+  await ui.keyboard.press('Enter');
+  await expect(ui.getByLabel('标签组名称')).toBeFocused();
+  await ui.keyboard.press('Escape');
+  await expect(groupSearch).toBeFocused();
+  expect(await groupSearch.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 2]);
+  await groupSearch.fill('');
   await expect(ui.locator('.palette-footer .primary-action')).toBeInViewport();
   await ui.getByRole('button', { name: '打开操作菜单' }).click();
   await ui.getByRole('combobox', { name: '搜索操作' }).fill('重命名');

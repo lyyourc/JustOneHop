@@ -4,7 +4,7 @@ import { t } from './i18n';
 export function PaletteFooter({ leading, status, primary, actions, isMac }: {
   leading?: ReactNode;
   status?: ReactNode;
-  primary?: { label: string; keys: string[]; disabled?: boolean; onAction: () => void };
+  primary?: { label: string; keys: string[]; disabled?: boolean; danger?: boolean; onAction: () => void };
   actions?: { open: boolean; disabled?: boolean; onToggle: () => void };
   isMac: boolean;
 }) {
@@ -12,7 +12,7 @@ export function PaletteFooter({ leading, status, primary, actions, isMac }: {
     {leading}
     {status ? <div className="palette-footer-status">{status}</div> : null}
     <div className="footer-actions">
-      {primary ? <button className="primary-action" disabled={primary.disabled} onClick={primary.onAction} title={primary.label} aria-label={primary.label}>
+      {primary ? <button className={`primary-action ${primary.danger ? 'danger' : ''}`} disabled={primary.disabled} onClick={primary.onAction} title={primary.label} aria-label={primary.label}>
         <span className="primary-label">{primary.label}</span><span className="key-chord">{primary.keys.map(key => <kbd key={key}>{key}</kbd>)}</span>
       </button> : null}
       {primary && actions ? <span className="footer-separator" /> : null}

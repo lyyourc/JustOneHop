@@ -352,7 +352,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
             <span className="navigation-key"><span className="navigation-arrow">↑</span><Key>Ctrl P</Key></span>
             <span className="navigation-key"><span className="navigation-arrow">↓</span><Key>Ctrl N</Key></span>
           </span>}
-        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || busy || !!deleteTarget, onAction: () => void run(current) }}
+        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || busy || !!deleteTarget, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
         actions={{ open: !!actionTarget, disabled: !selected || busy || !!deleteTarget, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}

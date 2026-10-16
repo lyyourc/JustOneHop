@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, Layers, PanelTop } from 'lucide-react';
+import { ArrowLeft, Layers, Palette, PanelTop, Pencil, Save, X } from 'lucide-react';
 import { BackLayer } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
@@ -26,30 +26,45 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const input = useRef<HTMLInputElement>(null);
+  const caret = useRef<[number, number]>([0, 0]);
+  const pointer = useRef<{ x: number; y: number } | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const colorInput = useRef<HTMLSelectElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const members = entries({ ...data, groups: [], bookmarks: [], tabs: data.tabs.filter(tab => tab.groupId === groupId) }).filter(entry => entry.kind === 'tab');
   const results = search(members, query);
   const selected = results.find(entry => entry.id === selection) || results[0];
-  const allActions = editor ? [{ id: 'save', title: t('groupSave') }] : [
-    ...(selected ? [{ id: 'switch', title: t('switchTabPrimary') }, { id: 'ungroupTab', title: t('groupRemoveTab') }, { id: 'close', title: t('closeTab'), danger: true }] : []),
-    ...(group ? [{ id: 'collapse', title: t(group.collapsed ? 'groupExpand' : 'groupCollapse') }, { id: 'name', title: t('groupRename') }, { id: 'color', title: t('groupColor') }] : []),
+  const allActions: { id: string; title: string; keywords: string; icon: React.ReactNode; danger?: boolean }[] = editor ? [{ id: 'save', title: t('groupSave'), keywords: 'save 保存', icon: <Save size={16} /> }] : [
+    ...(selected ? [
+      { id: 'switch', title: t('switchTabPrimary'), keywords: 'switch tab 切换标签页', icon: <PanelTop size={16} /> },
+      { id: 'ungroupTab', title: t('groupRemoveTab'), keywords: 'remove ungroup tab 移出 取消分组', icon: <Layers size={16} /> },
+      { id: 'close', title: t('closeTab'), keywords: 'close tab 关闭标签页', icon: <X size={16} />, danger: true },
+    ] : []),
+    ...(group ? [
+      { id: 'collapse', title: t(group.collapsed ? 'groupExpand' : 'groupCollapse'), keywords: group.collapsed ? 'expand open 展开' : 'collapse fold 折叠', icon: <Layers size={16} /> },
+      { id: 'name', title: t('groupRename'), keywords: 'rename group 重命名 名称', icon: <Pencil size={16} /> },
+      { id: 'color', title: t('groupColor'), keywords: 'change group color 颜色 换色', icon: <Palette size={16} /> },
+    ] : []),
   ];
-  const actions = allActions.filter(action => action.title.toLocaleLowerCase().includes(actionQuery.toLocaleLowerCase()));
+  const actions = allActions.filter(action => `${action.title} ${action.keywords}`.toLocaleLowerCase().includes(actionQuery.trim().toLocaleLowerCase()));
   const chosen = actions.find(action => action.id === actionId) || actions[0];
   useLayoutEffect(() => {
     if (menu) return;
     if (editor === 'name') { nameInput.current?.focus(); nameInput.current?.select(); }
     else if (editor === 'color') colorInput.current?.focus();
-    else input.current?.focus();
+    else { input.current?.focus(); input.current?.setSelectionRange(...caret.current); }
   }, [menu, editor]);
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
-  function toggleMenu() { if (!busy) { setMenu(!menu); setActionQuery(''); setActionId(''); } }
+  function rememberCaret() {
+    if (!menu && !editor) caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+  }
+  function toggleMenu() {
+    if (!busy) { rememberCaret(); setMenu(!menu); setActionQuery(''); setActionId(''); }
+  }
   async function run(id: string) {
     if (busy || !group) return;
-    if (id === 'name' || id === 'color') { setName(group.title); setColor(group.color); setEditor(id); setMenu(false); setError(''); return; }
-    setBusy(true); setError('');
+    if (id === 'name' || id === 'color') { rememberCaret(); setName(group.title); setColor(group.color); setEditor(id); setMenu(false); setError(''); return; }
+    rememberCaret(); setBusy(true); setError('');
     try {
       if (id === 'save') {
         await execute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: editor === 'name' ? { title: name.trim() } : { color } });
@@ -63,7 +78,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   }
-  const primary = menu ? chosen : editor ? { id: 'save', title: t('groupSave') } : selected ? { id: 'switch', title: t('switchTabPrimary') } : undefined;
+  const primary: { id: string; title: string; danger?: boolean } | undefined = menu ? chosen : editor ? { id: 'save', title: t('groupSave') } : selected ? { id: 'switch', title: t('switchTabPrimary') } : undefined;
   const body = <>
     <header className="settings-header"><button className="settings-back" aria-label={t('back')} onClick={() => editor ? setEditor(undefined) : onBack()}><ArrowLeft size={18} /></button>
       <h1><Layers size={18} data-color={group?.color} /> {editor ? t(editor === 'name' ? 'groupRename' : 'groupColor') : `${t('categoryTabGroup')}: ${group?.title || t('unnamedGroup')}`}</h1><kbd>esc</kbd></header>
@@ -78,7 +93,17 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
           placeholder={t('groupSearch')} aria-label={t('groupSearch')} role="combobox" aria-expanded="true" aria-controls="zing-group-tabs" aria-activedescendant={selected ? `group-${selected.id}` : undefined} disabled={busy} /></div>
         <div ref={list} className="results" id="zing-group-tabs" role="listbox" aria-label={t('resultsLabel')}>
           {results.map(entry => <div key={entry.id} id={`group-${entry.id}`} role="option" aria-selected={entry.id === selected?.id} className="result tab"
-            onMouseMove={event => { if (event.movementX || event.movementY) setSelection(entry.id); }} onClick={() => { if (!busy) { setSelection(entry.id); void execute({ action: 'switch', groupId, tabId: entry.tabId, windowId: data.windowId }).then(onClose).catch(reason => setError(errorMessage(reason))); } }}>
+            onMouseMove={event => {
+              const next = { x: event.screenX, y: event.screenY };
+              if (pointer.current && (pointer.current.x !== next.x || pointer.current.y !== next.y)) setSelection(entry.id);
+              pointer.current = next;
+            }}
+            onClick={() => { if (!busy) { setSelection(entry.id); void execute({ action: 'switch', groupId, tabId: entry.tabId, windowId: data.windowId }).then(onClose).catch(reason => setError(errorMessage(reason))); } }}
+            onContextMenu={event => {
+              event.preventDefault();
+              if (busy) return;
+              rememberCaret(); setSelection(entry.id); setMenu(true); setActionQuery(''); setActionId(''); setError('');
+            }}>
             <span className="entry-icon"><Favicon pageUrl={entry.faviconPageUrl} fallback={<PanelTop size={18} />} /></span>
             <span className="entry-copy"><span className="entry-title"><HighlightedText text={entry.title} query={query} /></span><span className="entry-subtitle"><HighlightedText text={entry.subtitle} query={query} /></span></span>
           </div>)}
@@ -88,20 +113,27 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
     </div>
     {error ? <div className="error-banner" role="alert">{error}</div> : null}
     <PaletteFooter isMac={isMac} status={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
-      primary={primary ? { label: primary.title, keys: ['↵'], disabled: busy || !group, onAction: () => void run(primary.id) } : undefined}
+      primary={primary ? { label: primary.title, keys: ['↵'], disabled: busy || !group, danger: !!primary.danger, onAction: () => void run(primary.id) } : undefined}
       actions={{ open: menu, disabled: busy || !group, onToggle: toggleMenu }} />
     {menu ? <ActionMenu id="group-actions" title={editor ? t(editor === 'name' ? 'groupRename' : 'groupColor') : group?.title} actions={actions} query={actionQuery} onQueryChange={setActionQuery}
       selectedId={chosen?.id} onSelectionChange={setActionId} onAction={id => void run(id)} onClose={() => setMenu(false)} isMac={isMac} /> : null}
   </>;
   return <BackLayer onBack={onBack}><section className="palette group-view" aria-busy={busy} onKeyDown={event => {
     if (event.nativeEvent.isComposing || event.keyCode === 229 || menu) return;
-    if ((isMac ? event.metaKey : event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') { event.preventDefault(); toggleMenu(); return; }
+    const mod = isMac ? event.metaKey : event.ctrlKey;
+    if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') { event.preventDefault(); toggleMenu(); return; }
     if (busy) return;
-    const down = event.key === 'ArrowDown' || (event.ctrlKey && event.key.toLowerCase() === 'n');
-    const up = event.key === 'ArrowUp' || (event.ctrlKey && event.key.toLowerCase() === 'p');
-    if (!editor && !event.metaKey && !event.altKey && !event.shiftKey && (down || up)) {
-      event.preventDefault(); const index = results.findIndex(entry => entry.id === selected?.id);
-      if (results.length) setSelection(results[(index + (down ? 1 : -1) + results.length) % results.length].id);
+    const arrow = event.key === 'ArrowDown' || event.key === 'ArrowUp';
+    const emacs = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ['n', 'p'].includes(event.key.toLowerCase());
+    if (!editor && !event.shiftKey && (arrow || emacs || ['PageDown', 'PageUp'].includes(event.key))) {
+      event.preventDefault();
+      if (!results.length) return;
+      const index = results.findIndex(entry => entry.id === selected?.id);
+      const down = event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'n';
+      let next = (index + (down ? 1 : -1) + results.length) % results.length;
+      if (arrow && mod) next = down ? results.length - 1 : 0;
+      else if (event.altKey || event.key.startsWith('Page')) next = Math.max(0, Math.min(results.length - 1, index + (down ? 1 : -1) * 6));
+      setSelection(results[next].id);
     } else if (event.key === 'Enter' && !event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && (event.target as HTMLElement).tagName !== 'BUTTON' && (event.target as HTMLElement).tagName !== 'SELECT') {
       event.preventDefault(); if (primary) void run(primary.id);
     }

@@ -1,6 +1,7 @@
 import { BackLayer } from './Navigation';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
+import { HighlightedText } from './HighlightedText';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ArrowLeft, Copy, LoaderCircle, Play, Search } from 'lucide-react';
 import { getScripts, subscribeScripts } from './scripts';
@@ -146,7 +147,7 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
         {!selectedId ? <>
           <div className="script-search"><Search size={16} /><input data-back-on-empty ref={search} aria-label={t('searchScripts')} placeholder={t('searchScripts')} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} /></div>
           <div ref={list} className="script-list" role="listbox" aria-label={t('scriptLibrary')}>{rows.map(row => <button key={row.id} role="option" aria-selected={row.id === selected?.id} className={`script-item ${row.id === selected?.id ? 'selected' : ''}`} onClick={() => void run(row.id)}>
-            <span>{row.title}</span><Play size={14} /></button>)}</div>
+            <span><HighlightedText text={row.title} query={query} allowTypos={false} /></span><Play size={14} /></button>)}</div>
           {!rows.length ? <p className="empty">{t(scripts.length ? 'noResults' : 'noRunnableScripts')}</p> : null}
         </> : <>
           {busy ? <div className="script-run-status" role="status"><LoaderCircle className="spinner" size={18} />{t('scriptExecuting')}<p>{t('scriptRunningBack')}</p></div> : null}
