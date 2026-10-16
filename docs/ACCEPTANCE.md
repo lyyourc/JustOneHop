@@ -390,6 +390,18 @@ Storage 列表和详情接入现有 ActionMenu / PaletteFooter，统一菜单搜
 
 日常 Chrome 扩展管理页重新加载后显示 Reloaded，管理页已关闭。执行测试仅使用隔离浏览器中的自建夹具，没有运行用户保存的脚本或操作业务页面。
 
+## 地址栏唤起的焦点交接（2026-10-16）
+
+日常 Chrome 通过原生 Cmd+L → Cmd+Shift+P 稳定复现：浮层已显示，但地址栏仍选中并显示建议。先后测试 modal 显示后 window.focus()、收到 toggle 时同步 window.focus()、后台 executeScript 直接请求 window.focus()、windows.update({ focused: true })，均未交接焦点。直接注入的诊断结果为 page=false、frame=false、input=INPUT、gesture=true：输入框在 DOM 内已激活，用户操作状态仍有效，但网页没有实际键盘焦点。这证明当前 Chrome 的这条网页聚焦路径不可用；不将其外推为所有浏览器或所有方法都不可能。
+
+修正：创建浮层前检查 document.hasFocus()。若网页不能接收键盘输入，返回现有 false 握手结果，让后台走已有的 action popup 兜底；已有浮层的关闭不受此检查影响。没有增加消息字段、权限或存储。网页内正常唤起仍居中；地址栏场景使用 Chrome 定位的右上角弹窗。移除了后台聚焦实验及所有临时诊断标记；仅在可见网页失焦时尝试一次 window.focus()，随后以实际 hasFocus() 结果决定是否回退。
+
+Computer Use 已直接点击 chrome://extensions 中 zing 的 Reload，观察到 Reloaded。随后在日常 Chrome 实测两轮「地址栏 → Cmd+Shift+P → 不点击输入框直接输入 settings」，两轮均由 popup 接收文字、更新搜索结果，Esc 正常关闭。中间点击网页的非操作标题后用同一快捷键打开居中浮层，直接输入 new tab 成功；再次从地址栏唤起仍正常回退。未执行页面业务操作、导航或搜索结果命令。
+
+无界面 Chrome 对标签页焦点有模拟，切换到另一标签仍返回 hasFocus()=true，不能作为地址栏复现。自动化改为在测试扩展的隔离执行环境注入 hasFocus()=false，验证拒绝创建浮层；恢复真实方法后验证可打开、直接输入与 Esc 关闭。该用例只锁定焦点失败的处理分支，不声称模拟原生地址栏。另回归普通页首次启动居中、闭合 iframe 输入恢复和设置键盘操作。原生地址栏验收以上述 Computer Use 实测为准。
+
+最终构建已由 Computer Use 再次重载，观察到 Reloaded；第三次从地址栏唤起后直接输入 settings 成功并显示 6 个结果，Esc 关闭正常。类型检查、构建与 git diff --check 通过。
+
 ## 后台脚本加载错误的规避（2026-10-16）
 
 日常 Chrome 原始错误记录：`Failed to load the script unexpectedly`，Context `background.js`，Stack `background.js:0 (anonymous function)`，没有业务代码调用栈。Chromium 的 InstalledServiceWorkerModuleScriptFetcher 在已安装脚本数据缺失或 MIME 不符时发出该文本；仅凭这条日志无法区分底层原因。

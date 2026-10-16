@@ -96,8 +96,16 @@ if (!scope[marker]) {
     if (message.type === 'ping') { respond(true); return; }
     if (message.type === 'toggle') {
       void Promise.all([preferencesReady, usageReady]).then(() => {
-        try { if (host) close(); else open(); respond(true); }
-        catch { close(); respond(false); }
+        try {
+          if (host) { close(); respond(true); return; }
+          // DOM focus inside the frame cannot take keyboard focus from Chrome's
+          // address bar. Let the existing native popup fallback handle this case
+          // instead of opening an overlay that cannot receive typing.
+          if (!document.hidden && !document.hasFocus()) window.focus();
+          if (!document.hasFocus()) { respond(false); return; }
+          open();
+          respond(true);
+        } catch { close(); respond(false); }
       });
       return true;
     }

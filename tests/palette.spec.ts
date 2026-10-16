@@ -2891,3 +2891,28 @@ test('English palette launch worker lifecycle repeatedly wakes and reloads witho
   }
   expect(errors).toEqual([]);
 });
+
+test('English storage overlay refuses an unfocused page and opens after focus returns', async () => {
+  const page = await context.newPage(); await page.goto(`${origin}/Focus-boundary`);
+  const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
+  await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }), id);
+  // Headless Chrome emulates tab focus, so inject the observed native failure
+  // at the isolated-world boundary. Native omnibox acceptance is separate.
+  await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
+    Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
+  } }), id);
+  expect(await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' }, { frameId: 0 }), id)).toBe(false);
+  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
+    Reflect.deleteProperty(document, 'hasFocus');
+    window.focus();
+  } }), id);
+  await expect.poll(() => page.evaluate(() => document.hasFocus())).toBe(true);
+  expect(await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' }, { frameId: 0 }), id)).toBe(true);
+  const search = page.frameLocator('.zing-frame').getByRole('combobox');
+  await expect(search).toBeFocused();
+  await page.keyboard.type('settings');
+  await expect(search).toHaveValue('settings');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+});
