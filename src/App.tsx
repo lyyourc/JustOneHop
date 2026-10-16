@@ -297,7 +297,13 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
             <p>{t('noResultsHint')}</p></div> : null}
           {visible.map((item, index) => <div className={`result-group ${grouped && index > 0 && item.kind !== visible[index - 1].kind ? 'section-start' : ''}`} key={item.id}>
             <div id={`zing-${item.id}`} role="option" aria-selected={selected?.id === item.id}
-            className={`result ${item.kind} ${item.danger ? 'danger' : ''}`} title={`${entryTitle(item)} — ${item.subtitle}`} onMouseMove={event => hover(event, item.id)} onClick={() => void run(item)}>
+            className={`result ${item.kind} ${item.danger ? 'danger' : ''}`} title={`${entryTitle(item)} — ${item.subtitle}`} onMouseMove={event => hover(event, item.id)} onClick={() => void run(item)}
+            onContextMenu={event => {
+              event.preventDefault();
+              if (busy) return;
+              savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+              setSelection(item.id); setActionTarget(item); setActionQuery(''); setActionSelection(''); setError('');
+            }}>
             <span className={`entry-icon ${item.kind}`} data-color={item.groupColor}><Favicon pageUrl={item.faviconPageUrl} fallback={<Glyph name={item.icon} />} /></span>
             <span className="entry-copy"><span className="entry-title"><HighlightedText text={entryTitle(item)} query={entrySearchQuery(query)} /></span><span className="entry-subtitle">
               {item.kind === 'command' ? (matchingAlias(item, query)

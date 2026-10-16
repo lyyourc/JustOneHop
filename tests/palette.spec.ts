@@ -3138,3 +3138,20 @@ test('English palette launch storage overlay Undo Tuck restores typing after foo
     await expect(input).toBeFocused();
   }
 });
+
+test('English human first palette right click targets the clicked result and restores typing', async () => {
+  const a = await context.newPage(); await a.goto(`${origin}/Mouse-A`);
+  const b = await context.newPage(); await b.goto(`${origin}/Mouse-B`);
+  await ui.bringToFront(); await ui.reload();
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  await input.fill('Mouse');
+  const row = ui.getByRole('option').filter({ hasText: 'Mouse A' });
+  await row.click({ button: 'right' });
+  await expect(ui.getByRole('dialog', { name: 'Actions', exact: true })).toBeVisible();
+  await expect(ui.locator('.action-heading')).toContainText('Mouse A');
+  await ui.keyboard.press('Escape');
+  await expect(input).toBeFocused(); await expect(input).toHaveValue('Mouse');
+  await expect(row).toHaveAttribute('aria-selected', 'true');
+  await input.press('Control+n');
+  await expect(row).toHaveAttribute('aria-selected', 'false');
+});
