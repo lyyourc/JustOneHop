@@ -28,7 +28,7 @@
 .palette { position: relative; width: min(750px, 100%); margin: 0 auto; border-radius: 16px; background: var(--bg);
   border: 1px solid var(--border); box-shadow: 0 14px 40px rgb(32 33 36 / .20), 0 3px 10px rgb(32 33 36 / .08);
   overflow: hidden; animation: zing-enter 110ms ease-out both; }
-.palette:is(.settings-view, .storage-view, .group-view) { animation: none; }
+.zing-app.settled .palette { animation: none; }
 @media (prefers-color-scheme: dark) {
   .palette { box-shadow: 0 18px 48px rgb(0 0 0 / .52), 0 4px 12px rgb(0 0 0 / .32); }
 }

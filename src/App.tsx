@@ -75,6 +75,13 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   const actions = useMemo(() => search(actionItems, actionQuery), [actionItems, actionQuery]);
   const selectedAction = actions.find(item => item.id === actionSelection) || actions[0];
   const loading = !data && !error;
+  const [settled, setSettled] = useState(mode !== 'overlay');
+
+  useEffect(() => {
+    if (settled) return;
+    const timer = setTimeout(() => setSettled(true), 200);
+    return () => clearTimeout(timer);
+  }, [settled]);
 
   useEffect(() => {
     setShowLoading(false);
@@ -270,7 +277,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   const primaryLabel = current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
     : current?.kind === 'script' && current.action === 'runScript' ? t('runScript') : current?.action === 'copyScript' ? t('copyScript') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
-  return <NavigationRoot><BackLayer onBack={onClose}><div className={`zing-app ${mode}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
+  return <NavigationRoot><BackLayer onBack={onClose}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else onClose(); }
   }}>
     {groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}

@@ -12,6 +12,7 @@ import type { PageStorage, StorageEntry, StorageRead } from './types';
 export function StorageView({ request, onBack, isMac }: { request: StorageRead; onBack: () => void; isMac: boolean }) {
   const [data, setData] = useState<PageStorage | null>(null);
   const [busy, setBusy] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [query, setQuery] = useState('');
@@ -53,6 +54,12 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       if (sequence.current === revision) { setData(null); setError(errorMessage(reason)); }
     } finally { if (sequence.current === revision) setBusy(false); }
   }
+  useEffect(() => {
+    setShowLoading(false);
+    if (!busy || data) return;
+    const timer = setTimeout(() => setShowLoading(true), 150);
+    return () => clearTimeout(timer);
+  }, [busy, data]);
   useEffect(() => {
     void refresh(true);
     // The overlay lives in an isolated iframe. Chrome restores focus to that
@@ -163,8 +170,8 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
           placeholder={t('storageSearch')} aria-label={t('storageSearchLabel')} role="combobox" aria-expanded="true" aria-controls="storage-results" aria-autocomplete="list"
           aria-activedescendant={selected ? `storage-row-${rows.indexOf(selected)}` : undefined} aria-describedby="storage-navigation" autoComplete="off" spellCheck={false} /></div>
         <div className="storage-results" id="storage-results" role="listbox" aria-label={t('storageEntries')} ref={list}>
-          {busy ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void refresh(); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
-            : !rows.length ? <div className="empty"><Database size={26} /><strong>{query ? t('noResults') : t('storageEmpty')}</strong></div>
+          {busy && !data && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void refresh(); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
+            : !rows.length && !busy ? <div className="empty"><Database size={26} /><strong>{query ? t('noResults') : t('storageEmpty')}</strong></div>
             : rows.map((row, index) => <div key={row.id} id={`storage-row-${index}`} className="result storage-row" role="option" aria-selected={row.id === selected?.id}
               onMouseMove={event => hover(event, () => setSelection(row.id))}
               onClick={() => { setSelection(row.id); void act('value', row); input.current?.focus(); }}
