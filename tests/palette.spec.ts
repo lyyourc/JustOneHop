@@ -2866,3 +2866,28 @@ test('English pinned hostname result outranks bookmark prefixes and switches wit
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, targetId)).toBe(true);
   expect(await worker.evaluate(async url => (await chrome.tabs.query({})).filter(tab => tab.url === url).length, target.url())).toBe(1);
 });
+
+test('English palette launch worker lifecycle repeatedly wakes and reloads without script load errors', async () => {
+  test.setTimeout(90_000);
+  const monitor = await context.newPage(); await monitor.goto('chrome://extensions');
+  await monitor.getByRole('button', { name: 'Developer mode', exact: true }).click();
+  await monitor.goto(origin);
+  const client = await context.newCDPSession(monitor);
+  const errors: unknown[] = [];
+  client.on('ServiceWorker.workerErrorReported', event => errors.push(event.errorMessage));
+  await client.send('ServiceWorker.enable');
+  for (let round = 0; round < 100; round++) {
+    await client.send('ServiceWorker.stopAllWorkers');
+    const reply = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
+    expect(reply.ok, `wake ${round}: ${JSON.stringify(errors)}`).toBe(true);
+    if (round % 5 === 4) {
+      await ui.evaluate(() => chrome.runtime.reload()).catch(() => {});
+      ui = await context.newPage();
+      await expect.poll(async () => {
+        try { await ui.goto(popupUrl); return await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' })).then(reply => reply.ok); }
+        catch { return false; }
+      }, { message: JSON.stringify(errors) }).toBe(true);
+    }
+  }
+  expect(errors).toEqual([]);
+});

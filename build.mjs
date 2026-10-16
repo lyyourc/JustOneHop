@@ -18,7 +18,8 @@ const jobs = [
   { ...shared, entryPoints: ['src/recent-keys.ts'], outfile: 'dist/recent-keys.js', format: 'iife' },
   { ...shared, entryPoints: ['src/switcher.tsx'], outfile: 'dist/switcher.js', format: 'iife' },
   { ...shared, entryPoints: ['src/cookie-access.tsx'], outfile: 'dist/cookie-access.js', format: 'iife' },
-  { ...shared, entryPoints: ['src/background.ts'], outfile: 'dist/background.js', format: 'esm' },
+  // The worker is a single self-contained bundle; no runtime module graph is needed.
+  { ...shared, entryPoints: ['src/background.ts'], outfile: 'dist/background.js', format: 'iife' },
   { ...shared, entryPoints: ['src/content.tsx'], outfile: 'dist/content.js', format: 'iife', loader: { '.css': 'text' } },
   { ...shared, entryPoints: ['src/popup.tsx'], outfile: 'dist/popup.js', format: 'iife' },
 ];

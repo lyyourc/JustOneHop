@@ -10,6 +10,8 @@
 
 采用 Manifest V3 本地扩展：React 界面负责交互，service worker 读取浏览器状态并执行操作，不引入账号、服务端或遥测。
 
+后台由 esbuild 打包为单文件 IIFE，使用 classic Service Worker，不声明 module。源代码仍可使用 TypeScript 模块，但运行时无模块依赖，因此无需额外的模块加载路径；这也规避了实机观察到的 Chromium installed module worker 加载错误所在路径。初始故障的底层触发条件未复现，验证边界见验收记录。
+
 普通网页通过 activeTab 按需注入，以 Shadow DOM、原生 modal dialog 和空白沙箱 iframe 隔离布局与键盘事件；Chrome 内部页等受限场景回退到 action popup。启动必须收到面板明确的就绪回复，不能只凭 sendMessage 未报错判断已安装。
 
 ## 取舍与影响

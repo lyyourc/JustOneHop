@@ -389,3 +389,15 @@ Storage 列表和详情接入现有 ActionMenu / PaletteFooter，统一菜单搜
 类型检查与生产构建通过，9 项相关浏览器用例最终通过。覆盖真实网页脚本计数、精确复制含末尾换行、菜单和底栏重新运行、焦点/选区恢复、菜单空结果、中文失败重试、空字符串结果、复制失败、长按与修饰 Enter 保护、执行中退出、权限关闭、受限页面及既有自动复制行为。中英文截图已检查；390×440 网页浮层的操作名称完整且底栏可见。原 pending-run 测试因底栏新增相同运行文案出现定位歧义，改为定位正文状态区域后通过；原生 popup 夹具使用实际声明的 750×516 尺寸，窄屏验证使用网页浮层。
 
 日常 Chrome 扩展管理页重新加载后显示 Reloaded，管理页已关闭。执行测试仅使用隔离浏览器中的自建夹具，没有运行用户保存的脚本或操作业务页面。
+
+## 后台脚本加载错误的规避（2026-10-16）
+
+日常 Chrome 原始错误记录：`Failed to load the script unexpectedly`，Context `background.js`，Stack `background.js:0 (anonymous function)`，没有业务代码调用栈。Chromium 的 InstalledServiceWorkerModuleScriptFetcher 在已安装脚本数据缺失或 MIME 不符时发出该文本；仅凭这条日志无法区分底层原因。
+
+先验证原构建：日常 Chrome 重载及手动 Stop/Start 正常，面板可搜索；隔离 Chrome 20 次 Stop/Wake + 4 次 Reload 无 workerErrorReported。另在临时项目复制件进行 30 次改动重建并监听文件读取，未观察到空文件或半写入文件，因此没有将构建竞态认定为根因。最初 reload 用例失败是隔离 profile 未开启开发者模式，Chrome 重载后禁用 unpacked 扩展；修正测试环境后通过，不是产品错误。
+
+采用有限规避：后台已经是无运行时 import 的单文件 bundle，改用 classic Service Worker + IIFE，去掉不需要的 module worker 加载路径。保持后台消息、权限、存储、扩展 ID 不变。此改动不代表已复现或证明原始底层缓存故障；保留生命周期压力测试以捕获未来回归。
+
+新构建验证：100 次 Stop/Wake + 20 次 runtime.reload 均能返回 snapshot，CDP workerErrorReported 为空；84 项单元测试及类型检查通过，17 项面板/切换器/生命周期回归和 2 项启动存储失败/真实 Chrome 重启恢复用例最终通过。原生窗口 Pin Tab 用例的按键 RPC 偶尔在成功关闭窗口时返回 target closed，改为仅在窗口确已关闭时容许该异常，并保留来源标签已 pinned 的独立断言。
+
+日常 Chrome 已通过 Computer Use Reload，面板搜索 settings 返回 6 项。原始一条错误已按本节留档后清除，再读取 Errors 页无错误条目。压力测试为隔离 profile 的验证结果；没有把未复现的初始缓存加载故障标记为已证明根因。
