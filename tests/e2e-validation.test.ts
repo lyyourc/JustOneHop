@@ -51,9 +51,94 @@ test('runner builds first, forwards selectors literally, preserves failure, and 
   assert.deepEqual(report.command.slice(4), args);
   assert.equal(report.dist.freshlyBuilt, true);
   assert.equal(report.dist.hash, hashDirectory(join(path, 'dist')));
+  for (const phase of ['sourceBeforeMs', 'buildMs', 'distBeforeMs', 'testsMs', 'distAfterMs', 'sourceAfterMs']) {
+    assert.ok(report.timings[phase] >= 0);
+  }
+  assert.ok(report.timings.totalMs >= report.timings.testsMs);
   const run = runs.find(run => existsSync(join(path, 'test-results', 'runs', run, 'args.json')))!;
   assert.deepEqual(JSON.parse(readFileSync(join(path, 'test-results', 'runs', run, 'args.json'), 'utf8')), args);
   assert.equal(reports(path).find(report => report.mode === 'list').status, 'listed');
+});
+
+test('discovery forwards selectors without building, requiring dist, or taking the execution lock', async t => {
+  const path = temporary(t);
+  const release = acquireLock(path, path);
+  const lockPath = join(path, 'test-results', '.e2e.lock');
+  const lock = readFileSync(lockPath, 'utf8');
+  const forbiddenBuild = command('process.exit(99)');
+  const playwright = command("require('fs').writeFileSync(require('path').join(process.env.ZING_E2E_RUN_DIR, 'args.json'), JSON.stringify(process.argv.slice(1)))");
+  try {
+    for (const flag of ['--list', '--help', '-h']) {
+      const args = ['tests/palette.spec.ts', '--grep', 'settings$', flag];
+      assert.equal(await runE2E(args, { root: path, build: forbiddenBuild, playwright }), 0);
+    }
+    assert.equal(existsSync(join(path, 'dist')), false);
+    assert.equal(readFileSync(lockPath, 'utf8'), lock);
+    for (const run of readdirSync(join(path, 'test-results', 'runs'))) {
+      const directory = join(path, 'test-results', 'runs', run);
+      const report = JSON.parse(readFileSync(join(directory, 'validation.json'), 'utf8'));
+      assert.equal(report.build.status, 'not-required');
+      assert.equal(report.status, report.mode === 'list' ? 'listed' : 'help');
+      assert.equal(report.dist, undefined);
+      assert.equal(report.timings.buildMs, undefined);
+      assert.ok(report.timings.discoveryMs >= 0);
+      assert.ok(report.timings.totalMs >= report.timings.discoveryMs);
+      assert.deepEqual(JSON.parse(readFileSync(join(directory, 'args.json'), 'utf8')), report.command.slice(4));
+    }
+  } finally { release(); }
+});
+
+test('failed discovery preserves the exit code and existing build', async t => {
+  const path = temporary(t);
+  mkdirSync(join(path, 'dist'));
+  writeFileSync(join(path, 'dist', 'app.js'), 'existing build');
+  const before = hashDirectory(join(path, 'dist'));
+  assert.equal(await runE2E(['--list'], { root: path, build, playwright: command('process.exit(7)') }), 7);
+  assert.equal(hashDirectory(join(path, 'dist')), before);
+  const report = reports(path)[0];
+  assert.equal(report.status, 'failed');
+  assert.equal(report.build.status, 'not-required');
+  assert.equal(report.exitCode, 7);
+});
+
+test('verified build reuse skips rebuilding and composes with last-failed selectors', async t => {
+  const path = temporary(t);
+  assert.equal(await runE2E([], { root: path, build, playwright: command('process.exit(4)') }), 4);
+  const previous = join(path, 'test-results', 'runs', readdirSync(join(path, 'test-results', 'runs'))[0], 'validation.json');
+  const state = join(path, 'test-results', 'previous.json');
+  writeFileSync(state, JSON.stringify({ status: 'failed', failedTests: ['one'] }));
+  const playwright = command("const args = process.argv.slice(1); if (args.some(arg => arg.startsWith('--reuse-build')) || !args.some(arg => arg.startsWith('--last-failed-file='))) process.exit(99)");
+  for (const args of [
+    ['--reuse-build', previous, '--last-failed', '--last-failed-file', state],
+    ['--last-failed', `--last-failed-file=${state}`, `--reuse-build=${previous}`],
+  ]) {
+    assert.equal(await runE2E(args, { root: path, build: command('process.exit(99)'), playwright }), 0);
+  }
+  for (const report of reports(path).filter(report => report.build.status === 'reused')) {
+    assert.equal(report.dist.freshlyBuilt, false);
+    assert.equal(report.distAfter.changedDuringRun, false);
+    assert.equal(report.sourceChangedDuringRun, false);
+    assert.equal(report.timings.buildMs, undefined);
+    assert.ok(report.timings.reuseCheckMs >= 0);
+  }
+  assert.equal(reports(path).filter(report => report.build.status === 'reused').length, 2);
+});
+
+test('build reuse rejects stale source, altered artifacts, and incomplete evidence before launching tests', async t => {
+  const path = temporary(t);
+  assert.equal(await runE2E([], { root: path, build, playwright: command('process.exit(0)') }), 0);
+  const previous = join(path, 'test-results', 'runs', readdirSync(join(path, 'test-results', 'runs'))[0], 'validation.json');
+  const original = readFileSync(previous, 'utf8');
+  const reject = async () => {
+    assert.equal(await runE2E(['--reuse-build', previous], { root: path, build: command('process.exit(99)'),
+      playwright: command("require('fs').writeFileSync('unexpected-launch', '')") }), 1);
+    assert.equal(existsSync(join(path, 'unexpected-launch')), false);
+  };
+  writeFileSync(join(path, 'changed.ts'), 'changed'); await reject(); rmSync(join(path, 'changed.ts'));
+  writeFileSync(join(path, 'dist/app.js'), 'altered'); await reject(); writeFileSync(join(path, 'dist/app.js'), 'built');
+  for (const patch of [{ mode: 'list' }, { sourceChangedDuringRun: true }, { distAfter: {} }, { build: { status: 'failed' } }]) {
+    writeFileSync(previous, JSON.stringify({ ...JSON.parse(original), ...patch })); await reject();
+  }
 });
 
 test('last-failed requires valid explicit state and never falls back to all tests', async t => {
@@ -156,10 +241,10 @@ test('SIGTERM stops the child and releases the lock before exiting', { timeout: 
   const source = `import { runE2E } from ${JSON.stringify(join(root, 'scripts', 'run-e2e.ts'))}; process.exitCode = await runE2E([], ${JSON.stringify({ root: path, build: command(childCode), playwright: command('process.exit(0)') })});`;
   const child = spawn(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', source], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
   t.after(() => { if (child.exitCode === null) child.kill('SIGKILL'); });
-  let output = '';
+  let output = '', signaled = false;
   child.stdout.on('data', data => {
     output += data.toString();
-    if (output.includes('CHILD_READY')) child.kill('SIGTERM');
+    if (!signaled && output.includes('CHILD_READY')) { signaled = true; child.kill('SIGTERM'); }
   });
   const code = await new Promise<number | null>((resolve, reject) => { child.on('error', reject); child.on('close', resolve); });
   assert.equal(code, 143);
@@ -181,7 +266,7 @@ test('reporter records selected, executed, skipped, failure and browser annotati
   const path = temporary(t);
   const reporter = new ValidationReporter({ directory: path });
   const tests = [fakeTest('pass'), fakeTest('fail', 'unexpected'), fakeTest('skip', 'skipped', 'skipped'), fakeTest('not-reached')];
-  reporter.onBegin(config, { allTests: () => tests } as Suite);
+  reporter.onBegin({ ...config, rootDir: path }, { allTests: () => tests } as Suite);
   reporter.onTestBegin(tests[0]);
   reporter.onTestEnd(tests[0], fakeResult('passed', [{ type: 'browser-version', description: 'Chromium 123' }]));
   reporter.onTestBegin(tests[1]);
@@ -200,7 +285,7 @@ test('reporter distinguishes blocked tests from intentional skips and retains ar
   const path = temporary(t);
   const reporter = new ValidationReporter({ directory: path });
   const tests = [fakeTest('blocked-after-setup-failure', 'skipped'), fakeTest('intentional-skip', 'skipped', 'skipped'), fakeTest('failure', 'unexpected')];
-  reporter.onBegin(config, { allTests: () => tests } as Suite);
+  reporter.onBegin({ ...config, rootDir: path }, { allTests: () => tests } as Suite);
   for (const test of tests.slice(0, 2)) {
     reporter.onTestBegin(test);
     reporter.onTestEnd(test, fakeResult('skipped'));
@@ -220,7 +305,7 @@ test('reporter distinguishes blocked tests from intentional skips and retains ar
 test('list mode enumerates tests without claiming execution, skips or success', t => {
   const path = temporary(t);
   const reporter = new ValidationReporter({ directory: path, listOnly: true });
-  reporter.onBegin(config, { allTests: () => [fakeTest('pass'), fakeTest('skip', 'skipped', 'skipped')] } as Suite);
+  reporter.onBegin({ ...config, rootDir: path }, { allTests: () => [fakeTest('pass'), fakeTest('skip', 'skipped', 'skipped')] } as Suite);
   reporter.onEnd(result);
   const report = JSON.parse(readFileSync(join(path, 'validation.json'), 'utf8'));
   assert.equal(report.build.status, 'unverified');

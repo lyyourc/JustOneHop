@@ -58,6 +58,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => { server.close(); });
 test.beforeEach(async ({ environment }, testInfo) => {
+  const started = performance.now();
   browserStarted = false;
   profile = '';
   testExtension = undefined;
@@ -120,11 +121,13 @@ test.beforeEach(async ({ environment }, testInfo) => {
     const manifest = JSON.parse(await readFile(join(vimium, 'manifest.json'), 'utf8'));
     expect(JSON.stringify(manifest), 'ZING_VIMIUM_PATH must identify Vimium').toMatch(/vimium/i);
   }
+  const prepared = performance.now();
   context = await chromium.launchPersistentContext(profile, {
     ignoreDefaultArgs: process.platform === 'darwin' ? ['about:blank'] : [],
     locale, headless: !environment.headed, reducedMotion: 'reduce', executablePath, viewport: environment.headed ? null : { width: 1100, height: 760 },
     args: [...(verticalTabs ? ['--enable-features=VerticalTabs'] : []), `--lang=${locale}`, `--disable-extensions-except=${[extension, vimium].filter(Boolean).join(',')}`, `--load-extension=${[extension, vimium].filter(Boolean).join(',')}`],
   });
+  const launched = performance.now();
   browserStarted = true;
   if (environment.headed) context.on('page', page => {
     nativeWindowEvents.push({ event: 'created', url: page.url(), at: Date.now() });
@@ -142,7 +145,9 @@ test.beforeEach(async ({ environment }, testInfo) => {
     return false;
   }).toBe(true);
   worker = zingWorker!;
-  const session = await context.newCDPSession(context.pages()[0] || await context.newPage());
+  const ready = performance.now();
+  ui = await context.newPage();
+  const session = await context.newCDPSession(ui);
   const browser = await session.send('Browser.getVersion');
   testInfo.annotations.push({ type: 'browser-version', description: browser.product });
   await session.detach();
@@ -151,11 +156,15 @@ test.beforeEach(async ({ environment }, testInfo) => {
     testInfo.annotations.push({ type: 'compatibility', description: 'Vimium service worker loaded' });
   }
   popupUrl = worker.url().replace('background.js', 'popup.html');
-  ui = await context.newPage();
   await ui.goto(popupUrl);
   await expect(ui.locator('.result.command')).toHaveCount(9);
+  testInfo.annotations.push({ type: 'fixture-timing', description: JSON.stringify({
+    prepareMs: Math.round(prepared - started), launchMs: Math.round(launched - prepared),
+    workerMs: Math.round(ready - launched), uiMs: Math.round(performance.now() - ready),
+  }) });
 });
 test.afterEach(async ({ environment }, testInfo) => {
+  const started = performance.now();
   try {
     if (browserStarted && environment.headed && testInfo.status !== testInfo.expectedStatus) {
       const state = await worker.evaluate(async () => ({
@@ -169,8 +178,9 @@ test.afterEach(async ({ environment }, testInfo) => {
   } finally {
     try { if (browserStarted) await context.close(); }
     finally {
-      if (profile) await rm(profile, { recursive: true, force: true });
-      if (testExtension) await rm(testExtension, { recursive: true, force: true });
+      await Promise.all([profile, testExtension].filter((path): path is string => Boolean(path))
+        .map(path => rm(path, { recursive: true, force: true })));
+      testInfo.annotations.push({ type: 'fixture-cleanup-ms', description: String(Math.round(performance.now() - started)) });
     }
   }
 });

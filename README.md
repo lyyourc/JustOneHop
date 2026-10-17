@@ -101,7 +101,7 @@ npx playwright install chromium   # 首次浏览器测试前安装
 npm run check                     # 类型检查、单元测试、构建、端到端测试
 ```
 
-日常按影响范围运行 `npm run typecheck`、`npm test` 和 `npm run test:e2e -- --grep '<用例筛选>'`；E2E 入口会先构建，并为本轮保存独立产物与 `validation.json`。`npm run check` 运行完整套件，当前定位矩阵仍有未解决项。`ZING_CHROMIUM_PATH` 可指定 Chrome for Testing 可执行文件；Vimium 兼容用例仅在提供 `ZING_VIMIUM_PATH` 且确认扩展加载后执行，缺少路径时明确跳过。运行方式与验收边界见[测试指南](docs/TESTING.md)。
+日常按[测试指南的分层矩阵](docs/TESTING.md#按影响范围验证)选择类型检查、模块单测和少量相关浏览器用例；纯布局调整不默认运行完整单测。`npm run test:e2e -- --grep '<用例筛选>' --list` 仅选例，不构建或启动浏览器；去掉 `--list` 才构建并执行。每轮保存独立产物、阶段耗时与 `validation.json`。`npm run check` 运行完整套件，当前定位矩阵仍有未解决项。`ZING_CHROMIUM_PATH` 可指定 Chrome for Testing 可执行文件；Vimium 兼容用例仅在提供 `ZING_VIMIUM_PATH` 且确认扩展加载后执行，缺少路径时明确跳过。运行方式与验收边界见[测试指南](docs/TESTING.md)。
 
 构建后在 Chrome 扩展管理页重新加载 zing，并刷新测试网页。`public/` 的 manifest 或语言包改变后需重新运行构建。`dist/`、依赖和测试截图不提交到 Git。
 

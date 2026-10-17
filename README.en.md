@@ -101,7 +101,7 @@ npx playwright install chromium   # Before the first browser test run
 npm run check                     # Type checks, unit tests, build, and end-to-end tests
 ```
 
-For routine changes, run `npm run typecheck`, `npm test`, and `npm run test:e2e -- --grep '<test selector>'` for the affected cases. The E2E runner builds first and saves isolated artifacts plus `validation.json`. `npm run check` runs the full suite; the positioning matrix still has unresolved cases. Set `ZING_CHROMIUM_PATH` to specify Chrome for Testing. Vimium compatibility cases require `ZING_VIMIUM_PATH` and verify that the extension loaded; without the path, they are explicitly skipped. See the [testing guide](docs/TESTING.md) for execution and acceptance boundaries.
+For routine changes, use the [testing matrix](docs/TESTING.md) to select type checks, module unit tests, and a few relevant browser scenarios; layout-only changes do not default to the full unit suite. `npm run test:e2e -- --grep '<test selector>' --list` discovers tests without building or launching a browser; remove `--list` to build and execute. Each run saves isolated artifacts, phase timings, and `validation.json`. `npm run check` runs the full suite; the positioning matrix still has unresolved cases. Set `ZING_CHROMIUM_PATH` to specify Chrome for Testing. Vimium compatibility cases require `ZING_VIMIUM_PATH` and verify that the extension loaded; without the path, they are explicitly skipped. See the [testing guide](docs/TESTING.md) for execution and acceptance boundaries.
 
 After building, reload zing on Chrome's extensions page and refresh the test webpage. Changes to the manifest or locale files in `public/` require a rebuild. Build output, dependencies, and test screenshots are not committed to Git.
 
