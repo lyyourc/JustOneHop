@@ -4,7 +4,8 @@ import { runSavedScript } from './scriptExecution';
 import { openRecentSwitcher } from './recentTabs';
 import { readPageStorage, openCookieAccess } from './pageStorage';
 import { preferencesReady } from './preferences';
-import { errorMessage } from './i18n';
+import { errorMessage, t } from './i18n';
+import { openChromePage } from './chromePages';
 import { perform, snapshot } from './browser';
 import { resetUsage } from './usageStorage';
 import type { Request, Snapshot, PageStorage, ScriptResult } from './types';
@@ -64,7 +65,9 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     if (request.type === 'snapshot') return snapshot(sender.tab);
     if (request.type === 'execute') return perform(request.payload, () => success());
     if (request.type === 'reset-usage') return resetUsage();
-    return chrome.tabs.create({ url: 'chrome://extensions/shortcuts', ...(sender.tab ? { windowId: sender.tab.windowId } : {}) }).then(() => undefined);
+    const windowId = sender.tab?.windowId ?? (await chrome.windows.getCurrent()).id;
+    if (windowId === undefined) throw new Error(t('errorWindow'));
+    return openChromePage('openExtensionShortcuts', windowId);
   });
   void result.then(success).catch(error => {
     if (!responded) respond({ ok: false, error: errorMessage(error) });

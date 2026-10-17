@@ -212,6 +212,14 @@
   "settings": {
     "message": "设置"
   },
+  "categoryChromePages": { "message": "Chrome 内置页面" },
+  "chromeExtensions": { "message": "扩展管理" },
+  "chromePasswords": { "message": "密码管理器" },
+  "chromeDownloads": { "message": "下载内容" },
+  "chromeHistory": { "message": "历史记录" },
+  "chromeBookmarks": { "message": "书签管理器" },
+  "chromeSettings": { "message": "Chrome 设置" },
+  "chromeExtensionShortcuts": { "message": "扩展快捷键" },
   "settingsHint": {
     "message": "语言、外观、标签页管理与快捷键"
   },

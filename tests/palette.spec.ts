@@ -175,6 +175,195 @@ test.afterEach(async ({ environment }, testInfo) => {
   }
 });
 
+// Keep these expectations independent of the production Chrome Pages registry.
+const chromePageCases = [
+  { action: 'openExtensions', en: 'Extensions', zh: '扩展管理', url: 'chrome://extensions/', root: 'extensions-manager', aliases: ['extension', 'extensions', '扩展', '插件'], input: 'keyboard' },
+  { action: 'openPasswords', en: 'Password Manager', zh: '密码管理器', url: 'chrome://password-manager/passwords', root: 'password-manager-app', aliases: ['password', 'passwords', '密码'], input: 'keyboard' },
+  { action: 'openDownloads', en: 'Downloads', zh: '下载内容', url: 'chrome://downloads/', root: 'downloads-manager', aliases: ['download', 'downloads', '下载'], input: 'mouse' },
+  { action: 'openHistory', en: 'History', zh: '历史记录', url: 'chrome://history/', root: 'history-app', aliases: ['history', '历史'], input: 'mouse' },
+  { action: 'openBookmarks', en: 'Bookmark Manager', zh: '书签管理器', url: 'chrome://bookmarks/', root: 'bookmarks-app', aliases: ['bookmark manager', '书签管理'], input: 'footer' },
+  { action: 'openChromeSettings', en: 'Chrome Settings', zh: 'Chrome 设置', url: 'chrome://settings/', root: 'settings-ui', aliases: ['chrome settings', '浏览器设置'], input: 'footer' },
+  { action: 'openExtensionShortcuts', en: 'Extension Shortcuts', zh: '扩展快捷键', url: 'chrome://extensions/shortcuts', root: 'extensions-keyboard-shortcuts', aliases: ['extension shortcuts', '扩展快捷键'], input: 'menu' },
+] as const;
+
+async function expectChromePageLoaded(page: Page, target: { url: string; root: string }) {
+  await expect(page).toHaveURL(target.url);
+  // A committed URL alone also passes for a failed/blank navigation. Inspect
+  // Chrome's actual WebUI, including the shortcuts subview inside Extensions.
+  await expect(page.locator(target.root)).toBeVisible();
+  await expect.poll(() => page.title()).not.toBe('');
+  await expect(page.locator('#main-frame-error')).toHaveCount(0);
+}
+
+for (const target of chromePageCases) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test(`Chrome Pages: ${target.en} loads the native page and reuses its exact tab via ${target.input}`, async () => {
+    const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    await expect(search).toBeFocused();
+    await ui.keyboard.type(target.aliases[0]);
+    const row = ui.locator(`[id="zing-command:${target.action}"]`);
+    await expect(row).toHaveAttribute('aria-selected', 'true');
+    await expect(row.locator('.entry-title')).toHaveText(`Chrome Pages: ${target.en}`);
+    const created = context.waitForEvent('page');
+    if (target.input === 'mouse') await row.click();
+    else if (target.input === 'footer') await ui.locator('.palette-footer .primary-action').click();
+    else {
+      if (target.input === 'menu') {
+        await ui.keyboard.press('Meta+k');
+        await expect(ui.getByRole('combobox', { name: 'Search actions' })).toBeFocused();
+        await expect(ui.locator('.action-row')).toHaveCount(1);
+      }
+      await ui.keyboard.press('Enter').catch(error => { if (!ui.isClosed()) throw error; });
+    }
+    const destination = await created;
+    await expectChromePageLoaded(destination, target);
+    await expect.poll(() => ui.isClosed()).toBe(true);
+    const first = await worker.evaluate(async ({ windowId, url }) => (await chrome.tabs.query({ windowId })).filter(tab => tab.url === url), { windowId: owner, url: target.url });
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatchObject({ active: true, windowId: owner });
+    const beforeReuse = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner);
+
+    const reopened = context.waitForEvent('page');
+    await worker.evaluate(({ windowId, url }) => chrome.tabs.create({ windowId, url, active: true }), { windowId: owner, url: popupUrl });
+    ui = await reopened;
+    await expect(ui.getByRole('combobox')).toBeFocused();
+    await ui.getByRole('combobox').fill(target.aliases[0]);
+    await expect(ui.locator('#zing-results [role="option"]').first()).toHaveAttribute('id', `zing-command:${target.action}`);
+    await ui.locator('.palette-footer .primary-action').click();
+    await expect.poll(() => ui.isClosed()).toBe(true);
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, first[0].id!)).toBe(true);
+    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner)).toEqual(beforeReuse);
+    await expectChromePageLoaded(destination, target);
+  });
+});
+
+for (const language of ['English', 'Chinese']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
+  test(`Chrome Pages: ${language} labels aliases and mixed right-click Escape footer flow preserve zing settings`, async () => {
+    const en = language === 'English';
+    const prefix = en ? 'Chrome Pages' : 'Chrome 内置页面';
+    const search = ui.getByRole('combobox', { name: en ? 'Search commands, tabs, and bookmarks' : '搜索命令、标签页和书签' });
+    const first = ui.locator('#zing-results [role="option"]').first();
+    for (const target of chromePageCases) await expect(ui.locator(`[id="zing-command:${target.action}"]`)).toHaveCount(0);
+    for (const category of ['Chrome Pages', 'Chrome 内置页面']) {
+      await search.fill(category);
+      for (const target of chromePageCases) {
+        const row = ui.locator(`[id="zing-command:${target.action}"]`);
+        await expect(row.locator('.entry-title')).toHaveText(`${prefix}: ${en ? target.en : target.zh}`);
+        await expect(row.locator('.entry-shortcut')).toHaveCount(0);
+      }
+    }
+    for (const target of chromePageCases) for (const alias of target.aliases) {
+      await search.fill(alias);
+      await expect(first).toHaveAttribute('id', `zing-command:${target.action}`);
+      await expect(first.locator('.entry-title')).toHaveText(`${prefix}: ${en ? target.en : target.zh}`);
+    }
+    for (const query of ['Chrome Pages: downloads', 'Chrome 内置页面：下载']) {
+      await search.fill(query);
+      await expect(first).toHaveAttribute('id', 'zing-command:openDownloads');
+      await expect(first.locator('mark')).not.toHaveCount(0);
+    }
+
+    const tabIds = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id!).sort((a, b) => a - b));
+    for (const query of ['settings', '设置', 'shortcut', '快捷键']) {
+      await search.fill(query);
+      await expect(first).toHaveAttribute('id', query === 'settings' || query === '设置' ? 'zing-command:settings' : 'zing-command:settings:keyboard');
+      await search.press('Enter');
+      await expect(ui.getByRole('heading', { name: en ? 'Settings' : '设置', exact: true })).toBeVisible();
+      await ui.keyboard.press('Escape');
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue(query);
+    }
+    expect(await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id!).sort((a, b) => a - b))).toEqual(tabIds);
+
+    await search.fill(prefix);
+    await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+    const bookmarks = ui.locator('[id="zing-command:openBookmarks"]');
+    await expect(bookmarks).toHaveAttribute('aria-selected', 'false');
+    await bookmarks.click({ button: 'right' });
+    const actions = ui.getByRole('combobox', { name: en ? 'Search actions' : '搜索操作' });
+    await expect(actions).toBeFocused();
+    await expect(ui.locator('.action-heading')).toContainText(en ? 'Bookmark Manager' : '书签管理器');
+    await actions.fill(en ? '书签管理' : 'bookmark manager');
+    await expect(ui.locator('.action-row')).toHaveCount(1);
+    await expect(ui.locator('.palette-footer .primary-action')).toContainText(en ? 'Bookmark Manager' : '书签管理器');
+    await ui.keyboard.press('Escape');
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue(prefix);
+    expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    await expect(bookmarks).toHaveAttribute('aria-selected', 'true');
+    await search.press('Control+n');
+    await expect(bookmarks).toHaveAttribute('aria-selected', 'false');
+    await search.press('Control+p');
+    await expect(bookmarks).toHaveAttribute('aria-selected', 'true');
+    await ui.getByRole('button', { name: en ? 'Open action menu' : '打开操作菜单' }).click();
+    await expect(actions).toBeFocused();
+    await expect(ui.locator('.action-row')).toHaveCount(1);
+    const created = context.waitForEvent('page');
+    await ui.locator('.palette-footer .primary-action').click();
+    await expectChromePageLoaded(await created, { url: 'chrome://bookmarks/', root: 'bookmarks-app' });
+    await expect.poll(() => ui.isClosed()).toBe(true);
+  });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('Chrome Pages: Settings Change in Chrome reuses the existing extension shortcuts tab', async () => {
+    const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
+    const created = context.waitForEvent('page');
+    const shortcuts = await worker.evaluate(windowId => chrome.tabs.create({ windowId, url: 'chrome://extensions/shortcuts', active: false }), owner);
+    const destination = await created;
+    await expectChromePageLoaded(destination, { url: 'chrome://extensions/shortcuts', root: 'extensions-keyboard-shortcuts' });
+    const selfId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.id!);
+    const before = await worker.evaluate(async ({ windowId, selfId }) => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).filter(id => id !== selfId).sort((a, b) => a - b), { windowId: owner, selfId });
+    await ui.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(ui.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+    await ui.getByRole('button', { name: 'Change in Chrome', exact: true }).click();
+    await expect.poll(() => ui.isClosed()).toBe(true);
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, shortcuts.id!)).toBe(true);
+    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner)).toEqual(before);
+    await expectChromePageLoaded(destination, { url: 'chrome://extensions/shortcuts', root: 'extensions-keyboard-shortcuts' });
+  });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
+  test('Chrome Pages: closed-shadow overlay Enter opens native Downloads and dismisses the palette', async () => {
+    const page = await context.newPage();
+    await page.goto(`${origin}/Chrome-Pages-overlay`);
+    await page.getByRole('textbox', { name: 'Page input' }).click();
+    const source = await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      return { tabId: tab.id!, windowId: tab.windowId };
+    }, page.url());
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
+    const session = await context.newCDPSession(page);
+    const ax = async () => {
+      const { frameTree } = await session.send('Page.getFrameTree');
+      const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+      return (await session.send('Accessibility.getFullAXTree', { frameId })).nodes;
+    };
+    await expect(page.locator('#zing-command-palette')).toBeAttached();
+    expect(await page.locator('#zing-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
+    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.properties?.some(property => property.name === 'focused' && property.value.value === true))).toBe(true);
+    await page.keyboard.type('downloads');
+    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value.includes('Chrome Pages: Downloads'))).toBe(true);
+    const created = context.waitForEvent('page');
+    await page.keyboard.press('Enter');
+    await expectChromePageLoaded(await created, { url: 'chrome://downloads/', root: 'downloads-manager' });
+    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    const tabs = await worker.evaluate(async windowId => chrome.tabs.query({ windowId }), source.windowId);
+    expect(tabs.filter(tab => tab.url === 'chrome://downloads/')).toHaveLength(1);
+    expect(tabs.find(tab => tab.url === 'chrome://downloads/')).toMatchObject({ active: true, windowId: source.windowId });
+    expect(tabs.find(tab => tab.id === source.tabId)).toMatchObject({ url: `${origin}/Chrome-Pages-overlay` });
+    await session.detach();
+  });
+});
+
 test('unified bilingual search, action menu, Esc and empty results', async () => {
   const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
   await expect(input).toBeFocused();
@@ -3800,6 +3989,58 @@ async function openNativePalette() {
   await expect(palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeFocused();
   return { source, palette };
 }
+
+for (const mode of ['create', 'reuse'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test(`Chrome Pages: native standalone popup ${mode}s only in its source window and preserves other routes`, async () => {
+    const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
+    // Finish all setup before launching the popup: a newly focused window after
+    // launch would correctly dismiss it and invalidate the interaction under test.
+    const seeded = await worker.evaluate(async ({ windowId, reuse }) => {
+      const sibling = await chrome.tabs.create({ windowId, url: 'chrome://extensions/shortcuts', active: false });
+      const exact = reuse ? await chrome.tabs.create({ windowId, url: 'chrome://extensions/', active: false, pinned: true }) : undefined;
+      const other = await chrome.windows.create({ url: 'chrome://extensions/', focused: false });
+      await chrome.windows.update(windowId, { focused: true });
+      return { siblingId: sibling.id!, exactId: exact?.id, otherWindowId: other!.id!, otherTabId: other!.tabs![0].id! };
+    }, { windowId: owner, reuse: mode === 'reuse' });
+    for (const id of [seeded.siblingId, seeded.otherTabId, ...(seeded.exactId === undefined ? [] : [seeded.exactId])]) {
+      await expect.poll(() => worker.evaluate(async tabId => (await chrome.tabs.get(tabId)).status, id)).toBe('complete');
+    }
+    const { source, palette } = await openNativePalette();
+    expect(source.windowId).toBe(owner);
+    const popupWindow = await palette.evaluate(() => chrome.windows.getCurrent());
+    expect(popupWindow.type).toBe('popup');
+    expect(popupWindow.id).not.toBe(owner);
+    const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner);
+    const search = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    await search.fill('extensions');
+    await expect(palette.locator('#zing-results [role="option"]').first()).toHaveAttribute('id', 'zing-command:openExtensions');
+    await search.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
+    await expect.poll(() => palette.isClosed()).toBe(true);
+    await expect.poll(() => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, owner)).toBe('chrome://extensions/');
+    const after = await worker.evaluate(async windowId => chrome.tabs.query({ windowId }), owner);
+    const matches = after.filter(tab => tab.url === 'chrome://extensions/');
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({ windowId: owner, active: true });
+    if (mode === 'reuse') {
+      expect(matches[0]).toMatchObject({ id: seeded.exactId, pinned: true });
+      expect(after.map(tab => tab.id!).sort((a, b) => a - b)).toEqual(before);
+    } else {
+      expect(before).not.toContain(matches[0].id);
+      expect(after.map(tab => tab.id!).sort((a, b) => a - b)).toEqual([...before, matches[0].id!].sort((a, b) => a - b));
+    }
+    expect(await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).toMatchObject({ windowId: owner, url: 'chrome://version/' });
+    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.siblingId)).toMatchObject({ windowId: owner, url: 'chrome://extensions/shortcuts' });
+    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.otherTabId)).toMatchObject({ windowId: seeded.otherWindowId, url: 'chrome://extensions/', active: true });
+    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), seeded.otherWindowId)).toEqual([seeded.otherTabId]);
+    // Both windows have this URL. Inspect both WebUIs so a loaded page in the
+    // other window cannot mask a failed navigation in the source window.
+    await expect.poll(() => context.pages().filter(page => page.url() === 'chrome://extensions/').length).toBe(2);
+    for (const page of context.pages().filter(page => page.url() === 'chrome://extensions/')) {
+      await expectChromePageLoaded(page, { url: 'chrome://extensions/', root: 'extensions-manager' });
+    }
+  });
+});
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });

@@ -212,6 +212,14 @@
   "settings": {
     "message": "Settings"
   },
+  "categoryChromePages": { "message": "Chrome Pages" },
+  "chromeExtensions": { "message": "Extensions" },
+  "chromePasswords": { "message": "Password Manager" },
+  "chromeDownloads": { "message": "Downloads" },
+  "chromeHistory": { "message": "History" },
+  "chromeBookmarks": { "message": "Bookmark Manager" },
+  "chromeSettings": { "message": "Chrome Settings" },
+  "chromeExtensionShortcuts": { "message": "Extension Shortcuts" },
   "settingsHint": {
     "message": "Language, appearance, tab management, and shortcuts"
   },

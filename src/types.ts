@@ -1,4 +1,5 @@
-export type ActionId = 'switch' | 'openBookmark' | 'newTab' | 'reload' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
+export type ChromePageAction = 'openExtensions' | 'openPasswords' | 'openDownloads' | 'openHistory' | 'openBookmarks' | 'openChromeSettings' | 'openExtensionShortcuts';
+export type ActionId = ChromePageAction | 'switch' | 'openBookmark' | 'newTab' | 'reload' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
 
 export interface TabItem {
   id: number;
@@ -65,10 +66,10 @@ export type Request =
   | { source: 'zing'; type: 'reset-usage' }
   | { source: 'zing'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
-export type IconName = 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
+export type IconName = 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
 export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'ranking' | 'tabs';
 export interface Entry {
-  category?: 'tabGroup' | 'tab' | 'script' | 'storage' | 'settings';
+  category?: 'tabGroup' | 'tab' | 'script' | 'storage' | 'settings' | 'chromePages';
   shortcut?: string;
   faviconPageUrl?: string;
   id: string;

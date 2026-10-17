@@ -10,7 +10,7 @@ import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import {
   Code, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
-  Layers, LoaderCircle, Pin, Plus, RotateCcw,
+  Layers, LoaderCircle, Pin, Plus, RotateCcw, Puzzle, KeyRound, Download, History, Keyboard,
   Settings2, Search, Volume2, VolumeX, X, PanelTop, AlertCircle,
 } from 'lucide-react';
 import { getPreferences, subscribePreferences } from './preferences';
@@ -27,7 +27,7 @@ import { execute, getSnapshot } from './api';
 import { actionsFor, closeTargets, entries, homeEntries, matchingAlias, search } from './model';
 import type { Entry, IconName, Snapshot, StorageRead, SettingsSection, ScriptRun } from './types';
 
-const icons = { tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
+const icons = { extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
   others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, script: Code, edit: Pencil, tuck: ArrowDownToLine };
 function Glyph({ name, size = 18 }: { name: IconName; size?: number }) {
   const Icon = icons[name]; return <Icon size={size} strokeWidth={1.7} aria-hidden="true" />;

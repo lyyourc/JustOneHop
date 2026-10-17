@@ -14,8 +14,8 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one index contains tabs, bookmarks and commands; home prioritizes recent tabs', () => {
   const items = entries(data);
-  assert.equal(items.length, 25);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 21);
+  assert.equal(items.length, 32);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 28);
   const home = homeEntries(items);
   assert.deepEqual(home.slice(0, 3).map(entry => entry.kind), ['tab', 'tab', 'tab']);
   assert.ok(home.slice(3).every(entry => entry.kind === 'command' && !entry.danger));
@@ -183,6 +183,44 @@ test('feature commands are discoverable by intent without changing the empty-sea
     ['auto tuck', 'command:settings:tabs'], ['自动收起', 'command:settings:tabs'],
   ]) assert.equal(search(items, query)[0]?.id, id, query);
   assert.equal(homeEntries(items).filter(item => item.kind === 'command').length, 9);
+});
+
+test('Chrome Pages have bilingual intent, independent identities and search-only discovery', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['zh-CN', 'en-US']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      const items = entries({ ...data, tabs: [{ ...tab(1, 0), title: 'Extensions' }, { ...tab(2, 1), title: 'Password' }],
+        bookmarks: [{ id: 'extension', title: 'Extensions', url: 'chrome://extensions/', folder: '' }] });
+      for (const [action, queries] of [
+        ['openExtensions', ['extension', 'extensions', '扩展', '插件', 'chrome://extensions/']],
+        ['openPasswords', ['password', 'passwords', 'password manager', '密码']],
+        ['openDownloads', ['download', 'downloads', '下载']],
+        ['openHistory', ['history', '历史记录']],
+        ['openBookmarks', ['bookmark manager', '管理书签']],
+        ['openChromeSettings', ['chrome settings', '浏览器设置']],
+        ['openExtensionShortcuts', ['extension shortcuts', '扩展快捷键']],
+      ] as const) {
+        for (const query of queries) assert.equal(search(items, query)[0]?.action, action, `${locale}: ${query}`);
+        const entry = items.find(item => item.action === action)!;
+        assert.equal(entry.id, `command:${action}`);
+        assert.equal(entry.category, 'chromePages');
+        assert.equal(entry.searchOnly, true);
+        assert.deepEqual(actionsFor(entry, data), [entry]);
+      }
+      for (const query of ['chrome pages', 'Chrome 内置页面', 'browser', '浏览器']) {
+        assert.equal(search(items, query).filter(item => item.category === 'chromePages').length, 7);
+      }
+      for (const query of ['Chrome Pages:password', 'Chrome 内置页面：密码']) {
+        assert.equal(search(items, query)[0]?.action, 'openPasswords', `${locale}: ${query}`);
+      }
+      for (const query of ['settings', '设置']) assert.equal(search(items, query)[0]?.id, 'command:settings');
+      for (const query of ['shortcut', '快捷键']) assert.equal(search(items, query)[0]?.id, 'command:settings:keyboard');
+      const scores = new Map(items.filter(item => item.category === 'chromePages').map(item => [item.id, 100]));
+      assert.ok(homeEntries(items, scores).every(item => item.category !== 'chromePages'));
+      assert.equal(homeEntries(items, scores).filter(item => item.kind === 'command').length, 9);
+    }
+  } finally { globalThis.chrome = original; }
 });
 
 test('tucking appears only for eligible targets and stays out of the empty-search home', () => {

@@ -1,9 +1,10 @@
 import { categoryTerms, entrySearchQuery, entryTitle } from './entryPresentation';
 import { t } from './i18n';
+import { chromePages } from './chromePages';
 import Fuse, { type Expression } from 'fuse.js';
 import { termMatches } from './searchMatch';
 import { usageTarget } from './usage';
-import type { ActionId, Entry, Snapshot, TabItem } from './types';
+import type { ActionId, ChromePageAction, Entry, Snapshot, TabItem } from './types';
 
 export function labelUrl(raw: string): string {
   try { const url = new URL(raw); return (url.hostname || url.protocol.replace(':', '')) + (url.pathname === '/' ? '' : url.pathname); }
@@ -57,6 +58,11 @@ export function entries(snapshot: Snapshot): Entry[] {
       keywords: '恢复 收起 继续管理 检查 分组 recover resume tuck group', aliases: ['recover tucked tabs', 'resume tuck', '继续管理', '恢复收起组'],
     })),
     ...commands(snapshot.tabs.find(tab => tab.id === snapshot.currentTabId)),
+    ...(Object.keys(chromePages) as ChromePageAction[]).map((action): Entry => {
+      const page = chromePages[action];
+      return { id: `command:${action}`, kind: 'command', category: 'chromePages', action, icon: page.icon,
+        title: t(page.title), subtitle: page.url, keywords: page.url, aliases: [...page.aliases], searchOnly: true };
+    }),
     ...(snapshot.canUndoTuck ? [{ id: 'command:undoTuck', kind: 'command' as const, category: 'tab' as const, action: 'undoTuck' as const,
       icon: 'restore' as const, title: t('undoTuck'), subtitle: '', keywords: 'undo tuck away 撤销 收起' }] : []),
     { id: 'command:runScript', kind: 'command', category: 'script', action: 'runScript', icon: 'script', title: t('runScript'), subtitle: '',

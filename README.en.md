@@ -12,6 +12,10 @@ A locally loaded extension for personal use. No account, backend, or telemetry.
 
 Find tabs, bookmarks, and browser commands in one place. Matching text is highlighted, relevant commands take priority, and frequently chosen results move up based on your usage. Click a result or press Enter to run it, and use the Actions menu to manage the selected tab.
 
+### Chrome Pages
+
+Search `extension`, `password`, or equivalent Chinese keywords to open Extensions, Password Manager, Downloads, History, Bookmark Manager, Chrome Settings, and Extension Shortcuts. An exact destination already open in the current window is activated; otherwise a new tab opens, preserving your current page and other native subpages. Search “Chrome Pages” or “Chrome 内置页面” to find the group; these commands stay out of the empty-search home. `settings` / `设置` still opens zing Settings. These commands only navigate, without reading passwords, history, or download data or adding permissions.
+
 ### Tab Switcher
 
 Switch between tabs in the current window in order of recent use, or type a title or URL to filter them. Hold the shortcut to browse, release to confirm, and quickly return to your previous tab.

@@ -64,6 +64,82 @@ test('bookmark opens in the original window', async () => {
   await perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b' });
   assert.deepEqual(calls, [['create', { windowId: 10, url: 'https://example.com' }]]);
 });
+const chromePageTargets = [
+  ['openExtensions', 'chrome://extensions/'], ['openPasswords', 'chrome://password-manager/passwords'],
+  ['openDownloads', 'chrome://downloads/'], ['openHistory', 'chrome://history/'],
+  ['openBookmarks', 'chrome://bookmarks/'], ['openChromeSettings', 'chrome://settings/'],
+  ['openExtensionShortcuts', 'chrome://extensions/shortcuts'],
+] as const;
+
+test('Chrome Pages create in the source window and learn each destination separately', async () => {
+  chrome.tabs.query = (async query => {
+    assert.deepEqual(query, { windowId: 10 });
+    return tabs.filter(tab => tab.windowId === query.windowId);
+  }) as typeof chrome.tabs.query;
+  for (const [action, url] of chromePageTargets) {
+    tabs[3].url = url;
+    await perform({ action, windowId: 10, query: 'chrome pages' });
+  }
+  assert.deepEqual(calls, chromePageTargets.map(([, url]) => ['create', { windowId: 10, url }]));
+  assert.deepEqual(new Set(usage.map(record => record.target)), new Set(chromePageTargets.map(([action]) => `command:${action}`)));
+});
+
+test('Chrome Pages reuse the exact destination in the source window, including pending navigation', async () => {
+  for (const [action, url] of chromePageTargets) {
+    tabs[0].url = url;
+    await perform({ action, windowId: 10 });
+    assert.deepEqual(calls.pop(), ['update', 1, { active: true }]);
+    tabs[0].url = 'chrome://version/'; tabs[0].pendingUrl = url;
+    await perform({ action, windowId: 10 });
+    assert.deepEqual(calls.pop(), ['update', 1, { active: true }]);
+    delete tabs[0].pendingUrl;
+  }
+  assert.equal(calls.length, 0);
+  tabs[0].url = 'chrome://extensions';
+  await perform({ action: 'openExtensions', windowId: 10 });
+  assert.deepEqual(calls, [['update', 1, { active: true }]]);
+});
+
+test('Chrome Pages preserve subpages, searches, details and tabs navigating away', async () => {
+  for (const url of ['chrome://extensions/shortcuts', 'chrome://extensions/?id=zing', 'chrome://extensions/?q=zing', 'chrome://extensions/#detail']) {
+    tabs[0].url = url;
+    await perform({ action: 'openExtensions', windowId: 10 });
+    assert.deepEqual(calls.pop(), ['create', { windowId: 10, url: 'chrome://extensions/' }]);
+  }
+  tabs[0].url = 'chrome://extensions/'; tabs[0].pendingUrl = 'https://example.com/';
+  await perform({ action: 'openExtensions', windowId: 10 });
+  assert.deepEqual(calls, [['create', { windowId: 10, url: 'chrome://extensions/' }]]);
+});
+
+test('Chrome Pages revalidate candidates that closed, moved or navigated after the query', async () => {
+  tabs[0].url = 'chrome://extensions/';
+  for (const state of ['closed', 'moved', 'navigated']) {
+    chrome.tabs.get = (async () => {
+      if (state === 'closed') throw new Error('No tab');
+      return { ...tabs[0], ...(state === 'moved' ? { windowId: 20 } : { url: 'chrome://extensions/shortcuts' }) };
+    }) as typeof chrome.tabs.get;
+    await perform({ action: 'openExtensions', windowId: 10 });
+    assert.deepEqual(calls.pop(), ['create', { windowId: 10, url: 'chrome://extensions/' }]);
+  }
+});
+
+test('Chrome Pages prefer an already active exact match and do not train on failure or private windows', async () => {
+  tabs[0].url = tabs[1].url = 'chrome://extensions/';
+  await perform({ action: 'openExtensions', windowId: 10 });
+  assert.deepEqual(calls, [['update', 2, { active: true }]]);
+  usage = []; calls = [];
+  chrome.tabs.update = async () => { throw new Error('Cannot activate tab'); };
+  await assert.rejects(perform({ action: 'openExtensions', windowId: 10 }), /Cannot activate/);
+  chrome.tabs.create = async () => { throw new Error('Cannot create tab'); };
+  await assert.rejects(perform({ action: 'openPasswords', windowId: 10 }), /Cannot create/);
+  assert.deepEqual(usage, []);
+  assert.deepEqual(calls, []);
+  chrome.tabs.update = (async id => { calls.push(['update', id]); return tabs[1]; }) as typeof chrome.tabs.update;
+  chrome.windows.get = async () => ({ id: 10, incognito: true }) as chrome.windows.Window;
+  await perform({ action: 'openExtensions', windowId: 10 });
+  assert.deepEqual(usage, []);
+});
+
 test('restore uses the latest session and reports an empty session list', async () => {
   await perform({ action: 'restore', windowId: 10 });
   assert.deepEqual(calls, [['restore', 'session']]);

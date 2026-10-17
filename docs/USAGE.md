@@ -52,6 +52,26 @@
 
 书签按名称、URL、文件夹搜索；脚本书签（`javascript:`）不执行。恢复操作使用 Chrome 最近关闭记录，可能恢复原窗口中的标签页或整个窗口。搜索最多显示 100 条结果，继续输入可缩小范围。
 
+## Chrome 内置页面
+
+「Chrome 内置页面 / Chrome Pages」负责快速打开或切换到指定的 Chrome 内置页面。所有入口支持中英文搜索；点击结果、普通 Enter、底栏主操作和操作菜单执行相同动作。空搜索不显示这组命令，输入 `Chrome Pages`、「Chrome 内置页面」或「浏览器 / browser」可找到整组入口，也支持 `Chrome Pages: password` 这样的分类关键词。
+
+| 入口 | 搜索词示例 | 目标地址 |
+| --- | --- | --- |
+| 扩展管理 | `extension`、`extensions`、扩展、插件 | `chrome://extensions/` |
+| 密码管理器 | `password`、`passwords`、密码 | `chrome://password-manager/passwords` |
+| 下载内容 | `download`、`downloads`、下载 | `chrome://downloads/` |
+| 历史记录 | `history`、历史、浏览记录 | `chrome://history/` |
+| 书签管理器 | `bookmark manager`、管理书签 | `chrome://bookmarks/` |
+| Chrome 设置 | `chrome settings`、浏览器设置 | `chrome://settings/` |
+| 扩展快捷键 | `extension shortcuts`、扩展快捷键 | `chrome://extensions/shortcuts` |
+
+执行时只复用来源窗口中目标地址一致的标签页；有多个匹配时优先当前活动页，否则选择最左侧匹配页。没有匹配时在来源窗口新建标签页，不替换当前网页，不切换到其他窗口。地址中的子路径、查询参数和片段保留区别，例如扩展详情、扩展搜索和扩展快捷键页不算扩展管理首页。成功后关闭面板，失败保留搜索并显示错误；每个入口独立记录本机使用偏好，无痕窗口不记录。
+
+`settings / 设置` 仍打开 zing 自身设置，`shortcut / 快捷键` 仍定位 zing 的键盘设置；Chrome 设置和扩展快捷键通过表中的具体关键词直达。设置及脚本配置中的扩展快捷键按钮也采用上述复用规则。书签管理器与现有书签内容搜索并存。
+
+这些入口不读取密码、浏览历史或下载数据，也不新增权限；密码查看与身份验证由 Chrome 处理。打开当前页 DevTools 不属于这组页面入口，目前未提供该命令。
+
 ## 脚本收藏与 Ctrl+Tab 配置
 
 设置 → 键盘 →「设置 Ctrl+Tab」提供内置绑定代码，自动使用当前安装的扩展 ID。先复制代码，再打开 Chrome 快捷键页，按页面说明在该页的 DevTools Console 中执行。该入口绑定 Ctrl+Tab / Ctrl+Shift+Tab；Chrome 内部接口不能从扩展设置页直接调用。

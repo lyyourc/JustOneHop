@@ -1,5 +1,6 @@
 import { tuckFlags, canUndoTuck, tabTuckingReady, tuckTab, undoTuck, tuckRecoveries, resumeTuck, forgetTuckRecovery, updateManagedGroup } from './tabTuck';
 import { t } from './i18n';
+import { isChromePageAction, openChromePage } from './chromePages';
 import { closeTargets } from './model';
 import { recordUsage } from './usageStorage';
 import type { BookmarkItem, Execution, Snapshot, TabItem } from './types';
@@ -95,6 +96,7 @@ async function performAction(payload: Execution): Promise<string> {
     if (tab.windowId !== windowId || tab.groupId !== payload.groupId) throw new Error(t('errorGroup'));
     await chrome.tabs.ungroup(tab.id!); return '';
   }
+  if (isChromePageAction(action)) { await openChromePage(action, windowId); return target(`command:${action}`); }
   if (action === 'settings') return target('command:settings');
   if (action === 'resumeTuck') { await resumeTuck(windowId, payload.recoveryId!, payload.groupId!, payload.fingerprint!); return ''; }
   if (action === 'forgetTuckRecovery') { await forgetTuckRecovery(payload.recoveryId!); return ''; }
