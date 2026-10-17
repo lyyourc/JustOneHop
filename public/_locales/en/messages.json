@@ -38,6 +38,9 @@
   "reload": {
     "message": "Reload Current Tab"
   },
+  "categoryZing": { "message": "Zing" },
+  "reloadExtension": { "message": "Reload" },
+  "reloadExtensionHint": { "message": "Closes zing panels and loads the installed build; keeps pages and saved settings." },
   "reloadTab": {
     "message": "Reload Tab"
   },
@@ -232,6 +235,15 @@
   "settingsHint": {
     "message": "Language, appearance, tab management, and shortcuts"
   },
+  "searchSettings": { "message": "Search settings" },
+  "searchSettingsPlaceholder": { "message": "Search settings…" },
+  "clearSettingsSearch": { "message": "Clear search" },
+  "ctrlTabSetting": { "message": "Switch Recent Tabs" },
+  "setUpShortcut": { "message": "Set Up" },
+  "preferences": { "message": "Preferences" },
+  "experimentalFeatures": { "message": "Experimental Features" },
+  "settingsNavigate": { "message": "Navigate" },
+  "settingsNavigationHelp": { "message": "Tab moves to the next control; Shift+Tab moves to the previous control." },
   "general": {
     "message": "General"
   },
@@ -299,7 +311,7 @@
     "message": "Search Ranking"
   },
   "searchRankingHint": {
-    "message": "Prioritizes your frequent commands and preferred search results based on use. Saved only on this device."
+    "message": "Prioritize frequent commands and preferred results on this device."
   },
   "resetSearchRanking": {
     "message": "Reset Ranking"
@@ -449,7 +461,7 @@
     "message": "Script Library"
   },
   "scriptLibraryHint": {
-    "message": "Save scripts locally. Search their names to run on the current page; use Actions to copy code, edit, or delete."
+    "message": "Save custom scripts locally and run them on the active page."
   },
   "manageScripts": {
     "message": "Manage Scripts"
@@ -458,7 +470,7 @@
     "message": "Set Up Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "Copy a setup snippet to bind Ctrl+Tab and Ctrl+Shift+Tab."
+    "message": "Bind Chrome’s tab-switching shortcut via a one-time setup snippet."
   },
   "bindingEffect": {
     "message": "Uses Chrome’s internal settings API to bind Ctrl+Tab and Ctrl+Shift+Tab to zing’s recent tab switcher."
@@ -638,7 +650,7 @@
     "message": "Auto Tuck Idle Tabs"
   },
   "autoTuckHint": {
-    "message": "Organizes tabs idle for 7 days into a collapsed Tucked Away group. Pages remain open and can be restored anytime."
+    "message": "Move tabs idle for 7 days into a collapsed Tucked Away group."
   },
   "autoTuckOffHint": {
     "message": "Turning this off returns managed tabs to the tab strip. After restart, matching groups reconnect automatically; uncertain groups wait for your review."

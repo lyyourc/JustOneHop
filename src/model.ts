@@ -58,6 +58,10 @@ export function entries(snapshot: Snapshot): Entry[] {
       keywords: '恢复 收起 继续管理 检查 分组 recover resume tuck group', aliases: ['recover tucked tabs', 'resume tuck', '继续管理', '恢复收起组'],
     })),
     ...commands(snapshot.tabs.find(tab => tab.id === snapshot.currentTabId)),
+    { id: 'command:reloadExtension', kind: 'command', category: 'zing', action: 'reloadExtension', icon: 'reload',
+      title: t('reloadExtension'), subtitle: t('reloadExtensionHint'), searchOnly: true,
+      keywords: 'reload restart zing extension extention 重载 重新加载 重启 扩展',
+      aliases: ['reload zing', 'reload zing extension', 'reload extension', 'reload zing extention', 'restart zing', '重载 zing', '重载扩展', '重新加载扩展', '重新加载 zing 扩展', '重启扩展'] },
     ...(Object.keys(chromePages) as ChromePageAction[]).map((action): Entry => {
       const page = chromePages[action];
       return { id: `command:${action}`, kind: 'command', category: 'chromePages', action, icon: page.icon,
@@ -192,7 +196,9 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     return 6;
   };
   const kindOrder = { tab: 0, bookmark: 1, command: 2, script: 3 };
-  return matches.filter(({ item }) => (!item.danger || item.action === 'deleteScript' || explicitClose) && terms.every(term =>
+  const explicitExtensionReload = /\b(?:zing|extension|extention)\b|扩展/i.test(normalized);
+  return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
+    (!item.danger || item.action === 'deleteScript' || explicitClose) && terms.every(term =>
     // Metadata is searchable, but must not manufacture typo matches. Only
     // visible names and natural-language command aliases receive typo tolerance.
     item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||

@@ -146,6 +146,18 @@ test('restore uses the latest session and reports an empty session list', async 
   chrome.sessions.getRecentlyClosed = async () => [];
   await assert.rejects(perform({ action: 'restore', windowId: 10 }), /No recently closed/);
 });
+test('extension reload validates the window and needs no target tab', async () => {
+  chrome.runtime = { getURL: path => `chrome-extension://zing/${path}`, reload: () => { calls.push(['extensionReload']); } } as typeof chrome.runtime;
+  chrome.tabs.query = async () => [];
+  await perform({ action: 'reloadExtension', windowId: 10 }, () => { calls.push(['ack']); });
+  assert.deepEqual(calls, [['ack'], ['extensionReload']]);
+  assert.deepEqual(usage, []);
+  calls = [];
+  chrome.windows.get = async () => { throw new Error('Invalid window'); };
+  await assert.rejects(perform({ action: 'reloadExtension', windowId: 10 }), /Invalid window/);
+  assert.deepEqual(calls, []);
+});
+
 test('invalid commands cannot trigger another action', async () => {
   await assert.rejects(perform({ action: 'unknown' as never, windowId: 10, tabId: 2 }), /Unsupported/);
   assert.equal(calls.length, 0);

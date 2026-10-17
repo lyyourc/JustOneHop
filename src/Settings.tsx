@@ -1,14 +1,17 @@
 import { BackLayer } from './Navigation';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeft, Check, ChevronDown, ExternalLink, Code, Globe2, Keyboard, Monitor, Search, PanelsTopLeft } from 'lucide-react';
+import { Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, Search, SlidersHorizontal, X } from 'lucide-react';
+import { HighlightedText } from './HighlightedText';
+import { matchingSettings, type SettingRow } from './settingsSearch';
+import { PaletteFooter } from './PaletteFooter';
 import type { SettingsSection } from './types';
 import { ScriptLibrary } from './ScriptLibrary';
 import { systemLanguage, t } from './i18n';
 import { savePreferences, type Preferences } from './preferences';
 import { openShortcuts, resetSearchRanking } from './api';
 
-function Choice<T extends string>({ label, value, options, onChange }: {
-  label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void;
+function Choice<T extends string>({ label, value, options, onChange, query }: {
+  label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; query: string;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -60,13 +63,13 @@ function Choice<T extends string>({ label, value, options, onChange }: {
     <button ref={button} className="choice-trigger" role="combobox" aria-label={label}
       aria-expanded={open} aria-controls={id} aria-haspopup="listbox" aria-activedescendant={open ? `${id}-${index}` : undefined}
       onClick={() => { setOpen(!open); setIndex(selected); }}>
-      <span>{options[selected].label}</span><ChevronDown size={14} />
+      <span><HighlightedText text={options[selected].label} query={query} allowTypos={false} /></span><ChevronDown size={14} />
     </button>
     {open ? <div className={`choice-menu ${above ? 'above' : ''}`} style={{ maxHeight: menuHeight, overflowY: 'auto' }} role="listbox" id={id} aria-label={label}>
       {options.map((option, at) => <div key={option.value} id={`${id}-${at}`} role="option" aria-selected={value === option.value}
         className={`choice-option ${at === index ? 'highlighted' : ''}`} onMouseMove={() => setIndex(at)}
         onMouseDown={event => event.preventDefault()} onClick={() => choose(at)}>
-        <span>{option.label}</span>{value === option.value ? <Check size={14} /> : null}
+        <span><HighlightedText text={option.label} query={query} allowTypos={false} /></span>{value === option.value ? <Check size={14} /> : null}
       </div>)}
     </div> : null}
   </div></BackLayer>;
@@ -81,15 +84,26 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
   const [tuckSaving, setTuckSaving] = useState(false);
   const tuckHint = useId();
   const tuckToggle = useId();
-  const back = useRef<HTMLButtonElement>(null);
   const body = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const returnTo = useRef<SettingRow | undefined>(initialSection);
+  const scrollTop = useRef(0);
+  const [query, setQuery] = useState('');
+  const matches = matchingSettings(query);
+  const highlight = (text: string) => <HighlightedText text={text} query={query} allowTypos={false} />;
+  function openLibrary(mode: 'all' | 'binding') {
+    returnTo.current = mode === 'all' ? 'scripts' : 'binding';
+    scrollTop.current = body.current?.scrollTop ?? 0;
+    setLibrary(mode);
+  }
+  function clearSearch() { setQuery(''); input.current?.focus(); }
   useLayoutEffect(() => {
     if (library) return;
-    const section = initialSection && body.current?.querySelector<HTMLElement>(`[data-setting="${initialSection}"]`);
-    const target = section && section.querySelector<HTMLElement>('button');
-    if (target) { section.scrollIntoView({ block: 'nearest' }); target.focus({ preventScroll: true }); }
-    else back.current?.focus();
-  }, [library, initialSection]);
+    const target = returnTo.current && body.current?.querySelector<HTMLElement>(`[data-setting="${returnTo.current}"] button`);
+    if (body.current) body.current.scrollTop = scrollTop.current;
+    if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'nearest' }); }
+    else input.current?.focus();
+  }, [library]);
   async function change(patch: Partial<Preferences>) {
     setError(false);
     try { await savePreferences(patch); } catch { setError(true); }
@@ -109,63 +123,77 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
     try { await resetSearchRanking(); setRankingReset('done'); }
     catch { setError(true); setRankingReset('idle'); }
   }
-  return <BackLayer onBack={onBack}>{library ? <ScriptLibrary initialBinding={library === 'binding'} onBack={() => setLibrary(null)} onClose={onClose} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view" aria-label={t('settings')}>
-    <header className="settings-header">
-      <button ref={back} className="settings-back" onClick={onBack} aria-label={t('back')}><ArrowLeft size={18} /></button>
-      <h1>{t('settings')}</h1><kbd>esc</kbd>
+  return <BackLayer onBack={onBack}>{library ? <ScriptLibrary initialBinding={library === 'binding'} onBack={() => setLibrary(null)} onClose={onClose} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
+    <header className="search-bar settings-search">
+      <span className="search-icon"><Search size={20} /></span>
+      <input ref={input} data-back-on-empty aria-label={t('searchSettings')} placeholder={t('searchSettingsPlaceholder')}
+        value={query} onChange={event => { setQuery(event.target.value); if (body.current) body.current.scrollTop = 0; }}
+        onKeyDown={event => { if (event.key === 'Enter') event.stopPropagation(); }} autoComplete="off" spellCheck={false} />
+      {query ? <button className="settings-clear" title={t('clearSettingsSearch')} aria-label={t('clearSettingsSearch')}
+        onClick={clearSearch}><X size={16} /></button> : null}
     </header>
     <div className="settings-body" ref={body}>
-      <h2><Globe2 size={15} />{t('general')}</h2>
-      <div className="settings-group" data-setting="language">
-        <div className="setting-row">
-          <div className="setting-copy"><label>{t('language')}</label><p>{t('languageHint')}</p></div>
-          <Choice label={t('language')} value={preferences.language} onChange={language => void change({ language })}
-            options={[{ value: 'system', label: t('followSystem') }, { value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }]} />
+      {matches.has('language') || matches.has('theme') ? <>
+        <h2><SlidersHorizontal size={14} />{highlight(t('general'))}</h2>
+        <div className="settings-group settings-preferences">
+          {matches.has('language') ? <div data-setting="language">
+            <div className="setting-row">
+              <div className="setting-copy"><label>{highlight(t('language'))}</label>{preferences.language === 'system' ? <p>{highlight(t('systemLanguage', systemLanguage() === 'zh' ? '简体中文' : 'English'))}</p> : null}</div>
+              <Choice query={query} label={t('language')} value={preferences.language} onChange={language => void change({ language })}
+                options={[{ value: 'system', label: t('followSystem') }, { value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }]} />
+            </div>
+          </div> : null}
+          {matches.has('theme') ? <div data-setting="theme">
+            <div className="setting-row">
+              <div className="setting-copy"><label>{highlight(t('theme'))}</label></div>
+              <Choice query={query} label={t('theme')} value={preferences.theme} onChange={theme => void change({ theme })}
+                options={[{ value: 'system', label: t('followSystem') }, { value: 'light', label: t('lightTheme') }, { value: 'dark', label: t('darkTheme') }]} />
+            </div>
+          </div> : null}
         </div>
-        {preferences.language === 'system' ? <p className="setting-note">{t('systemLanguage', systemLanguage() === 'zh' ? '简体中文' : 'English')}</p> : null}
-      </div>
-      <h2><Monitor size={15} />{t('appearance')}</h2>
-      <div className="settings-group" data-setting="theme">
-        <div className="setting-row">
-          <div className="setting-copy"><label>{t('theme')}</label><p>{t('themeHint')}</p></div>
-          <Choice label={t('theme')} value={preferences.theme} onChange={theme => void change({ theme })}
-            options={[{ value: 'system', label: t('followSystem') }, { value: 'light', label: t('lightTheme') }, { value: 'dark', label: t('darkTheme') }]} />
+      </> : null}
+      {matches.has('keyboard') || matches.has('binding') ? <>
+        <h2><Keyboard size={14} />{highlight(t('keyboard'))}</h2>
+        <div className="settings-group settings-keyboard">
+          {matches.has('keyboard') ? <div className="setting-row hotkey-row" data-setting="keyboard">
+            <div className="setting-copy"><label>{highlight(t('paletteHotkey'))}</label></div>
+            <div className="hotkey-controls"><kbd className="hotkey-value">{shortcut || t('notAssigned')}</kbd>
+              <button className="hotkey-change" onClick={() => void changeHotkey()}>{highlight(t('changeHotkey'))}<ExternalLink size={12} /></button>
+            </div>
+          </div> : null}
+          {matches.has('binding') ? <div className="setting-row" data-setting="binding"><div className="setting-copy"><label>{highlight(t('ctrlTabSetting'))}</label><p>{highlight(t('bindingHint'))}</p></div>
+            <div className="hotkey-controls"><kbd className="hotkey-value">{highlight('Ctrl+Tab')}</kbd>
+              <button className="ranking-reset" onClick={() => openLibrary('binding')}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
         </div>
-      </div>
-      <h2><PanelsTopLeft size={15} />{t('tabManagement')}</h2>
-      <div className="settings-group" data-setting="tabs">
-        <div className="setting-row">
-          <div className="setting-copy"><label htmlFor={tuckToggle}>{t('autoTuck')}</label><p id={tuckHint}>{t('autoTuckHint')}</p></div>
-          <button id={tuckToggle} className="setting-toggle" role="switch" aria-label={t('autoTuck')} aria-checked={preferences.autoTuck}
-            aria-describedby={tuckHint} disabled={tuckSaving} onClick={() => void toggleAutoTuck()}><span /></button>
+      </> : null}
+      {matches.has('tabs') || matches.has('ranking') || matches.has('scripts') ? <>
+        <h2><FlaskConical size={14} />{highlight(t('experimentalFeatures'))}</h2>
+        <div className="settings-group settings-experiments">
+          {matches.has('tabs') ? <div data-setting="tabs">
+            <div className="setting-row">
+              <div className="setting-copy"><label htmlFor={tuckToggle}>{highlight(t('autoTuck'))}</label><p id={tuckHint}>{highlight(t('autoTuckHint'))}</p></div>
+              <button id={tuckToggle} className="setting-toggle" role="switch" aria-label={t('autoTuck')} aria-checked={preferences.autoTuck}
+                aria-describedby={tuckHint} disabled={tuckSaving} onClick={() => void toggleAutoTuck()}><span /></button>
+            </div>
+          </div> : null}
+          {matches.has('ranking') ? <div data-setting="ranking">
+            <div className="setting-row">
+              <div className="setting-copy"><label>{highlight(t('searchRanking'))}</label><p>{highlight(t('searchRankingHint'))}</p>{rankingReset === 'done' ? <p className="setting-note" role="status">{t('rankingReset')}</p> : null}</div>
+              <button className="ranking-reset" onClick={() => void resetRanking()} aria-disabled={rankingReset === 'busy'}>{highlight(t('resetSearchRanking'))}</button>
+            </div>
+          </div> : null}
+          {matches.has('scripts') ? <div className="setting-row" data-setting="scripts"><div className="setting-copy"><label>{highlight(t('scriptLibrary'))}</label><p>{highlight(t('scriptLibraryHint'))}</p></div>
+            <button className="ranking-reset" onClick={() => openLibrary('all')}>{highlight(t('manageScripts'))}</button></div> : null}
         </div>
-        <p className="setting-note">{t('autoTuckOffHint')}</p>
-      </div>
-      <h2><Search size={15} />{t('searchRanking')}</h2>
-      <div className="settings-group" data-setting="ranking">
-        <div className="setting-row">
-          <div className="setting-copy"><label>{t('searchRanking')}</label><p>{t('searchRankingHint')}</p></div>
-          <button className="ranking-reset" onClick={() => void resetRanking()} aria-disabled={rankingReset === 'busy'}>{t('resetSearchRanking')}</button>
-        </div>
-        {rankingReset === 'done' ? <p className="setting-note" role="status">{t('rankingReset')}</p> : null}
-      </div>
-      <h2><Keyboard size={15} />{t('keyboard')}</h2>
-      <div className="settings-group" data-setting="keyboard">
-        <div className="setting-row hotkey-row">
-          <div className="setting-copy"><label>{t('paletteHotkey')}</label><p>{t('defaultHotkey', isMac ? '⌘⇧P' : 'Ctrl+Shift+P')}</p></div>
-          <div className="hotkey-controls"><kbd className="hotkey-value">{shortcut || t('notAssigned')}</kbd>
-            <button className="hotkey-change" onClick={() => void changeHotkey()}>{t('changeHotkey')}<ExternalLink size={12} /></button>
-          </div>
-        </div>
-        <p className="setting-note">{t('hotkeyHint')}</p>
-        <div className="setting-row binding-row"><div className="setting-copy"><label>{t('recentSwitcher')}</label><p>{t('bindingHint')}</p></div>
-          <button className="ranking-reset" onClick={() => setLibrary('binding')}>{t('bindCtrlTab')}</button></div>
-      </div>
-      <h2><Code size={15} />{t('scriptLibrary')}</h2>
-      <div className="settings-group"><div className="setting-row"><div className="setting-copy"><label>{t('scriptLibrary')}</label><p>{t('scriptLibraryHint')}</p></div>
-        <button className="ranking-reset" onClick={() => setLibrary('all')}>{t('manageScripts')}</button></div></div>
+      </> : null}
+      {!matches.size ? <div className="empty"><Search size={26} /><strong role="status">{t('noResults')}</strong>
+        <button className="ranking-reset" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
     </div>
     {error ? <div className="error-banner" role="alert">{t('errorSaveSettings')}</div> : null}
-    <footer className="footer settings-footer"><span>{t('savedLocally')}</span><span className="key-chord"><kbd>esc</kbd>{t('back')}</span></footer>
+    <PaletteFooter title={t('settings')}
+      navigation={{ kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: onBack }}
+      context={<span className="settings-navigation" title={t('settingsNavigationHelp')} aria-label={t('settingsNavigationHelp')}>
+        <span>{t('settingsNavigate')}</span><span className="key-chord"><kbd>Tab</kbd></span><span>/</span><span className="key-chord"><kbd>Shift+Tab</kbd></span>
+      </span>} />
   </section>}</BackLayer>;
 }

@@ -38,6 +38,9 @@
   "reload": {
     "message": "刷新当前标签页"
   },
+  "categoryZing": { "message": "Zing" },
+  "reloadExtension": { "message": "重新加载" },
+  "reloadExtensionHint": { "message": "关闭 zing 面板并加载已安装的构建，保留网页和已保存设置。" },
   "reloadTab": {
     "message": "刷新标签页"
   },
@@ -232,6 +235,15 @@
   "settingsHint": {
     "message": "语言、外观、标签页管理与快捷键"
   },
+  "searchSettings": { "message": "搜索设置" },
+  "searchSettingsPlaceholder": { "message": "搜索设置…" },
+  "clearSettingsSearch": { "message": "清空搜索" },
+  "ctrlTabSetting": { "message": "切换最近标签页" },
+  "setUpShortcut": { "message": "前往配置" },
+  "preferences": { "message": "偏好设置" },
+  "experimentalFeatures": { "message": "实验性功能" },
+  "settingsNavigate": { "message": "切换控件" },
+  "settingsNavigationHelp": { "message": "Tab 切换到下一个控件，Shift+Tab 切换到上一个控件。" },
   "general": {
     "message": "通用"
   },
@@ -299,7 +311,7 @@
     "message": "搜索排序"
   },
   "searchRankingHint": {
-    "message": "根据你的使用习惯优先呈现常用命令与搜索结果。偏好记录仅保存在本机。"
+    "message": "根据本机使用习惯，优先展示常用命令与高频搜索结果。"
   },
   "resetSearchRanking": {
     "message": "重置搜索排序"
@@ -449,7 +461,7 @@
     "message": "脚本收藏"
   },
   "scriptLibraryHint": {
-    "message": "脚本安全保存在本机。搜索名称即可在当前网页运行；操作菜单支持复制代码、编辑或删除。"
+    "message": "在本机保存常用脚本，从主搜索随时在当前网页运行。"
   },
   "manageScripts": {
     "message": "管理脚本"
@@ -458,7 +470,7 @@
     "message": "设置 Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "复制配置代码，重新绑定 Ctrl+Tab 和 Ctrl+Shift+Tab。"
+    "message": "通过一次性配置代码，将切换快捷键绑定到此按键组合。"
   },
   "bindingEffect": {
     "message": "借助 Chrome 内部设置接口，将 Ctrl+Tab 和 Ctrl+Shift+Tab 绑定到 zing 的最近标签页切换。"
@@ -638,7 +650,7 @@
     "message": "自动收起闲置标签页"
   },
   "autoTuckHint": {
-    "message": "将 7 天未使用的标签页整理到折叠的「已收起」标签组中，页面始终保持打开，随时可以找回。"
+    "message": "将闲置满 7 天的标签页移入折叠的「已收起」分组，不关闭页面。"
   },
   "autoTuckOffHint": {
     "message": "关闭后，已收起的标签页会移回标签栏。浏览器重启后，zing 会自动恢复匹配的分组；若无法确认则交由你核对。"

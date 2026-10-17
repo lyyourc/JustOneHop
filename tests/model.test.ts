@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { actionsFor, closeTargets, entries, homeEntries, search } from '../src/model.ts';
 import type { Snapshot, TabItem } from '../src/types.ts';
+import { entryTitle } from '../src/entryPresentation.ts';
 
 const tab = (id: number, index: number, pinned = false, windowId = 1): TabItem => ({
   id, index, windowId, pinned, title: `Page ${id}`, url: `https://example.com/${id}`,
@@ -14,8 +15,8 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one index contains tabs, bookmarks and commands; home prioritizes recent tabs', () => {
   const items = entries(data);
-  assert.equal(items.length, 32);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 28);
+  assert.equal(items.length, 33);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 29);
   const home = homeEntries(items);
   assert.deepEqual(home.slice(0, 3).map(entry => entry.kind), ['tab', 'tab', 'tab']);
   assert.ok(home.slice(3).every(entry => entry.kind === 'command' && !entry.danger));
@@ -29,6 +30,39 @@ test('Chinese and English command terms are searchable', () => {
   assert.equal(search(entries(data), 'reload')[0].action, 'reload');
   assert.equal(search(entries(data), 'close right')[0].action, 'closeRight');
 });
+test('extension reload requires an extension query and stays out of learned home commands', () => {
+  const items = entries(data);
+  const scores = new Map([['command:reloadExtension', 1e9]]);
+  for (const query of ['reload zing', 'reload extension', 'reload zing extention', '重新加载扩展', '重载扩展']) {
+    assert.equal(search(items, query)[0].action, 'reloadExtension', query);
+  }
+  for (const query of ['reload', 'refresh', '刷新']) {
+    assert.equal(search(items, query, scores)[0].action, 'reload', query);
+    assert.ok(!search(items, query, scores).some(item => item.action === 'reloadExtension'));
+  }
+  assert.ok(!homeEntries(items, scores).some(item => item.action === 'reloadExtension'));
+  const command = items.find(item => item.action === 'reloadExtension')!;
+  assert.equal(command.tabId, undefined);
+  assert.equal(command.shortcut, undefined);
+});
+
+test('zing commands use shared category titles and bilingual colon searches', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      const items = entries(data);
+      const command = items.find(item => item.action === 'reloadExtension')!;
+      assert.equal(command.category, 'zing');
+      assert.equal(entryTitle(command), locale === 'en-US' ? 'Zing: Reload' : 'Zing: 重新加载');
+      assert.equal(entryTitle(actionsFor(command, data)[0]), entryTitle(command));
+      for (const query of ['Zing: Reload', 'zing:reload', 'Zing：重新加载', 'reload zing', '重新加载扩展']) {
+        assert.equal(search(items, query)[0]?.action, 'reloadExtension', `${locale}: ${query}`);
+      }
+    }
+  } finally { globalThis.chrome = original; }
+});
+
 test('search finds bookmark folders and URLs', () => {
   assert.equal(search(entries(data), '开发')[0].bookmarkId, 'b');
   assert.equal(search(entries(data), 'docs.github')[0].bookmarkId, 'b');

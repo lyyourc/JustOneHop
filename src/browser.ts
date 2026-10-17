@@ -1,5 +1,6 @@
 import { tuckFlags, canUndoTuck, tabTuckingReady, tuckTab, undoTuck, tuckRecoveries, resumeTuck, forgetTuckRecovery, updateManagedGroup } from './tabTuck';
 import { t } from './i18n';
+import { reloadExtension } from './reloadExtension';
 import { isChromePageAction, openChromePage } from './chromePages';
 import { closeTargets } from './model';
 import { recordUsage } from './usageStorage';
@@ -66,6 +67,7 @@ export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
 
 export async function perform(payload: Execution, onPerformed?: () => void): Promise<void> {
   const target = await performAction(payload);
+  if (payload.action === 'reloadExtension') { await reloadExtension(onPerformed); return; }
   // Let the panel refresh or dismiss as soon as Chrome finishes the action,
   // while this promise still owns queued persistence in the service worker.
   onPerformed?.();
@@ -98,6 +100,7 @@ async function performAction(payload: Execution): Promise<string> {
   }
   if (isChromePageAction(action)) { await openChromePage(action, windowId); return target(`command:${action}`); }
   if (action === 'settings') return target('command:settings');
+  if (action === 'reloadExtension') return '';
   if (action === 'resumeTuck') { await resumeTuck(windowId, payload.recoveryId!, payload.groupId!, payload.fingerprint!); return ''; }
   if (action === 'forgetTuckRecovery') { await forgetTuckRecovery(payload.recoveryId!); return ''; }
   if (action === 'undoTuck') { await undoTuck(windowId); return target('command:undoTuck'); }

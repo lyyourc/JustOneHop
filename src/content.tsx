@@ -94,6 +94,7 @@ if (!scope[marker]) {
     }
     if (message?.source !== 'zing') return;
     if (message.type === 'ping') { respond(true); return; }
+    if (message.type === 'close-for-reload') { if (host) close(); respond(true); return; }
     if (message.type === 'toggle') {
       void Promise.all([preferencesReady, usageReady]).then(() => {
         try {
