@@ -12,7 +12,7 @@
     "message": "zing browser command palette"
   },
   "togglePalette": {
-    "message": "Open / close command palette"
+    "message": "Open / Close command palette"
   },
   "languageTag": {
     "message": "en"
@@ -221,6 +221,33 @@
   "errorCommand": {
     "message": "Unsupported command."
   },
+  "help": { "message": "Help" },
+  "helpHint": { "message": "Getting started, features, and common questions." },
+  "searchHelp": { "message": "Search help" },
+  "searchHelpPlaceholder": { "message": "Search help…" },
+  "helpSectionCount": { "message": "$1 matching sections" },
+  "openHelp": { "message": "Read Help" },
+  "closeHelp": { "message": "Close Help" },
+  "helpIntro": { "message": "Use this guide to find commands and complete common tasks. Enter keywords in Search help to find a section." },
+  "helpStartTitle": { "message": "Open and search" },
+  "toolbarShortcut": { "message": "Open zing: $1 · Change shortcut" },
+  "helpStartBody": { "message": "To open zing with the mouse, click its icon in the Chrome toolbar. Current shortcut: $1. If a shortcut is assigned, press it to open zing. To change or assign a shortcut, open Settings → Keyboard. You can also right-click the zing toolbar icon. Select the shortcut item to change the binding. Select Help to open this guide in a new tab." },
+  "helpSearchBody": { "message": "Enter a page title, domain, bookmark name, or command in the main search. Use English or Chinese keywords. A special prefix is not necessary. Examples: “new tab”, “reopen last tab”, “scripts”, “theme”, and “downloads”. Click a result to use it. For keyboard operation, select a result with ↑/↓. Then press Enter." },
+  "helpControlsTitle": { "message": "Actions and going back" },
+  "helpControlsBody": { "message": "To see more actions, right-click a result. Alternatively, click Actions in the footer. Keyboard shortcut: Cmd+K on macOS; Ctrl+K on Windows/Linux. In a list, press Ctrl+P to select the previous item. Press Ctrl+N to select the next item. To move between controls, press Tab or Shift+Tab." },
+  "helpBackBody": { "message": "To go back one level, click the back arrow or press Esc. zing restores your search and selection. At the main search, Esc closes zing. In an empty search field on a secondary page, Backspace goes back one level. If the field contains text, Backspace deletes text." },
+  "helpTabsTitle": { "message": "Manage and switch tabs" },
+  "helpTabsBody": { "message": "To manage a tab, enter its title in the main search. Right-click the target result. Select the pin, mute, or close action. These actions apply to the selected tab. The palette stays open after these actions. A tab switch closes the palette. Bulk close actions keep pinned tabs. To manage a tab group, search for its name. To use the recent-tab switcher, press its assigned shortcut. Keep the modifier key down while you select a tab. Release the modifier key to switch. To search instead, click the switcher search field before you release the modifier key. Enter a title or URL. Click a result to switch." },
+  "helpTuckBody": { "message": "To move a tab into a collapsed Chrome group, search for “tuck tab”. Select Tuck Away Tab. The page stays open. zing does not discard the page. To return the page to the tab strip, search for its title. Click the result. Auto Tuck is off by default. To enable Auto Tuck, open Settings. Enable Auto Tuck Idle Tabs. It groups tabs idle for 7 days. After a restart, some groups can require review. To review these groups, search for “recover tucked tabs”." },
+  "helpScriptsTitle": { "message": "Save and run scripts" },
+  "helpScriptsBody": { "message": "To open Script Library, search for “scripts”. Click a script to see its code. Click Copy Code to copy it. Enter also copies the selected script. To change a script, select Edit Script from Actions. To delete a script, select Delete from Actions. Confirm the deletion. To create a script, click New Script. Enter a name. Enter the code. To save, press Cmd+Enter on macOS or Ctrl+Enter on Windows/Linux. Before you run a script, check its code. The code can change the page or send network requests. After you complete the permission setup below, open zing on the target webpage. Search for “run script”. Select Run Script. Click a saved script to run it once. Results stay in the current panel. Scripts do not run automatically when pages load." },
+  "helpScriptPermissionBody": { "message": "Running scripts requires Chrome 135 or later. On Chrome 138 or later, open the zing extension details. Enable “Allow user scripts”. On Chrome 135–137, enable Developer mode instead. Run scripts only on ordinary HTTP or HTTPS webpages." },
+  "helpStorageTitle": { "message": "View website storage" },
+  "helpStorageBody": { "message": "On the target webpage, search for “local storage”, “session storage”, or “cookies”. Select the storage command. To copy a value, click its row or press Enter. To read a long value, select View Details from Actions. These commands are read-only. To read cookies for the first time, click Allow Website Access. Check the website domains on the permission page. Confirm access in Chrome. To revoke access, use Chrome’s extension settings." },
+  "helpQuestionsTitle": { "message": "Common questions" },
+  "helpShortcutBody": { "message": "If the shortcut does not work, open Settings → Keyboard. Click Change in Chrome. Assign a shortcut to zing. Open zing again to see the new binding. Ctrl+Tab requires separate manual setup. For setup instructions, search for “ctrl tab”. zing cannot assign Ctrl+Tab automatically." },
+  "helpWindowBody": { "message": "On ordinary webpages, zing opens as an overlay. On Chrome internal pages, zing opens in a separate panel. On restricted pages, zing can use the Chrome toolbar popup. This popup can also appear when the address bar has focus." },
+  "helpPrivacyBody": { "message": "zing has no account, server, or telemetry. Preferences, saved scripts, and learned search ranking stay on this device. Website storage values and script results stay in the current panel. To open this guide again, use Settings → General → Help. You can also search for “help”." },
   "settings": {
     "message": "Settings"
   },

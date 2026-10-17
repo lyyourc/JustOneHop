@@ -57,6 +57,14 @@ npm run build
 
 ## Getting started
 
+Right-click the zing toolbar icon to find “Open zing: actual shortcut · Change shortcut” and “Help”. The labels use the zing interface language. Chrome controls the menu’s appearance and grouping. Click the shortcut item to open Chrome’s Extension Shortcuts page in the current window, reusing a tab with the same address if available. The main search no longer shows a persistent launch shortcut hint.
+
+The shortcut comes from Chrome’s actual binding. If you change it and immediately right-click in the same tab, the menu may still show the previous binding. Switch tabs or open zing, then reopen the menu. Help’s “Open and search” section shows the actual binding and full key names, or explains that no shortcut is assigned.
+
+Click Help in the toolbar menu to open a new help tab in the current window. To read it inside the palette, open Settings → General → Help, or enter `help`, `帮助`, or `使用说明` in the main search. Help works offline and uses your saved theme and language preferences. The toolbar menu adds only the `contextMenus` permission. Opening Help does not request website access.
+
+Enter English or Chinese keywords in Search help to filter sections and highlight matches. Clear the search to show the full guide. Inside the palette, click Back in the footer or press Esc to restore your search or settings context. The standalone page has an explicit Close Help action in the footer. Click it, click `esc` beside the search field, press Esc, or press Backspace in an empty search field to close the help tab.
+
 Mute and pin search terms follow the target tab's state: on an unmuted tab, `unmute / 取消静音 / 恢复声音` will not suggest muting it; on an unpinned tab, `unpin / 取消固定` will not suggest pinning it. General terms such as `sound / jingyin / guding` still find the currently available toggle, consistently in main search and tab Actions.
 
 Find features using everyday terms: `refresh page / 刷新页面`, `reopen last tab / 恢复标签`, `open settings / 打开设置`, `dark mode / 深色`, `English / 英文`, or `打开书签`. Theme, language, and reset-ranking queries open the relevant settings without changing values or clearing records. Combine a title with a domain, tab group, or bookmark folder, such as `github pull`, `notion 路线`, or `前端 react`.

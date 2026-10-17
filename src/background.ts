@@ -7,6 +7,7 @@ import { preferencesReady } from './preferences';
 import { errorMessage, t } from './i18n';
 import { openChromePage } from './chromePages';
 import { snapshot } from './browser';
+import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
 import { resetUsage } from './usageStorage';
 import type { Request, Snapshot, PageStorage, ScriptResult, PaletteState } from './types';
 
@@ -67,7 +68,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     if (request.type === 'open-script-settings') return chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}`, ...(sender.tab ? { windowId: sender.tab.windowId } : {}) }).then(() => undefined);
     if (request.type === 'open-cookie-access') return openCookieAccess(request.payload, sender);
     if (request.type === 'read-page-storage') return readPageStorage(request.payload, sender);
-    if (request.type === 'snapshot') return snapshot(sender.tab);
+    if (request.type === 'snapshot') { void refreshToolbarMenu(); return snapshot(sender.tab); }
     if (request.type === 'execute') return performWithPaletteContinuation(request.payload, sender, () => success(), ticket);
     if (request.type === 'reset-usage') return resetUsage();
     const windowId = sender.tab?.windowId ?? (await chrome.windows.getCurrent()).id;
@@ -110,3 +111,4 @@ chrome.tabGroups.onUpdated.addListener(changed);
 chrome.tabGroups.onRemoved.addListener(changed);
 chrome.tabGroups.onMoved.addListener(changed);
 startTabTucking(changed);
+startToolbarMenu();

@@ -6,6 +6,7 @@
   "minimum_chrome_version": "127",
   "permissions": [
     "activeTab",
+    "contextMenus",
     "cookies",
     "scripting",
     "tabs",

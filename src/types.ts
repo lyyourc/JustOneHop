@@ -75,7 +75,7 @@ export type Request =
   | { source: 'zing'; type: 'reset-usage' }
   | { source: 'zing'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
-export type IconName = 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
+export type IconName = 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
 export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'ranking' | 'tabs';
 export interface Entry {
   category?: 'tabGroup' | 'tab' | 'script' | 'storage' | 'settings' | 'chromePages' | 'zing';
@@ -87,7 +87,7 @@ export interface Entry {
   subtitle: string;
   keywords: string;
   icon: IconName;
-  action: ActionId | 'settings' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
+  action: ActionId | 'settings' | 'help' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
   settingsSection?: SettingsSection;
   recoveryId?: string;
   groupId?: number;

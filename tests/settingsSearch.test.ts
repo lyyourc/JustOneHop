@@ -4,7 +4,8 @@ import { matchingSettings } from '../src/settingsSearch.ts';
 
 test('settings search finds individual rows by bilingual labels, descriptions and aliases', () => {
   for (const [query, rows] of [
-    ['  ', ['language', 'theme', 'keyboard', 'binding', 'tabs', 'ranking', 'scripts']],
+    ['  ', ['language', 'theme', 'help', 'keyboard', 'binding', 'tabs', 'ranking', 'scripts']],
+    ['help', ['help']], ['帮助', ['help']], ['使用说明', ['help']], ['general', ['language', 'theme', 'help']],
     ['LANG', ['language']], ['语言', ['language']], ['外观', ['theme']], ['dark', ['theme']],
     ['7 days', ['tabs']], ['页面始终保持打开', ['tabs']], ['search 排序', ['ranking']],
     ['userscript', ['scripts']], ['ctrl tab', ['binding']], ['hotkey', ['keyboard']],

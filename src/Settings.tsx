@@ -8,6 +8,7 @@ import { PaletteFooter } from './PaletteFooter';
 import { describeShortcut } from './Shortcut';
 import type { SettingsSection } from './types';
 import { ScriptLibrary } from './ScriptLibrary';
+import { HelpView } from './HelpView';
 import { systemLanguage, t } from './i18n';
 import { savePreferences, type Preferences } from './preferences';
 import { openShortcuts, resetSearchRanking } from './api';
@@ -84,6 +85,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
 }) {
   const back = useNavigateBack();
   const [library, setLibrary] = useState<'all' | 'binding' | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [error, setError] = useState(false);
   const [rankingReset, setRankingReset] = useState<'idle' | 'busy' | 'done'>('idle');
   const [tuckSaving, setTuckSaving] = useState(false);
@@ -105,12 +107,12 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
   }
   function clearSearch() { setQuery(''); input.current?.focus(); }
   useLayoutEffect(() => {
-    if (library) return;
+    if (library || helpOpen) return;
     const target = returnTo.current && body.current?.querySelector<HTMLElement>(`[data-setting="${returnTo.current}"] button`);
     if (body.current) body.current.scrollTop = scrollTop.current;
     if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'nearest' }); }
     else input.current?.focus();
-  }, [library]);
+  }, [library, helpOpen]);
   async function change(patch: Partial<Preferences>) {
     setError(false);
     try { await savePreferences(patch); } catch { setError(true); }
@@ -130,7 +132,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
     try { await resetSearchRanking(); setRankingReset('done'); }
     catch { setError(true); setRankingReset('idle'); }
   }
-  return <BackLayer onBack={onBack}>{library ? <ScriptLibrary initialBinding={library === 'binding'} onBack={() => setLibrary(null)} onClose={onClose} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
+  return <BackLayer onBack={onBack}>{helpOpen ? <HelpView shortcut={shortcut} onBack={() => setHelpOpen(false)} /> : library ? <ScriptLibrary initialBinding={library === 'binding'} onBack={() => setLibrary(null)} onClose={onClose} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
     <header className="search-bar settings-search">
       <span className="search-icon"><Search size={20} /></span>
       <input ref={input} data-back-on-empty aria-label={t('searchSettings')} placeholder={t('searchSettingsPlaceholder')}
@@ -141,7 +143,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
       <SearchDismissButton label={t('back')} />
     </header>
     <div className="settings-body" ref={body}>
-      {matches.has('language') || matches.has('theme') ? <>
+      {matches.has('language') || matches.has('theme') || matches.has('help') ? <>
         <h2><SlidersHorizontal size={14} />{highlight(t('general'))}</h2>
         <div className="settings-group settings-preferences">
           {matches.has('language') ? <div data-setting="language">
@@ -157,6 +159,12 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
               <Choice query={query} label={t('theme')} value={preferences.theme} onChange={theme => void change({ theme })}
                 options={[{ value: 'system', label: t('followSystem') }, { value: 'light', label: t('lightTheme') }, { value: 'dark', label: t('darkTheme') }]} />
             </div>
+          </div> : null}
+          {matches.has('help') ? <div className="setting-row" data-setting="help">
+            <div className="setting-copy"><label>{highlight(t('help'))}</label><p>{highlight(t('helpHint'))}</p></div>
+            <button className="ranking-reset" onClick={() => {
+              returnTo.current = 'help'; scrollTop.current = body.current?.scrollTop ?? 0; setHelpOpen(true);
+            }}>{highlight(t('openHelp'))}</button>
           </div> : null}
         </div>
       </> : null}

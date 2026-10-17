@@ -22,6 +22,7 @@ const jobs = [
   { ...shared, entryPoints: ['src/background.ts'], outfile: 'dist/background.js', format: 'iife' },
   { ...shared, entryPoints: ['src/content.tsx'], outfile: 'dist/content.js', format: 'iife', loader: { '.css': 'text' } },
   { ...shared, entryPoints: ['src/popup.tsx'], outfile: 'dist/popup.js', format: 'iife' },
+  { ...shared, entryPoints: ['src/help.tsx'], outfile: 'dist/help.js', format: 'iife' },
 ];
 if (process.argv.includes('--watch')) {
   await Promise.all(jobs.map(async options => { const ctx = await context(options); await ctx.watch(); }));

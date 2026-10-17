@@ -12,12 +12,13 @@ type Environment = {
   pageAccess: boolean;
   cookieDomains: boolean;
   commands: boolean;
+  toolbarMenus: boolean;
   headed: boolean;
   verticalTabs: boolean;
   vimium: boolean;
 };
 const defaults: Environment = { locale: 'zh-CN', shadow: 'closed', pageAccess: false,
-  cookieDomains: false, commands: false, headed: false, verticalTabs: false, vimium: false };
+  cookieDomains: false, commands: false, toolbarMenus: false, headed: false, verticalTabs: false, vimium: false };
 const test = base.extend<{ environment: Environment }>({ environment: [defaults, { option: true }] });
 
 let server: Server;
@@ -101,6 +102,29 @@ test.beforeEach(async ({ environment }, testInfo) => {
     // Invoke the real registered command callback in headless Chrome. No test RPC
     // or global hook is shipped in the production extension.
     const hook = `globalThis.__recentCommands = []; const addCommand = chrome.commands.onCommand.addListener.bind(chrome.commands.onCommand); chrome.commands.onCommand.addListener = callback => { globalThis.__recentCommands.push(callback); addCommand(callback); };\n`;
+    await writeFile(background, hook + await readFile(background, 'utf8'));
+    extension = testExtension;
+  }
+  if (environment.toolbarMenus) {
+    if (!testExtension) {
+      testExtension = `${profile}-extension`;
+      await cp(extension, testExtension, { recursive: true });
+    }
+    const background = join(testExtension, 'background.js');
+    // Capture registrations after Chrome accepts them and invoke the real click
+    // callback. This does not inspect or interact with Chrome's native menu UI.
+    const hook = `globalThis.__toolbarClicks = []; globalThis.__toolbarItems = {};
+const addMenuClick = chrome.contextMenus.onClicked.addListener.bind(chrome.contextMenus.onClicked);
+chrome.contextMenus.onClicked.addListener = callback => { globalThis.__toolbarClicks.push(callback); addMenuClick(callback); };
+const createMenu = chrome.contextMenus.create.bind(chrome.contextMenus);
+chrome.contextMenus.create = (properties, callback) => createMenu(properties, () => {
+  if (!chrome.runtime.lastError) globalThis.__toolbarItems[properties.id] = properties;
+  callback?.();
+});
+const updateMenu = chrome.contextMenus.update.bind(chrome.contextMenus);
+chrome.contextMenus.update = async (id, properties) => {
+  await updateMenu(id, properties); globalThis.__toolbarItems[id] = { id, ...properties };
+};\n`;
     await writeFile(background, hook + await readFile(background, 'utf8'));
     extension = testExtension;
   }
@@ -695,6 +719,177 @@ test('settings language and theme persist, synchronize, and preserve search focu
 });
 
 test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', toolbarMenus: true } });
+  test('Toolbar menu opens shortcuts and searchable standalone Help', async () => {
+    const items = () => worker.evaluate(() => (globalThis as any).__toolbarItems as Record<string, { title: string; contexts: string[] }>);
+    const shortcut = await worker.evaluate(async () => (await chrome.commands.getAll()).find(command => command.name === 'toggle-palette')!.shortcut!);
+    await expect.poll(async () => Object.keys(await items()).length).toBe(2);
+    expect(await items()).toEqual({
+      'zing-toolbar-shortcut': { id: 'zing-toolbar-shortcut', title: `Open zing: ${shortcut} · Change shortcut`, contexts: ['action'] },
+      'zing-toolbar-help': { id: 'zing-toolbar-help', title: 'Help', contexts: ['action'] },
+    });
+    await expect(ui.locator('.launch-hint')).toHaveCount(0);
+    await ui.goto('chrome://settings/');
+    const source = await worker.evaluate(async () => (await chrome.tabs.query({ url: 'chrome://settings/' }))[0]);
+    async function clickMenu(id: string) {
+      await worker.evaluate(({ id, source }) => {
+        for (const callback of (globalThis as any).__toolbarClicks) callback({ menuItemId: id }, source);
+      }, { id, source });
+    }
+    async function openHelp() {
+      const created = context.waitForEvent('page');
+      await clickMenu('zing-toolbar-help');
+      const page = await created;
+      await expect(page).toHaveURL(popupUrl.replace('popup.html', 'help.html'));
+      return page;
+    }
+    const page = await openHelp();
+    const search = page.getByRole('textbox', { name: 'Search help', exact: true });
+    const article = page.getByRole('article');
+    await expect(search).toBeFocused();
+    await expect(article).toContainText(shortcut);
+    expect(await worker.evaluate(async url => (await chrome.tabs.query({ url }))[0].windowId, page.url())).toBe(source.windowId);
+    await expect(ui).toHaveURL('chrome://settings/');
+    await search.fill('cookies');
+    await expect(article.getByRole('heading')).toHaveText('View website storage');
+    await search.press('Backspace'); await expect(search).toHaveValue('cookie');
+    await page.locator('.settings-clear').click();
+    await search.press('Tab'); await page.keyboard.press('Tab'); await expect(article).toBeFocused();
+    await article.press('PageDown'); await expect.poll(() => article.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+    await article.press('Tab'); await expect(page.locator('.primary-action')).toBeFocused();
+    await page.setViewportSize({ width: 390, height: 400 });
+    for (const theme of ['light', 'dark']) {
+      await worker.evaluate(async theme => chrome.storage.local.set({ preferences: { language: 'zh', theme } }), theme);
+      await expect(page.locator('.zing-app')).toHaveAttribute('data-theme', theme);
+      await expect(page).toHaveTitle('使用帮助 · zing');
+      await expect(page.locator('.primary-action')).toHaveText('关闭帮助esc');
+      expect(await article.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+      const footer = await page.locator('.palette-footer').boundingBox();
+      expect(footer!.y + footer!.height).toBeLessThanOrEqual(400);
+      await page.screenshot({ path: test.info().outputPath(`toolbar-help-${theme}.png`) });
+    }
+    await expect.poll(async () => (await items())['zing-toolbar-shortcut'].title).toBe(`打开 zing：${shortcut} · 修改快捷键`);
+    await expect.poll(async () => (await items())['zing-toolbar-help'].title).toBe('使用帮助');
+    await page.getByRole('button', { name: '关闭帮助', exact: true }).last().click();
+    await expect.poll(() => page.isClosed()).toBe(true);
+    async function closeWithKey(key: string) {
+      const help = await openHelp();
+      await expect(help.getByRole('textbox')).toBeFocused();
+      await help.getByRole('textbox').press(key).catch(error => {
+        // The handler closes its own tab before Playwright's key-up completes.
+        if (!help.isClosed() || !String(error).includes('Target page, context or browser has been closed')) throw error;
+      });
+      await expect.poll(() => help.isClosed()).toBe(true);
+      await expect(ui).toHaveURL('chrome://settings/');
+    }
+    await closeWithKey('Escape');
+    await closeWithKey('Backspace');
+    const shortcutsCreated = context.waitForEvent('page');
+    await clickMenu('zing-toolbar-shortcut');
+    const shortcuts = await shortcutsCreated;
+    await expect(shortcuts).toHaveURL('chrome://extensions/shortcuts');
+    await clickMenu('zing-toolbar-shortcut');
+    await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, url: 'chrome://extensions/shortcuts' })).length, source.windowId)).toBe(1);
+    await expect(ui).toHaveURL('chrome://settings/');
+  });
+});
+
+for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale } });
+  test(`Help document entry and return context ${locale}`, async () => {
+    const english = locale === 'en-US';
+    const helpName = english ? 'Help' : '使用帮助';
+    const readName = english ? 'Read Help' : '查看帮助';
+    const input = ui.getByRole('combobox', { name: english ? 'Search commands, tabs, and bookmarks' : '搜索命令、标签页和书签' });
+    const article = ui.getByRole('article', { name: helpName });
+    const helpSearch = ui.getByRole('textbox', { name: english ? 'Search help' : '搜索帮助', exact: true });
+    const originalFooter = await ui.locator('.palette-footer').boundingBox();
+    const shortcut = await worker.evaluate(async () => (await chrome.commands.getAll()).find(command => command.name === 'toggle-palette')!.shortcut!);
+    await expect(ui.locator('.launch-hint')).toHaveCount(0);
+    await input.fill('help');
+    await expect(ui.locator('.launch-hint')).toHaveCount(0);
+    await input.press('Home'); await input.press('Shift+ArrowRight');
+    await input.press('Enter');
+    await expect(helpSearch).toBeFocused();
+    await expect(article.getByRole('heading')).toHaveCount(6);
+    await expect(article).toContainText(shortcut);
+    await helpSearch.fill('cookies');
+    await expect(article.getByRole('heading')).toHaveText(english ? 'View website storage' : '查看网站存储');
+    await expect(article.locator('mark').first()).toContainText(/cookies/i);
+    const headingBox = await article.getByRole('heading').boundingBox();
+    const searchBox = await ui.locator('.help-search').boundingBox();
+    expect(headingBox!.y - (searchBox!.y + searchBox!.height)).toBeLessThanOrEqual(12);
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`help-${locale}-filtered.png`) });
+    await helpSearch.fill(english ? '查看网站存储' : 'view website storage');
+    await expect(article.getByRole('heading')).toHaveCount(1);
+    await helpSearch.fill('135');
+    await expect(article.getByRole('heading')).toHaveText(english ? 'Save and run scripts' : '保存与运行脚本');
+    await helpSearch.fill('zzzz-no-help');
+    await expect(article.getByRole('heading')).toHaveCount(0);
+    await expect(article.getByText(english ? 'No results found' : '没有找到匹配结果')).toBeVisible();
+    await helpSearch.press('Backspace'); await expect(helpSearch).toHaveValue('zzzz-no-hel');
+    await article.getByRole('button', { name: english ? 'Clear search' : '清空搜索' }).click();
+    await expect(helpSearch).toBeFocused(); await expect(helpSearch).toHaveValue('');
+    await helpSearch.press('Tab'); await expect(ui.locator('.help-search .search-dismiss')).toBeFocused();
+    await ui.keyboard.press('Tab'); await expect(article).toBeFocused();
+    await article.press('PageDown');
+    await expect.poll(() => article.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    await article.press('Home'); expect(await article.evaluate(el => el.scrollTop)).toBe(0);
+    await article.press('ArrowDown'); await expect.poll(() => article.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+    await article.press('Home');
+    await article.press('Tab'); await expect(ui.locator('.footer-back')).toBeFocused();
+    await ui.keyboard.press('Shift+Tab'); await expect(article).toBeFocused();
+    await article.press('Escape');
+    await expect(input).toBeFocused(); await expect(input).toHaveValue('help');
+    expect(await input.evaluate(el => [(el as HTMLInputElement).selectionStart, (el as HTMLInputElement).selectionEnd])).toEqual([0, 1]);
+    await expect(ui.locator('.result[aria-selected="true"]')).toContainText(helpName);
+
+    // Mouse entry and footer return use the same document as keyboard search.
+    await ui.locator('.settings-button').click();
+    await expect(ui.locator('.settings-preferences > div').last()).toHaveAttribute('data-setting', 'help');
+    const settingsSearch = ui.getByRole('textbox', { name: english ? 'Search settings' : '搜索设置', exact: true });
+    await settingsSearch.fill(english ? '帮助' : 'help');
+    await expect(ui.locator('[data-setting]')).toHaveCount(1);
+    await ui.getByRole('button', { name: readName }).click();
+    await expect(helpSearch).toBeFocused();
+    await expect(article).toContainText(shortcut);
+    expect((await ui.locator('.palette-footer').boundingBox())!.y).toBe(originalFooter!.y);
+    await ui.locator('.footer-back').click();
+    await expect(settingsSearch).toHaveValue(english ? '帮助' : 'help');
+    await expect(ui.getByRole('button', { name: readName })).toBeFocused();
+    await ui.keyboard.press('Enter'); await expect(helpSearch).toBeFocused();
+    await ui.keyboard.press('Backspace');
+    await expect(ui.getByRole('button', { name: readName })).toBeFocused();
+    await ui.keyboard.press('Escape'); await expect(input).toBeFocused();
+
+    await input.fill('使用说明');
+    await ui.locator('.result').first().click();
+    await expect(helpSearch).toBeFocused();
+    await ui.setViewportSize({ width: 390, height: 400 });
+    await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+    for (const theme of ['light', 'dark']) {
+      await ui.evaluate(async theme => { await chrome.storage.local.set({ preferences: { language: 'system', theme } }); }, theme);
+      await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', theme);
+      expect(await article.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight > el.clientHeight)).toBe(true);
+      const footer = await ui.locator('.palette-footer').boundingBox();
+      expect(footer!.height).toBe(44); expect(footer!.y + footer!.height).toBeLessThanOrEqual(400);
+      await ui.locator('.palette').screenshot({ path: test.info().outputPath(`help-${locale}-${theme}-narrow.png`) });
+    }
+    await ui.locator('.footer-back').click();
+    await expect(input).toBeFocused(); await expect(input).toHaveValue('使用说明');
+    await ui.keyboard.press('Meta+k');
+    await ui.locator('.action-row').first().click();
+    await expect(helpSearch).toBeFocused();
+    await helpSearch.fill('cookie');
+    await ui.locator('.help-search .settings-clear').click();
+    await expect(helpSearch).toBeFocused(); await expect(helpSearch).toHaveValue('');
+    await helpSearch.fill('cookie');
+    await ui.locator('.help-search .search-dismiss').click(); await expect(input).toBeFocused();
+    await expect(ui.locator('.action-menu')).toHaveCount(0);
+  });
+});
+
+test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English settings entries, narrow layout and Chrome hotkey settings', async () => {
   const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
@@ -755,7 +950,7 @@ test.describe(() => {
   await expect(navigation).toHaveAttribute('title', 'Tab moves to the next control; Shift+Tab moves to the previous control.');
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-light.png') });
   // Tab follows visible controls and wraps through the footer back to search.
-  const controls = [header.locator('.search-dismiss'), language, theme, ui.getByRole('button', { name: 'Change in Chrome' }),
+  const controls = [header.locator('.search-dismiss'), language, theme, ui.getByRole('button', { name: 'Read Help' }), ui.getByRole('button', { name: 'Change in Chrome' }),
     ui.getByRole('button', { name: 'Set Up', exact: true }), experiments.getByRole('switch'),
     experiments.getByRole('button', { name: 'Reset Ranking' }), experiments.getByRole('button', { name: 'Manage Scripts' }),
     ui.locator('.footer-back'), settingsSearch];

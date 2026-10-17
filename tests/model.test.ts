@@ -15,8 +15,8 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one index contains tabs, bookmarks and commands; home prioritizes recent tabs', () => {
   const items = entries(data);
-  assert.equal(items.length, 33);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 29);
+  assert.equal(items.length, 34);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 30);
   const home = homeEntries(items);
   assert.deepEqual(home.slice(0, 3).map(entry => entry.kind), ['tab', 'tab', 'tab']);
   assert.ok(home.slice(3).every(entry => entry.kind === 'command' && !entry.danger));
@@ -255,6 +255,7 @@ test('script actions retain the target and allow searching delete in both langua
 test('feature commands are discoverable by intent without changing the empty-search home', () => {
   const items = entries(data);
   for (const [query, id] of [
+    ['help', 'command:help'], ['帮助', 'command:help'], ['使用说明', 'command:help'],
     ['new script', 'command:newScript'], ['新建脚本', 'command:newScript'],
     ['scripts', 'command:scriptLibrary'], ['脚本', 'command:scriptLibrary'], ['管理脚本', 'command:scriptLibrary'],
     ['language', 'command:settings:language'], ['语言', 'command:settings:language'],

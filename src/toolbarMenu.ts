@@ -1,0 +1,65 @@
+import { getPreferences, preferencesReady, subscribePreferences } from './preferences';
+import { t } from './i18n';
+import { openChromePage } from './chromePages';
+
+const shortcutId = 'zing-toolbar-shortcut';
+const helpId = 'zing-toolbar-help';
+const titles = new Map<string, string>();
+let pending = Promise.resolve();
+
+async function setItem(id: string, title: string) {
+  if (titles.get(id) === title) return;
+  const properties = { title, contexts: ['action'] as ['action'] };
+  try { await chrome.contextMenus.update(id, properties); }
+  catch {
+    await new Promise<void>((resolve, reject) => {
+      chrome.contextMenus.create({ id, ...properties }, () => {
+        const error = chrome.runtime.lastError;
+        if (error) reject(new Error(error.message)); else resolve();
+      });
+    });
+  }
+  titles.set(id, title);
+}
+
+export function refreshToolbarMenu(): Promise<void> {
+  pending = pending.then(async () => {
+    await preferencesReady;
+    const commands = await chrome.commands.getAll();
+    const shortcut = commands.find(command => command.name === 'toggle-palette')?.shortcut;
+    await setItem(shortcutId, t('toolbarShortcut', shortcut || t('notAssigned')));
+    await setItem(helpId, t('help'));
+  }).catch(error => { console.warn('zing: unable to update toolbar menu.', error); });
+  return pending;
+}
+
+export function startToolbarMenu() {
+  chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (info.menuItemId !== shortcutId && info.menuItemId !== helpId) return;
+    void (async () => {
+      const windowId = tab?.windowId ?? (await chrome.windows.getCurrent()).id;
+      if (windowId === undefined) throw new Error(t('errorWindow'));
+      if (info.menuItemId === shortcutId) await openChromePage('openExtensionShortcuts', windowId);
+      else await chrome.tabs.create({ windowId, url: chrome.runtime.getURL('help.html') });
+    })().catch(error => { console.warn('zing: unable to open toolbar menu target.', error); });
+    void refreshToolbarMenu();
+  });
+  // Chrome has no action-menu onShown or command-binding change event. Refresh
+  // on browser activity as well as palette snapshots, without polling.
+  chrome.runtime.onInstalled.addListener(() => { void refreshToolbarMenu(); });
+  chrome.runtime.onStartup.addListener(() => { void refreshToolbarMenu(); });
+  chrome.tabs.onActivated.addListener(() => { void refreshToolbarMenu(); });
+  chrome.windows.onFocusChanged.addListener(windowId => {
+    if (windowId !== chrome.windows.WINDOW_ID_NONE) void refreshToolbarMenu();
+  });
+  chrome.tabs.onUpdated.addListener((_id, _change, tab) => {
+    if (tab.url === 'chrome://extensions/shortcuts') void refreshToolbarMenu();
+  });
+  let language = getPreferences().language;
+  subscribePreferences(() => {
+    if (language === getPreferences().language) return;
+    language = getPreferences().language;
+    void refreshToolbarMenu();
+  });
+  void refreshToolbarMenu();
+}

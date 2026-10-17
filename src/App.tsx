@@ -13,7 +13,7 @@ import { ActionMenu } from './ActionMenu';
 import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import {
-  Code, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
+  BookOpen, Code, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
   Layers, LoaderCircle, Pin, Plus, RotateCcw, Puzzle, KeyRound, Download, History, Keyboard,
   Settings2, Search, Volume2, VolumeX, X, PanelTop, AlertCircle,
 } from 'lucide-react';
@@ -26,12 +26,13 @@ import { copyText } from './clipboard';
 import { ScriptRunner } from './ScriptRunner';
 import { ScriptLibrary } from './ScriptLibrary';
 import { Settings } from './Settings';
+import { HelpView } from './HelpView';
 import { HighlightedText } from './HighlightedText';
 import { cancelPaletteContinuation, execute, getSnapshot } from './api';
 import { actionsFor, closeTargets, entries, homeEntries, matchingAlias, search } from './model';
 import type { Entry, IconName, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteState, Execution } from './types';
 
-const icons = { extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
+const icons = { help: BookOpen, extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
   others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, script: Code, edit: Pencil, tuck: ArrowDownToLine };
 function Glyph({ name, size = 18 }: { name: IconName; size?: number }) {
   const Icon = icons[name]; return <Icon size={size} strokeWidth={1.7} aria-hidden="true" />;
@@ -52,6 +53,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const [deleteTarget, setDeleteTarget] = useState<SavedScript | null>(null);
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [data, setData] = useState<Snapshot | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [query, setQuery] = useState(initialState?.query ?? '');
@@ -159,15 +161,15 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
 
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.id, settingsOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  }, [selected?.id, settingsOpen, helpOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
   useLayoutEffect(() => {
-    if (busy || settingsOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
+    if (busy || settingsOpen || helpOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
     if (deleteTarget) { cancelDelete.current?.focus(); return; }
     if (!actionTarget) { input.current?.focus(); input.current?.setSelectionRange(...savedCaret.current); }
-  }, [actionTarget, settingsOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun, recoveryId, groupId, busy]);
+  }, [actionTarget, settingsOpen, helpOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun, recoveryId, groupId, busy]);
 
   function openSettings(section?: SettingsSection) {
-    if (busy || settingsOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
+    if (busy || settingsOpen || helpOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     closeActions(); setSettingsSection(section); setSettingsOpen(true); setError('');
   }
@@ -183,6 +185,10 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   }
   async function run(entry?: Entry) {
     if (!entry || !data || busy) return;
+    if (entry.action === 'help') {
+      if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+      closeActions(); setError(''); setNotice(''); setHelpOpen(true); return;
+    }
     if (entry.action === 'manageGroup') {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       closeActions(); setGroupId(entry.groupId); return;
@@ -260,7 +266,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   }
   function keyboard(event: KeyboardEvent) {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-    if ((scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
+    if ((helpOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
     const modifier = isMac ? event.metaKey : event.ctrlKey;
     if (modifier && !event.altKey && !event.shiftKey && event.key === ',') {
       event.preventDefault(); openSettings(); return;
@@ -325,7 +331,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   return <NavigationRoot><BackLayer onBack={dismiss}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else dismiss(); }
   }}>
-    {groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
+    {helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
       initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
       onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : scriptRun ? <ScriptRunner {...scriptRun} onBack={() => setScriptRun(null)} /> : scriptLibraryOpen ? <ScriptLibrary isMac={isMac} onBack={() => setScriptLibraryOpen(false)} onClose={onClose} /> : scriptEditor ? <ScriptLibrary initialScript={scriptEditor} isMac={isMac} onBack={() => setScriptEditor(null)} onClose={onClose}
       onComplete={message => { setScriptEditor(null); setNotice(message); }} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} isMac={isMac}
