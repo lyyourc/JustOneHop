@@ -4,6 +4,7 @@ import { reloadExtension } from './reloadExtension';
 import { isChromePageAction, openChromePage } from './chromePages';
 import { closeTargets } from './model';
 import { recordUsage } from './usageStorage';
+import { settingsUsageTarget } from './usage';
 import type { BookmarkItem, Execution, HistorySearchResult, Snapshot, TabItem } from './types';
 
 function safeHistoryUrl(value: unknown): value is string {
@@ -139,9 +140,12 @@ async function performAction(payload: Execution): Promise<string> {
   if (isChromePageAction(action)) { await openChromePage(action, windowId); return target(`command:${action}`); }
   if (action === 'openHistoryPage') {
     if (window.incognito || !safeHistoryUrl(payload.url)) throw new Error(t('errorHistorySearch'));
-    await chrome.tabs.create({ windowId, url: payload.url }); return '';
+    await chrome.tabs.create({ windowId, url: payload.url }); return target(`tab:${payload.url}`);
   }
-  if (action === 'settings') return target('command:settings');
+  if (action === 'settings') {
+    if (payload.settingsSection !== undefined && !['language', 'theme', 'keyboard', 'ranking', 'tabs'].includes(payload.settingsSection)) throw new Error(t('errorCommand'));
+    return target(settingsUsageTarget(payload.settingsSection));
+  }
   if (action === 'reloadExtension') return '';
   if (action === 'resumeTuck') { await resumeTuck(windowId, payload.recoveryId!, payload.groupId!, payload.fingerprint!); return ''; }
   if (action === 'forgetTuckRecovery') { await forgetTuckRecovery(payload.recoveryId!); return ''; }

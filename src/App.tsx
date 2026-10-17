@@ -18,7 +18,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalS
 import { LoaderCircle, Search, AlertCircle } from 'lucide-react';
 import { getPreferences, subscribePreferences } from './preferences';
 import { getUsage, subscribeUsage } from './usageState';
-import { commandUsage, queryUsage } from './usage';
+import { commandUsage, queryUsage, rankingInfo, usageTarget, type RankingInfo } from './usage';
 import { StorageView } from './StorageView';
 import { bindingScript, deleteScript, type SavedScript, getScripts, scriptEntries, scriptsReady, subscribeScripts } from './scripts';
 import { copyText } from './clipboard';
@@ -26,7 +26,7 @@ import { ScriptRunner } from './ScriptRunner';
 import { ScriptLibrary } from './ScriptLibrary';
 import { Settings } from './Settings';
 import { HelpView } from './HelpView';
-import { cancelPaletteContinuation, execute, getSnapshot } from './api';
+import { cancelPaletteContinuation, execute, forgetSearchRanking, getSnapshot } from './api';
 import { actionsFor, closeTargets, entries, homeEntries, matchingAlias, search } from './model';
 import type { Entry, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteState, Execution } from './types';
 
@@ -35,6 +35,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
   const scripts = useSyncExternalStore(subscribeScripts, getScripts);
   const [notice, setNotice] = useState('');
+  const [frozenRanking, setFrozenRanking] = useState<{ query: string; scores: ReadonlyMap<string, number> } | null>(null);
   const [groupId, setGroupId] = useState<number | undefined>(initialState?.group?.id);
   const [recoveryId, setRecoveryId] = useState<string>();
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
@@ -69,23 +70,38 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const mod = isMac ? '⌘' : 'Ctrl';
   const items = useMemo(() => data ? [...entries(data), ...scriptEntries(scripts)] : [], [data, preferences.language, scripts]);
   const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
-  const committed = useRef<{ query: string; results: Entry[]; visible: Entry[] }>({ query: '', results: [], visible: [] });
-  const nextResults = useMemo(() => {
-    if (!query.trim()) return homeEntries(items, commandUsage(usage));
-    const local = search(items, query, queryUsage(usage, query));
-    return search(mergeHistoryResults(local, historyEntries(history.outcome.items)), query, queryUsage(usage, query));
-  }, [items, query, usage, history.outcome]);
+  const committed = useRef<{ query: string; results: Entry[]; visible: Entry[]; ranking: Map<string, RankingInfo> }>({ query: '', results: [], visible: [], ranking: new Map() });
+  const liveScores = useMemo(() => query.trim() ? queryUsage(usage, query) : commandUsage(usage), [usage, query]);
+  // Forget preserves only the current query's scores; browser/history candidates remain live.
+  const scores = frozenRanking?.query === query ? frozenRanking.scores : liveScores;
+  const next = useMemo(() => {
+    if (!query.trim()) {
+      const results = homeEntries(items, scores);
+      return { results, baseline: homeEntries(items) };
+    }
+    const candidates = mergeHistoryResults(search(items, query), historyEntries(history.outcome.items));
+    const baseline = search(candidates, query);
+    const results = scores.size ? search(candidates, query, scores) : baseline;
+    return { results, baseline };
+  }, [items, query, scores, history.outcome]);
+  const nextResults = next.results;
+  const nextRanking = useMemo(() => rankingInfo(nextResults, next.baseline, liveScores), [next, liveScores]);
   const nextVisible = query.trim() && data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults.slice(0, 100);
   const results = history.pending ? committed.current.results : nextResults;
   const visible = history.pending ? committed.current.visible : nextVisible;
   const displayQuery = history.pending ? committed.current.query : query;
-  useLayoutEffect(() => { if (!history.pending) committed.current = { query, results: nextResults, visible: nextVisible }; });
+  const ranking = history.pending ? committed.current.ranking : nextRanking;
+  useLayoutEffect(() => { if (!history.pending) committed.current = { query, results: nextResults, visible: nextVisible, ranking: nextRanking }; });
   const resultBusy = busy || history.pending;
   const grouped = !displayQuery.trim();
   const { selected, selection, setSelection } = useResultSelection(visible, displayQuery, data?.currentTabId, initialState?.selection);
   const liveTarget = actionTarget && [...items, ...visible].find(item => item.id === actionTarget.id);
-  const actionItems = useMemo(() => data && liveTarget ? actionsFor(liveTarget, data)
-    .sort((a, b) => Number(a.action.startsWith('close')) - Number(b.action.startsWith('close'))) : [], [data, liveTarget, preferences.language]);
+  const actionItems = useMemo(() => {
+    if (!data || !liveTarget) return [];
+    const actions = actionsFor(liveTarget, data)
+      .sort((a, b) => Number(a.action.startsWith('close')) - Number(b.action.startsWith('close')));
+    return actions;
+  }, [data, liveTarget, preferences.language]);
   const actions = useMemo(() => search(actionItems, actionQuery), [actionItems, actionQuery]);
   const selectedAction = actions.find(item => item.id === actionSelection) || actions[0];
   const loading = !data && !error;
@@ -165,8 +181,13 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   }, []);
 
   useEffect(() => {
+    if (frozenRanking && (frozenRanking.query !== query || settingsOpen || helpOpen || historyOpen || storage || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined)) {
+      setFrozenRanking(null);
+    }
+  }, [frozenRanking, query, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.id, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  }, [selected?.id, nextResults, actionTarget, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
   useLayoutEffect(() => {
     if (busy || settingsOpen || helpOpen || historyOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
     if (deleteTarget) { cancelDelete.current?.focus(); return; }
@@ -188,8 +209,32 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       setActionTarget(selected); setActionQuery(''); setActionSelection(''); setError(''); }
   }
+  async function forget(entry?: Entry) {
+    if (!entry || resultBusy || executing.current || !ranking.get(entry.id)?.learned) return;
+    executing.current = true;
+    savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+    const previousRanking = frozenRanking;
+    setFrozenRanking({ query, scores });
+    setSelection(entry.id); setBusy(true); setError(''); setNotice('');
+    try {
+      await forgetSearchRanking(usageTarget(entry), query.trim() ? query : undefined);
+      setNotice(t('rankingForgotten'));
+    } catch { setFrozenRanking(previousRanking); setError(t('errorForgetRanking')); }
+    finally { executing.current = false; setBusy(false); }
+  }
   async function run(entry?: Entry) {
     if (!entry || !data || resultBusy) return;
+    if (entry.action === 'copyUrl') {
+      if (!entry.url || executing.current) return;
+      const anchor = input.current?.closest('.palette')?.querySelector<HTMLInputElement>('.action-search input') ?? input.current;
+      if (!anchor) return;
+      if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+      executing.current = true; setBusy(true); setError(''); setNotice('');
+      try { await copyText(entry.url, anchor); closeActions(); setNotice(t('urlCopied')); }
+      catch { setError(t('errorCopyUrl')); }
+      finally { executing.current = false; setBusy(false); }
+      return;
+    }
     if (entry.action === 'searchAllHistory') {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       closeActions(); setError(''); setHistoryOpen(true); return;
@@ -244,7 +289,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
         tabId: tab.id, windowId: data.windowId, expectedUrl: tab.url, query: learningQuery ?? '' });
       return;
     }
-    const execution = { action: entry.action, tabId: entry.tabId, bookmarkId: entry.bookmarkId, url: entry.url, windowId: data.windowId, query: learningQuery };
+    const execution = { action: entry.action, settingsSection: entry.settingsSection, tabId: entry.tabId, bookmarkId: entry.bookmarkId, url: entry.url, windowId: data.windowId, query: learningQuery };
     if (entry.action === 'settings') { openSettings(entry.settingsSection); void execute(execution).catch(() => {}); return; }
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     setBusy(true); setError(''); setNotice('');
@@ -285,6 +330,11 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
       event.preventDefault(); toggleActions(); return;
     }
     if (resultBusy && event.key !== 'Tab') return;
+    if (!storage && !actionTarget && event.key === 'Backspace' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && selected && ranking.get(selected.id)?.learned) {
+      event.preventDefault(); event.stopPropagation();
+      if (!event.repeat) void forget(selected);
+      return;
+    }
     const pool = actionTarget ? actions : visible;
     const current = actionTarget ? selectedAction : selected;
     const setter = actionTarget ? setActionSelection : setSelection;
@@ -312,6 +362,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
         next = Math.max(0, Math.min(pool.length - 1, index + delta * step));
       }
       setter(pool[next].id);
+      if ((event.target as HTMLElement).closest('.ranking-forget')) input.current?.focus();
     } else if (event.key === 'Enter') {
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.repeat) { event.preventDefault(); return; }
       if ((event.target as HTMLElement).tagName === 'BUTTON') return;
@@ -363,7 +414,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
           {data && !history.pending && !visible.length ? <div className="empty"><Search size={30} /><strong>{t('noResults')}</strong>
             <p>{t('noResultsHint')}</p></div> : null}
           {visible.map((item, index) => <div className={`result-group ${grouped && index > 0 && item.kind !== visible[index - 1].kind ? 'section-start' : ''}`} key={item.id}>
-            <SearchResultItem entry={item} query={displayQuery} isMac={isMac} showKind={!grouped} suppressTabShortcuts={mode === 'popup'} id={`zing-${item.id}`} selected={!history.pending && selected?.id === item.id}
+            <SearchResultItem entry={item} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} showKind={!grouped} suppressTabShortcuts={mode === 'popup'} id={`zing-${item.id}`} selected={!history.pending && selected?.id === item.id}
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();

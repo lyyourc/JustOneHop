@@ -229,7 +229,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||
     item.title.includes(term) || termMatches(item.title, term).length > 0 || item.aliases.some(alias =>
       termMatches(alias, term, !pinyinAliases.has(alias)).length > 0)))
-    .map(result => ({ ...result, tier: tier(result.item), usage: result.item.kind === 'history' ? 0 : usageScores.get(usageTarget(items[result.refIndex])) || 0,
+    .map(result => ({ ...result, tier: tier(result.item), usage: usageScores.get(usageTarget(items[result.refIndex])) || 0,
       // More aliases should improve discovery, not multiply a command's rank.
       nameLength: result.item.kind === 'command'
         ? Math.min(Infinity, ...result.item.names.filter(name => terms.every(term => name.includes(term))).map(name => name.length)) : Infinity,
@@ -246,6 +246,15 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     .map(result => items[result.refIndex]);
 }
 
+export function copyUrlAction(entry: Entry): Entry | undefined {
+  if (!entry.url || !['tab', 'bookmark', 'history'].includes(entry.kind)) return undefined;
+  return {
+    id: `${entry.id}:copyUrl`, kind: 'command', action: 'copyUrl', icon: 'copy',
+    title: t('copyUrl'), subtitle: '', keywords: 'copy url link address 复制 链接 网址 地址',
+    url: entry.url, tabId: entry.tabId, bookmarkId: entry.bookmarkId,
+  };
+}
+
 export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
   if (entry.kind === 'script') {
     const builtin = entry.scriptId === 'builtin-ctrl-tab';
@@ -259,12 +268,14 @@ export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
       ...(!builtin ? [{ ...entry, id: `${entry.id}:delete`, action: 'deleteScript' as const, icon: 'close' as const, title: t('deleteScript'), subtitle: '', keywords: 'delete remove 删除', danger: true }] : []),
     ];
   }
-  if (entry.kind === 'history') return [{ ...entry, title: t('openHistoryPage'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }];
   if (entry.kind === 'command') return [entry];
-  if (entry.kind === 'bookmark') return [{ ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }];
+  const copy = copyUrlAction(entry);
+  const copyActions = copy ? [copy] : [];
+  if (entry.kind === 'history') return [{ ...entry, title: t('openHistoryPage'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }, ...copyActions];
+  if (entry.kind === 'bookmark') return [{ ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }, ...copyActions];
   const tab = snapshot.tabs.find(item => item.id === entry.tabId);
   const available = commands(tab).filter(command => ['close', 'pin', 'mute', 'reload', 'closeOthers', 'closeRight', 'tuck'].includes(command.action));
-  return [{ ...entry, title: t('switchTab'), subtitle: entry.title, keywords: `${entry.keywords} switch tab 切换标签页` }, ...available.map(command => ({
+  return [{ ...entry, title: t('switchTab'), subtitle: entry.title, keywords: `${entry.keywords} switch tab 切换标签页` }, ...copyActions, ...available.map(command => ({
     ...command, shortcut: tab?.id === snapshot.currentTabId ? command.shortcut : undefined, title: command.title.replace(t('current'), ''), id: `action:${command.action}`, tabId: entry.tabId,
   }))];
 }

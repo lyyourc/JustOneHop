@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { actionsFor, closeTargets, entries, homeEntries, search } from '../src/model.ts';
 import type { Snapshot, TabItem } from '../src/types.ts';
 import { entryTitle } from '../src/entryPresentation.ts';
+import { usageTarget } from '../src/usage.ts';
 
 const tab = (id: number, index: number, pinned = false, windowId = 1): TabItem => ({
   id, index, windowId, pinned, title: `Page ${id}`, url: `https://example.com/${id}`,
@@ -79,7 +80,29 @@ test('search finds bookmark folders and URLs', () => {
 test('actions target the selected tab, not the active tab', () => {
   const selected = entries(data).find(entry => entry.tabId === 3)!;
   assert.ok(actionsFor(selected, data).every(action => action.tabId === 3));
-  assert.equal(actionsFor(selected, data).length, 7);
+  assert.equal(actionsFor(selected, data).length, 8);
+});
+test('URL actions preserve the selected URL and never inherit shortcuts or learning identity', () => {
+  const snapshot = { ...data, tabs: [{ ...tab(3, 0), url: 'chrome://settings/content?search=test#cookies' }],
+    bookmarks: [{ id: 'url', title: 'Docs', url: 'https://example.com/docs?q=one%20two#section', folder: 'Folder' }] };
+  const targets = entries(snapshot).filter(entry => entry.kind === 'tab' || entry.kind === 'bookmark');
+  for (const entry of targets) {
+    const actions = actionsFor({ ...entry, shortcut: 'Mod+W' }, snapshot);
+    const copy = actions.find(action => action.action === 'copyUrl')!;
+    assert.ok(copy);
+    assert.equal(copy.url, entry.url);
+    assert.notEqual(copy.url, entry.subtitle);
+    assert.equal(copy.icon, 'copy');
+    assert.equal(copy.shortcut, undefined);
+    assert.equal(usageTarget(copy), '');
+    assert.equal(new Set(actions.map(action => action.id)).size, actions.length);
+    for (const query of ['copy URL', 'copy link', '复制', '网址', '链接']) {
+      assert.equal(search(actions, query)[0]?.action, 'copyUrl', query);
+    }
+    assert.ok(!actionsFor({ ...entry, url: undefined }, snapshot).some(action => action.action === 'copyUrl'));
+    assert.ok(!actionsFor({ ...entry, url: '' }, snapshot).some(action => action.action === 'copyUrl'));
+  }
+  assert.ok(!entries(snapshot).some(entry => entry.action === 'copyUrl'));
 });
 test('close others protects pinned tabs and other windows', () => {
   const tabs = [...data.tabs, tab(4, 2, false, 2)];

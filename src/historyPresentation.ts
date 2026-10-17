@@ -17,6 +17,6 @@ export function historySearchEntry(outcome: HistoryQueryOutcome, query = ''): En
 /** A navigation action has a stable slot, independent of relevance and learned ranking. */
 export function insertHistorySearch(results: Entry[], entry: Entry, query = ''): Entry[] {
   const visible = results.slice(0, 99);
-  visible.splice(isHistorySearchIntent(query) ? 0 : Math.min(4, visible.length), 0, entry);
+  visible.splice(isHistorySearchIntent(query) ? 0 : Math.min(6, visible.length), 0, entry);
   return visible;
 }

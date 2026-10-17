@@ -44,6 +44,7 @@ export interface PaletteState {
 export interface Execution {
   paletteState?: PaletteState;
   action: ActionId | 'settings';
+  settingsSection?: SettingsSection;
   windowId: number;
   tabId?: number;
   bookmarkId?: string;
@@ -78,9 +79,10 @@ export type Request =
   | { source: 'zing'; type: 'open-cookie-access'; payload: CookieAccessRequest }
   | { source: 'zing'; type: 'open-shortcuts' }
   | { source: 'zing'; type: 'reset-usage' }
+  | { source: 'zing'; type: 'forget-usage'; payload: { target: string; query?: string } }
   | { source: 'zing'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
-export type IconName = 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
+export type IconName = 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
 export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'ranking' | 'tabs';
 export interface Entry {
   category?: 'tabGroup' | 'tab' | 'script' | 'storage' | 'settings' | 'chromePages' | 'zing';
@@ -94,7 +96,7 @@ export interface Entry {
   subtitle: string;
   keywords: string;
   icon: IconName;
-  action: ActionId | 'settings' | 'help' | 'searchAllHistory' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
+  action: ActionId | 'copyUrl' | 'settings' | 'help' | 'searchAllHistory' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
   settingsSection?: SettingsSection;
   recoveryId?: string;
   groupId?: number;

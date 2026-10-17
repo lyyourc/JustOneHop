@@ -8,7 +8,7 @@ import { errorMessage, t } from './i18n';
 import { openChromePage } from './chromePages';
 import { historyWindow, searchHistory, snapshot } from './browser';
 import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
-import { resetUsage } from './usageStorage';
+import { forgetUsage, resetUsage } from './usageStorage';
 import type { Request, Snapshot, PageStorage, ScriptResult, PaletteState, HistorySearchResult } from './types';
 
 const opening = new Set<number>();
@@ -48,7 +48,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 });
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'zing') return;
-  if (!['run-saved-script', 'open-script-settings', 'snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
+  if (!['run-saved-script', 'open-script-settings', 'snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
   // Register before any await so a dismissal arriving during preflight also
   // cancels this caller's continuation, without cancelling its browser action.
   const ticket = request.type === 'execute' && request.payload?.paletteState && ['close', 'closeOthers', 'closeRight'].includes(request.payload.action)
@@ -78,6 +78,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
       return performWithPaletteContinuation(request.payload, sender, () => success(), ticket);
     }
     if (request.type === 'reset-usage') return resetUsage();
+    if (request.type === 'forget-usage') return forgetUsage(request.payload?.target, request.payload?.query);
     const windowId = sender.tab?.windowId ?? (await chrome.windows.getCurrent()).id;
     if (windowId === undefined) throw new Error(t('errorWindow'));
     return openChromePage('openExtensionShortcuts', windowId);

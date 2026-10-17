@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addUsage, commandUsage, normalizeUsage, queryUsage, usageTarget } from '../src/usage.ts';
+import { addUsage, commandUsage, normalizeUsage, queryUsage, rankingInfo, usageTarget } from '../src/usage.ts';
 import { entries, homeEntries, search } from '../src/model.ts';
 
 const now = 1_800_000_000_000;
@@ -116,5 +116,6 @@ test('learned choices move ahead within the same relevance tier and query while 
   assert.equal(search(items, 'new tab', new Map([['tab:chrome://newtab/', 100]]))[0].action, 'newTab');
   const restored = { ...items[0], id: 'tab:99', tabId: 99 };
   assert.equal(usageTarget(restored), target); // Browser restart changes tab IDs, not the learned URL.
-  assert.equal(usageTarget({ ...restored, keywords: 'https://auth.example/Other' }) === target, false);
+  assert.equal(usageTarget({ ...restored, url: 'https://auth.example/Other' }) === target, false);
+  assert.equal(usageTarget({ ...restored, keywords: `${restored.url} tucked away 已收起 switch tab 切换标签页` }), target);
 });

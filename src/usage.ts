@@ -1,4 +1,4 @@
-import type { Entry } from './types';
+import type { Entry, SettingsSection } from './types';
 
 /** Local selections; an empty query represents commands run without a search. */
 export interface UsageRecord { query: string; target: string; weight: number; lastUsed: number }
@@ -9,10 +9,29 @@ const MAX_RECORDS = 500;
 
 export const usageQuery = (query: string) => query.trim().toLowerCase().replace(/\s+/g, ' ');
 
+export const settingsUsageTarget = (section?: SettingsSection): string => section ? `command:settings:${section}` : 'command:settings';
+
 export function usageTarget(entry: Entry): string {
-  if (entry.kind === 'tab') return `tab:${entry.keywords}`;
-  if (entry.kind === 'bookmark') return `bookmark:${entry.bookmarkId}`;
+  if (entry.action === 'copyUrl') return '';
+  // History becomes an open tab after selection; keep its preference across that transition.
+  if (entry.kind === 'tab' || entry.kind === 'history') return entry.url ? `tab:${entry.url}` : '';
+  if (entry.kind === 'bookmark') return entry.bookmarkId ? `bookmark:${entry.bookmarkId}` : '';
+  if (entry.kind !== 'command') return '';
+  if (entry.action === 'settings') return settingsUsageTarget(entry.settingsSection);
+  // Only actions with a successful-execution recording path can learn.
+  if (['help', 'manageGroup', 'reviewTuck', 'runScript', 'runCopyScript', 'newScript', 'scriptLibrary', 'reloadExtension', 'searchAllHistory'].includes(entry.action)) return '';
   return `command:${entry.action}`;
+}
+
+export interface RankingInfo { learned: boolean; promoted: boolean }
+
+/** Compare the same candidates with and without habits, before truncation or fixed entries. */
+export function rankingInfo(ranked: Entry[], baseline: Entry[], scores: ReadonlyMap<string, number>): Map<string, RankingInfo> {
+  const positions = new Map(baseline.map((entry, index) => [entry.id, index]));
+  return new Map(ranked.map((entry, index) => {
+    const learned = (scores.get(usageTarget(entry)) || 0) > 0;
+    return [entry.id, { learned, promoted: learned && index < (positions.get(entry.id) ?? index) }];
+  }));
 }
 
 export function usageWeight(record: UsageRecord, now = Date.now()): number {

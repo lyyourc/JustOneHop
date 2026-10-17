@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { searchHistory } from '../src/api.ts';
 import { historyEntries, mergeHistoryResults } from '../src/historySearch.ts';
 import { actionsFor, entries, search } from '../src/model.ts';
+import { addUsage, queryUsage, rankingInfo, usageTarget } from '../src/usage.ts';
 import type { HistoryPage, Snapshot } from '../src/types.ts';
 
 const page = (id: string, title: string, url: string, lastVisitTime = 100): HistoryPage => ({ id, title, url, lastVisitTime });
@@ -12,7 +13,7 @@ const snapshot: Snapshot = {
   bookmarks: [{ id: 'book', title: 'Guide', url: 'https://book.example/', folder: '' }],
 };
 
-test('history entries carry only opening data and expose only the open action', () => {
+test('history entries offer opening and copying the complete URL', () => {
   const [entry] = historyEntries([page('42', 'Old guide', 'https://example.com/docs?q=one#two', 345)]);
   assert.equal(entry.id, 'history:42');
   assert.equal(entry.kind, 'history');
@@ -22,8 +23,10 @@ test('history entries carry only opening data and expose only the open action', 
   assert.equal(entry.keywords, entry.url);
   assert.equal(entry.lastVisitTime, 345);
   assert.equal(entry.subtitle, 'example.com/docs');
-  assert.deepEqual(actionsFor(entry, snapshot).map(action => action.action), ['openHistoryPage']);
-  assert.equal(actionsFor(entry, snapshot)[0].url, entry.url);
+  const actions = actionsFor(entry, snapshot);
+  assert.deepEqual(actions.map(action => action.action), ['openHistoryPage', 'copyUrl']);
+  assert.deepEqual(actions.map(action => action.url), ['https://example.com/docs?q=one#two', 'https://example.com/docs?q=one#two']);
+  assert.equal(usageTarget(actions[1]), '');
 });
 
 test('history joins title, domain and exact URL metadata relevance tiers', () => {
@@ -42,13 +45,36 @@ test('history joins title, domain and exact URL metadata relevance tiers', () =>
   assert.equal(search(historyEntries([page('hash', 'Other', 'https://example.com/#section')]), 'section')[0]?.id, 'history:hash');
 });
 
-test('history respects relevance before kind, falls behind matching tabs/bookmarks within a tier, and never gains usage weight', () => {
+test('history respects relevance and default source order while URL preferences can reorder same-tier results', () => {
   const history = historyEntries([page('new', 'Guide', 'https://new.example/', 200), page('old', 'Guide', 'https://old.example/', 100)]);
   const base = entries(snapshot).filter(entry => entry.kind === 'tab' || entry.kind === 'bookmark');
   const learned = new Map([['command:openHistoryPage', 1e9], ['history:new', 1e9], ['history:old', 1e12]]);
   assert.deepEqual(search([...history, ...base], 'guide', learned).map(item => item.id), ['tab:1', 'bookmark:book', 'history:new', 'history:old']);
+  const scores = new Map([['tab:https://old.example/', 1]]);
+  assert.deepEqual(search([...history, ...base], 'guide', scores).map(item => item.id), ['history:old', 'tab:1', 'bookmark:book', 'history:new']);
   const weakerTab = { ...base[0], title: 'Guide reference' };
   assert.deepEqual(search([weakerTab, history[0]], 'guide', new Map([[`tab:${weakerTab.keywords}`, 1e9]])).map(item => item.id), ['history:new', 'tab:1']);
+});
+
+test('c2c-web history selection beats newer same-tier history and survives opening as a tab', () => {
+  const now = Date.now();
+  const history = historyEntries([
+    page('recent', 'Project', 'https://other.example/c2c-web', now),
+    page('selected', 'Project', 'https://g.echo.tech/c2c-web', now - 1000),
+  ]);
+  const scores = queryUsage(addUsage([], 'c2c-web', usageTarget(history[1]), now), 'c2c-web', now);
+  const baseline = search(history, 'c2c-web');
+  assert.equal(baseline[0].id, 'history:recent');
+  const ranked = search(history, 'c2c-web', scores);
+  assert.equal(ranked[0].id, 'history:selected');
+  assert.deepEqual(rankingInfo(ranked, baseline, scores).get('history:selected'), { learned: true, promoted: true });
+  const tab = entries({ ...snapshot, bookmarks: [], tabs: [{ ...snapshot.tabs[0], title: 'Project', url: 'https://g.echo.tech/c2c-web' }] })[0];
+  assert.equal(usageTarget(tab), usageTarget(history[1]));
+  assert.equal(search(mergeHistoryResults([tab], history), 'c2c-web', scores)[0].id, tab.id);
+  assert.equal(search(history, 'c2c-web', new Map())[0].id, 'history:recent');
+  const exact = historyEntries([page('exact', 'c2c-web', 'https://exact.example/', now)]);
+  assert.equal(search([...history, ...exact], 'c2c-web', scores)[0].id, 'history:exact');
+  assert.notEqual(usageTarget({ ...history[1], url: `${history[1].url}?q=other` }), usageTarget(history[1]));
 });
 
 test('history recency breaks same-tier ties before incidental Fuse scores', () => {

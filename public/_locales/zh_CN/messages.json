@@ -232,7 +232,7 @@
   "helpStartTitle": { "message": "打开与搜索" },
   "toolbarShortcut": { "message": "打开 zing：$1 · 修改快捷键" },
   "helpStartBody": { "message": "点击工具栏的 zing 图标，或按启动快捷键打开面板（当前：$1）。可在「设置 → 键盘」中修改快捷键，或右键工具栏图标修改绑定、在新标签页打开本帮助。" },
-  "helpSearchBody": { "message": "直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「脚本」「主题」「下载」。 最近一周的浏览历史也参与搜索。「搜索全部历史」位于第 5 条，结果较少时放末尾，可继续搜索全部时间；历史查询较慢时先显示其他结果，迟到的历史不再插入。" },
+  "helpSearchBody": { "message": "直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「脚本」「主题」「下载」。最近一周的浏览历史也参与搜索。「搜索全部历史」位于第 7 条，结果较少时放末尾，可继续搜索全部时间；历史查询较慢时先显示其他结果，迟到的历史不再插入。成功打开的历史结果与相同网站地址的标签页共用偏好。主搜索与全部历史子页均只在同词同相关性等级内按习惯排序，有偏好记录时显示历史图标。悬停或聚焦图标可查看原因和删除范围，点击即可忘记，也可按 Shift+Backspace 忘记选中项。忘记对历史与标签页共同生效。" },
   "helpControlsTitle": { "message": "更多操作与返回" },
   "helpControlsBody": { "message": "右键点击结果、点击底栏「操作」或按 Cmd/Ctrl+K，可打开针对当前选中项的操作菜单。除方向键外，列表也支持 Ctrl+P / Ctrl+N 上下选择。" },
   "helpBackBody": { "message": "按 Esc、点击返回箭头，或在二级页的空搜索框中按 Backspace，均逐层返回并恢复原搜索与选中项；在主搜索层按 Esc 关闭面板。" },
@@ -247,7 +247,7 @@
   "helpQuestionsTitle": { "message": "常见问题" },
   "helpShortcutBody": { "message": "若快捷键未生效或存在冲突，可在「设置 → 键盘」中前往 Chrome 扩展快捷键页修改。由于浏览器限制，Ctrl+Tab 需手动配置，搜索「ctrl tab」即可查看配置代码与步骤。" },
   "helpWindowBody": { "message": "zing 在普通网页中以页面浮层打开；在 Chrome 内置页、扩展商店等受限页面或地址栏聚焦时，会自动切换为独立面板或工具栏弹窗。" },
-  "helpPrivacyBody": { "message": "zing 无账号、服务端或遥测。设置偏好、保存的脚本与搜索习惯仅保存在本机；网站存储值与脚本结果仅保留在当前面板内存中。 浏览历史权限在安装时申请；zing 只读取、不持久保存历史副本，无痕窗口不搜索普通浏览历史。" },
+  "helpPrivacyBody": { "message": "zing 无账号、服务端或遥测。设置偏好、保存的脚本与搜索习惯仅保存在本机；网站存储值与脚本结果仅保留在当前面板内存中。浏览历史权限在安装时申请；zing 不持久复制历史库，仅记住你显式选择并成功打开的搜索词与网站地址。读取历史本身和打开失败均不记录。无痕窗口不读取普通历史，也不记录选择。" },
   "settings": {
     "message": "设置"
   },
@@ -339,7 +339,7 @@
     "message": "搜索排序"
   },
   "searchRankingHint": {
-    "message": "根据本机使用习惯，优先展示常用命令与高频搜索结果。"
+    "message": "同一搜索词下，习惯只调整同级结果。悬停历史图标查看原因，点击即可忘记偏好。"
   },
   "resetSearchRanking": {
     "message": "重置搜索排序"
@@ -347,6 +347,12 @@
   "rankingReset": {
     "message": "已重置使用偏好，恢复默认排序。"
   },
+  "rankingPromotedHint": { "message": "按使用习惯前移。" },
+  "rankingRecordedHint": { "message": "已记住偏好，位置未变。" },
+  "forgetQueryRanking": { "message": "忘记此搜索词的偏好" },
+  "forgetCommandRanking": { "message": "忘记此命令的偏好" },
+  "rankingForgotten": { "message": "已忘记排序偏好。" },
+  "errorForgetRanking": { "message": "未能忘记此偏好，请重试。" },
   "navigate": {
     "message": "选择"
   },
@@ -392,6 +398,9 @@
   "refreshStorage": {
     "message": "刷新"
   },
+  "copyUrl": { "message": "复制 URL" },
+  "urlCopied": { "message": "已复制 URL" },
+  "errorCopyUrl": { "message": "未能复制 URL，请重试。" },
   "copiedValue": {
     "message": "已复制值"
   },

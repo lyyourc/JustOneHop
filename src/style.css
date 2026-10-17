@@ -90,7 +90,7 @@
 .entry-meta { display: flex; gap: 6px; align-items: center; color: var(--muted); margin-left: 6px; }
 .kind-label { font-size: 11px; white-space: nowrap; }
 .history-metadata time { font-variant-numeric: tabular-nums; }
-.current-badge { font-size: 11px; font-weight: 500; padding: 2px 8px; background: var(--icon-well); color: var(--muted); border-radius: 999px; }
+.current-badge { font-size: 11px; font-weight: 400; white-space: nowrap; color: var(--muted); }
 .tucked-badge { font-size: 11px; white-space: nowrap; color: var(--muted); }
 
 .footer { position: relative; z-index: 4; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: var(--footer); border-top: 1px solid var(--line); }
@@ -140,6 +140,15 @@
 .action-scrim { position: absolute; inset: 0 0 44px; z-index: 1; cursor: default !important; }
 .action-menu { position: absolute; z-index: 3; bottom: 51px; right: 10px; width: min(320px, calc(100% - 20px)); max-height: calc(100% - 62px); display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--raised); box-shadow: 0 14px 40px rgb(32 33 36 / .22), 0 3px 10px rgb(32 33 36 / .08); animation: zing-actions 95ms cubic-bezier(.16, 1, .3, 1) both; overflow: hidden; }
 .action-heading, .action-search { flex-shrink: 0; }
+.ranking-forget { width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center; border-radius: 6px; }
+.ranking-forget:hover, .ranking-forget:focus-visible { background: var(--key); color: var(--text); }
+.ranking-forget .ranking-remove-icon { display: none; }
+.ranking-forget:hover .ranking-history-icon, .ranking-forget:focus-visible .ranking-history-icon { display: none; }
+.ranking-forget:hover .ranking-remove-icon, .ranking-forget:focus-visible .ranking-remove-icon { display: inline-block; }
+.ranking-tooltip { position: fixed; inset: auto; margin: 0; width: max-content; max-width: min(340px, calc(100vw - 16px)); padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--raised); color: var(--text); box-shadow: 0 4px 16px rgb(0 0 0 / .18); font-size: 11px; font-weight: 400; line-height: 1.5; text-align: left; white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
+.ranking-tooltip:popover-open { display: flex; flex-direction: column; gap: 6px; }
+.ranking-tooltip-action { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; font-weight: 500; }
+.ranking-tooltip-action kbd { font-size: 10px; }
 @keyframes zing-actions { from { opacity: 0; transform: translateY(4px) scale(.985); } to { opacity: 1; transform: none; } }
 .action-heading { display: flex; align-items: center; gap: 8px; margin: 12px 14px 8px; color: var(--muted); font-size: 11px; font-weight: 500; }
 .action-heading > span:last-child { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }

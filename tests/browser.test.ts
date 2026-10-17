@@ -1,7 +1,8 @@
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { historyWindow, perform, searchHistory, snapshot } from '../src/browser.ts';
-import { type UsageRecord, USAGE_STORAGE_KEY } from '../src/usage.ts';
+import { queryUsage, rankingInfo, type UsageRecord, USAGE_STORAGE_KEY } from '../src/usage.ts';
+import { entries, search } from '../src/model.ts';
 
 let calls: [string, ...unknown[]][];
 let tabs: chrome.tabs.Tab[];
@@ -104,9 +105,19 @@ test('history rejects incognito, inactive and vanished source contexts', async (
   assert.deepEqual(calls, []);
 });
 
-test('history opens a new tab in the validated window without learning its URL or query', async () => {
-  await perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/?q=one#two', query: 'private query' });
-  assert.deepEqual(calls, [['create', { windowId: 10, url: 'https://example.com/?q=one#two' }]]);
+test('successful history selections learn the query and share the full URL identity with tabs', async () => {
+  await perform({ action: 'openHistoryPage', windowId: 10, url: 'https://g.echo.tech/c2c-web?q=one#two', query: ' C2C-web ' });
+  assert.deepEqual(calls, [['create', { windowId: 10, url: 'https://g.echo.tech/c2c-web?q=one#two' }]]);
+  assert.equal(usage.length, 1);
+  assert.equal(usage[0].query, 'c2c-web');
+  assert.equal(usage[0].target, 'tab:https://g.echo.tech/c2c-web?q=one#two');
+  assert.equal(usage[0].weight, 1);
+});
+
+test('history failures and blank queries do not create preferences', async () => {
+  await perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/', query: ' ' });
+  chrome.tabs.create = async () => { throw new Error('Cannot create tab'); };
+  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/', query: 'example' }));
   assert.deepEqual(usage, []);
 });
 
@@ -272,6 +283,74 @@ test('only successful actions learn; tab identities use their live URL', async (
   assert.ok(usage.some(record => record.target === 'bookmark:b'));
   await perform({ action: 'settings', windowId: 10, query: 'language' });
   assert.ok(usage.some(record => record.target === 'command:settings'));
+});
+
+test('searching zed again after switching tabs retains its learned marker, including the now active tab', async () => {
+  Object.assign(tabs[0], { title: 'Zed', url: 'https://zed.example/' });
+  chrome.tabs.update = (async (id: number, changes: chrome.tabs.UpdateProperties) => {
+    calls.push(['update', id, changes]);
+    const selected = tabs.find(tab => tab.id === id)!;
+    if (changes.active) for (const tab of tabs.filter(tab => tab.windowId === selected.windowId)) tab.active = tab.id === id;
+    return { ...selected };
+  }) as typeof chrome.tabs.update;
+  const selected = search(entries(await snapshot(tabs[1])), 'zed')[0];
+  assert.equal(selected.tabId, 1);
+  assert.equal(selected.action, 'switch');
+  await perform({ action: 'switch', tabId: selected.tabId, url: selected.url, windowId: 10, query: 'zed' });
+  assert.equal(tabs[0].active, true);
+  assert.equal(tabs[1].active, false);
+  assert.deepEqual(usage.map(({ query, target, weight }) => ({ query, target, weight })),
+    [{ query: 'zed', target: 'tab:https://zed.example/', weight: 1 }]);
+
+  const reopened = entries(await snapshot(tabs[0]));
+  const scores = queryUsage(usage, 'zed');
+  const baseline = search(reopened, 'zed');
+  const ranked = search(reopened, 'zed', scores);
+  assert.equal(ranked[0].tabId, 1);
+  assert.equal(ranked[0].active, true);
+  // A sole result still displays a learned marker even when its position cannot improve.
+  assert.deepEqual(rankingInfo(ranked, baseline, scores).get('tab:1'), { learned: true, promoted: false });
+});
+
+test('settings sections learn independently and preserve the generic settings target', async () => {
+  for (const settingsSection of ['language', 'theme', 'keyboard', 'ranking', 'tabs'] as const) {
+    await perform({ action: 'settings', windowId: 10, settingsSection, query: ' Preferences ' });
+    await perform({ action: 'settings', windowId: 10, settingsSection });
+  }
+  await perform({ action: 'settings', windowId: 10, query: 'preferences' });
+  await perform({ action: 'settings', windowId: 10 });
+  assert.equal(usage.length, 12);
+  for (const target of ['command:settings', 'command:settings:language', 'command:settings:theme', 'command:settings:keyboard', 'command:settings:ranking', 'command:settings:tabs']) {
+    assert.deepEqual(usage.filter(record => record.target === target).map(({ query, weight }) => ({ query, weight }))
+      .sort((a, b) => a.query.localeCompare(b.query)), [{ query: '', weight: 1 }, { query: 'preferences', weight: 1 }]);
+  }
+  assert.deepEqual(calls, []);
+});
+
+test('settings reject unknown sections at runtime without recording or acknowledging success', async () => {
+  let acknowledged = false;
+  for (const settingsSection of ['', 'Language', 'unknown', null, 42, false, [], {}, ['theme']]) {
+    await assert.rejects(perform({ action: 'settings', windowId: 10, settingsSection } as never,
+      () => { acknowledged = true; }), /Unsupported/);
+  }
+  assert.equal(acknowledged, false);
+  assert.deepEqual(usage, []);
+  assert.deepEqual(calls, []);
+});
+
+test('settings do not learn in private or unavailable windows', async () => {
+  chrome.windows.get = async () => ({ id: 10, incognito: true }) as chrome.windows.Window;
+  await perform({ action: 'settings', windowId: 10, settingsSection: 'theme', query: 'theme' });
+  await perform({ action: 'settings', windowId: 10 });
+  chrome.windows.get = async () => { throw new Error('No window'); };
+  await assert.rejects(perform({ action: 'settings', windowId: 10, settingsSection: 'theme' }), /No window/);
+  assert.deepEqual(usage, []);
+});
+
+test('ranking deletion cannot execute or train through perform', async () => {
+  await assert.rejects(perform({ action: 'forgetUsage', windowId: 10, tabId: 2 } as never), /Unsupported/);
+  assert.deepEqual(usage, []);
+  assert.deepEqual(calls, []);
 });
 
 test('failed browser operations never train, and failed learning never retries successful actions', async () => {

@@ -28,15 +28,15 @@ test('history failures and timeouts are distinct, including late rejection', asy
   fail(new Error('late'));
   await Promise.resolve();
 });
-test('all-history action occupies fifth slot without exceeding the 100-row display limit', () => {
+test('all-history action occupies seventh slot without exceeding the 100-row display limit', () => {
   const rows = Array.from({ length: 150 }, (_, i) => entry(String(i)));
   const action = entry('all-history');
   const visible = insertHistorySearch(rows, action);
   assert.equal(visible.length, 100);
-  assert.equal(visible[4], action);
+  assert.equal(visible[6], action);
   assert.deepEqual(visible.filter(row => row !== action), rows.slice(0, 99));
   assert.equal(rows.length, 150);
-  for (const count of [0, 1, 3, 4]) {
+  for (const count of [0, 1, 3, 4, 5, 6]) {
     assert.deepEqual(insertHistorySearch(rows.slice(0, count), action), [...rows.slice(0, count), action]);
   }
 });
@@ -54,6 +54,6 @@ test('explicit bilingual history intent promotes the entry without swallowing pa
   for (const query of ['', 'react history', 'history api', '历史论文', 'chrome history']) {
     assert.equal(isHistorySearchIntent(query), false);
     const action = historySearchEntry(outcome, query);
-    assert.equal(insertHistorySearch(rows, action, query)[4], action);
+    assert.equal(insertHistorySearch(rows, action, query)[6], action);
   }
 });
