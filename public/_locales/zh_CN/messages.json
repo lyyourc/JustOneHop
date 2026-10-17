@@ -243,7 +243,7 @@
   "helpScriptsBody": { "message": "搜索「脚本」管理本机保存的 JavaScript：选中可预览并复制代码，从「操作」菜单编辑、新建或删除（Cmd/Ctrl+Enter 保存）。在目标网页直接搜索脚本名称或「运行脚本」，即可显式运行一次；代码最后一个表达式的值（支持 Promise）会显示在当前面板中。脚本不会随网页加载自动执行。" },
   "helpScriptPermissionBody": { "message": "运行脚本需要 Chrome 135+，且仅支持普通 HTTP/HTTPS 网页。首次使用前，请在 Chrome 的 zing 扩展详情中开启「允许用户脚本」（Chrome 135–137 需开启开发者模式）。" },
   "helpStorageTitle": { "message": "查看网站存储" },
-  "helpStorageBody": { "message": "在网页中搜索「local storage」「session storage」或「cookies」，可查看并复制当前页面的存储条目（双击或从「操作」查看格式化详情，不修改数据）。首次读取 Cookie 时只按需申请当前网站域名的访问权限，可随时在 Chrome 扩展设置中撤销。" },
+  "helpStorageBody": { "message": "在网页中搜索「local storage」「session storage」或「cookies」，左侧选择 key，右侧预览 value；Enter 或「复制值」复制原始字符串。JSON 自动格式化预览，不修改数据。首次读取 Cookie 时只按需申请当前网站域名的访问权限，可随时在 Chrome 扩展设置中撤销。" },
   "helpQuestionsTitle": { "message": "常见问题" },
   "helpShortcutBody": { "message": "若快捷键未生效或存在冲突，可在「设置 → 键盘」中前往 Chrome 扩展快捷键页修改。由于浏览器限制，Ctrl+Tab 需手动配置，搜索「ctrl tab」即可查看配置代码与步骤。" },
   "helpWindowBody": { "message": "zing 在普通网页中以页面浮层打开；在 Chrome 内置页、扩展商店等受限页面或地址栏聚焦时，会自动切换为独立面板或工具栏弹窗。" },

@@ -36,9 +36,9 @@ Raycast 的 [A fresh look and feel](https://www.raycast.com/blog/a-fresh-look-an
 
 ## 尺寸与响应式契约
 
-面板统一由 `.palette` 提供含边框的常规 516px 总高与纵向 flex 骨架；网页浮层受可用视口高度约束，独立窗口填满视口。正文以 `flex: 1; min-height: 0` 占满剩余空间并内部滚动，44px 底栏固定且不收缩。列表复用 `.result` 的 40px 行高、26px 图标槽与 `.entry-copy` 单行布局；Storage 名称与值预览并排，完整值仍从详情查看。本次底栏修订保持 516 / 44 / 40 的几何契约；独立窗口的内容区锚点、视口缩小规则与原生边框校准见 [ADR 0010](0010-content-anchor-panel-geometry.md)。Tab Switcher 浮层的 `.recent-overlay .recent-switcher` 改用 `flex: 1; min-height: 0; height: auto` 填满父 `.palette` 可用空间，不再另设 516px 高度／最大高度，避免底栏溢出或删除帮助行后留下底部空白；独立窗口仍使用 `100vh`。
+面板统一由 `.palette` 提供含边框的常规 516px 总高与纵向 flex 骨架；网页浮层受可用视口高度约束，独立窗口填满视口。正文以 `flex: 1; min-height: 0` 占满剩余空间并内部滚动，44px 底栏固定且不收缩。列表复用 `.result` 的 40px 行高、26px 图标槽与 `.entry-copy` 单行布局；Storage 与脚本收藏共享分栏预览布局：左侧 key 列表、右侧完整 value 与实际 Cookie 属性，两个区域各自滚动；单击仅选择，悬停保持预览，Enter 与底栏主操作复制原始值，双击／菜单仍可进入单独详情层。本次底栏修订保持 516 / 44 / 40 的几何契约；独立窗口的内容区锚点、视口缩小规则与原生边框校准见 [ADR 0010](0010-content-anchor-panel-geometry.md)。Tab Switcher 浮层的 `.recent-overlay .recent-switcher` 改用 `flex: 1; min-height: 0; height: auto` 填满父 `.palette` 可用空间，不再另设 516px 高度／最大高度，避免底栏溢出或删除帮助行后留下底部空白；独立窗口仍使用 `100vh`。
 
-脚本收藏的列表与预览各自滚动，共享固定搜索栏与底栏；宽度 ≤520px 时改为列表在上、预览在下，两个区域仍独立滚动并保持可见。共享候选行的高度、图标槽与文字样式不要求收藏列表和全宽运行列表同宽。
+脚本收藏与 Storage 的右侧共用 `ReadOnlyPreview` 组件，直接展示只读内容，下方显示名称／key、内容类型及适用的 Cookie 属性，不在内容上方重复标题或复制说明。信息区高度上限为一半，溢出可滚动；内容保留原生文本选择与滚动。两页的列表和预览复用同一布局样式，各自滚动，共享固定搜索栏与底栏；宽度 ≤520px 时改为列表在上、预览在下，两个区域仍独立滚动并保持可见。共享候选行的高度、图标槽与文字样式不要求收藏列表和全宽运行列表同宽。
 
 底栏在宽度 ≤520px 时仅隐藏补充信息 `.palette-footer-context`，包括主搜索与 Tab Switcher 的导航提示；`status` 不隐藏，复制成功、执行中及危险操作等反馈仍在同一位置替换上下文，必要时可截断。导航按钮、位置名称和右侧操作始终保留；Tab Switcher 把松键提示或进入搜索后的切换器名称放在 `title`，窄屏也保留。按钮不收缩，长名称先于操作控件截断。短暂反馈不另占一行，也不改变底栏高度。
 

@@ -1664,7 +1664,10 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     await expect(surface.locator('.storage-row')).toHaveCount(1);
     const storage = await geometry();
     await surface.locator('.palette-footer').screenshot({ path: test.info().outputPath(`footer-storage-${language}-${size.width}x${size.height}.png`) });
-    for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(storage[key]).toEqual(main[key]);
+    for (const key of ['panel', 'footer', 'search', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(storage[key]).toEqual(main[key]);
+    expect(storage.row.x).toBe(main.row.x); expect(storage.row.y).toBe(main.row.y); expect(storage.row.height).toBe(main.row.height);
+    if (size.width > 520) expect(storage.row.width).toBeLessThan(main.row.width);
+    else expect(storage.row.width).toBe(main.row.width);
     expect(storage.input.x).toBe(main.input.x);
     expect(storage.input.y).toBe(main.input.y);
     await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport();
@@ -1709,6 +1712,8 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await rootInput.fill('local storage'); await rootInput.press('Enter');
   const input = surface.locator('.storage-search input');
   await expect(surface.locator('.storage-row')).toHaveCount(3);
+  await expect(surface.locator('.storage-preview .preview-code')).toHaveValue(JSON.stringify(JSON.parse(raw), null, 2));
+  await expect(surface.locator('.storage-row').first()).not.toContainText(raw);
   await expect(input).toBeFocused();
   await input.press('Control+n');
   await expect(surface.locator('.storage-row[aria-selected="true"]')).toContainText('empty');
@@ -1781,6 +1786,15 @@ test.describe(() => {
   const surface = await openStorageOverlay(page); await surface.locator('.search-bar input').fill('cookie'); await page.keyboard.press('Enter');
   await expect(surface.locator('.storage-row')).toHaveCount(2);
   await expect(surface.locator('.storage-cookie-scope')).toContainText(['/', '/Storage']);
+  await expect(surface.locator('.storage-preview .preview-code')).toHaveValue('root-token');
+  await expect(surface.locator('.storage-preview .preview-info')).toContainText('true / false');
+  await page.setViewportSize({ width: 390, height: 440 });
+  await expect(surface.locator('.storage-preview .preview-code')).toBeInViewport({ ratio: 1 });
+  const info = surface.locator('.storage-preview .preview-info');
+  await info.focus(); await info.press('End');
+  expect(await info.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('storage-cookie-preview-narrow.png') });
+  await surface.locator('.storage-search input').focus();
   await page.keyboard.press('Enter'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('root-token');
   await page.keyboard.press('Meta+k'); await surface.locator('.action-search input').fill('details'); await page.keyboard.press('Enter');
   await expect(surface.locator('.cookie-metadata')).toContainText('true / false');
@@ -1833,12 +1847,12 @@ test.describe(() => {
   await page.evaluate(() => localStorage.setItem('long.value', 'updated-value'));
   await input.press('Meta+k'); await surface.locator('.action-search input').fill('refresh'); await page.keyboard.press('Enter');
   await expect(input).toHaveValue('long');
-  await expect(surface.locator('.storage-row')).toContainText('updated-value');
+  await expect(surface.locator('.storage-preview .preview-code')).toHaveValue('updated-value');
   await expect(input).toBeFocused();
   await input.press('Enter'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('updated-value');
   await input.press('Escape'); await rootInput.fill('session storage'); await rootInput.press('Enter');
   await expect(surface.locator('.storage-row')).toHaveCount(1);
-  await expect(surface.locator('.storage-row')).toContainText('source-session');
+  await expect(surface.locator('.storage-preview .preview-code')).toHaveValue('source-session');
   await input.press('Enter'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('source-session');
   await input.press('Escape'); await rootInput.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
@@ -2568,7 +2582,7 @@ test.describe(() => {
   await ui.keyboard.press('Enter');
   const search = ui.getByRole('combobox', { name: 'Search scripts' });
   const preview = ui.getByRole('region', { name: 'Code Preview', exact: true });
-  const code = preview.locator('.script-preview-code');
+  const code = preview.locator('.preview-code');
   const primary = ui.locator('.palette-footer .primary-action');
   const first = ui.getByRole('option', { name: 'Preview alpha', exact: true });
   const second = ui.getByRole('option', { name: 'Preview beta', exact: true });
@@ -2584,10 +2598,10 @@ test.describe(() => {
   await second.click();
   await expect(second).toHaveAttribute('aria-selected', 'true');
   await expect(code).toHaveValue(beta);
-  await expect(preview.locator('.script-preview-info')).toContainText('Name');
-  await expect(preview.locator('.script-preview-info')).toContainText('Preview beta');
-  await expect(preview.locator('.script-preview-info')).toContainText('Content Type');
-  await expect(preview.locator('.script-preview-info')).toContainText('JavaScript');
+  await expect(preview.locator('.preview-info')).toContainText('Name');
+  await expect(preview.locator('.preview-info')).toContainText('Preview beta');
+  await expect(preview.locator('.preview-info')).toContainText('Content Type');
+  await expect(preview.locator('.preview-info')).toContainText('JavaScript');
   await first.hover(); await second.hover(); await first.hover();
   await expect(second).toHaveAttribute('aria-selected', 'true');
   await expect(code).toHaveValue(beta);
@@ -2630,7 +2644,7 @@ test.describe(() => {
   await search.fill('no matching script');
   await expect(ui.locator('.script-item')).toHaveCount(0);
   await expect(code).toHaveCount(0);
-  await expect(ui.locator('.script-preview-info')).toHaveCount(0);
+  await expect(ui.locator('.preview-info')).toHaveCount(0);
   await expect(primary).toBeDisabled();
   await expect(search).not.toHaveAttribute('aria-activedescendant', /.+/);
   await search.press('Enter');
@@ -3851,7 +3865,7 @@ test.describe(() => {
   await expect(ui.locator('.script-item mark').first()).toHaveText('Polish');
   expect(await ui.locator('.script-list [role=option]').evaluateAll(rows => rows.every(row => (row as HTMLElement).tabIndex === -1))).toBe(true);
   await search.press('Tab'); await expect(ui.locator('.script-search .search-dismiss')).toBeFocused();
-  await ui.keyboard.press('Tab'); await expect(ui.locator('.script-preview-code')).toBeFocused();
+  await ui.keyboard.press('Tab'); await expect(ui.locator('.preview-code')).toBeFocused();
   await ui.keyboard.press('Tab'); await expect(ui.locator('.palette-footer .footer-back')).toBeFocused();
   await search.click();
   await ui.getByRole('option', { name: 'Polish 03', exact: true }).hover();
@@ -3936,17 +3950,27 @@ test.describe(() => {
   test('English interaction polish storage shares menu footer highlighting and focus restoration', async () => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const page = await context.newPage(); await page.goto(`${origin}/Interaction-polish`);
-  await page.evaluate(() => localStorage.setItem('polish.key', 'value'));
+  const raw = JSON.stringify({ lines: Array.from({ length: 120 }, (_, index) => `Value ${index}: 你好`) });
+  await page.evaluate(value => {
+    localStorage.setItem('polish.key', 'value');
+    localStorage.setItem('polish.long', value);
+    for (let index = 0; index < 24; index++) localStorage.setItem(`z.key.${String(index).padStart(2, '0')}`, `${index}`);
+  }, raw);
   const surface = await openStorageOverlay(page);
   await surface.locator('.search-bar input').fill('local storage'); await page.keyboard.press('Enter');
   const search = surface.locator('.storage-search input');
   // A secondary list names its layer at the left of the footer and spends nothing on the ↑↓ hint.
   await expect(surface.locator('.palette-footer .navigation-hint')).toHaveCount(0);
   await expect(surface.locator('.palette-footer-title')).toHaveText('Local Storage');
-  await expect(surface.locator('.storage-row')).toHaveCount(1);
+  await expect(surface.locator('.storage-row')).toHaveCount(26);
   const locationTitle = await surface.locator('.palette-footer-title').boundingBox();
   const contextBox = await surface.locator('.palette-footer-context').boundingBox();
+  await page.evaluate(() => navigator.clipboard.writeText('before selection'));
   await surface.locator('.storage-row').first().click();
+  await expect(surface.locator('.storage-preview .preview-code')).toHaveValue('value');
+  await expect(surface.locator('.storage-notice')).toHaveCount(0);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('before selection');
+  await surface.locator('.palette-footer .primary-action').click();
   await expect(surface.locator('.storage-notice')).toContainText('Value copied');
   await expect(surface.locator('.palette-footer-context')).toHaveCount(0);
   expect(await surface.locator('.palette-footer-title').boundingBox()).toEqual(locationTitle);
@@ -3960,11 +3984,73 @@ test.describe(() => {
   await expect(surface.locator('.action-row mark')).toHaveCount(2);
   await actions.press('Control+n');
   await expect(surface.locator('.palette-footer .primary-action')).toHaveText(/Copy Name/);
-  await actions.press('Tab'); await expect(actions).toBeFocused();
+  await actions.press('Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
   await actions.press('Escape'); await expect(search).toBeFocused();
   expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 3]);
-  await page.setViewportSize({ width: 390, height: 600 });
-  expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await search.fill('');
+  const preview = surface.locator('.storage-preview');
+  const value = preview.locator('.preview-code');
+  const list = surface.locator('.storage-results');
+  const longRow = surface.getByRole('option', { name: 'polish.long', exact: true });
+  for (const size of [{ width: 1100, height: 760 }, { width: 390, height: 440 }]) {
+    await page.setViewportSize(size);
+    await longRow.click();
+    await expect(value).toHaveValue(JSON.stringify(JSON.parse(raw), null, 2));
+    await expect(value).toHaveAttribute('readonly', '');
+    await expect(preview.locator('h1, .storage-value-label')).toHaveCount(0);
+    await expect(preview.locator('.preview-info')).toContainText('Keypolish.long');
+    await expect(preview.locator('.preview-info')).toContainText('Content TypeJSON');
+    const valueBox = (await value.boundingBox())!;
+    const infoBox = (await preview.locator('.preview-info').boundingBox())!;
+    expect(valueBox.y + valueBox.height).toBeLessThan(infoBox.y);
+    await surface.getByRole('option', { name: 'polish.key', exact: true }).hover();
+    await expect(longRow).toHaveAttribute('aria-selected', 'true');
+    const listBox = (await list.boundingBox())!;
+    const previewBox = (await preview.boundingBox())!;
+    if (size.width > 520) {
+      expect(listBox.x + listBox.width).toBeLessThanOrEqual(previewBox.x);
+      expect(listBox.y).toBe(previewBox.y);
+    } else {
+      expect(listBox.y + listBox.height).toBeLessThanOrEqual(previewBox.y);
+      expect(listBox.width).toBe(previewBox.width);
+    }
+    await expect(list).toBeInViewport({ ratio: 1 });
+    await expect(preview).toBeInViewport({ ratio: 1 });
+    const footerBox = await surface.locator('.palette-footer').boundingBox();
+    const searchBox = await surface.locator('.storage-search').boundingBox();
+    await search.press('Control+p');
+    await expect(preview.locator('.preview-code')).toHaveValue('value');
+    await search.press('Control+n');
+    await search.press('Enter');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(raw);
+    await search.press('Tab'); await expect(surface.locator('.storage-search .search-dismiss')).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(value).toBeFocused();
+    const listScroll = await list.evaluate(node => node.scrollTop);
+    await value.press('PageDown');
+    await expect.poll(() => value.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+    await expect(longRow).toHaveAttribute('aria-selected', 'true');
+    expect(await list.evaluate(node => node.scrollTop)).toBe(listScroll);
+    const previewScroll = await value.evaluate(node => node.scrollTop);
+    await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    expect(await list.evaluate(node => node.scrollTop)).toBeGreaterThan(listScroll);
+    expect(await value.evaluate(node => node.scrollTop)).toBe(previewScroll);
+    expect(await surface.locator('.palette-footer').boundingBox()).toEqual(footerBox);
+    expect(await surface.locator('.storage-search').boundingBox()).toEqual(searchBox);
+    await value.press('Tab'); await expect(surface.locator('.palette-footer .footer-back')).toBeFocused();
+    await list.evaluate(node => { node.scrollTop = 0; });
+    await value.evaluate(node => { node.scrollTop = 0; });
+    for (const theme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: theme });
+      await surface.locator('.palette').screenshot({ path: test.info().outputPath(`storage-preview-${theme}-${size.width}.png`) });
+    }
+    expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  }
+  await search.fill('missing-key');
+  await expect(preview).toHaveCount(0);
+  await expect(surface.locator('.palette-footer .primary-action')).toBeDisabled();
+  await surface.locator('.palette-footer .footer-back').click();
+  await expect(surface.locator('.search-bar input')).toHaveValue('local storage');
 });
 });
 
@@ -4014,9 +4100,14 @@ test.describe(() => {
       }
       await picker.press('Tab'); await expect(surface.locator('.script-search .search-dismiss')).toBeFocused();
       if (command === 'manage scripts') {
-        await page.keyboard.press('Tab'); await expect(surface.locator('.script-preview-code')).toBeFocused();
+        await page.keyboard.press('Tab'); await expect(surface.locator('.preview-code')).toBeFocused();
       }
-      await page.keyboard.press('Tab'); await expect(surface.locator('.palette-footer .footer-back')).toBeFocused();
+      await page.keyboard.press('Tab');
+      await test.info().attach(`script-tab-focus-${size.width}-${command}`, { contentType: 'application/json', body: JSON.stringify(await surface.locator('.palette').evaluate(panel => {
+        const root = panel.getRootNode() as Document | ShadowRoot;
+        return { active: root.activeElement?.outerHTML, documentFocused: panel.ownerDocument.hasFocus() };
+      })) });
+      await expect(surface.locator('.palette-footer .footer-back')).toBeFocused();
       await picker.click();
       await picker.press('Meta+ArrowUp');
       const firstId = await surface.locator('.script-item.selected').getAttribute('id');
@@ -4027,7 +4118,7 @@ test.describe(() => {
         const list = surface.locator('.script-list');
         const detail = surface.locator('.script-list-detail');
         const preview = surface.getByRole('region', { name: 'Code Preview', exact: true });
-        const code = preview.locator('.script-preview-code');
+        const code = preview.locator('.preview-code');
         await surface.getByRole('option', { name: 'Execution helper', exact: true }).click();
         await expect(code).toHaveValue(longCode);
         await expect(list).toBeInViewport({ ratio: 1 });
@@ -4045,8 +4136,8 @@ test.describe(() => {
         }
         expect(listBox.height).toBeGreaterThanOrEqual(40);
         expect(detailBox.height).toBeGreaterThan(60);
-        await expect(preview.locator('.script-preview-info')).toContainText('Execution helper');
-        await expect(preview.locator('.script-preview-info')).toContainText('JavaScript');
+        await expect(preview.locator('.preview-info')).toContainText('Execution helper');
+        await expect(preview.locator('.preview-info')).toContainText('JavaScript');
         await expect(code).toHaveAttribute('readonly', '');
         await code.focus();
         await expect(code).toBeFocused();

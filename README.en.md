@@ -26,6 +26,10 @@ Switch between tabs in the current window in order of recent use, or type a titl
 
 Search “scripts” to manage locally saved scripts: select from the list on the left to see a live, read-only code preview, Name, and Content Type JavaScript on the right. A click only selects the preview; hovering preserves your selection. Arrow keys or Ctrl+N/P also change the preview, while Enter or Copy Code in the footer copies the selected script. Open the context menu or Actions to edit; built-in items offer View Setup Instructions. Use New Script in the footer (a plus button on narrow panels) or Cmd+Shift+N (Ctrl+Shift+N on Windows/Linux) to create, save the name-and-code form with Cmd/Ctrl+Enter, and confirm before deleting. At widths of 520px or less, the list sits above the preview, with each scrolling independently. “Run script” still opens a full-width selection list where clicking or pressing Enter runs a script once on the current webpage. Scripts run only when explicitly requested, with no automatic text expansion or execution on page load; results stay in the current panel.
 
+### Website Storage
+
+Search `local storage`, `session storage`, or `cookie` to inspect the current site's storage. Like Script Library, select a key on the left to preview its full value on the right, with the key, content type, and cookie attributes below. A click only selects; Enter or Copy Value in the footer copies the original string. JSON is formatted for reading, and cookies retain domain, path, and other attributes. Narrow panels stack the list above the preview, with each scrolling independently. Storage is read-only, cookie access is granted per site, and values stay in the current panel.
+
 ### Auto Tuck
 
 Automatically move tabs unused for 7 days into a collapsed Tucked Away group, leaving room for what you are working on. Pages stay open; search or click to bring one back. Off by default, with manual tuck and undo actions available too.

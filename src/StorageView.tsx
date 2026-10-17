@@ -2,6 +2,7 @@ import { BackLayer } from './Navigation';
 import { SearchDismissButton } from './SearchDismissButton';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
+import { ReadOnlyPreview } from './ReadOnlyPreview';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Copy, Database, Cookie, Search, RotateCcw, FileText, LoaderCircle } from 'lucide-react';
 import { readPageStorage, openCookieAccess } from './api';
@@ -28,7 +29,6 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
   const sequence = useRef(0);
   const waitingForAccess = useRef(false);
   const learned = useRef(false);
-  const pointer = useRef<{ x: number; y: number } | null>(null);
   const caret = useRef<[number, number]>([0, 0]);
   const title = request.kind === 'local' ? 'Local Storage' : request.kind === 'session' ? 'Session Storage' : 'Cookies';
   const normalized = query.trim().toLocaleLowerCase();
@@ -111,11 +111,11 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
     if (modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') { event.preventDefault(); openMenu(); return; }
     if (event.key === 'Tab') {
       const scope = event.currentTarget;
-      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, button:not(:disabled), [tabindex="0"]')).filter(node => node.offsetParent !== null);
+      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, textarea, button:not(:disabled), [tabindex="0"]')).filter(node => node.offsetParent !== null);
       const index = nodes.indexOf(event.target as HTMLElement);
       event.preventDefault(); nodes[(index + (event.shiftKey ? -1 : 1) + nodes.length) % nodes.length]?.focus(); return;
     }
-    if (busy) return;
+    if (busy || (event.target as HTMLElement).closest('.storage-preview')) return;
     const emacs = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ['p', 'n'].includes(event.key.toLowerCase());
     const arrow = ['ArrowDown', 'ArrowUp'].includes(event.key);
     if (detail && !event.shiftKey && (arrow || emacs || ['PageDown', 'PageUp'].includes(event.key))) {
@@ -140,40 +140,24 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       void act('value');
     }
   }
-  function hover(event: React.MouseEvent, change: () => void) {
-    const next = { x: event.screenX, y: event.screenY };
-    if (pointer.current && (next.x !== pointer.current.x || next.y !== pointer.current.y)) change();
-    pointer.current = next;
-  }
-  let formatted = detail?.value || '';
-  let json = false;
-  if (detail) { try { formatted = JSON.stringify(JSON.parse(detail.value), null, 2); json = true; } catch { /* Plain text. */ } }
-  const cookie = detail?.cookie;
   return <BackLayer onBack={onBack}><BackLayer active={!!detail} onBack={() => setDetail(null)}><section tabIndex={-1} className="palette storage-view" aria-label={title} aria-busy={busy} onKeyDown={keyboard}>
     <span className="sr-only" id="storage-navigation">{t('navigationHelp')}</span>
     <div className={`storage-surface ${menu ? 'subdued' : ''}`} inert={menu ? true : undefined}>
       {detail ? <div className="storage-detail" ref={detailBody} tabIndex={0} aria-label={t('viewDetails')}>
-        <h1>{detail.name || t('storageEmptyName')}</h1>
-        {cookie ? <dl className="cookie-metadata">
-          <dt>{t('cookieDomain')}</dt><dd>{cookie.domain}</dd><dt>{t('cookiePath')}</dt><dd>{cookie.path}</dd>
-          <dt>HttpOnly / Secure</dt><dd>{String(cookie.httpOnly)} / {String(cookie.secure)}</dd>
-          <dt>SameSite</dt><dd>{cookie.sameSite}</dd><dt>{t('cookieExpires')}</dt><dd>{cookie.session ? t('cookieSession') : new Date(cookie.expirationDate! * 1000).toLocaleString()}</dd>
-          <dt>{t('cookiePartition')}</dt><dd>{cookie.partitionKey ? JSON.stringify(cookie.partitionKey) : t('cookieUnpartitioned')}</dd>
-        </dl> : null}
-        <p className="storage-value-label">{json ? t('storageJson') : t('storageValue')}</p>
-        <pre className="storage-value">{formatted || t('storageEmptyValue')}</pre>
+        <StorageValue entry={detail} />
       </div> : <>
         <div className="storage-search"><span className="search-icon"><Search size={20} /></span><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setNotice(''); }}
           placeholder={t('storageSearch')} aria-label={t('storageSearchLabel')} role="combobox" aria-expanded="true" aria-controls="storage-results" aria-autocomplete="list"
           aria-activedescendant={selected ? `storage-row-${rows.indexOf(selected)}` : undefined} aria-describedby="storage-navigation" autoComplete="off" spellCheck={false} />
           <SearchDismissButton label={t('back')} /></div>
+        <div className={`storage-list-content ${selected ? 'with-detail' : ''}`}>
         <div className="storage-results" id="storage-results" role="listbox" aria-label={t('storageEntries')} ref={list}>
           {busy && !data && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void refresh(); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
             : !rows.length && !busy ? <div className="empty"><Database size={26} /><strong>{query ? t('noResults') : t('storageEmpty')}</strong></div>
             : rows.map((row, index) => <div key={row.id} id={`storage-row-${index}`} className="result storage-row" role="option" aria-selected={row.id === selected?.id}
-              onMouseMove={event => hover(event, () => setSelection(row.id))}
-              onClick={() => { setSelection(row.id); void act('value', row); input.current?.focus(); }}
-              onDoubleClick={() => { setSelection(row.id); setDetail(row); }}
+              title={row.name || t('storageEmptyName')}
+              onClick={() => { setSelection(row.id); setNotice(''); input.current?.focus({ preventScroll: true }); }}
+              onDoubleClick={() => { setSelection(row.id); void act('detail', row); }}
               onContextMenu={event => {
                 event.preventDefault();
                 if (busy) return;
@@ -181,10 +165,13 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
                 setSelection(row.id); setMenu(true); setActionQuery(''); setActionSelection(''); setError('');
               }}>
               <span className="entry-icon command">{row.cookie ? <Cookie size={18} /> : <Database size={18} />}</span>
-              <span className="entry-copy"><span className="entry-title"><HighlightedText text={row.name || t('storageEmptyName')} query={query} allowTypos={false} /></span>
-                <span className="entry-subtitle storage-summary">{row.value.slice(0, 180) || t('storageEmptyValue')}</span></span>
+              <span className="entry-copy"><span className="entry-title"><HighlightedText text={row.name || t('storageEmptyName')} query={query} allowTypos={false} /></span></span>
               {row.cookie ? <span className="storage-cookie-scope">{row.cookie.domain}<span>{row.cookie.path}{row.cookie.partitionKey ? ` · ${t('cookiePartition')}` : ''}</span></span> : null}
             </div>)}
+        </div>
+        {selected ? <div className="storage-list-detail">
+          <StorageValue entry={selected} preview />
+        </div> : null}
         </div>
       </>}
     </div>
@@ -201,4 +188,32 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       primary={{ label: menu ? activeAction?.title || t('copyValue') : t('copyValue'), keys: ['↵'], disabled: busy || (menu ? !activeAction : !current), onAction: () => void act(menu ? activeAction?.id || '' : 'value') }}
       actions={{ open: menu, disabled: busy, onToggle: openMenu }} />
   </section></BackLayer></BackLayer>;
+}
+
+function StorageValue({ entry, preview = false }: { entry: StorageEntry; preview?: boolean }) {
+  let formatted = entry.value;
+  let json = false;
+  try { formatted = JSON.stringify(JSON.parse(entry.value), null, 2); json = true; } catch { /* Plain text. */ }
+  const cookie = entry.cookie;
+  const metadata = cookie ? [
+    { label: t('cookieDomain'), value: cookie.domain },
+    { label: t('cookiePath'), value: cookie.path },
+    { label: 'HttpOnly / Secure', value: `${cookie.httpOnly} / ${cookie.secure}` },
+    { label: 'SameSite', value: cookie.sameSite },
+    { label: t('cookieExpires'), value: cookie.session ? t('cookieSession') : new Date(cookie.expirationDate! * 1000).toLocaleString() },
+    { label: t('cookiePartition'), value: cookie.partitionKey ? JSON.stringify(cookie.partitionKey) : t('cookieUnpartitioned') },
+  ] : [];
+  if (preview) return <ReadOnlyPreview className="storage-preview" label={t('storageValue')}
+    content={{ id: entry.id, value: formatted, label: t('storageValue'), placeholder: t('storageEmptyValue') }}
+    information={[
+      { label: 'Key', value: entry.name || t('storageEmptyName') },
+      { label: t('scriptContentType'), value: json ? 'JSON' : 'Text' },
+      ...metadata,
+    ]} />;
+  return <>
+    <h1>{entry.name || t('storageEmptyName')}</h1>
+    <p className="storage-value-label">{json ? t('storageJson') : t('storageValue')}</p>
+    <pre className="storage-value">{formatted || t('storageEmptyValue')}</pre>
+    {cookie ? <dl className="cookie-metadata">{metadata.map(item => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl> : null}
+  </>;
 }
