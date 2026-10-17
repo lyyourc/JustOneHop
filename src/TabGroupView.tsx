@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { useResultSelection } from './useResultSelection';
 import { Layers, Palette, PanelTop, Pencil, Save, Search, X } from 'lucide-react';
 import { BackLayer } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
@@ -6,34 +7,35 @@ import { ActionMenu } from './ActionMenu';
 import { Favicon } from './Favicon';
 import { HighlightedText } from './HighlightedText';
 import { entries, search } from './model';
-import { execute } from './api';
 import { errorMessage, t, countMessage, type MessageKey } from './i18n';
-import type { Snapshot } from './types';
+import type { Snapshot, Entry, Execution, PaletteState } from './types';
 
 const colors = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'] as const;
-export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh }: {
-  groupId: number; data: Snapshot; isMac: boolean; onBack: () => void; onClose: () => void; onRefresh: () => Promise<void>;
+export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute, executionBusy, refreshError, paletteState, initialState }: {
+  groupId: number; data: Snapshot; isMac: boolean; onBack: () => void; onClose: () => void; executionBusy: boolean; refreshError: string;
+  onExecute: (execution: Execution) => Promise<void>; paletteState: PaletteState; initialState?: PaletteState['group'];
 }) {
   const group = data.groups?.find(group => group.id === groupId);
-  const [query, setQuery] = useState('');
-  const [selection, setSelection] = useState('');
+  const [query, setQuery] = useState(initialState?.id === groupId ? initialState.query : '');
   const [menu, setMenu] = useState(false);
   const [actionQuery, setActionQuery] = useState('');
   const [actionId, setActionId] = useState('');
   const [editor, setEditor] = useState<'name' | 'color'>();
   const [name, setName] = useState('');
   const [color, setColor] = useState<chrome.tabGroups.TabGroup['color']>('grey');
-  const [busy, setBusy] = useState(false);
+  const [localBusy, setBusy] = useState(false);
+  const busy = localBusy || executionBusy;
   const [error, setError] = useState('');
   const input = useRef<HTMLInputElement>(null);
-  const caret = useRef<[number, number]>([0, 0]);
+  const caret = useRef<[number, number]>(initialState?.id === groupId ? initialState.caret : [0, 0]);
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
   const colorInput = useRef<HTMLSelectElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const members = entries({ ...data, groups: [], bookmarks: [], tabs: data.tabs.filter(tab => tab.groupId === groupId) }).filter(entry => entry.kind === 'tab');
   const results = search(members, query);
-  const selected = results.find(entry => entry.id === selection) || results[0];
+  const { selected, selection, setSelection } = useResultSelection(results, query, data.currentTabId,
+    initialState?.id === groupId ? initialState.selection : '');
   const allActions: { id: string; title: string; keywords: string; icon: React.ReactNode; danger?: boolean }[] = editor ? [{ id: 'save', title: t('groupSave'), keywords: 'save 保存', icon: <Save size={16} /> }] : [
     ...(selected ? [
       { id: 'switch', title: t('switchTabPrimary'), keywords: 'switch tab 切换标签页', icon: <PanelTop size={16} /> },
@@ -49,11 +51,11 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
   const actions = allActions.filter(action => `${action.title} ${action.keywords}`.toLocaleLowerCase().includes(actionQuery.trim().toLocaleLowerCase()));
   const chosen = actions.find(action => action.id === actionId) || actions[0];
   useLayoutEffect(() => {
-    if (menu) return;
+    if (menu || busy) return;
     if (editor === 'name') { nameInput.current?.focus(); nameInput.current?.select(); }
     else if (editor === 'color') colorInput.current?.focus();
     else { input.current?.focus(); input.current?.setSelectionRange(...caret.current); }
-  }, [menu, editor]);
+  }, [menu, editor, busy]);
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
   function rememberCaret() {
     if (!menu && !editor) caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
@@ -67,20 +69,21 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
     if (editor) { setEditor(undefined); return; }
     onBack();
   }
-  async function run(id: string) {
+  async function run(id: string, target: Entry | undefined = selected) {
     if (busy || !group) return;
     if (id === 'name' || id === 'color') { rememberCaret(); setName(group.title); setColor(group.color); setEditor(id); setMenu(false); setError(''); return; }
     rememberCaret(); setBusy(true); setError('');
     try {
       if (id === 'save') {
-        await execute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: editor === 'name' ? { title: name.trim() } : { color } });
+        await onExecute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: editor === 'name' ? { title: name.trim() } : { color } });
       } else if (id === 'collapse') {
-        await execute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: { collapsed: !group.collapsed } });
-      } else if (selected && (id === 'switch' || id === 'close' || id === 'ungroupTab')) {
-        await execute({ action: id, windowId: data.windowId, groupId, tabId: selected.tabId });
-        if (id === 'switch' || (id === 'close' && selected.tabId === data.currentTabId)) { onClose(); return; }
+        await onExecute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: { collapsed: !group.collapsed } });
+      } else if (target && (id === 'switch' || id === 'close' || id === 'ungroupTab')) {
+        await onExecute({ action: id, windowId: data.windowId, groupId, tabId: target.tabId,
+          ...(id === 'close' ? { paletteState: { ...paletteState, group: { id: groupId, query, selection, caret: caret.current } } } : {}) });
+        if (id === 'switch') { onClose(); return; }
       } else return;
-      await onRefresh(); setMenu(false); setEditor(undefined);
+      setMenu(false); setEditor(undefined);
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   }
@@ -101,10 +104,10 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
           {results.map(entry => <div key={entry.id} id={`group-${entry.id}`} role="option" aria-selected={entry.id === selected?.id} className="result tab"
             onMouseMove={event => {
               const next = { x: event.screenX, y: event.screenY };
-              if (pointer.current && (pointer.current.x !== next.x || pointer.current.y !== next.y)) setSelection(entry.id);
+              if (selection !== null && !busy && pointer.current && (pointer.current.x !== next.x || pointer.current.y !== next.y)) setSelection(entry.id);
               pointer.current = next;
             }}
-            onClick={() => { if (!busy) { setSelection(entry.id); void execute({ action: 'switch', groupId, tabId: entry.tabId, windowId: data.windowId }).then(onClose).catch(reason => setError(errorMessage(reason))); } }}
+            onClick={() => { if (!busy) { setSelection(entry.id); void run('switch', entry); } }}
             onContextMenu={event => {
               event.preventDefault();
               if (busy) return;
@@ -117,11 +120,12 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
         </div>
       </>}
     </div>
-    {error ? <div className="error-banner" role="alert">{error}</div> : null}
+    {error || refreshError ? <div className="error-banner" role="alert">{error || refreshError}</div> : null}
     <PaletteFooter isMac={isMac}
       navigation={{ kind: 'back', label: `${t('back')} · ${groupLabel}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={groupLabel}
       context={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
+      status={selection === null && !editor ? <span role="status">{t('chooseNextTab')}</span> : undefined}
       primary={primary ? { label: primary.title, keys: ['↵'], disabled: busy || !group, danger: !!primary.danger, onAction: () => void run(primary.id) } : undefined}
       actions={{ open: menu, disabled: busy || !group, onToggle: toggleMenu }} />
     {menu ? <ActionMenu id="group-actions" title={editor ? t(editor === 'name' ? 'groupRename' : 'groupColor') : group?.title} actions={actions} query={actionQuery} onQueryChange={setActionQuery}
@@ -139,7 +143,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onRefresh 
       if (!results.length) return;
       const index = results.findIndex(entry => entry.id === selected?.id);
       const down = event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'n';
-      let next = (index + (down ? 1 : -1) + results.length) % results.length;
+      let next = index < 0 ? (down ? 0 : results.length - 1) : (index + (down ? 1 : -1) + results.length) % results.length;
       if (arrow && mod) next = down ? results.length - 1 : 0;
       else if (event.altKey || event.key.startsWith('Page')) next = Math.max(0, Math.min(results.length - 1, index + (down ? 1 : -1) * 6));
       setSelection(results[next].id);

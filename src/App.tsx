@@ -1,4 +1,6 @@
 import { TabGroupView } from './TabGroupView';
+import { keepsPaletteOpen } from './paletteActions';
+import { useResultSelection } from './useResultSelection';
 import { TuckRecoveryView } from './TuckRecoveryView';
 import { entrySearchQuery, entryTitle } from './entryPresentation';
 import { Favicon } from './Favicon';
@@ -23,9 +25,9 @@ import { ScriptRunner } from './ScriptRunner';
 import { ScriptLibrary } from './ScriptLibrary';
 import { Settings } from './Settings';
 import { HighlightedText } from './HighlightedText';
-import { execute, getSnapshot } from './api';
+import { cancelPaletteContinuation, execute, getSnapshot } from './api';
 import { actionsFor, closeTargets, entries, homeEntries, matchingAlias, search } from './model';
-import type { Entry, IconName, Snapshot, StorageRead, SettingsSection, ScriptRun } from './types';
+import type { Entry, IconName, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteState, Execution } from './types';
 
 const icons = { extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
   others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, script: Code, edit: Pencil, tuck: ArrowDownToLine };
@@ -34,11 +36,11 @@ function Glyph({ name, size = 18 }: { name: IconName; size?: number }) {
 }
 function Key({ children }: { children: React.ReactNode }) { return <kbd>{children}</kbd>; }
 
-export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () => void }) {
+export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState }) {
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
   const scripts = useSyncExternalStore(subscribeScripts, getScripts);
   const [notice, setNotice] = useState('');
-  const [groupId, setGroupId] = useState<number>();
+  const [groupId, setGroupId] = useState<number | undefined>(initialState?.group?.id);
   const [recoveryId, setRecoveryId] = useState<string>();
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
   const [scriptRun, setScriptRun] = useState<{ target: Omit<ScriptRun, 'scriptId'>; initialScriptId?: string; autoCopy: boolean } | null>(null);
@@ -51,15 +53,19 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [data, setData] = useState<Snapshot | null>(null);
   const [showLoading, setShowLoading] = useState(false);
-  const [query, setQuery] = useState('');
-  const [selection, setSelection] = useState('');
+  const [query, setQuery] = useState(initialState?.query ?? '');
   const [actionTarget, setActionTarget] = useState<Entry | null>(null);
   const [actionQuery, setActionQuery] = useState('');
   const [actionSelection, setActionSelection] = useState('');
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [localBusy, setBusy] = useState(false);
+  const [executionBusy, setExecutionBusy] = useState(false);
+  const busy = localBusy || executionBusy;
   const input = useRef<HTMLInputElement>(null);
-  const savedCaret = useRef<[number, number]>([0, 0]);
+  const savedCaret = useRef<[number, number]>(initialState?.caret ?? [0, 0]);
+  const executing = useRef(false);
+  const refreshVersion = useRef(0);
+  const mounted = useRef(true);
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
@@ -68,14 +74,20 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   const results = useMemo(() => query.trim() ? search(items, query, queryUsage(usage, query)) : homeEntries(items, commandUsage(usage)), [items, query, usage]);
   const visible = results.slice(0, 100);
   const grouped = !query.trim();
-  const selected = visible.find(item => item.id === selection) || visible[0];
-  const liveTarget = actionTarget && (items.find(item => item.id === actionTarget.id) || actionTarget);
+  const { selected, selection, setSelection } = useResultSelection(visible, query, data?.currentTabId, initialState?.selection);
+  const liveTarget = actionTarget && items.find(item => item.id === actionTarget.id);
   const actionItems = useMemo(() => data && liveTarget ? actionsFor(liveTarget, data)
     .sort((a, b) => Number(a.action.startsWith('close')) - Number(b.action.startsWith('close'))) : [], [data, liveTarget, preferences.language]);
   const actions = useMemo(() => search(actionItems, actionQuery), [actionItems, actionQuery]);
   const selectedAction = actions.find(item => item.id === actionSelection) || actions[0];
   const loading = !data && !error;
   const [settled, setSettled] = useState(mode !== 'overlay');
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 2500);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     if (settled) return;
@@ -91,25 +103,57 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
     return () => clearTimeout(timer);
   }, [loading]);
 
+  async function refreshSnapshot() {
+    const version = ++refreshVersion.current;
+    try {
+      const value = await getSnapshot();
+      if (mounted.current && version === refreshVersion.current) setData(value);
+    } catch (reason) {
+      if (mounted.current && version === refreshVersion.current) throw reason;
+    }
+  }
+  async function executeAction(execution: Execution) {
+    if (executing.current) throw new Error(t('running'));
+    executing.current = true;
+    setExecutionBusy(true); setError('');
+    refreshVersion.current++;
+    try {
+      try { await execute(execution); }
+      catch (reason) {
+        await refreshSnapshot().catch(() => {});
+        if (mounted.current) setError(errorMessage(reason));
+        throw reason;
+      }
+      if (execution.action !== 'settings' && data && keepsPaletteOpen(execution.action, execution.tabId, data.currentTabId)) {
+        await refreshSnapshot().catch(() => { if (mounted.current) setError(t('errorRefreshAfterAction')); });
+      }
+    } finally { executing.current = false; setExecutionBusy(false); }
+  }
+  function dismiss() {
+    void cancelPaletteContinuation().catch(() => {});
+    onClose();
+  }
   useEffect(() => {
-    let alive = true;
+    mounted.current = true;
     let timer: ReturnType<typeof setTimeout>;
-    const refresh = () => { void getSnapshot().then(value => { if (alive) setData(value); })
-      .catch(reason => { if (alive) setError(errorMessage(reason)); }); };
+    const refresh = () => {
+      if (executing.current) return;
+      void refreshSnapshot().catch(reason => { if (mounted.current && !executing.current) setError(errorMessage(reason)); });
+    };
     const changed = () => { clearTimeout(timer); timer = setTimeout(refresh, 100); };
     refresh();
-    void scriptsReady.catch(() => { if (alive) setError(t('errorGeneric')); });
+    void scriptsReady.catch(() => { if (mounted.current) setError(t('errorGeneric')); });
     const focusWindow = () => refresh();
     window.addEventListener('focus', focusWindow);
     input.current?.focus();
-    input.current?.setSelectionRange(0, 0);
+    input.current?.setSelectionRange(...savedCaret.current);
     // Content scripts only have runtime access; updates are forwarded by the worker.
     const listener = (message: { source?: string; type?: string }) => {
       if (message.source === 'zing' && message.type === 'changed') changed();
     };
     const port = chrome.runtime.connect({ name: 'zing' });
     port.onMessage.addListener(listener);
-    return () => { alive = false; clearTimeout(timer); port.disconnect(); window.removeEventListener('focus', focusWindow); };
+    return () => { mounted.current = false; refreshVersion.current++; clearTimeout(timer); port.disconnect(); window.removeEventListener('focus', focusWindow); };
   }, []);
 
   useEffect(() => {
@@ -127,6 +171,8 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
     closeActions(); setSettingsSection(section); setSettingsOpen(true); setError('');
   }
   function closeActions() { setActionTarget(null); setActionQuery(''); setActionSelection(''); }
+  useEffect(() => { if (actionTarget && !liveTarget && !busy) closeActions(); }, [actionTarget, liveTarget, busy]);
+  function paletteState(): PaletteState { return { query, selection, caret: savedCaret.current }; }
   function toggleActions() {
     if (busy) return;
     if (actionTarget) closeActions();
@@ -185,18 +231,16 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
     const execution = { action: entry.action, tabId: entry.tabId, bookmarkId: entry.bookmarkId, windowId: data.windowId, query: learningQuery };
     if (entry.action === 'settings') { openSettings(entry.settingsSection); void execute(execution).catch(() => {}); return; }
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setNotice('');
+    const keepOpen = keepsPaletteOpen(entry.action, entry.tabId, data.currentTabId);
     try {
-      await execute(execution);
-      if (entry.action === 'undoTuck' || (entry.action === 'tuck' && entry.tabId !== data.currentTabId)) {
-        setData(await getSnapshot());
-        setBusy(false); closeActions();
-        setNotice(t(entry.action === 'tuck' ? 'tabTucked' : 'tuckUndone'));
-      } else onClose();
+      await executeAction({ ...execution, ...(keepOpen ? { paletteState: paletteState() } : {}) });
+      if (!keepOpen) { onClose(); return; }
+      closeActions();
+      setNotice(t(entry.action === 'tuck' ? 'tabTucked' : entry.action === 'undoTuck' ? 'tuckUndone' : 'actionCompleted'));
     } catch (reason) {
       setError(errorMessage(reason));
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   }
   async function confirmDelete() {
     if (!deleteTarget || busy) return;
@@ -208,7 +252,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   function hover(event: React.MouseEvent, id: string) {
     // Scrolling under a stationary pointer must not undo keyboard selection.
     const position = { x: event.screenX, y: event.screenY };
-    if (pointer.current && (pointer.current.x !== position.x || pointer.current.y !== position.y)) {
+    if (selection !== null && !busy && pointer.current && (pointer.current.x !== position.x || pointer.current.y !== position.y)) {
       setSelection(id);
     }
     pointer.current = position;
@@ -236,7 +280,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
       if (!pool.length) return;
       const down = event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'n';
       const delta = down ? 1 : -1;
-      let next = (index + delta + pool.length) % pool.length;
+      let next = index < 0 ? (down ? 0 : pool.length - 1) : (index + delta + pool.length) % pool.length;
       if (arrow && modifier) {
         // The home view has recent tabs and common commands; other lists jump to an edge.
         next = down ? pool.length - 1 : 0;
@@ -277,11 +321,11 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
   const primaryLabel = current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
     : current?.kind === 'script' && current.action === 'runScript' ? t('runScript') : current?.action === 'copyScript' ? t('copyScript') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
-  return <NavigationRoot><BackLayer onBack={onClose}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
-    if (event.target === event.currentTarget) { if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else onClose(); }
+  return <NavigationRoot><BackLayer onBack={dismiss}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
+    if (event.target === event.currentTarget) { if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else dismiss(); }
   }}>
     {groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
-      onRefresh={async () => setData(await getSnapshot())} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
+      initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
       onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : scriptRun ? <ScriptRunner {...scriptRun} onBack={() => setScriptRun(null)} /> : scriptLibraryOpen ? <ScriptLibrary isMac={isMac} onBack={() => setScriptLibraryOpen(false)} onClose={onClose} /> : scriptEditor ? <ScriptLibrary initialScript={scriptEditor} isMac={isMac} onBack={() => setScriptEditor(null)} onClose={onClose}
       onComplete={message => { setScriptEditor(null); setNotice(message); }} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} isMac={isMac}
       onBack={() => setSettingsOpen(false)} onClose={onClose} /> : <section tabIndex={-1} className="palette" aria-label="zing" aria-busy={busy}>
@@ -295,7 +339,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
             aria-describedby="zing-navigation"
             aria-activedescendant={selected ? `zing-${selected.id}` : undefined}
             autoComplete="off" autoCorrect="off" spellCheck={false} disabled={busy} />
-          <button className="icon-button close-button" aria-label={t('closePalette')} title={t('closeTooltip')} onClick={onClose}><Key>esc</Key></button>
+          <button className="icon-button close-button" aria-label={t('closePalette')} title={t('closeTooltip')} onClick={dismiss}><Key>esc</Key></button>
         </header>
         <span className="sr-only result-status" role="status">{data ? countMessage('resultOne', 'resultMany', results.length) : loading && showLoading ? t('loading') : ''}</span>
         <div className="results" ref={list} id="zing-results" role="listbox" aria-label={t('resultsLabel')}>
@@ -304,7 +348,7 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
             <p>{t('noResultsHint')}</p></div> : null}
           {visible.map((item, index) => <div className={`result-group ${grouped && index > 0 && item.kind !== visible[index - 1].kind ? 'section-start' : ''}`} key={item.id}>
             <div id={`zing-${item.id}`} role="option" aria-selected={selected?.id === item.id}
-            className={`result ${item.kind} ${item.danger ? 'danger' : ''}`} title={`${entryTitle(item)} — ${item.subtitle}`} onMouseMove={event => hover(event, item.id)} onClick={() => void run(item)}
+            className={`result ${item.kind} ${item.danger ? 'danger' : ''}`} title={`${entryTitle(item)} — ${item.subtitle}`} onMouseMove={event => hover(event, item.id)} onClick={() => { if (!busy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
               if (busy) return;
@@ -347,13 +391,14 @@ export function App({ mode, onClose }: { mode: 'overlay' | 'popup'; onClose: () 
         query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }} selectedId={selectedAction?.id} onSelectionChange={setActionSelection}
         onAction={id => void run(actions.find(action => action.id === id))} onClose={closeActions} /> : null}
 
-      {notice ? <div className="shortcut-notice" role="status">{notice}</div> : null}
       {error ? <div className="error-banner" role="alert"><AlertCircle size={15} /><span>{errorMessage(new Error(error))}</span>
-        {!data ? <button onClick={() => { setError(''); void getSnapshot().then(setData).catch(reason => setError(errorMessage(reason))); }}>{t('retry')}</button> : null}</div> : null}
+        {!data ? <button onClick={() => { setError(''); void refreshSnapshot().catch(reason => setError(errorMessage(reason))); }}>{t('retry')}</button> : null}</div> : null}
       <PaletteFooter isMac={isMac}
         navigation={{ kind: 'settings', label: t('settings'), tooltip: `${t('settings')} (${mod},)`, disabled: busy, onAction: () => openSettings() }}
         title="zing" context={<NavigationHint />}
         status={busy ? <span className="footer-status"><LoaderCircle className="spinner" size={13} />{t('running')}</span>
+          : notice ? <span role="status">{notice}</span>
+          : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
         primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || busy || !!deleteTarget, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}

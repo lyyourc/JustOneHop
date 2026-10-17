@@ -112,6 +112,7 @@
 .palette-footer-title { display: flex; align-items: center; min-width: 0; color: var(--muted); font-size: 11.5px; font-weight: 500; }
 .footer-title-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-footer-context, .palette-footer-status { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.palette-footer-status > [role="status"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .palette-footer-context { flex-shrink: 8; font-size: 11px; font-weight: 400; line-height: 16px; }
 /* Navigation hints are supporting text, matching origins and counts in other layers. */
 .palette-footer-context kbd { font: inherit; color: inherit; min-width: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; }

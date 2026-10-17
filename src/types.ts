@@ -32,7 +32,14 @@ export interface Snapshot {
   canUndoTuck?: boolean;
   tuckRecoveries?: TuckRecoveryItem[];
 }
+export interface PaletteState {
+  query: string;
+  selection: string | null;
+  caret: [number, number];
+  group?: { id: number; query: string; selection: string | null; caret: [number, number] };
+}
 export interface Execution {
+  paletteState?: PaletteState;
   action: ActionId | 'settings';
   windowId: number;
   tabId?: number;
@@ -60,6 +67,8 @@ export type Request =
   | { source: 'zing'; type: 'run-saved-script'; payload: ScriptRun }
   | { source: 'zing'; type: 'open-script-settings' }
   | { source: 'zing'; type: 'snapshot' }
+  | { source: 'zing'; type: 'palette-state' }
+  | { source: 'zing'; type: 'cancel-palette-continuation' }
   | { source: 'zing'; type: 'read-page-storage'; payload: StorageRead }
   | { source: 'zing'; type: 'open-cookie-access'; payload: CookieAccessRequest }
   | { source: 'zing'; type: 'open-shortcuts' }

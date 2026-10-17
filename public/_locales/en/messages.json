@@ -158,6 +158,15 @@
   "running": {
     "message": "Running…"
   },
+  "actionCompleted": {
+    "message": "Done"
+  },
+  "chooseNextTab": {
+    "message": "Choose a result to continue"
+  },
+  "errorRefreshAfterAction": {
+    "message": "Action completed, but the list could not refresh. Reopen zing to see the latest tabs."
+  },
   "closeCountOne": {
     "message": "Will close $1 tab"
   },

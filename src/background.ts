@@ -1,4 +1,4 @@
-import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut } from './paletteWindow';
+import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut, getPaletteWindowState, performWithPaletteContinuation, registerPaletteContinuation, releasePaletteContinuation, cancelPaletteContinuation } from './paletteWindow';
 import { startTabTucking } from './tabTuck';
 import { runSavedScript } from './scriptExecution';
 import { openRecentSwitcher } from './recentTabs';
@@ -6,9 +6,9 @@ import { readPageStorage, openCookieAccess } from './pageStorage';
 import { preferencesReady } from './preferences';
 import { errorMessage, t } from './i18n';
 import { openChromePage } from './chromePages';
-import { perform, snapshot } from './browser';
+import { snapshot } from './browser';
 import { resetUsage } from './usageStorage';
-import type { Request, Snapshot, PageStorage, ScriptResult } from './types';
+import type { Request, Snapshot, PageStorage, ScriptResult, PaletteState } from './types';
 
 const opening = new Set<number>();
 async function launch(tab: chrome.tabs.Tab) {
@@ -47,29 +47,34 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 });
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'zing') return;
-  if (!['run-saved-script', 'open-script-settings', 'snapshot', 'execute', 'open-shortcuts', 'reset-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
+  if (!['run-saved-script', 'open-script-settings', 'snapshot', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
+  // Register before any await so a dismissal arriving during preflight also
+  // cancels this caller's continuation, without cancelling its browser action.
+  const ticket = request.type === 'execute' && request.payload?.paletteState && ['close', 'closeOthers', 'closeRight'].includes(request.payload.action)
+    ? registerPaletteContinuation(sender) : undefined;
   let responded = false;
-  const success = (data?: void | Snapshot | PageStorage | ScriptResult) => {
+  const success = (data?: void | Snapshot | PageStorage | ScriptResult | PaletteState) => {
     if (responded) return;
     responded = true;
     // Switching/closing a tab can remove the caller before the reply. That
     // must not interrupt the successful action's queued usage write.
     try { respond({ ok: true, data }); } catch { /* Caller already gone. */ }
   };
-  const result = preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | ScriptResult> => {
+  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | ScriptResult | PaletteState> => {
+    if (request.type === 'palette-state') return getPaletteWindowState(sender);
     sender = await paletteSender(sender);
     if (request.type === 'run-saved-script') return runSavedScript(request.payload, sender);
     if (request.type === 'open-script-settings') return chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}`, ...(sender.tab ? { windowId: sender.tab.windowId } : {}) }).then(() => undefined);
     if (request.type === 'open-cookie-access') return openCookieAccess(request.payload, sender);
     if (request.type === 'read-page-storage') return readPageStorage(request.payload, sender);
     if (request.type === 'snapshot') return snapshot(sender.tab);
-    if (request.type === 'execute') return perform(request.payload, () => success());
+    if (request.type === 'execute') return performWithPaletteContinuation(request.payload, sender, () => success(), ticket);
     if (request.type === 'reset-usage') return resetUsage();
     const windowId = sender.tab?.windowId ?? (await chrome.windows.getCurrent()).id;
     if (windowId === undefined) throw new Error(t('errorWindow'));
     return openChromePage('openExtensionShortcuts', windowId);
   });
-  void result.then(success).catch(error => {
+  void result.finally(() => releasePaletteContinuation(ticket)).then(success).catch(error => {
     if (!responded) respond({ ok: false, error: errorMessage(error) });
   });
   return true;

@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import type { Reply, Request, Snapshot, Execution, StorageRead, PageStorage, CookieAccessRequest, ScriptRun, ScriptResult } from './types';
+import type { Reply, Request, Snapshot, PaletteState, Execution, StorageRead, PageStorage, CookieAccessRequest, ScriptRun, ScriptResult } from './types';
 
 async function send<T>(request: Request): Promise<T> {
   const reply = await chrome.runtime.sendMessage<Request, Reply<T>>(request);
@@ -7,6 +7,8 @@ async function send<T>(request: Request): Promise<T> {
   return reply.data;
 }
 export const getSnapshot = () => send<Snapshot>({ source: 'zing', type: 'snapshot' });
+export const getPaletteState = () => send<PaletteState | undefined>({ source: 'zing', type: 'palette-state' });
+export const cancelPaletteContinuation = () => send<void>({ source: 'zing', type: 'cancel-palette-continuation' });
 export const execute = (payload: Execution) => send<void>({ source: 'zing', type: 'execute', payload });
 
 export const openShortcuts = () => send<void>({ source: 'zing', type: 'open-shortcuts' });

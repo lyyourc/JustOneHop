@@ -158,6 +158,15 @@
   "running": {
     "message": "执行中…"
   },
+  "actionCompleted": {
+    "message": "已完成"
+  },
+  "chooseNextTab": {
+    "message": "请选择结果以继续操作"
+  },
+  "errorRefreshAfterAction": {
+    "message": "操作已完成，但列表未能刷新。请重新打开 zing 查看最新标签页。"
+  },
   "closeCountOne": {
     "message": "将关闭 $1 个标签页"
   },

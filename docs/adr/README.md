@@ -19,6 +19,7 @@ ADR 解释“为什么这样做”，保留背景、决策、备选方案和接�
 | 0009 | [列表型二级页取消标题栏，层名与返回移到底栏左侧](0009-list-page-footer-breadcrumb.md) | 已采纳 |
 | 0010 | [内容区锚定与原生窗口边框校准](0010-content-anchor-panel-geometry.md) | 已采纳；更新 0001 的独立窗口几何策略 |
 | 0011 | [Chrome 内置页面与当前窗口复用](0011-chrome-pages.md) | 已采纳 |
+| 0012 | [整理操作保留面板与关闭来源页后接续](0012-continuous-tab-management.md) | 已采纳；更新 0001、0007 |
 
 ## 维护方式
 

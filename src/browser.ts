@@ -66,8 +66,8 @@ export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
 
 export async function perform(payload: Execution, onPerformed?: () => void): Promise<void> {
   const target = await performAction(payload);
-  // Let the panel dismiss as soon as Chrome finishes the action, while this
-  // promise still owns the queued persistence work in the service worker.
+  // Let the panel refresh or dismiss as soon as Chrome finishes the action,
+  // while this promise still owns queued persistence in the service worker.
   onPerformed?.();
   if (target) {
     // Learning is secondary: a storage failure must not turn a successful browser
