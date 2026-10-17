@@ -379,7 +379,7 @@ async function openRecovery() {
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('recover tucked tabs');
   await ui.getByRole('option').filter({ hasText: 'Review Tucked Away Groups' }).first().click();
-  await expect(ui.getByRole('heading', { name: 'Review Tucked Away Groups' })).toBeVisible();
+  await expect(ui.locator('.tuck-recovery .palette-footer-title')).toHaveText('Review Tucked Away Groups');
 }
 
 test('English actual Chrome restart retains records and safely resumes a group with incomplete restored metadata', async () => {
@@ -406,7 +406,7 @@ test('English actual Chrome restart retains records and safely resumes a group w
     await ui.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
     await expect(ui.getByRole('dialog')).toBeVisible();
     await ui.keyboard.press('Escape');
-    await expect(ui.getByRole('heading', { name: 'Review Tucked Away Groups' })).toBeVisible();
+    await expect(ui.locator('.tuck-recovery .palette-footer-title')).toHaveText('Review Tucked Away Groups');
     await ui.screenshot({ path: test.info().outputPath('zing-tuck-recovery.png') });
     await ui.evaluate(async () => {
       const { preferences } = await chrome.storage.local.get('preferences');
@@ -450,6 +450,23 @@ test('English recovery rejects stale confirmation and forgetting leaves native p
   expect(stale.ok).toBe(false);
   expect(await ui.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'My changed group', color: 'blue' });
   const before = await liveTabs();
+  await openRecovery();
+  await expect(ui.locator('.tuck-recovery .settings-header')).toHaveCount(0);
+  await expect(ui.locator('.tuck-recovery .footer-back')).toHaveAccessibleName('Back · Review Tucked Away Groups');
+  const selected = ui.locator('.recovery-candidate[aria-selected=true]');
+  const selectedId = await selected.getAttribute('id');
+  await selected.click({ button: 'right' });
+  await expect(ui.getByRole('dialog')).toBeVisible();
+  await ui.locator('.tuck-recovery .footer-back').click();
+  await expect(ui.getByRole('dialog')).toHaveCount(0);
+  await expect(ui.locator('.tuck-recovery .palette-footer-title')).toHaveText('Review Tucked Away Groups');
+  await expect(ui.getByRole('listbox')).toBeFocused();
+  await expect(selected).toHaveAttribute('id', selectedId!);
+  expect((await recoverySnapshot()).tuckRecoveries).toHaveLength(1);
+  await ui.locator('.tuck-recovery .footer-back').click();
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  await expect(search).toBeFocused(); await expect(search).toHaveValue('recover tucked tabs');
+  expect((await liveTabs()).map(tab => [tab.id, tab.groupId])).toEqual(before.map(tab => [tab.id, tab.groupId]));
   await openRecovery();
   await ui.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
   await ui.getByRole('dialog').getByRole('option').filter({ hasText: 'Stop Recovering This Record' }).click();

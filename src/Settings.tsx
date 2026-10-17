@@ -1,4 +1,4 @@
-import { BackLayer } from './Navigation';
+import { BackLayer, useNavigateBack } from './Navigation';
 import { SearchDismissButton } from './SearchDismissButton';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, Search, SlidersHorizontal, X } from 'lucide-react';
@@ -82,6 +82,7 @@ function Choice<T extends string>({ label, value, options, onChange, query }: {
 export function Settings({ preferences, shortcut, onBack, onClose, isMac, initialSection }: {
   initialSection?: SettingsSection; preferences: Preferences; shortcut: string; onBack: () => void; onClose: () => void; isMac: boolean;
 }) {
+  const back = useNavigateBack();
   const [library, setLibrary] = useState<'all' | 'binding' | null>(null);
   const [error, setError] = useState(false);
   const [rankingReset, setRankingReset] = useState<'idle' | 'busy' | 'done'>('idle');
@@ -198,7 +199,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
     </div>
     {error ? <div className="error-banner" role="alert">{t('errorSaveSettings')}</div> : null}
     <PaletteFooter title={t('settings')}
-      navigation={{ kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: onBack }}
+      navigation={{ kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: back }}
       context={<span className="settings-navigation" title={t('settingsNavigationHelp')} aria-label={t('settingsNavigationHelp')}>
         <span className="navigation-key"><span className="key-chord"><kbd>Tab</kbd></span><span>{t('nextControl')}</span></span>
         <span aria-hidden="true">·</span>

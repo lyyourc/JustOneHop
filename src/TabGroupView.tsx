@@ -58,7 +58,9 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
     else if (editor === 'color') colorInput.current?.focus();
     else { input.current?.focus(); input.current?.setSelectionRange(...caret.current); }
   }, [menu, editor, busy]);
-  useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
+  useLayoutEffect(() => {
+    if (!editor && !menu) list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [selected?.id, editor, menu]);
   function rememberCaret() {
     if (!menu && !editor) caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
   }

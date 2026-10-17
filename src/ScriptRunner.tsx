@@ -1,10 +1,10 @@
 import { BackLayer } from './Navigation';
-import { SearchDismissButton } from './SearchDismissButton';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
-import { HighlightedText } from './HighlightedText';
+import { ScriptList } from './ScriptList';
+import { useResultSelection } from './useResultSelection';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowLeft, Copy, LoaderCircle, Play, Search } from 'lucide-react';
+import { Copy, LoaderCircle, Play } from 'lucide-react';
 import { getScripts, subscribeScripts } from './scripts';
 import { openScriptSettings, runSavedScript } from './api';
 import { copyText } from './clipboard';
@@ -17,7 +17,6 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
   const scripts = useSyncExternalStore(subscribeScripts, getScripts);
   const [selectedId, setSelectedId] = useState(initialScriptId || '');
   const [query, setQuery] = useState('');
-  const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ScriptResult | null>(null);
   const [error, setError] = useState('');
@@ -33,13 +32,12 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const search = useRef<HTMLInputElement>(null);
   const searchCaret = useRef<[number, number]>([0, 0]);
-  const list = useRef<HTMLDivElement>(null);
   const back = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
   const pending = useRef(false);
   const runRevision = useRef(0);
   const rows = scripts.filter(script => script.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  const selected = rows[Math.min(index, rows.length - 1)];
+  const { selected, setSelection } = useResultSelection(rows, query);
   const script = scripts.find(script => script.id === selectedId);
   const actions = [
     ...(result?.success ? [{ id: 'copy', title: t('copyScriptResult'), keywords: 'copy result 复制结果', icon: <Copy size={16} /> }] : []),
@@ -79,7 +77,7 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
   async function run(id: string) {
     if (pending.current) return;
     if (!selectedId) {
-      setIndex(Math.max(0, rows.findIndex(row => row.id === id)));
+      setSelection(id);
       searchCaret.current = [search.current?.selectionStart ?? query.length, search.current?.selectionEnd ?? query.length];
     }
     const revision = ++runRevision.current;
@@ -112,8 +110,8 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
       if (field.tagName === 'TEXTAREA') (field as HTMLTextAreaElement).setSelectionRange(...outputCaret.current);
     } else (primaryButton() || back.current)?.focus();
   }, [selectedId, busy, result, menu]);
-  useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id, !!selectedId]);
   function leave() {
+    if (menu) { setMenu(false); return; }
     if (selectedId && !initialScriptId) {
       runRevision.current++; pending.current = false; setBusy(false);
       setSelectedId(''); setMenu(false); setResult(null); setError(''); setNotice(''); setCopyFailed(false);
@@ -136,54 +134,28 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
       if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) act(result?.success ? 'copy' : 'rerun');
       return;
     }
-    if (!selectedId && event.target === search.current) {
-      const arrow = event.key === 'ArrowDown' || event.key === 'ArrowUp';
-      const emacs = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ['n', 'p'].includes(event.key.toLowerCase());
-      if (!event.shiftKey && (arrow || emacs || ['PageDown', 'PageUp'].includes(event.key))) {
-        event.preventDefault(); event.stopPropagation();
-        if (!rows.length) return;
-        const at = rows.indexOf(selected);
-        const down = event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'n';
-        let next = (at + (down ? 1 : -1) + rows.length) % rows.length;
-        if (arrow && modifier) next = down ? rows.length - 1 : 0;
-        else if (event.altKey || event.key.startsWith('Page')) {
-          const row = list.current?.querySelector<HTMLElement>('.script-item');
-          const page = Math.max(1, Math.floor((list.current?.clientHeight ?? 280) / (row?.offsetHeight || 40)) - 1);
-          next = Math.max(0, Math.min(rows.length - 1, at + (down ? page : -page)));
-        }
-        setIndex(next);
-      } else if (event.key === 'Enter') {
-        event.preventDefault(); event.stopPropagation();
-        if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && selected) void run(selected.id);
-      }
-    }
   }}>
     <div className={`script-surface ${menu ? 'subdued' : ''}`} inert={menu ? true : undefined}>
-      <header className="settings-header"><button ref={back} className="settings-back" onClick={leave} aria-label={t('back')}><ArrowLeft size={18} /></button>
-        <h1>{selectedId ? script?.title || t('runScript') : t(autoCopy ? 'runCopyScript' : 'runScript')}</h1>{selectedId ? <kbd>esc</kbd> : null}</header>
-      <div className="settings-body">
-        <p className="script-description script-run-target">{t('scriptRunTarget', (() => { try { return new URL(target.expectedUrl).host; } catch { return target.expectedUrl; } })())}</p>
-        {!selectedId ? <>
-          <div className="script-search"><Search size={16} /><input data-back-on-empty ref={search} aria-label={t('searchScripts')} placeholder={t('searchScripts')} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} />
-            <SearchDismissButton label={t('back')} /></div>
-          <div ref={list} className="script-list" role="listbox" aria-label={t('scriptLibrary')}>{rows.map(row => <button key={row.id} role="option" aria-selected={row.id === selected?.id} className={`script-item ${row.id === selected?.id ? 'selected' : ''}`} onClick={() => void run(row.id)}>
-            <span><HighlightedText text={row.title} query={query} allowTypos={false} /></span><Play size={14} /></button>)}</div>
-          {!rows.length ? <p className="empty">{t(scripts.length ? 'noResults' : 'noRunnableScripts')}</p> : null}
-        </> : <>
+      {!selectedId ? <ScriptList id="script-run-results" scripts={rows} selected={selected} query={query} onQueryChange={setQuery}
+        onSelect={setSelection} onActivate={row => void run(row.id)} searchRef={search} isMac={isMac}
+        emptyLabel={t(scripts.length ? 'noResults' : 'noRunnableScripts')} /> : <div className="script-result-body">
+          <h1>{script?.title || t('runScript')}</h1>
+          <p className="script-description script-run-target">{t('scriptRunTarget', (() => { try { return new URL(target.expectedUrl).host; } catch { return target.expectedUrl; } })())}</p>
           {busy ? <div className="script-run-status" role="status"><LoaderCircle className="spinner" size={18} />{t('scriptExecuting')}<p>{t('scriptRunningBack')}</p></div> : null}
           {result ? <><p className="setting-note">{t(result.success ? 'scriptResult' : 'scriptRunFailed')}</p>
             <textarea className="script-output" aria-label={t('scriptResult')} value={result.text} readOnly spellCheck={false} />
             {!result.success ? <p className="recent-error" role="alert">{t('scriptRunFailed')}</p> : null}</> : null}
           {error ? <p className="recent-error" role="alert">{error}</p> : null}
-          {error === t('errorScriptDisabled') ? <div className="binding-guide"><p>{t('scriptEnableHint')}</p><button className="ranking-reset" onClick={() => { void openScriptSettings().catch(reason => setError(errorMessage(reason))); }}>{t('enableUserScripts')}</button></div> : null}
-        </>}
-      </div>
+          {error === t('errorScriptDisabled') ? <div className="binding-guide"><p>{t('scriptEnableHint')}</p><button className="surface-button" onClick={() => { void openScriptSettings().catch(reason => setError(errorMessage(reason))); }}>{t('enableUserScripts')}</button></div> : null}
+      </div>}
     </div>
     {menu ? <ActionMenu id="script-result-actions" isMac={isMac} title={<span>{script?.title || t('scriptResult')}</span>}
       actions={actions} query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }}
       selectedId={activeAction?.id} onSelectionChange={setActionSelection} onAction={act} onClose={() => setMenu(false)} /> : null}
-    {notice ? <div className="script-feedback"><p className={copyFailed ? 'recent-error' : 'setting-note'} role={copyFailed ? 'alert' : 'status'}>{notice}</p></div> : null}
-    <PaletteFooter isMac={isMac} status={<span className="footer-note" title={t('scriptResultsTemporary')}>{t('scriptResultsTemporary')}</span>}
+    <PaletteFooter isMac={isMac} title={selectedId ? t('scriptResult') : t(autoCopy ? 'runCopyScript' : 'runScript')}
+      navigation={{ kind: 'back', label: `${t('back')} · ${t('runScript')}`, tooltip: `${t('back')} · Esc`, buttonRef: back, onAction: leave }}
+      context={<span className="storage-origin" title={selectedId ? t('scriptResultsTemporary') : target.expectedUrl}>{selectedId ? t('scriptResultsTemporary') : (() => { try { return new URL(target.expectedUrl).host; } catch { return target.expectedUrl; } })()}</span>}
+      status={notice ? <span className={copyFailed ? 'footer-status' : undefined} role={copyFailed ? 'alert' : 'status'}>{notice}</span> : undefined}
       primary={selectedId ? {
         label: busy ? t('scriptExecuting') : menu ? activeAction?.title || t('copyScriptResult') : t(result?.success ? 'copyScriptResult' : 'rerunScript'),
         keys: ['↵'], disabled: busy || (menu ? !activeAction : !result?.success && !script),

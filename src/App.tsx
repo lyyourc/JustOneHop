@@ -383,8 +383,8 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
         <div className="action-menu script-confirm" role="alertdialog" aria-modal="true" aria-labelledby="script-delete-title" aria-describedby="script-delete-detail">
           <h2 id="script-delete-title">{t('confirmDeleteScript')}</h2>
           <p id="script-delete-detail">{t('scriptDeletePrompt', deleteTarget.title)}</p>
-          <div className="script-controls"><button ref={cancelDelete} className="ranking-reset" disabled={busy} onClick={() => setDeleteTarget(null)}>{t('cancelScriptDelete')}</button>
-            <button className="ranking-reset delete-script-button" disabled={busy} onClick={() => void confirmDelete()}>{t('deleteScript')}</button></div>
+          <div className="script-controls"><button ref={cancelDelete} className="surface-button" disabled={busy} onClick={() => setDeleteTarget(null)}>{t('cancelScriptDelete')}</button>
+            <button className="surface-button delete-script-button" disabled={busy} onClick={() => void confirmDelete()}>{t('deleteScript')}</button></div>
         </div>
       </BackLayer> : <ActionMenu id="zing-actions" isMac={isMac}
         title={<><span className="action-target-icon"><Favicon pageUrl={actionTarget.faviconPageUrl} fallback={<Glyph name={actionTarget.icon} size={15} />} /></span><span>{liveTarget?.title}</span></>}

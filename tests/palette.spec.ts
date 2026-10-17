@@ -792,7 +792,7 @@ test.describe(() => {
   await expect(settingsSearch).toHaveValue('');
   await settingsSearch.fill('scripts');
   await ui.getByRole('button', { name: 'Manage Scripts' }).click();
-  await expect(ui.getByRole('textbox', { name: 'Search scripts' })).toBeVisible();
+  await expect(ui.getByRole('combobox', { name: 'Search scripts' })).toBeVisible();
   await ui.keyboard.press('Escape');
   await expect(settingsSearch).toHaveValue('scripts');
   await expect(ui.getByRole('button', { name: 'Manage Scripts' })).toBeFocused();
@@ -2312,6 +2312,111 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English script library preview selects without activation and copies exact code', async () => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const alpha = 'globalThis.__zingPreviewExecuted = true;\nconst text = "<script> & 中文";\n\n';
+  const beta = 'globalThis.__zingPreviewExecuted = true;\n  "Beta keeps indentation";\n\n';
+  await worker.evaluate(({ alpha, beta }) => chrome.storage.local.set({
+    'saved-script:preview-alpha': { title: 'Preview alpha', code: alpha },
+    'saved-script:preview-beta': { title: 'Preview beta', code: beta },
+  }), { alpha, beta });
+  await ui.evaluate(async () => {
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    const scope = window as unknown as { previewRunRequests: number };
+    scope.previewRunRequests = 0;
+    chrome.runtime.sendMessage = ((request: { type?: string }) => {
+      if (request.type === 'run-saved-script') scope.previewRunRequests++;
+      return send(request);
+    }) as typeof chrome.runtime.sendMessage;
+    await navigator.clipboard.writeText('clipboard before preview');
+  });
+  await ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' }).fill('manage scripts');
+  await ui.keyboard.press('Enter');
+  const search = ui.getByRole('combobox', { name: 'Search scripts' });
+  const preview = ui.getByRole('region', { name: 'Code Preview', exact: true });
+  const code = preview.locator('.script-preview-code');
+  const primary = ui.locator('.palette-footer .primary-action');
+  const first = ui.getByRole('option', { name: 'Preview alpha', exact: true });
+  const second = ui.getByRole('option', { name: 'Preview beta', exact: true });
+  await search.fill('Preview');
+  await expect(first).toHaveAttribute('aria-selected', 'true');
+  await expect(code).toHaveValue(alpha);
+  await expect(code).toHaveAttribute('readonly', '');
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAccessibleName('Code Preview');
+  await expect(primary).toHaveAccessibleName('Copy Code');
+
+  // A click changes the preview only; pointer motion must not steal its target.
+  await second.click();
+  await expect(second).toHaveAttribute('aria-selected', 'true');
+  await expect(code).toHaveValue(beta);
+  await expect(preview.locator('.script-preview-info')).toContainText('Name');
+  await expect(preview.locator('.script-preview-info')).toContainText('Preview beta');
+  await expect(preview.locator('.script-preview-info')).toContainText('Content Type');
+  await expect(preview.locator('.script-preview-info')).toContainText('JavaScript');
+  await first.hover(); await second.hover(); await first.hover();
+  await expect(second).toHaveAttribute('aria-selected', 'true');
+  await expect(code).toHaveValue(beta);
+  await expect(ui.locator('.script-editor-body, .script-run-status, .script-output')).toHaveCount(0);
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe('clipboard before preview');
+  await search.press('ArrowUp');
+  await expect(first).toHaveAttribute('aria-selected', 'true');
+  await expect(code).toHaveValue(alpha);
+  await search.press('ArrowDown');
+  await expect(second).toHaveAttribute('aria-selected', 'true');
+  await search.press('Control+p');
+  await expect(first).toHaveAttribute('aria-selected', 'true');
+  await search.press('Control+n');
+  await expect(second).toHaveAttribute('aria-selected', 'true');
+  await expect(search).toHaveAttribute('aria-activedescendant', (await second.getAttribute('id'))!);
+  await search.press('Shift+Enter'); await search.press('Meta+Enter');
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe('clipboard before preview');
+  await search.press('Enter');
+  await expect(ui.getByRole('status')).toContainText('Code copied');
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(beta);
+  await expect(search).toBeFocused();
+  await first.click(); await primary.click();
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(alpha);
+  await code.focus(); await expect(code).toBeFocused();
+  expect(await code.evaluate(node => getComputedStyle(node).userSelect)).not.toBe('none');
+  await expect(ui.locator('.script-editor-body')).toHaveCount(0);
+
+  // Menu editing returns to the same filtered target and input selection.
+  await search.focus();
+  await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+  await ui.locator('.palette-footer .actions-button').click();
+  await ui.getByRole('option', { name: 'Edit Script', exact: true }).click();
+  await expect(ui.getByLabel('Name', { exact: true })).toHaveValue('Preview alpha');
+  await expect(ui.getByLabel('JavaScript code')).toHaveValue(alpha);
+  await ui.keyboard.press('Escape');
+  await expect(search).toBeFocused(); await expect(search).toHaveValue('Preview');
+  expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+  await expect(first).toHaveAttribute('aria-selected', 'true');
+  await expect(code).toHaveValue(alpha);
+  await search.fill('no matching script');
+  await expect(ui.locator('.script-item')).toHaveCount(0);
+  await expect(code).toHaveCount(0);
+  await expect(ui.locator('.script-preview-info')).toHaveCount(0);
+  await expect(primary).toBeDisabled();
+  await expect(search).not.toHaveAttribute('aria-activedescendant', /.+/);
+  await search.press('Enter');
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(alpha);
+
+  // Built-in setup is previewable and reaches its read-only instructions via Actions.
+  await search.fill('Ctrl+Tab');
+  await expect(code).toBeVisible();
+  await ui.locator('.palette-footer .actions-button').click();
+  await expect(ui.getByRole('dialog').getByRole('option', { name: 'Edit Script', exact: true })).toHaveCount(0);
+  await ui.getByRole('option', { name: 'View Setup Instructions', exact: true }).click();
+  await expect(ui.getByLabel('JavaScript code')).toHaveAttribute('readonly', '');
+  await ui.keyboard.press('Escape');
+  await expect(search).toHaveValue('Ctrl+Tab');
+  expect(await ui.evaluate(() => (window as unknown as { previewRunRequests: number }).previewRunRequests)).toBe(0);
+  expect(await ui.evaluate(() => '__zingPreviewExecuted' in globalThis)).toBe(false);
+  expect(await worker.evaluate(() => '__zingPreviewExecuted' in globalThis)).toBe(false);
+  expect(await worker.evaluate(async () => (await chrome.storage.local.get('saved-script:preview-alpha'))['saved-script:preview-alpha'])).toEqual({ title: 'Preview alpha', code: alpha });
+});
+
   test('English script library saves edits searches copies and deletes without executing code', async () => {
   await context.grantPermissions(['clipboard-read']);
   const code = 'globalThis.__zingSavedScriptExecuted = true;\nconst text = "<script> & Unicode 中文";\n\n';
@@ -2323,7 +2428,7 @@ test.describe(() => {
   await ui.getByLabel('Name', { exact: true }).fill('Storage helper');
   await ui.getByLabel('JavaScript code').fill(code);
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(ui.getByRole('button', { name: 'Storage helper Edit Script' })).toBeVisible();
+  await expect(ui.getByRole('option', { name: 'Storage helper', exact: true })).toBeVisible();
   await ui.reload();
   await ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' }).fill('Storage helper');
   await expect(ui.getByRole('option').first()).toContainText('Storage helper');
@@ -2338,17 +2443,59 @@ test.describe(() => {
   await expect(ui.getByRole('option')).toHaveCount(0);
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
   await ui.getByRole('button', { name: 'Manage Scripts' }).click();
-  await ui.getByRole('textbox', { name: 'Search scripts' }).fill('Storage helper');
+  const scripts = ui.getByRole('combobox', { name: 'Search scripts' });
+  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:decoy': { title: 'Storage alpha', code: '"Do not copy this script"' } }));
+  await scripts.fill('Storage');
+  await expect(ui.locator('.script-item')).toHaveCount(2);
+  await scripts.press('Meta+ArrowUp');
+  await expect(ui.locator('.script-item.selected')).toHaveText('Storage alpha');
+  await scripts.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+  const helper = ui.getByRole('option', { name: 'Storage helper', exact: true });
+  const helperId = await helper.getAttribute('id');
+  // Right-click must choose the clicked script, even when another row was selected.
+  await helper.click({ button: 'right' });
+  const actions = ui.getByRole('combobox', { name: 'Search actions' });
+  await expect(actions).toBeFocused();
+  await expect(ui.locator('.action-heading')).toContainText('Storage helper');
+  await expect(ui.locator('.action-row')).toContainText(['Copy Code', 'Edit Script', 'New Script', 'Delete']);
+  await actions.fill('copy'); await actions.press('Enter');
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  await expect(scripts).toBeFocused();
+  expect(await scripts.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+  await helper.click({ button: 'right' });
+  await actions.fill('delete'); await actions.press('Enter');
+  const confirmation = ui.getByRole('alertdialog');
+  await expect(confirmation).toContainText('Storage helper');
+  await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
   await ui.keyboard.press('Enter');
+  await expect(confirmation).toHaveCount(0);
+  await expect(scripts).toBeFocused();
+  await expect(helper).toHaveAttribute('aria-selected', 'true');
+  expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')).length)).toBe(2);
+  await helper.click({ button: 'right' });
+  await actions.fill('edit'); await ui.locator('.palette-footer .primary-action').click();
   await expect(ui.getByLabel('JavaScript code')).toHaveValue(code);
-  await ui.getByLabel('Name', { exact: true }).fill('Storage helper renamed');
+  // Rename across the sort order: restoration follows identity, not the old index.
+  await ui.getByLabel('Name', { exact: true }).fill('Storage 0 renamed');
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await ui.getByRole('button', { name: 'Storage helper renamed Edit Script' }).click();
-  await ui.keyboard.press('Meta+k');
-  await ui.getByRole('combobox', { name: 'Search actions' }).fill('delete'); await ui.keyboard.press('Enter');
-  await ui.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect(ui.getByRole('button', { name: 'Storage helper renamed Edit Script' })).toHaveCount(0);
-  expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')))).toEqual([]);
+  await expect(scripts).toBeFocused(); await expect(scripts).toHaveValue('Storage');
+  expect(await scripts.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+  const renamed = ui.getByRole('option', { name: 'Storage 0 renamed', exact: true });
+  await expect(renamed).toHaveAttribute('id', helperId!);
+  await expect(renamed).toHaveAttribute('aria-selected', 'true');
+  await renamed.click({ button: 'right' });
+  await actions.fill('new'); await actions.press('Enter');
+  await expect(ui.locator('.palette-footer-title')).toHaveText('New Script');
+  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
+  await expect(ui.getByLabel('Name', { exact: true })).toHaveValue('');
+  await ui.keyboard.press('Escape');
+  await expect(renamed).toHaveAttribute('aria-selected', 'true');
+  await renamed.click({ button: 'right' });
+  await actions.fill('delete'); await actions.press('Enter');
+  await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(renamed).toHaveCount(0);
+  await expect(ui.getByRole('option', { name: 'Storage alpha', exact: true })).toBeVisible();
+  expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')))).toEqual(['saved-script:decoy']);
 });
 });
 
@@ -2359,11 +2506,22 @@ test.describe(() => {
   const before = await worker.evaluate(() => chrome.commands.getAll());
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
   await ui.getByRole('button', { name: 'Set Up', exact: true }).click();
-  await expect(ui.getByRole('heading', { name: 'Set Up Ctrl+Tab' })).toBeVisible();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'Set Up Ctrl+Tab' })).toBeVisible();
   await expect(ui.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
   await expect(ui.getByRole('textbox', { name: 'JavaScript code' })).toHaveAttribute('readonly', '');
-  await ui.getByRole('button', { name: 'Copy Code', exact: true }).click();
+  await expect(ui.locator('.script-library .settings-header')).toHaveCount(0);
+  const copy = ui.locator('.palette-footer .primary-action');
+  await expect(copy).toHaveAccessibleName('Copy Code');
+  await expect(copy).toBeFocused();
+  await expect(ui.locator('.script-editor-body')).toBeVisible();
+  await ui.keyboard.press('Enter');
+  await expect(ui.getByRole('status')).toContainText('Code copied');
+  await expect(copy).toBeFocused();
   const code = await ui.evaluate(() => navigator.clipboard.readText());
+  await ui.keyboard.press('Enter');
+  await expect(copy).toBeFocused();
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
   const calls: unknown[] = [];
   new Function('chrome', code)({ developerPrivate: { updateExtensionCommand: (value: unknown) => calls.push(value) } });
   expect(calls).toEqual([
@@ -2373,11 +2531,17 @@ test.describe(() => {
   expect(await worker.evaluate(() => chrome.commands.getAll())).toEqual(before);
   await ui.setViewportSize({ width: 390, height: 500 });
   await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
-  expect(await ui.locator('.settings-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-  await ui.getByRole('button', { name: 'Copy Code', exact: true }).scrollIntoViewIfNeeded();
+  expect(await ui.locator('.script-editor-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await expect(ui.locator('.palette-footer .primary-action')).toBeInViewport({ ratio: 1 });
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('script-binding-guide.png') });
+  await ui.locator('.palette-footer .actions-button').click();
+  await expect(ui.getByRole('dialog').getByRole('option', { name: 'Delete', exact: true })).toHaveCount(0);
+  await ui.locator('.palette-footer .footer-back').click();
+  await expect(ui.locator('.action-menu')).toHaveCount(0);
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
+  await ui.locator('.palette-footer .actions-button').click();
   const created = context.waitForEvent('page');
-  await ui.getByRole('button', { name: 'Open Chrome Shortcuts' }).click();
+  await ui.getByRole('dialog').getByRole('option', { name: /Open Chrome Shortcuts/ }).click();
   await expect(await created).toHaveURL('chrome://extensions/shortcuts');
 });
 });
@@ -2392,14 +2556,18 @@ test('Chinese script library supports keyboard editing and nested Escape', async
   await expect(ui.getByLabel('JavaScript 代码')).toBeFocused();
   await ui.keyboard.type('const value = 42;');
   await ui.keyboard.press('Tab');
+  await expect(ui.locator('.palette-footer .footer-back')).toBeFocused();
+  await ui.keyboard.press('Tab');
   await expect(ui.getByRole('button', { name: '保存', exact: true })).toBeFocused();
   await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('textbox', { name: '搜索脚本' })).toBeFocused();
-  await ui.getByRole('textbox', { name: '搜索脚本' }).fill('Keyboard');
+  await expect(ui.getByRole('combobox', { name: '搜索脚本' })).toBeFocused();
+  await ui.getByRole('combobox', { name: '搜索脚本' }).fill('Keyboard');
+  await ui.keyboard.press('Meta+k');
+  await ui.locator('.action-search input').fill('编辑');
   await ui.keyboard.press('Enter');
   await expect(ui.getByLabel('JavaScript 代码')).toHaveValue('const value = 42;');
   await ui.keyboard.press('Escape');
-  await expect(ui.getByRole('heading', { name: '脚本收藏', exact: true })).toBeVisible();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: '脚本收藏' })).toBeVisible();
   await ui.keyboard.press('Escape');
   await expect(ui.getByRole('region', { name: '设置', exact: true })).toBeVisible();
   await ui.keyboard.press('Escape');
@@ -2501,7 +2669,7 @@ test('Chinese script actions protect built-in setup and return directly to searc
   await expect(ui.locator('.action-row')).toHaveCount(2);
   await expect(ui.locator('.action-row')).toContainText(['复制代码', '查看设置说明']);
   await ui.keyboard.press('Control+n'); await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('heading', { name: '设置 Ctrl+Tab' })).toBeVisible();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: '设置 Ctrl+Tab' })).toBeVisible();
   await expect(ui.getByLabel('JavaScript 代码')).toHaveAttribute('readonly', '');
   await expect(ui.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
   await ui.keyboard.press('Escape');
@@ -2558,7 +2726,7 @@ test.describe(() => {
   await search.fill('new script');
   await expect(ui.locator('.result[aria-selected=true]')).toContainText('New Script');
   await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('heading', { name: 'New Script', exact: true })).toBeVisible();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
   await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
   await ui.keyboard.type('Clipboard helper'); await ui.keyboard.press('Tab');
   await ui.keyboard.type('localStorage.getItem("demo");');
@@ -2580,8 +2748,8 @@ test.describe(() => {
   await expect(search).toBeFocused();
   await expect(ui.locator('.result.script')).toHaveCount(0);
   await ui.keyboard.press('Meta+a'); await ui.keyboard.type('scripts'); await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('heading', { name: 'Script Library', exact: true })).toBeVisible();
-  await expect(ui.getByRole('textbox', { name: 'Search scripts' })).toBeFocused();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'Script Library' })).toBeVisible();
+  await expect(ui.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('scripts');
   await search.fill('new script'); await ui.keyboard.press('Enter');
   await ui.keyboard.type('Unsaved'); await ui.keyboard.press('Escape');
@@ -2607,10 +2775,10 @@ test('Chinese command discovery opens each preference at its keyboard control', 
   await expect(ui.locator('[data-setting=ranking] button')).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
   await search.fill('脚本'); await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('heading', { name: '脚本收藏', exact: true })).toBeVisible();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: '脚本收藏' })).toBeVisible();
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
   await search.fill('新建脚本'); await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('heading', { name: '新建脚本', exact: true })).toBeVisible();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: '新建脚本' })).toBeVisible();
 });
 
 async function enableScriptExecution() {
@@ -2660,7 +2828,7 @@ test.describe(() => {
   const { page, surface } = await scriptExecutionFixture('Promise.resolve({ answer: 42, markup: "<script>not HTML</script>" })');
   const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('run script'); await page.keyboard.press('Enter');
-  await expect(surface.getByRole('textbox', { name: 'Search scripts' })).toBeFocused();
+  await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
   await page.keyboard.type('Execution helper'); await page.keyboard.press('Enter');
   await expect(surface.getByLabel('Result', { exact: true })).toHaveValue('{\n  "answer": 42,\n  "markup": "<script>not HTML</script>"\n}');
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
@@ -2721,7 +2889,7 @@ test.describe(() => {
   await ui.setViewportSize({ width: 750, height: 516 });
   await ui.getByRole('combobox').fill('new script');
   await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('heading', { name: 'New Script', exact: true })).toBeVisible();
+  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
   await ui.getByLabel('Name', { exact: true }).fill('Visible save regression');
   await ui.getByLabel('JavaScript code').fill('localStorage.getItem("demo")');
   await expect(ui.getByRole('button', { name: 'Save', exact: true })).toBeInViewport({ ratio: 1 });
@@ -2755,7 +2923,7 @@ test.describe(() => {
   await code.fill('42');
   await code.evaluate(el => (el as HTMLElement).style.height = '650px');
   await expect(save).toBeInViewport({ ratio: 1 });
-  await surface.locator('.settings-body').evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await surface.locator('.script-editor-body').evaluate(el => { el.scrollTop = el.scrollHeight; });
   await expect(save).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: test.info().outputPath('zing-save-short.png') });
   await save.click();
@@ -2786,7 +2954,7 @@ test.describe(() => {
   const bounds = await surface.locator('.palette').boundingBox();
   expect(Math.abs(bounds!.x + bounds!.width / 2 - 550)).toBeLessThan(1);
   await surface.getByRole('combobox').fill('new script'); await page.keyboard.press('Enter');
-  await expect(surface.getByRole('heading', { name: 'New Script', exact: true })).toBeVisible();
+  await expect(surface.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
   const editor = await surface.locator('.palette').boundingBox();
   expect(editor!.x).toBe(bounds!.x); expect(editor!.y).toBe(bounds!.y);
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
@@ -2877,7 +3045,12 @@ test.describe(() => {
   await page.keyboard.press('Enter');
   await expect.poll(() => focused('Search scripts')).toBe(true);
   await expect.poll(async () => (await ax()).some(node => node.role?.value === 'button' && node.name?.value === 'New Script' && !node.properties?.some(prop => prop.name === 'disabled' && prop.value.value === true))).toBe(true);
-  await page.keyboard.press('Tab');
+  await page.keyboard.press('Meta+Shift+n');
+  await expect.poll(() => focused('Name')).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => focused('Search scripts')).toBe(true);
+  // Search dismiss, footer back, primary Edit, then secondary New; rows are not Tab stops.
+  for (let at = 0; at < 4; at++) await page.keyboard.press('Tab');
   await expect.poll(() => focused('New Script')).toBe(true);
   await page.keyboard.press('Enter');
   await expect.poll(() => focused('Name')).toBe(true);
@@ -2908,22 +3081,22 @@ test.describe(() => {
   const surface = page.frameLocator('.zing-frame');
   const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('manage scripts'); await page.keyboard.press('Enter');
-  await expect(surface.getByRole('textbox', { name: 'Search scripts' })).toBeFocused();
-  await surface.getByRole('heading', { name: 'Script Library', exact: true }).click();
+  await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
+  await surface.locator('.palette-footer-title').filter({ hasText: 'Script Library' }).click();
   await page.keyboard.press('Escape');
   await expect(search).toBeFocused();
   await expect(search).toHaveValue('manage scripts');
   // Central routing handles each page, including clicks on non-input content.
   for (const [query, heading] of [['settings', 'Settings'], ['new script', 'New Script'], ['run script', 'Run Script']]) {
     await search.fill(query); await page.keyboard.press('Enter');
-    await (query === 'settings' ? surface.locator('.settings-view .palette-footer-title') : surface.getByRole('heading', { name: heading, exact: true })).click();
+    await surface.locator('.palette-footer-title').filter({ hasText: heading }).click();
     await page.keyboard.press('Escape'); await expect(search).toBeFocused();
     await expect(search).toHaveValue(query);
   }
   await search.fill('new script'); await page.keyboard.press('Enter');
   await page.keyboard.press('Meta+k');
   await surface.locator('.action-heading').click(); await page.keyboard.press('Escape');
-  await expect(surface.getByRole('heading', { name: 'New Script', exact: true })).toBeVisible();
+  await expect(surface.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
   await expect(surface.getByLabel('Name', { exact: true })).toBeFocused();
   await page.keyboard.press('Escape'); await expect(search).toBeFocused();
   await search.fill('local storage'); await page.keyboard.press('Enter');
@@ -2931,7 +3104,7 @@ test.describe(() => {
   await expect(search).toBeFocused();
   await search.fill('settings'); await page.keyboard.press('Enter');
   await surface.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
-  await surface.getByRole('heading', { name: 'Script Library', exact: true }).click();
+  await surface.locator('.palette-footer-title').filter({ hasText: 'Script Library' }).click();
   await page.keyboard.press('Escape');
   await expect(surface.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await surface.locator('.settings-view .palette-footer-title').click();
@@ -2951,7 +3124,7 @@ test.describe(() => {
     await ui.keyboard.press('Escape');
   };
   await search.fill('manage scripts'); await search.press('Enter');
-  await expect(ui.getByRole('textbox', { name: 'Search scripts' })).toBeFocused();
+  await expect(ui.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
   await escapeWithoutControlFocus();
   await expect(search).toBeFocused();
   await search.fill('settings'); await search.press('Enter');
@@ -2960,8 +3133,10 @@ test.describe(() => {
   await expect(ui.getByRole('combobox', { name: 'Language', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await expect(ui.getByRole('combobox', { name: 'Language', exact: true })).toBeFocused();
   await ui.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
-  const scripts = ui.getByRole('textbox', { name: 'Search scripts' });
-  await scripts.fill('Escape fixture'); await scripts.press('Enter');
+  const scripts = ui.getByRole('combobox', { name: 'Search scripts' });
+  await scripts.fill('Escape fixture'); await scripts.press('Meta+k');
+  await ui.getByRole('combobox', { name: 'Search actions' }).fill('edit');
+  await ui.keyboard.press('Enter');
   await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
   await ui.keyboard.press('Meta+k');
   await escapeWithoutControlFocus();
@@ -3024,7 +3199,7 @@ test.describe(() => {
     doc.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, isComposing: true }));
     doc.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, repeat: true }));
   });
-  await expect(surface.getByRole('textbox', { name: 'Search scripts' })).toBeVisible();
+  await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeVisible();
   await escape(); await expect(search).toBeFocused();
   await escape(); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
   // Reopen to catch stale registrations/listeners left behind by the prior mount.
@@ -3049,7 +3224,7 @@ test.describe(() => {
   });
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('run script'); await search.press('Enter');
-  const picker = ui.getByRole('textbox', { name: 'Search scripts' });
+  const picker = ui.getByRole('combobox', { name: 'Search scripts' });
   await picker.fill('Pending fixture'); await picker.press('Enter');
   await expect(ui.locator('.script-run-status')).toBeVisible();
   await ui.keyboard.press('Escape'); await expect(picker).toBeFocused();
@@ -3070,7 +3245,7 @@ test.describe(() => {
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('settings'); await search.press('Enter');
   await ui.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
-  const scripts = ui.getByRole('textbox', { name: 'Search scripts' });
+  const scripts = ui.getByRole('combobox', { name: 'Search scripts' });
   await scripts.fill('test'); await scripts.press('Backspace');
   await expect(scripts).toHaveValue('tes');
   await scripts.press('Meta+a'); await scripts.press('Backspace');
@@ -3436,10 +3611,23 @@ test.describe(() => {
     `saved-script:polish-${i}`, { title: `Polish ${String(i).padStart(2, '0')}`, code: '42' },
   ]))));
   await ui.locator('.search-bar input').fill('manage scripts'); await ui.keyboard.press('Enter');
-  const search = ui.getByRole('textbox', { name: 'Search scripts' });
+  const search = ui.getByRole('combobox', { name: 'Search scripts' });
   await search.fill('Polish');
   await expect(ui.locator('.script-item')).toHaveCount(35);
   await expect(ui.locator('.script-item mark').first()).toHaveText('Polish');
+  expect(await ui.locator('.script-list [role=option]').evaluateAll(rows => rows.every(row => (row as HTMLElement).tabIndex === -1))).toBe(true);
+  await search.press('Tab'); await expect(ui.locator('.script-search .search-dismiss')).toBeFocused();
+  await ui.keyboard.press('Tab'); await expect(ui.locator('.script-preview-code')).toBeFocused();
+  await ui.keyboard.press('Tab'); await expect(ui.locator('.palette-footer .footer-back')).toBeFocused();
+  await search.click();
+  await ui.getByRole('option', { name: 'Polish 03', exact: true }).hover();
+  await ui.getByRole('option', { name: 'Polish 04', exact: true }).hover();
+  await expect(ui.locator('.script-item.selected')).toHaveText('Polish 00');
+  await ui.getByRole('option', { name: 'Polish 04', exact: true }).click();
+  await expect(ui.locator('.script-item.selected')).toHaveText('Polish 04');
+  await ui.keyboard.press('Control+n'); await expect(ui.locator('.script-item.selected')).toHaveText('Polish 05');
+  await ui.keyboard.press('Control+p'); await expect(ui.locator('.script-item.selected')).toHaveText('Polish 04');
+  await search.press('Meta+ArrowUp');
   await search.press('Shift+Enter'); await expect(search).toBeVisible();
   await search.press('Control+Shift+n');
   await expect(ui.locator('.script-item.selected')).toContainText('Polish 00');
@@ -3456,6 +3644,8 @@ test.describe(() => {
   })).toBe(true);
   await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 4));
   await expect(ui.locator('.script-search .search-dismiss')).toHaveText('esc');
+  await ui.locator('.palette-footer .actions-button').click();
+  await ui.getByRole('combobox', { name: 'Search actions' }).fill('edit');
   await ui.locator('.palette-footer .primary-action').click();
   await expect(ui.getByLabel('Name', { exact: true })).toHaveValue('Polish 28');
   await ui.keyboard.press('Escape');
@@ -3479,6 +3669,14 @@ test.describe(() => {
   await theme.press('Shift+Enter'); await expect(theme).toHaveAttribute('aria-expanded', 'true');
   await theme.press('Enter'); await expect(theme).toHaveAttribute('aria-expanded', 'false');
   await expect(theme).toBeFocused();
+  const currentTheme = await theme.innerText();
+  await theme.click();
+  await theme.press('Control+n');
+  await ui.locator('.settings-page .palette-footer .footer-back').click();
+  await expect(theme).toHaveAttribute('aria-expanded', 'false');
+  await expect(theme).toBeFocused();
+  await expect(theme).toHaveText(currentTheme);
+  await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await theme.click();
   const dismiss = ui.locator('.settings-search .search-dismiss');
   await expect(dismiss).toHaveText('esc');
@@ -3538,10 +3736,135 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English shared script lists preserve main geometry at normal and narrow widths', async () => {
+  const longCode = Array.from({ length: 100 }, (_, index) => `// Preview line ${index}: ${'long code '.repeat(16)}`).join('\n');
+  const { page, surface } = await scriptExecutionFixture(longCode, false);
+  await worker.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 24 }, (_, index) => [
+    `saved-script:geometry-${index}`, { title: `Geometry ${String(index).padStart(2, '0')}`, code: `// Script ${index}\n43` },
+  ]))));
+  const root = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const geometry = () => surface.locator('.palette').evaluate(panel => {
+    const box = (node: Element) => {
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    };
+    const first = (selector: string) => box(panel.querySelector(selector)!);
+    return { panel: box(panel), search: first('.search-bar'), input: first('.search-bar input'),
+      row: first('.result'), icon: first('.result .entry-icon'), footer: first('.palette-footer'),
+      navigation: first('.footer-navigation') };
+  });
+  for (const size of [{ width: 1100, height: 760 }, { width: 390, height: 440 }]) {
+    await page.setViewportSize(size);
+    await root.fill('manage scripts');
+    await expect(surface.getByRole('option').first()).toBeVisible();
+    const main = await geometry();
+    expect(main.search.height).toBe(56); expect(main.row.height).toBe(40);
+    expect(main.icon.width).toBe(26); expect(main.icon.height).toBe(26);
+    expect(main.footer.height).toBe(44);
+    for (const [command, title] of [['manage scripts', 'Script Library'], ['run script', 'Run Script']]) {
+      await root.fill(command); await root.press('Enter');
+      const picker = surface.getByRole('combobox', { name: 'Search scripts' });
+      await expect(picker).toBeFocused();
+      await expect(surface.locator('.palette-footer-title')).toHaveText(title);
+      await expect(surface.locator('.settings-header')).toHaveCount(0);
+      const current = await geometry();
+      for (const key of ['panel', 'search', 'input', 'footer', 'navigation'] as const) expect(current[key]).toEqual(main[key]);
+      expect(current.row.height).toBe(main.row.height);
+      expect(current.icon.width).toBe(main.icon.width); expect(current.icon.height).toBe(main.icon.height);
+      expect(current.row.y).toBe(main.row.y);
+      expect(await surface.locator('.script-item').evaluateAll(rows => rows.every(row => (row as HTMLElement).tabIndex === -1))).toBe(true);
+      if (command === 'run script') {
+        expect(current.row).toEqual(main.row);
+        expect(current.icon).toEqual(main.icon);
+        await expect(surface.locator('.script-list-detail, .script-preview')).toHaveCount(0);
+      }
+      await picker.press('Tab'); await expect(surface.locator('.script-search .search-dismiss')).toBeFocused();
+      if (command === 'manage scripts') {
+        await page.keyboard.press('Tab'); await expect(surface.locator('.script-preview-code')).toBeFocused();
+      }
+      await page.keyboard.press('Tab'); await expect(surface.locator('.palette-footer .footer-back')).toBeFocused();
+      await picker.click();
+      await picker.press('Meta+ArrowUp');
+      const firstId = await surface.locator('.script-item.selected').getAttribute('id');
+      await picker.press('Control+n'); await expect(surface.locator('.script-item.selected')).not.toHaveAttribute('id', firstId!);
+      await picker.press('Control+p'); await expect(surface.locator('.script-item.selected')).toHaveAttribute('id', firstId!);
+      await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport({ ratio: 1 });
+      if (command === 'manage scripts') {
+        const list = surface.locator('.script-list');
+        const detail = surface.locator('.script-list-detail');
+        const preview = surface.getByRole('region', { name: 'Code Preview', exact: true });
+        const code = preview.locator('.script-preview-code');
+        await surface.getByRole('option', { name: 'Execution helper', exact: true }).click();
+        await expect(code).toHaveValue(longCode);
+        await expect(list).toBeInViewport({ ratio: 1 });
+        await expect(preview).toBeInViewport({ ratio: 1 });
+        const listBox = (await list.boundingBox())!;
+        const detailBox = (await detail.boundingBox())!;
+        if (size.width > 520) {
+          expect(listBox.x + listBox.width).toBeLessThanOrEqual(detailBox.x + 1);
+          expect(Math.abs(listBox.y - detailBox.y)).toBeLessThanOrEqual(1);
+          expect(current.row.width).toBeLessThan(main.row.width);
+        } else {
+          expect(listBox.y + listBox.height).toBeLessThanOrEqual(detailBox.y + 1);
+          expect(Math.abs(listBox.x - detailBox.x)).toBeLessThanOrEqual(1);
+          expect(Math.abs(listBox.width - detailBox.width)).toBeLessThanOrEqual(1);
+        }
+        expect(listBox.height).toBeGreaterThanOrEqual(40);
+        expect(detailBox.height).toBeGreaterThan(60);
+        await expect(preview.locator('.script-preview-info')).toContainText('Execution helper');
+        await expect(preview.locator('.script-preview-info')).toContainText('JavaScript');
+        await expect(code).toHaveAttribute('readonly', '');
+        await code.focus();
+        await expect(code).toBeFocused();
+        await code.evaluate((node: HTMLTextAreaElement) => node.setSelectionRange(0, 20));
+        const selectedId = await picker.getAttribute('aria-activedescendant');
+        await code.press('ArrowDown');
+        await expect(picker).toHaveAttribute('aria-activedescendant', selectedId!);
+        await expect(code).toHaveValue(longCode);
+        const fixedGeometry = await geometry();
+        const listScroll = await list.evaluate(node => node.scrollTop);
+        expect(await code.evaluate(node => node.scrollHeight > node.clientHeight && node.scrollWidth > node.clientWidth)).toBe(true);
+        await code.evaluate(node => { node.scrollTop = node.scrollHeight; node.scrollLeft = node.scrollWidth; });
+        expect(await code.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+        expect(await code.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
+        expect(await list.evaluate(node => node.scrollTop)).toBe(listScroll);
+        for (const key of ['panel', 'search', 'footer'] as const) expect((await geometry())[key]).toEqual(fixedGeometry[key]);
+        const previewScroll = await code.evaluate(node => ({ top: node.scrollTop, left: node.scrollLeft }));
+        await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+        expect(await list.evaluate(node => node.scrollTop)).toBeGreaterThan(listScroll);
+        expect(await code.evaluate(node => ({ top: node.scrollTop, left: node.scrollLeft }))).toEqual(previewScroll);
+        await list.evaluate(node => { node.scrollTop = 0; });
+        await code.evaluate(node => { node.scrollTop = 0; node.scrollLeft = 0; });
+        await picker.focus();
+        for (const theme of ['light', 'dark'] as const) {
+          await page.emulateMedia({ colorScheme: theme });
+          await surface.locator('.palette').screenshot({ path: test.info().outputPath(`script-preview-${theme}-${size.width}.png`) });
+        }
+        await expect(surface.locator('.script-item .kind-label')).toHaveText('Built-in');
+        await expect(surface.locator('.palette-footer .secondary-action')).toHaveAccessibleName('New Script');
+        await expect(surface.locator('.palette-footer .secondary-action')).toBeInViewport({ ratio: 1 });
+        if (size.width <= 520) {
+          await expect(surface.locator('.secondary-compact-icon')).toBeVisible();
+          expect((await surface.locator('.palette-footer-title').boundingBox())!.width).toBeGreaterThan(50);
+        }
+        await picker.press('Meta+Shift+n');
+        await expect(surface.getByLabel('Name', { exact: true })).toBeFocused();
+        await expect(surface.locator('.palette-footer-title')).toHaveText('New Script');
+        await surface.locator('.palette').screenshot({ path: test.info().outputPath(`script-editor-${size.width}.png`) });
+        await surface.locator('.palette-footer .footer-back').click();
+        await expect(picker).toBeFocused();
+      }
+      expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+      await surface.locator('.palette-footer .footer-back').click();
+      await expect(root).toBeFocused(); await expect(root).toHaveValue(command);
+    }
+  }
+});
+
   test('English interaction polish storage script picker ignores modified Enter before execution', async () => {
   const { page, surface } = await scriptExecutionFixture('42', false);
   await surface.locator('.search-bar input').fill('run script'); await page.keyboard.press('Enter');
-  const search = surface.getByRole('textbox', { name: 'Search scripts' });
+  const search = surface.getByRole('combobox', { name: 'Search scripts' });
   await expect(search).toBeFocused();
   await search.press('Shift+Enter'); await expect(search).toBeFocused();
   await search.press('Meta+Enter'); await expect(search).toBeFocused();
@@ -3583,7 +3906,10 @@ test.describe(() => {
   const primary = surface.locator('.palette-footer .primary-action');
   await expect(output).toHaveValue('Exact result\n\n');
   await expect(primary).toHaveAccessibleName('Copy Result'); await expect(primary).toBeFocused();
-  await expect(surface.locator('.settings-body .script-controls')).toHaveCount(0);
+  await expect(surface.locator('.script-result-body')).toBeVisible();
+  await expect(surface.locator('.script-runner .settings-header')).toHaveCount(0);
+  await expect(surface.locator('.palette-footer-title')).toHaveText('Result');
+  await expect(surface.locator('.script-result-body .script-controls')).toHaveCount(0);
   await output.focus(); await output.evaluate((node: HTMLTextAreaElement) => node.setSelectionRange(2, 8));
   await output.press('Meta+k');
   const menu = surface.getByRole('combobox', { name: 'Search actions' });
@@ -3591,8 +3917,11 @@ test.describe(() => {
   await expect(surface.locator('.action-row')).toContainText(['Copy Result', 'Run Again']);
   await menu.press('Control+n'); await expect(primary).toHaveAccessibleName('Run Again');
   await menu.press('Control+p'); await expect(primary).toHaveAccessibleName('Copy Result');
-  await menu.press('Tab'); await expect(menu).toBeFocused();
-  await menu.press('Escape'); await expect(output).toBeFocused();
+  await menu.press('Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(menu).toBeFocused();
+  await surface.locator('.palette-footer .footer-back').click();
+  await expect(menu).toHaveCount(0); await expect(output).toBeFocused();
+  await expect(surface.locator('.palette-footer-title')).toHaveText('Result');
   expect(await output.evaluate((node: HTMLTextAreaElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 8]);
   await output.press('Meta+k'); await menu.fill('copy');
   await expect(surface.locator('.action-row mark')).toHaveText('Copy');
@@ -4811,6 +5140,21 @@ test.describe(() => {
   expect(await ui.locator('.palette-footer').boundingBox()).toEqual(mainFooter);
   expect(mainPanel!.height).toBe(516); expect(mainFooter!.height).toBe(44);
   await search.press('Control+n'); await search.press('Control+p');
+  // A lower row must remain visible when the editor remounts the member list.
+  const extraTabs = await worker.evaluate(async ({ origin, groupId }) => {
+    const ids: number[] = [];
+    for (let at = 0; at < 16; at++) ids.push((await chrome.tabs.create({ url: `${origin}/Group-Extra-${at}`, active: false })).id!);
+    await chrome.tabs.group({ groupId, tabIds: ids as [number, ...number[]] });
+    return ids;
+  }, { origin, groupId: setup.id });
+  await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(ui.locator('.group-view .result')).toHaveCount(18);
+  await search.fill('Group');
+  await search.press('Meta+ArrowDown');
+  const lowerRow = ui.locator('.group-view .result[aria-selected=true]');
+  const lowerId = await lowerRow.getAttribute('id');
+  expect(await ui.locator('#zing-group-tabs').evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+  await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 3));
   async function action(text: string) {
     await ui.keyboard.press('Meta+k');
     await ui.getByRole('combobox', { name: 'Search actions' }).fill(text);
@@ -4824,6 +5168,21 @@ test.describe(() => {
   await expect(name).toBeFocused();
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('Tab Group: Reading');
+  await expect(search).toBeFocused(); await expect(search).toHaveValue('Group');
+  expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 3]);
+  await expect(lowerRow).toHaveAttribute('id', lowerId!);
+  const lowerRowVisible = () => lowerRow.evaluate(node => {
+    const row = node.getBoundingClientRect(), list = node.closest('.results')!.getBoundingClientRect();
+    return row.top >= list.top - 1 && row.bottom <= list.bottom + 1;
+  });
+  expect(await lowerRowVisible()).toBe(true);
+  await action('Rename Group');
+  await ui.locator('.palette-footer .footer-back').click();
+  await expect(search).toBeFocused(); await expect(lowerRow).toHaveAttribute('id', lowerId!);
+  expect(await lowerRowVisible()).toBe(true);
+  await worker.evaluate(ids => chrome.tabs.remove(ids), extraTabs);
+  await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await search.fill(''); await expect(ui.locator('.group-view .result')).toHaveCount(2);
   await action('Change Group Color');
   await ui.getByLabel('Change Group Color', { exact: true }).selectOption('purple');
   await ui.getByRole('button', { name: 'Save', exact: true }).click();

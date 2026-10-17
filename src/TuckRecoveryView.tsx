@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, RotateCcw, X } from 'lucide-react';
-import { BackLayer } from './Navigation';
+import { BackLayer, useNavigateBack } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { execute } from './api';
@@ -16,7 +16,8 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
   const [actionId, setActionId] = useState('resume');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const back = useRef<HTMLButtonElement>(null);
+  const back = useNavigateBack();
+  const surface = useRef<HTMLElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const candidates = item?.candidates.filter(group => group.windowId === windowId) || [];
   const selected = candidates.find(group => group.id === selectedId) || candidates[0];
@@ -27,7 +28,9 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
   ].filter(action => !query || `${action.title} ${action.keywords}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const action: { id: string; title: string; danger?: boolean } | undefined = menu ? actions.find(action => action.id === actionId) || actions[0]
     : { id: selected ? 'resume' : 'back', title: selected ? t('resumeTuck') : t('tuckRecoveryLater') };
-  useLayoutEffect(() => { if (!menu) (selected ? list.current : back.current)?.focus(); }, [menu]);
+  useLayoutEffect(() => {
+    if (!menu) (selected ? list.current : surface.current?.querySelector<HTMLButtonElement>('.footer-back'))?.focus();
+  }, [menu, selected?.id]);
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
   function toggleMenu() { if (!busy) { setMenu(!menu); setQuery(''); setActionId(selected ? 'resume' : 'back'); } }
   async function run(id: string) {
@@ -42,7 +45,7 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   }
-  return <BackLayer onBack={onBack}><section className="palette settings-view tuck-recovery" aria-label={t('reviewTuck')} aria-busy={busy}
+  return <BackLayer onBack={onBack}><section ref={surface} className="palette settings-view tuck-recovery" aria-label={t('reviewTuck')} aria-busy={busy}
     onKeyDown={event => {
       if (event.nativeEvent.isComposing || event.keyCode === 229 || menu) return;
       const mod = isMac ? event.metaKey : event.ctrlKey;
@@ -61,8 +64,6 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
         if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) void run(action?.id || 'back');
       }
     }}>
-    <header className="settings-header"><button ref={back} className="settings-back" onClick={onBack} aria-label={t('back')}><ArrowLeft size={18} /></button>
-      <h1>{t('reviewTuck')}</h1><kbd>esc</kbd></header>
     <div className="settings-body" inert={menu ? true : undefined}>
       <p className="recovery-explanation">{item ? t('tuckRecoveryHint') : t('tuckRecoveryResolved')}</p>
       {item ? <p className="setting-note">{item.title} — {item.urls.join(' · ')}</p> : null}
@@ -82,7 +83,10 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
       <p className="setting-note">{t('tuckRecoveryForgetHint')}</p>
     </div>
     {error ? <div className="error-banner" role="alert">{error}</div> : null}
-    <PaletteFooter isMac={isMac} primary={{ label: action?.title || t('runCommand'), keys: ['↵'], disabled: busy || !action, danger: !!action?.danger, onAction: () => void run(action?.id || 'back') }}
+    <PaletteFooter isMac={isMac}
+      navigation={{ kind: 'back', label: `${t('back')} · ${t('reviewTuck')}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
+      title={t('reviewTuck')} context={item?.title}
+      primary={{ label: action?.title || t('runCommand'), keys: ['↵'], disabled: busy || !action, danger: !!action?.danger, onAction: () => void run(action?.id || 'back') }}
       actions={{ open: menu, disabled: busy, onToggle: toggleMenu }} />
     {menu ? <ActionMenu id="tuck-recovery-actions" title={t('reviewTuck')} actions={actions} query={query} onQueryChange={setQuery}
       selectedId={action?.id} onSelectionChange={setActionId} onAction={id => void run(id)} onClose={() => setMenu(false)} isMac={isMac} /> : null}

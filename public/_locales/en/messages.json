@@ -480,7 +480,7 @@
     "message": "Copy the snippet below (your extension ID is already included)."
   },
   "bindingStepOpen": {
-    "message": "Click below to open Chrome’s extension shortcuts page."
+    "message": "Choose Actions → Open Chrome Shortcuts to open Chrome’s extension shortcuts page."
   },
   "bindingStepConsole": {
     "message": "On that page, press $1 to open Console, then paste the code and press Enter."
@@ -530,6 +530,10 @@
   "searchScripts": {
     "message": "Search scripts"
   },
+  "scriptPreview": { "message": "Code Preview" },
+  "scriptInformation": { "message": "Information" },
+  "scriptContentType": { "message": "Content Type" },
+  "scriptPreviewEmpty": { "message": "Select a script to preview its code" },
   "builtInScript": {
     "message": "Built-in"
   },
