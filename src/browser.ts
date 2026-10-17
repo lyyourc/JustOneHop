@@ -4,7 +4,44 @@ import { reloadExtension } from './reloadExtension';
 import { isChromePageAction, openChromePage } from './chromePages';
 import { closeTargets } from './model';
 import { recordUsage } from './usageStorage';
-import type { BookmarkItem, Execution, Snapshot, TabItem } from './types';
+import type { BookmarkItem, Execution, HistorySearchResult, Snapshot, TabItem } from './types';
+
+function safeHistoryUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) return false;
+  try { return ['http:', 'https:'].includes(new URL(value).protocol); }
+  catch { return false; }
+}
+
+/** Called after paletteSender resolves a native palette to its original tab. */
+export async function historyWindow(sender: chrome.runtime.MessageSender, expectedWindowId?: number): Promise<number> {
+  const popup = sender.url === chrome.runtime.getURL('popup.html');
+  if (sender.id !== chrome.runtime.id || (sender.frameId !== undefined && sender.frameId !== 0) ||
+      (!popup && (sender.frameId !== 0 || !sender.tab || !safeHistoryUrl(sender.url)))) {
+    throw new Error(t('errorHistorySearch'));
+  }
+  const source = sender.tab?.id !== undefined ? await chrome.tabs.get(sender.tab.id)
+    : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+  if (!source?.id || !source.active || source.incognito || sender.tab?.incognito ||
+      (sender.tab && source.windowId !== sender.tab.windowId) ||
+      (!popup && source.url !== sender.url) ||
+      (expectedWindowId !== undefined && source.windowId !== expectedWindowId)) throw new Error(t('errorHistorySearch'));
+  const window = await chrome.windows.get(source.windowId);
+  if (window.incognito) throw new Error(t('errorHistorySearch'));
+  return source.windowId;
+}
+
+export async function searchHistory(request: { query: string; scope: 'week' | 'all' }, sender: chrome.runtime.MessageSender): Promise<HistorySearchResult> {
+  if (!request || typeof request.query !== 'string' || !['week', 'all'].includes(request.scope)) throw new Error(t('errorHistorySearch'));
+  await historyWindow(sender);
+  const results = await chrome.history.search({ text: request.query, startTime: request.scope === 'week' ? Date.now() - 7 * 24 * 60 * 60 * 1000 : 0, maxResults: 100 });
+  return {
+    items: results.filter(item => typeof item.id === 'string' && safeHistoryUrl(item.url)).map(item => ({
+      id: item.id, url: item.url!, title: typeof item.title === 'string' && item.title ? item.title : item.url!,
+      lastVisitTime: typeof item.lastVisitTime === 'number' && Number.isFinite(item.lastVisitTime) ? item.lastVisitTime : 0,
+    })),
+    limited: results.length >= 100,
+  };
+}
 
 export function toTab(tab: chrome.tabs.Tab): TabItem {
   return {
@@ -53,10 +90,11 @@ export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
     : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
   if (!active?.id) throw new Error(t('errorNoCurrent'));
   await tabTuckingReady();
-  const [tabs, bookmarks, bindings, groups] = await Promise.all([
-    chrome.tabs.query({ windowId: active.windowId }), getBookmarks(), chrome.commands.getAll(), chrome.tabGroups.query({ windowId: active.windowId }),
+  const [tabs, bookmarks, bindings, groups, window] = await Promise.all([
+    chrome.tabs.query({ windowId: active.windowId }), getBookmarks(), chrome.commands.getAll(), chrome.tabGroups.query({ windowId: active.windowId }), chrome.windows.get(active.windowId),
   ]);
   return {
+    incognito: !!(active.incognito || window.incognito),
     groups: groups.map(group => ({ ...group, title: group.title || t('unnamedGroup') })),
     currentTabId: active.id, windowId: active.windowId, canUndoTuck: canUndoTuck(active.windowId), tuckRecoveries: tuckRecoveries(),
     tabs: tabs.sort((a, b) => Number(a.id === active.id) - Number(b.id === active.id) ||
@@ -99,6 +137,10 @@ async function performAction(payload: Execution): Promise<string> {
     await chrome.tabs.ungroup(tab.id!); return '';
   }
   if (isChromePageAction(action)) { await openChromePage(action, windowId); return target(`command:${action}`); }
+  if (action === 'openHistoryPage') {
+    if (window.incognito || !safeHistoryUrl(payload.url)) throw new Error(t('errorHistorySearch'));
+    await chrome.tabs.create({ windowId, url: payload.url }); return '';
+  }
   if (action === 'settings') return target('command:settings');
   if (action === 'reloadExtension') return '';
   if (action === 'resumeTuck') { await resumeTuck(windowId, payload.recoveryId!, payload.groupId!, payload.fingerprint!); return ''; }

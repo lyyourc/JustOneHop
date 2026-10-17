@@ -80,7 +80,7 @@ test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
   testInfo.annotations.push({ type: 'browser-version', description: (await session.send('Browser.getVersion')).product },
     { type: 'browser-environment', description: JSON.stringify({ locale: 'en-US', startupStorageFailure, shadow: 'closed', headed: false }) });
   await session.detach();
-  await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeVisible();
+  await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
   windowId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
   for (const page of context.pages()) if (page !== ui) await page.close();
 });
@@ -109,7 +109,7 @@ const groupId = (tabId: number) => worker.evaluate(async id => (await chrome.tab
 const liveTabs = () => worker.evaluate(id => chrome.tabs.query({ windowId: id }), windowId);
 async function reopen() {
   ui = await context.newPage(); await ui.goto(popupUrl);
-  await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeVisible();
+  await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
 }
 async function enableAutomaticTucking() {
   await worker.evaluate(async () => {
@@ -136,7 +136,7 @@ test('English tuck keeps the original pages and their state, then search brings 
     (document.querySelector('input') as HTMLInputElement).value = 'Keep this unsaved note';
     return (window as unknown as { fixtureIdentity: string }).fixtureIdentity;
   });
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('Tuck Alpha');
   await expect(ui.getByRole('option').filter({ hasText: 'Tuck Alpha' }).first()).toBeVisible();
   await search.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
@@ -153,7 +153,7 @@ test('English tuck keeps the original pages and their state, then search brings 
   expect(await alphaPage.locator('input').inputValue()).toBe('Keep this unsaved note');
   expect(await alphaPage.evaluate(() => (window as unknown as { fixtureIdentity: string }).fixtureIdentity)).toBe(identity);
   await ui.reload();
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('Tuck Alpha');
   const row = ui.getByRole('option').filter({ hasText: 'Tuck Alpha' }).first();
   await expect(row).toContainText('Tucked');
@@ -239,7 +239,7 @@ test('English disabling automatic tuck releases its own tabs and keeps a same-na
     return group;
   }, { personal, owned });
   await ui.reload();
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('auto tuck'); await search.press('Enter');
   const setting = ui.getByRole('switch');
   await expect(setting).toBeChecked();
@@ -321,7 +321,7 @@ test('English disabling tuck releases other pages after a transient failure and 
 test.describe(() => {
   test.use({ startupStorageFailure: true });
   test('English startup storage failure leaves the command palette available', async () => {
-    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await search.fill('new tab');
     await expect(ui.getByRole('option').first()).toContainText('New Tab');
     const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
@@ -361,7 +361,7 @@ async function restartChrome() {
     || await context.waitForEvent('serviceworker', item => item.url().endsWith('/background.js'));
   popupUrl = worker.url().replace('background.js', 'popup.html');
   ui = await context.newPage(); await ui.goto(popupUrl);
-  await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeVisible();
+  await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
   windowId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
 }
 async function recoverySnapshot() {
@@ -376,7 +376,7 @@ async function prepareRestart() {
   await expect.poll(async () => (await recoverySnapshot()).tabs.filter((tab: { url?: string }) => tab.url?.startsWith(origin)).length).toBe(2);
 }
 async function openRecovery() {
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('recover tucked tabs');
   await ui.getByRole('option').filter({ hasText: 'Review Tucked Away Groups' }).first().click();
   await expect(ui.locator('.tuck-recovery .palette-footer-title')).toHaveText('Review Tucked Away Groups');
@@ -400,7 +400,7 @@ test('English actual Chrome restart retains records and safely resumes a group w
     await openRecovery();
     await expect(ui.getByRole('listbox')).toContainText(`${origin}/Restart-Alpha`);
     await ui.keyboard.press('Escape');
-    await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toHaveValue('recover tucked tabs');
+    await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toHaveValue('recover tucked tabs');
     expect((await recoverySnapshot()).tuckRecoveries).toHaveLength(1);
     await openRecovery();
     await ui.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
@@ -464,7 +464,7 @@ test('English recovery rejects stale confirmation and forgetting leaves native p
   await expect(selected).toHaveAttribute('id', selectedId!);
   expect((await recoverySnapshot()).tuckRecoveries).toHaveLength(1);
   await ui.locator('.tuck-recovery .footer-back').click();
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await expect(search).toBeFocused(); await expect(search).toHaveValue('recover tucked tabs');
   expect((await liveTabs()).map(tab => [tab.id, tab.groupId])).toEqual(before.map(tab => [tab.id, tab.groupId]));
   await openRecovery();

@@ -6,10 +6,10 @@ import { readPageStorage, openCookieAccess } from './pageStorage';
 import { preferencesReady } from './preferences';
 import { errorMessage, t } from './i18n';
 import { openChromePage } from './chromePages';
-import { snapshot } from './browser';
+import { historyWindow, searchHistory, snapshot } from './browser';
 import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
 import { resetUsage } from './usageStorage';
-import type { Request, Snapshot, PageStorage, ScriptResult, PaletteState } from './types';
+import type { Request, Snapshot, PageStorage, ScriptResult, PaletteState, HistorySearchResult } from './types';
 
 const opening = new Set<number>();
 async function launch(tab: chrome.tabs.Tab) {
@@ -48,20 +48,20 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 });
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'zing') return;
-  if (!['run-saved-script', 'open-script-settings', 'snapshot', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
+  if (!['run-saved-script', 'open-script-settings', 'snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
   // Register before any await so a dismissal arriving during preflight also
   // cancels this caller's continuation, without cancelling its browser action.
   const ticket = request.type === 'execute' && request.payload?.paletteState && ['close', 'closeOthers', 'closeRight'].includes(request.payload.action)
     ? registerPaletteContinuation(sender) : undefined;
   let responded = false;
-  const success = (data?: void | Snapshot | PageStorage | ScriptResult | PaletteState) => {
+  const success = (data?: void | Snapshot | PageStorage | ScriptResult | PaletteState | HistorySearchResult) => {
     if (responded) return;
     responded = true;
     // Switching/closing a tab can remove the caller before the reply. That
     // must not interrupt the successful action's queued usage write.
     try { respond({ ok: true, data }); } catch { /* Caller already gone. */ }
   };
-  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | ScriptResult | PaletteState> => {
+  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | ScriptResult | PaletteState | HistorySearchResult> => {
     if (request.type === 'palette-state') return getPaletteWindowState(sender);
     sender = await paletteSender(sender);
     if (request.type === 'run-saved-script') return runSavedScript(request.payload, sender);
@@ -69,7 +69,14 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     if (request.type === 'open-cookie-access') return openCookieAccess(request.payload, sender);
     if (request.type === 'read-page-storage') return readPageStorage(request.payload, sender);
     if (request.type === 'snapshot') { void refreshToolbarMenu(); return snapshot(sender.tab); }
-    if (request.type === 'execute') return performWithPaletteContinuation(request.payload, sender, () => success(), ticket);
+    if (request.type === 'search-history') return searchHistory(request.payload, sender);
+    if (request.type === 'execute') {
+      if (request.payload?.action === 'openHistoryPage') {
+        if (!Number.isInteger(request.payload.windowId)) throw new Error(t('errorWindow'));
+        await historyWindow(sender, request.payload.windowId);
+      }
+      return performWithPaletteContinuation(request.payload, sender, () => success(), ticket);
+    }
     if (request.type === 'reset-usage') return resetUsage();
     const windowId = sender.tab?.windowId ?? (await chrome.windows.getCurrent()).id;
     if (windowId === undefined) throw new Error(t('errorWindow'));

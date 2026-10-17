@@ -209,6 +209,264 @@ test.afterEach(async ({ environment }, testInfo) => {
   }
 });
 
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('History intent: bilingual commands enter an empty all-time search and restore root context', async () => {
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    for (const query of ['history', '历史', 'search all history']) {
+      await input.fill(query);
+      await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+      await expect(ui.locator('#zing-results .result').first()).toHaveAttribute('id', 'zing-search-all-history');
+      await expect(ui.locator('#zing-search-all-history')).toHaveAttribute('aria-selected', 'true');
+      if (query === '历史') await ui.locator('#zing-search-all-history').click();
+      else await input.press('Enter');
+      const history = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
+      await expect(history).toBeFocused(); await expect(history).toHaveValue('');
+      await expect(ui.getByText('Enter a title or URL to search history', { exact: true })).toBeVisible();
+      if (query === '历史') await history.press('Escape');
+      else await ui.locator('.history-view .footer-back').click();
+      await expect(input).toBeFocused(); await expect(input).toHaveValue(query);
+      await expect(ui.locator('#zing-search-all-history')).toHaveAttribute('aria-selected', 'true');
+    }
+    await input.fill('react history');
+    await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await ui.locator('#zing-search-all-history').click();
+    await expect(ui.getByRole('combobox', { name: 'Search browsing history', exact: true })).toHaveValue('react history');
+  });
+
+  test('History search: real Chrome visits support mouse opening and keyboard return without learning', async () => {
+    const query = 'ZingHistoryNative';
+    const urls = ['mouse', 'keyboard', 'third', 'fourth', 'fifth'].map(suffix => `${origin}/${query}-${suffix}`);
+    const baseline: UsageRecord[] = [{ query: 'unrelated', target: 'command:newTab', weight: 1, lastUsed: Date.now() }];
+    await worker.evaluate(async ({ urls, baseline }) => {
+      await chrome.storage.local.set({ searchUsage: baseline });
+      for (const url of urls) await chrome.history.addUrl({ url });
+    }, { urls, baseline });
+    // Independently confirm the fixture reached Chrome's actual history database.
+    const visits = await worker.evaluate(text => chrome.history.search({ text, startTime: 0 }), query);
+    expect(visits.map(visit => visit.url).sort()).toEqual([...urls].sort());
+    expect(visits.every(visit => typeof visit.lastVisitTime === 'number')).toBe(true);
+    const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const allHistory = ui.locator('#zing-search-all-history');
+    await search.fill(query);
+    await expect(ui.locator('.result.history')).toHaveCount(5);
+    const mainTimes = await ui.locator('.result.history time').evaluateAll(nodes => nodes.map(node => ({ id: node.closest('.result')!.id, text: node.textContent, dateTime: node.getAttribute('datetime'), title: node.getAttribute('title') })));
+    expect(mainTimes).toHaveLength(5);
+    expect(mainTimes.every(time => time.text === 'just now' && time.title?.startsWith('Last visited: '))).toBe(true);
+    expect(mainTimes.map(time => Date.parse(time.dateTime!)).sort()).toEqual(visits.map(visit => Math.trunc(visit.lastVisitTime!)).sort());
+
+    await expect(allHistory.locator('.entry-title')).toHaveText('Search All History');
+    await expect(ui.locator('.result').nth(4)).toHaveAttribute('id', 'zing-search-all-history');
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath('history-main-regular.png') });
+    await search.press('Home'); await search.press('Shift+ArrowRight');
+    for (let step = 0; step < 4; step++) await search.press('ArrowDown');
+    await expect(allHistory).toHaveAttribute('aria-selected', 'true');
+    await search.press('Enter');
+    const historySearch = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
+    await expect(historySearch).toBeFocused(); await expect(historySearch).toHaveValue(query);
+    await expect(ui.locator('.history-view .result.history')).toHaveCount(5);
+    expect(await ui.locator('.history-view .result.history time').evaluateAll(nodes => nodes.map(node => ({ id: node.closest('.result')!.id, text: node.textContent, dateTime: node.getAttribute('datetime'), title: node.getAttribute('title') })))).toEqual(mainTimes);
+    await expect(ui.locator('.history-view .history-kind')).toHaveCount(0);
+
+    await ui.setViewportSize({ width: 390, height: 600 });
+    await expect(historySearch).toBeVisible();
+    await expect(ui.locator('.history-view .footer-back')).toBeVisible();
+    expect(await ui.locator('.history-view').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await ui.locator('.history-view').screenshot({ path: test.info().outputPath('history-full-narrow.png') });
+    await ui.setViewportSize({ width: 1100, height: 760 });
+    await historySearch.press('Escape');
+    await expect(search).toBeFocused(); await expect(search).toHaveValue(query);
+    await expect(allHistory).toHaveAttribute('aria-selected', 'true');
+    expect(await search.evaluate(el => [(el as HTMLInputElement).selectionStart, (el as HTMLInputElement).selectionEnd])).toEqual([0, 1]);
+    // Mouse entry and footer return preserve the same root context.
+    await allHistory.click(); await expect(historySearch).toBeFocused();
+    await ui.locator('.history-view .footer-back').click();
+    await expect(search).toBeFocused(); await expect(search).toHaveValue(query);
+    const mouseOpened = context.waitForEvent('page');
+    await ui.locator('.result.history').filter({ hasText: `${query}-mouse` }).click();
+    const mousePage = await mouseOpened;
+    await expect(mousePage).toHaveURL(urls[0]);
+    await expect(mousePage.getByRole('heading')).toHaveText(`${query} mouse`);
+    await expect.poll(() => ui.isClosed()).toBe(true);
+    expect(await worker.evaluate(async url => (await chrome.tabs.query({})).filter(tab => tab.url === url).map(tab => tab.windowId), urls[0])).toEqual([owner]);
+    expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(baseline);
+
+    ui = await context.newPage(); await ui.goto(popupUrl);
+    const root = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await root.fill(`${query}-keyboard`);
+    await expect(ui.locator('.result.history')).toHaveCount(1);
+    await root.press('ArrowUp');
+    await expect(ui.locator('#zing-search-all-history')).toHaveAttribute('aria-selected', 'true');
+    await root.press('Enter');
+    const fullSearch = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
+    await expect(fullSearch).toBeFocused();
+    await expect(ui.locator('.history-view .result.history')).toHaveCount(1);
+    const keyboardOpened = context.waitForEvent('page');
+    await fullSearch.press('Enter');
+    const keyboardPage = await keyboardOpened;
+    await expect(keyboardPage).toHaveURL(urls[1]);
+    await expect(keyboardPage.getByRole('heading')).toHaveText(`${query} keyboard`);
+    await expect.poll(() => ui.isClosed()).toBe(true);
+    expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(baseline);
+  });
+
+  test('History search: 100ms deadline freezes pending rows and rejects late or superseded replies', async () => {
+    const query = 'ZingHistoryRace';
+    await worker.evaluate(async ({ query, origin }) => {
+      await chrome.bookmarks.create({ title: `${query} local`, url: `${origin}/${query}-local` });
+      const state = globalThis as unknown as { __historyRequests: { text: string; release: () => void }[] };
+      state.__historyRequests = [];
+      chrome.history.search = ((options: chrome.history.HistoryQuery) => new Promise<chrome.history.HistoryItem[]>(resolve => {
+        state.__historyRequests.push({ text: options.text, release: () => resolve([{
+          id: options.text, url: `${origin}/${encodeURIComponent(options.text)}`, title: `${options.text} remote`, lastVisitTime: Date.now(),
+        }]) });
+      })) as typeof chrome.history.search;
+    }, { query, origin });
+    await ui.reload();
+    await expect(ui.locator('.result.command')).toHaveCount(9);
+    await ui.clock.install(); await ui.clock.pauseAt(new Date());
+    // Observe delivery separately from rendering, so absence checks follow the late reply.
+    await ui.evaluate(() => {
+      const original = chrome.runtime.sendMessage.bind(chrome.runtime);
+      const state = globalThis as unknown as { __historyReplies: string[] };
+      state.__historyReplies = [];
+      chrome.runtime.sendMessage = (async (request: { type?: string; payload?: { query: string } }) => {
+        const reply = await original(request);
+        if (request.type === 'search-history') state.__historyReplies.push(request.payload!.query);
+        return reply;
+      }) as typeof chrome.runtime.sendMessage;
+    });
+    const requests = () => worker.evaluate(() => (globalThis as unknown as { __historyRequests: { text: string }[] }).__historyRequests.map(request => request.text));
+    const release = (text: string) => worker.evaluate(text => {
+      const state = globalThis as unknown as { __historyRequests: { text: string; release: () => void }[] };
+      state.__historyRequests.find(request => request.text === text)!.release();
+    }, text);
+    const delivered = (text: string) => expect.poll(() => ui.evaluate(() => (globalThis as unknown as { __historyReplies: string[] }).__historyReplies)).toContain(text);
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const rows = ui.locator('#zing-results');
+    const homeRows = await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id));
+    const beforeTabs = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id).sort());
+    await search.fill(query);
+    await expect.poll(requests).toContain(query);
+    await expect(rows).toHaveAttribute('aria-busy', 'true');
+    expect(await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(homeRows);
+    await expect(ui.locator('.primary-action')).toBeDisabled();
+    await search.press('Enter');
+    expect(await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id).sort())).toEqual(beforeTabs);
+    await ui.clock.runFor(99);
+    await expect(rows).toHaveAttribute('aria-busy', 'true');
+    await ui.clock.runFor(1);
+    await expect(rows).toHaveAttribute('aria-busy', 'false');
+    await expect(rows.locator('.result.bookmark')).toHaveCount(1);
+    await expect(ui.locator('#zing-search-all-history')).toContainText('History search unfinished');
+    await expect(rows.locator('.result.history')).toHaveCount(0);
+    const timedOutRows = await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id));
+    await release(query); await delivered(query); await ui.clock.runFor(1);
+    expect(await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(timedOutRows);
+    await expect(ui.locator('#zing-search-all-history')).toContainText('History search unfinished');
+
+    const stale = `${query} stale`, fresh = `${query} fresh`;
+    await search.fill(stale); await expect.poll(requests).toContain(stale);
+    await search.fill(fresh); await expect.poll(requests).toContain(fresh);
+    await release(stale); await delivered(stale); await ui.clock.runFor(1);
+    await expect(rows).toHaveAttribute('aria-busy', 'true');
+    expect(await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(timedOutRows);
+    await release(fresh); await delivered(fresh); await ui.clock.runFor(1);
+    await expect(rows).toHaveAttribute('aria-busy', 'false');
+    await expect(rows.locator('.result.history')).toHaveCount(1);
+    await expect(rows.locator('.result.history .entry-title')).toHaveText(`${fresh} remote`);
+    await expect(search).toBeFocused(); await expect(search).toHaveValue(fresh);
+    await ui.clock.runFor(100);
+    await expect(rows.locator('.result.history .entry-title')).toHaveText(`${fresh} remote`);
+  });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'zh-CN' } });
+  test('History search: Chinese all-time navigation finds an older visit outside the weekly scope', async () => {
+    const query = 'ZingHistoryArchive';
+    const url = `${origin}/${query}-older`;
+    await worker.evaluate(({ query, url }) => {
+      // Chrome addUrl cannot backdate visits; model an older visit at the Chrome
+      // API boundary while exercising the real request, scope and UI pipeline.
+      const older = { id: 'older-visit', url, title: `${query} older`, lastVisitTime: Date.now() - 30 * 24 * 60 * 60 * 1000 };
+      const state = globalThis as unknown as { __historyScopes: { text: string; startTime?: number }[] };
+      state.__historyScopes = [];
+      chrome.history.search = (async (options: chrome.history.HistoryQuery) => {
+        state.__historyScopes.push({ text: options.text, startTime: options.startTime });
+        return options.text === query && (options.startTime ?? 0) <= older.lastVisitTime ? [older] : [];
+      }) as typeof chrome.history.search;
+    }, { query, url });
+    const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
+    await search.fill(query);
+    const allHistory = ui.locator('#zing-search-all-history');
+    await expect(allHistory.locator('.entry-title')).toHaveText('搜索全部历史');
+    await expect(allHistory).toContainText('最近一周无匹配');
+    await expect(ui.locator('.result.history')).toHaveCount(0);
+    await expect(allHistory).toHaveAttribute('aria-selected', 'true');
+    await search.press('Enter');
+    const fullSearch = ui.getByRole('combobox', { name: '搜索浏览历史', exact: true });
+    await expect(fullSearch).toBeFocused(); await expect(fullSearch).toHaveValue(query);
+    await expect(ui.locator('.history-view .result.history')).toHaveCount(1);
+    await expect(ui.locator('.history-view .entry-title')).toHaveText(`${query} older`);
+    const scopes = await worker.evaluate(() => (globalThis as unknown as { __historyScopes: { text: string; startTime?: number }[] }).__historyScopes);
+    expect(scopes.map(scope => scope.text)).toEqual([query, query]);
+    expect(scopes[0].startTime).toBeGreaterThan(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    expect(scopes[1].startTime).toBe(0);
+    const opened = context.waitForEvent('page');
+    await ui.locator('.history-view .result.history').click();
+    const page = await opened;
+    await expect(page).toHaveURL(url);
+    await expect(page.getByRole('heading')).toHaveText(`${query} older`);
+    await expect.poll(() => ui.isClosed()).toBe(true);
+    expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage ?? [])).toEqual([]);
+  });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('History overlay: source permissions, action menu and narrow viewport retain navigation', async () => {
+    const query = 'ZingOverlayHistory';
+    const url = `${origin}/${query}-saved`;
+    await worker.evaluate(url => chrome.history.addUrl({ url }), url);
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 390, height: 600 });
+    await page.goto(`${origin}/history-source`);
+    const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
+    await worker.evaluate(async tabId => {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+    }, tabId);
+    const surface = page.frameLocator('.zing-frame');
+    const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await input.fill(query);
+    await expect(surface.locator('.result.history')).toHaveCount(1);
+    await surface.locator('#zing-search-all-history').click();
+    await expect(surface.locator('.history-view .result.history')).toHaveCount(1);
+    await expect(surface.locator('.history-view time')).toHaveText('just now');
+    const timestamp = await surface.locator('.history-view time').boundingBox();
+    const title = await surface.locator('.history-view .entry-title').boundingBox();
+    expect(title!.width).toBeGreaterThan(40);
+    expect(title!.x + title!.width).toBeLessThanOrEqual(timestamp!.x);
+    const box = await surface.locator('.history-view').boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(390);
+    await surface.locator('.history-view').screenshot({ path: test.info().outputPath('history-overlay-narrow.png') });
+    await surface.locator('.history-view .result.history').click({ button: 'right' });
+    await expect(surface.getByRole('combobox', { name: 'Search actions' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(surface.getByRole('combobox', { name: 'Search browsing history' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(input).toBeFocused(); await expect(input).toHaveValue(query);
+    await surface.locator('.result.history').click({ button: 'right' });
+    await expect(surface.getByRole('combobox', { name: 'Search actions' })).toBeFocused();
+    const opened = context.waitForEvent('page');
+    await page.keyboard.press('Enter');
+    await expect(await opened).toHaveURL(url);
+    await expect(page.locator('.zing-frame')).toHaveCount(0);
+  });
+});
+
 // Keep these expectations independent of the production Chrome Pages registry.
 const chromePageCases = [
   { action: 'openExtensions', en: 'Extensions', zh: '扩展管理', url: 'chrome://extensions/', root: 'extensions-manager', aliases: ['extension', 'extensions', '扩展', '插件'], input: 'keyboard' },
@@ -233,7 +491,7 @@ for (const target of chromePageCases) test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test(`Chrome Pages: ${target.en} loads the native page and reuses its exact tab via ${target.input}`, async () => {
     const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
-    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(search).toBeFocused();
     await ui.keyboard.type(target.aliases[0]);
     const row = ui.locator(`[id="zing-command:${target.action}"]`);
@@ -277,7 +535,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   test(`Chrome Pages: ${language} labels aliases and mixed right-click Escape footer flow preserve zing settings`, async () => {
     const en = language === 'English';
     const prefix = en ? 'Chrome Pages' : 'Chrome 内置页面';
-    const search = ui.getByRole('combobox', { name: en ? 'Search commands, tabs, and bookmarks' : '搜索命令、标签页和书签' });
+    const search = ui.getByRole('combobox', { name: en ? 'Search commands, tabs, bookmarks, and history' : '搜索命令、标签页、书签和历史' });
     const first = ui.locator('#zing-results [role="option"]').first();
     for (const target of chromePageCases) await expect(ui.locator(`[id="zing-command:${target.action}"]`)).toHaveCount(0);
     for (const category of ['Chrome Pages', 'Chrome 内置页面']) {
@@ -399,7 +657,7 @@ test.describe(() => {
 });
 
 test('unified bilingual search, action menu, Esc and empty results', async () => {
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('');
   await input.fill('close right');
@@ -434,7 +692,7 @@ test('search isolates windows, merges bookmarks, and target actions mute the sel
     await chrome.windows.create({ url: `${base}/OtherWindowUnique`, focused: false });
     return tab.id!;
   }, origin);
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('OtherWindowUnique');
   await expect(ui.getByRole('option')).toHaveCount(0);
   await input.fill('Design');
@@ -457,7 +715,7 @@ test('bookmark opens a new tab in the same window', async () => {
     await chrome.bookmarks.create({ title: 'BookmarkAcceptance', url: `${base}/Bookmarked` });
     return (await chrome.tabs.getCurrent())!.windowId;
   }, origin);
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('BookmarkAcceptance');
   await expect(ui.getByRole('option')).toHaveCount(1);
   await input.press('Enter');
@@ -476,26 +734,26 @@ test('close others preserves pinned tabs and another window; restore is function
     return { self: self.id!, pinned: pinned.id!, disposable: disposable.id!, other: other!.tabs![0].id! };
   }, origin);
   await expect.poll(() => worker.evaluate(id => chrome.tabs.get(id).then(tab => tab.status), seed.disposable)).toBe('complete');
-  await ui.getByRole('combobox', { name: '搜索命令、标签页和书签' }).fill('close other');
+  await ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' }).fill('close other');
   await expect(ui.locator('#zing-results [aria-selected="true"]')).toContainText('关闭其他');
   await ui.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(t => t.id === id), seed.disposable)).toBe(false);
   const survivors = await worker.evaluate(async () => (await chrome.tabs.query({})).map(t => t.id));
   expect(survivors).toContain(seed.pinned); expect(survivors).toContain(seed.other);
-  await expect(ui.getByRole('combobox', { name: '搜索命令、标签页和书签' })).toHaveValue('close other');
-  await expect(ui.getByRole('combobox', { name: '搜索命令、标签页和书签' })).toBeFocused();
+  await expect(ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' })).toHaveValue('close other');
+  await expect(ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' })).toBeFocused();
   await expect(ui.getByRole('dialog')).toHaveCount(0);
   const restorable = await ui.evaluate(async base => (await chrome.tabs.create({ url: `${base}/Restore-Target`, active: false })).id!, origin);
   await expect.poll(() => worker.evaluate(id => chrome.tabs.get(id).then(tab => tab.status), restorable)).toBe('complete');
   await ui.evaluate(id => chrome.tabs.remove(id), restorable);
-  await ui.getByRole('combobox', { name: '搜索命令、标签页和书签' }).fill('restore');
+  await ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' }).fill('restore');
   await expect(ui.locator('#zing-results [aria-selected="true"]')).toContainText('恢复');
   await ui.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(async base => (await chrome.tabs.query({})).some(t => t.url === `${base}/Restore-Target`), origin)).toBe(true);
 });
 
 test('IME Enter does not execute and the popup has no horizontal overflow', async () => {
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   const count = await ui.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length));
   await input.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 229, isComposing: true, bubbles: true });
   expect(await ui.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length))).toBe(count);
@@ -559,7 +817,7 @@ test('Raycast navigation pages, jumps sections and restores caret when actions c
     for (let i = 0; i < 12; i++) await chrome.tabs.create({ url: `${base}/Navigation-${i}`, active: false });
     await chrome.bookmarks.create({ title: 'Navigation Bookmark', url: `${base}/Navigation-Bookmark` });
   }, origin);
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('');
   await expect(ui.locator('.section-start')).toHaveCount(1);
   await input.press('Meta+ArrowUp');
@@ -588,7 +846,7 @@ test('Raycast navigation pages, jumps sections and restores caret when actions c
 
 test('stationary pointer does not steal keyboard selection; modified Enter does not execute', async () => {
   const rows = ui.locator('.result');
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await rows.nth(1).dispatchEvent('mousemove', { screenX: 100, screenY: 100 });
   await rows.nth(1).dispatchEvent('mousemove', { screenX: 101, screenY: 101 });
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
@@ -603,7 +861,7 @@ test('stationary pointer does not steal keyboard selection; modified Enter does 
 });
 
 test('light and dark surfaces, compact rows and bottom action search fit without clipping', async () => {
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await ui.evaluate(async base => {
     await chrome.tabs.create({ url: `${base}/Design-System`, active: false });
     await chrome.bookmarks.create({ title: 'Raycast Manual', url: 'https://manual.raycast.com' });
@@ -631,7 +889,7 @@ for (const variant of ['English', 'fallback', 'Taiwan']) {
     test.use({ environment: { ...defaults, locale: variant === 'English' ? 'en-US' : variant === 'fallback' ? 'fr-FR' : 'zh-TW' } });
     test(`${variant} locale resolves manifest, commands, actions, counts and errors`, async () => {
     const chinese = variant === 'Taiwan';
-    const input = ui.getByRole('combobox', { name: chinese ? '搜索命令、标签页和书签' : 'Search commands, tabs, and bookmarks' });
+    const input = ui.getByRole('combobox', { name: chinese ? '搜索命令、标签页、书签和历史' : 'Search commands, tabs, bookmarks, and history' });
     await expect(input).toBeFocused();
     expect(await ui.evaluate(() => chrome.runtime.getManifest().name)).toBe('zing');
     await expect(ui.locator('.navigation-label')).toHaveText(chinese ? ['上一个', '下一个'] : ['Previous', 'Next']);
@@ -663,7 +921,7 @@ for (const variant of ['English', 'fallback', 'Taiwan']) {
 }
 
 test('settings language and theme persist, synchronize, and preserve search focus', async () => {
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('reload');
   await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 5));
   await input.press('Meta+,');
@@ -688,7 +946,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(41, 42, 45)');
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-dark.png') });
   await theme.press('Escape');
-  const englishInput = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const englishInput = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await expect(englishInput).toHaveValue('reload');
   await expect(englishInput).toBeFocused();
   expect(await englishInput.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 5]);
@@ -800,7 +1058,7 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     const english = locale === 'en-US';
     const helpName = english ? 'Help' : '使用帮助';
     const readName = english ? 'Read Help' : '查看帮助';
-    const input = ui.getByRole('combobox', { name: english ? 'Search commands, tabs, and bookmarks' : '搜索命令、标签页和书签' });
+    const input = ui.getByRole('combobox', { name: english ? 'Search commands, tabs, bookmarks, and history' : '搜索命令、标签页、书签和历史' });
     const article = ui.getByRole('article', { name: helpName });
     const helpSearch = ui.getByRole('textbox', { name: english ? 'Search help' : '搜索帮助', exact: true });
     const originalFooter = await ui.locator('.palette-footer').boundingBox();
@@ -892,7 +1150,7 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English settings entries, narrow layout and Chrome hotkey settings', async () => {
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const mainFooter = await ui.locator('.palette-footer').boundingBox();
   const mainHeader = await ui.locator('.search-bar').boundingBox();
   await input.fill('设置');
@@ -1043,7 +1301,7 @@ test.describe(() => {
   await ui.getByRole('combobox', { name: 'Language', exact: true }).click();
   await ui.getByRole('option', { name: '简体中文', exact: true }).click();
   await ui.keyboard.press('Escape');
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('restore'); await input.press('Enter');
   await expect(ui.getByRole('alert')).toContainText('没有可以恢复的标签页。');
   await input.press('Meta+,');
@@ -1143,7 +1401,7 @@ test('unified results mix tabs bookmarks and commands; recent tabs switch with E
     await chrome.tabs.update(ids.newer, { active: true });
     await chrome.tabs.update(ids.self, { active: true });
   }, seed);
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await expect(input).toHaveValue('');
   await expect(ui.locator('.result').first()).toHaveAttribute('id', `zing-tab:${seed.newer}`);
   await expect(ui.locator('.result.danger')).toHaveCount(0);
@@ -1176,7 +1434,7 @@ test.describe(() => {
   await page.goto(`${origin}/New-Tab`);
   await ui.evaluate(async base => { await chrome.bookmarks.create({ title: 'New Tab', url: base }); }, origin);
   await ui.bringToFront();
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('new tab');
   await expect(ui.locator('.result.tab')).toHaveCount(1);
   await expect(ui.locator('.result.bookmark')).toHaveCount(1);
@@ -1194,7 +1452,7 @@ test('search highlights Chinese titles, translated command aliases, URLs and act
   const page = await context.newPage();
   await page.goto(`${origin}/New-Tab-Notes`);
   await ui.bringToFront();
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('new tab');
   const command = ui.locator('.result.command').first();
   await expect(command.locator('.entry-title')).toHaveText('标签页: 新建标签页');
@@ -1228,7 +1486,7 @@ test('search highlights Chinese titles, translated command aliases, URLs and act
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English title highlighting preserves text and fuzzy matches remain visible', async () => {
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('new tab');
   await expect(ui.locator('.result.command .entry-title')).toHaveText('Tab: New Tab');
   await expect(ui.locator('.result.command .entry-title mark')).toHaveText(['Tab', 'New', 'Tab']);
@@ -1252,7 +1510,7 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await chrome.bookmarks.create({ title: 'IAM Handbook', url: `${base}/Handbook` });
   }, origin);
   await ui.bringToFront();
-  const input = ui.getByRole('combobox', { name: chinese ? '搜索命令、标签页和书签' : 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: chinese ? '搜索命令、标签页、书签和历史' : 'Search commands, tabs, bookmarks, and history' });
   await input.fill('iam');
   await expect(ui.locator('.result')).toHaveCount(2);
   await expect(ui.locator('.result.tab .entry-title')).toHaveText('EchoTech IAM');
@@ -1326,12 +1584,12 @@ test.describe(() => {
   }, origin);
   const reopen = async () => {
     ui = await context.newPage(); await ui.goto(popupUrl);
-    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(input).toBeFocused();
     await input.fill('iam');
     return input;
   };
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await ui.bringToFront(); await input.fill('iam');
   await expect(ui.locator('.result').first()).toContainText('IAM Handbook');
   await input.press('ArrowDown');
@@ -1369,7 +1627,7 @@ test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English canceled and failed selections do not train, while opening settings does', async () => {
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('new tab');
   await input.press('ArrowDown'); // Highlighting alone is not a selection.
   // window.close() can destroy the target between Escape keydown and keyup.
@@ -1444,7 +1702,7 @@ test.describe(() => {
       return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
     };
     const combo = async (name: string) => (await ax()).find(node => node.role?.value === 'combobox' && node.name?.value === name);
-    const rootName = 'Search commands, tabs, and bookmarks';
+    const rootName = 'Search commands, tabs, bookmarks, and history';
     await expect.poll(async () => (await combo(rootName))?.properties?.find(property => property.name === 'focused')?.value.value).toBe(true);
     await page.keyboard.type('Closed target Alpha');
     for (const [query, target] of [['Closed target Alpha', seeded.first], ['Closed target Beta', seeded.second]] as const) {
@@ -1878,7 +2136,7 @@ for (const vimium of [false, true]) test.describe(() => {
     return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
   };
   const combo = async () => (await ax()).find(node => node.role?.value === 'combobox');
-  await expect.poll(async () => (await combo())?.name?.value).toBe('Search commands, tabs, and bookmarks');
+  await expect.poll(async () => (await combo())?.name?.value).toBe('Search commands, tabs, bookmarks, and history');
   await page.keyboard.type('local storage');
   await expect.poll(async () => (await combo())?.value?.value).toBe('local storage');
   await page.keyboard.press('Enter');
@@ -1902,7 +2160,7 @@ for (const vimium of [false, true]) test.describe(() => {
   await page.setViewportSize({ width: 390, height: 600 });
   await page.screenshot({ path: test.info().outputPath('storage-closed-vimium.png') });
   await page.keyboard.press('Escape');
-  await expect.poll(async () => (await combo())?.name?.value).toBe('Search commands, tabs, and bookmarks');
+  await expect.poll(async () => (await combo())?.name?.value).toBe('Search commands, tabs, bookmarks, and history');
   await expect.poll(async () => (await combo())?.value?.value).toBe('local storage');
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
@@ -2578,7 +2836,7 @@ test.describe(() => {
     }) as typeof chrome.runtime.sendMessage;
     await navigator.clipboard.writeText('clipboard before preview');
   });
-  await ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' }).fill('manage scripts');
+  await ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' }).fill('manage scripts');
   await ui.keyboard.press('Enter');
   const search = ui.getByRole('combobox', { name: 'Search scripts' });
   const preview = ui.getByRole('region', { name: 'Code Preview', exact: true });
@@ -2678,7 +2936,7 @@ test.describe(() => {
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(ui.getByRole('option', { name: 'Storage helper', exact: true })).toBeVisible();
   await ui.reload();
-  await ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' }).fill('Storage helper');
+  await ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' }).fill('Storage helper');
   await expect(ui.getByRole('option').first()).toContainText('Storage helper');
   await expect(ui.locator('.primary-action')).toContainText('Run Script');
   await ui.keyboard.press('Meta+k'); await ui.getByRole('combobox', { name: 'Search actions' }).fill('copy code'); await ui.keyboard.press('Enter');
@@ -2819,7 +3077,7 @@ test('Chinese script library supports keyboard editing and nested Escape', async
   await ui.keyboard.press('Escape');
   await expect(ui.getByRole('region', { name: '设置', exact: true })).toBeVisible();
   await ui.keyboard.press('Escape');
-  await expect(ui.getByRole('combobox', { name: '搜索命令、标签页和书签' })).toBeFocused();
+  await expect(ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' })).toBeFocused();
 });
 
 test.describe(() => {
@@ -2856,7 +3114,7 @@ test.describe(() => {
     'saved-script:alpha': { title: 'Action alpha', code },
     'saved-script:beta': { title: 'Action beta', code },
   }), code);
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('Action');
   await expect(ui.locator('.result.script')).toHaveCount(2);
   await ui.keyboard.press('ArrowDown');
@@ -2912,7 +3170,7 @@ test.describe(() => {
 });
 
 test('Chinese script actions protect built-in setup and return directly to search', async () => {
-  const search = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await search.fill('ctrl tab'); await ui.keyboard.press('Meta+k');
   await expect(ui.locator('.action-row')).toHaveCount(2);
   await expect(ui.locator('.action-row')).toContainText(['复制代码', '查看设置说明']);
@@ -2955,12 +3213,12 @@ test.describe(() => {
   await expect.poll(async () => (await ax()).some(node => node.role?.value === 'textbox' && node.name?.value === 'JavaScript code' && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true))).toBe(true);
   await page.keyboard.press('Meta+Enter');
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('saved-script:overlay-menu'))['saved-script:overlay-menu'])).toEqual({ title: 'Overlay helper edited', code: '43;' });
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Meta+k'); await page.keyboard.type('delete'); await page.keyboard.press('Enter');
   await expect.poll(async () => (await ax()).some(node => node.role?.value === 'alertdialog')).toBe(true);
   await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('saved-script:overlay-menu'))['saved-script:overlay-menu'])).toBeUndefined();
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
@@ -2970,7 +3228,7 @@ test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English command discovery completes the script lifecycle entirely from search and keyboard', async () => {
   await context.grantPermissions(['clipboard-read']);
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('new script');
   await expect(ui.locator('.result[aria-selected=true]')).toContainText('New Script');
   await ui.keyboard.press('Enter');
@@ -3007,7 +3265,7 @@ test.describe(() => {
 });
 
 test('Chinese command discovery opens each preference at its keyboard control', async () => {
-  const search = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   for (const [query, label] of [['语言', '语言'], ['主题', '主题']] as const) {
     await search.fill(query); await ui.keyboard.press('Enter');
     const control = ui.getByRole('combobox', { name: label, exact: true });
@@ -3047,7 +3305,7 @@ async function scriptExecutionFixture(code: string, enable = true) {
     await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
   }, tabId);
   const surface = page.frameLocator('.zing-frame');
-  await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeVisible();
+  await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
   return { page, surface, tabId };
 }
 
@@ -3056,7 +3314,7 @@ test.describe(() => {
   test('English script execution storage overlay runs once, copies exact results and restores search', async () => {
   await context.grantPermissions(['clipboard-read']);
   const { page, surface } = await scriptExecutionFixture('localStorage.setItem("runs", String(Number(localStorage.getItem("runs") || 0) + 1)); localStorage.getItem("demo")');
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('Execution helper'); await expect(surface.locator('.result.script')).toHaveCount(1);
   await page.keyboard.press('Meta+k'); await surface.getByRole('combobox', { name: 'Search actions' }).fill('run and copy'); await page.keyboard.press('Enter');
   await expect(surface.getByLabel('Result', { exact: true })).toHaveValue('中文\n\n');
@@ -3074,7 +3332,7 @@ test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
   test('English script execution storage searches the run command and handles async objects and errors', async () => {
   const { page, surface } = await scriptExecutionFixture('Promise.resolve({ answer: 42, markup: "<script>not HTML</script>" })');
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('run script'); await page.keyboard.press('Enter');
   await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
   await page.keyboard.type('Execution helper'); await page.keyboard.press('Enter');
@@ -3093,7 +3351,7 @@ test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
   test('English script execution storage explains disabled permission and never runs before enabling', async () => {
   const { page, surface } = await scriptExecutionFixture('localStorage.setItem("ran", "yes"); 42', false);
-  await surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' }).fill('Execution helper'); await page.keyboard.press('Enter');
+  await surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' }).fill('Execution helper'); await page.keyboard.press('Enter');
   await expect(surface.getByRole('alert')).toContainText('Enable user scripts');
   expect(await page.evaluate(() => localStorage.getItem('ran'))).toBeNull();
   await expect(surface.getByRole('button', { name: 'Open Extension Details' })).toBeVisible();
@@ -3108,7 +3366,7 @@ test.describe(() => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const { page, surface } = await scriptExecutionFixture('new Promise(resolve => setTimeout(() => { localStorage.setItem("done", "yes"); resolve("late result"); }, 700))');
   await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('Execution helper'); await page.keyboard.press('Meta+k');
   await surface.getByRole('combobox', { name: 'Search actions' }).fill('run and copy'); await page.keyboard.press('Enter');
   await expect(surface.locator('.script-run-status')).toContainText('Running script…');
@@ -3222,7 +3480,7 @@ test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English script editor shares the footer and action menu while preserving code editing', async () => {
   await context.grantPermissions(['clipboard-read']);
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await expect(ui.locator('.palette-footer .actions-button')).toBeVisible();
   await search.fill('new script'); await ui.keyboard.press('Enter');
   const name = ui.getByLabel('Name', { exact: true });
@@ -3280,11 +3538,11 @@ test.describe(() => {
     return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
   };
   const focused = async (name: string) => (await ax()).some(node => node.name?.value === name && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true));
-  await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.type('manage scripts'); await page.keyboard.press('Enter');
   await expect.poll(() => focused('Search scripts')).toBe(true);
   await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await expect(page.locator('#zing-command-palette')).toBeAttached();
   await page.keyboard.press('Meta+a'); await page.keyboard.type('settings'); await page.keyboard.press('Enter');
   await expect.poll(() => focused('Back')).toBe(true);
@@ -3312,7 +3570,7 @@ test.describe(() => {
   await expect.poll(() => focused('Language')).toBe(true);
   await expect.poll(async () => (await ax()).some(node => node.role?.value === 'region' && node.name?.value === 'Settings')).toBe(true);
   await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
@@ -3327,7 +3585,7 @@ test.describe(() => {
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
   const surface = page.frameLocator('.zing-frame');
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('manage scripts'); await page.keyboard.press('Enter');
   await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
   await surface.locator('.palette-footer-title').filter({ hasText: 'Script Library' }).click();
@@ -3366,7 +3624,7 @@ test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English Escape routing survives lost control focus through every script and settings layer', async () => {
   await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:escape-fixture': { title: 'Escape fixture', code: 'return "fixture";' } }));
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const escapeWithoutControlFocus = async () => {
     await ui.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await ui.keyboard.press('Escape');
@@ -3421,7 +3679,7 @@ test.describe(() => {
   });
   await open();
   const surface = page.frameLocator('.zing-frame');
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const blur = () => surface.locator('.zing-app').evaluate(node => {
     ((node.getRootNode() as ShadowRoot).activeElement as HTMLElement)?.blur();
   });
@@ -3470,7 +3728,7 @@ test.describe(() => {
     chrome.runtime.sendMessage = ((request: { type?: string }) => request.type === 'run-saved-script'
       ? new Promise<unknown>(resolve => { scope.finishRun = resolve; }) : send(request)) as typeof chrome.runtime.sendMessage;
   });
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('run script'); await search.press('Enter');
   const picker = ui.getByRole('combobox', { name: 'Search scripts' });
   await picker.fill('Pending fixture'); await picker.press('Enter');
@@ -3490,7 +3748,7 @@ test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English Backspace returns from empty searches while preserving text editing and the root', async () => {
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('settings'); await search.press('Enter');
   await ui.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
   const scripts = ui.getByRole('combobox', { name: 'Search scripts' });
@@ -3539,20 +3797,20 @@ test.describe(() => {
     return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
   };
   const focused = async (name: string) => (await ax()).some(node => node.name?.value === name && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true));
-  await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.type('manage scripts'); await page.keyboard.press('Enter');
   await expect.poll(() => focused('Search scripts')).toBe(true);
   await page.keyboard.type('x'); await page.keyboard.press('Backspace');
   await expect.poll(() => focused('Search scripts')).toBe(true);
   await page.keyboard.press('Backspace');
-  await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Meta+a'); await page.keyboard.type('new script'); await page.keyboard.press('Enter');
   await expect.poll(() => focused('Name')).toBe(true);
   await page.keyboard.press('Backspace'); await expect.poll(() => focused('Name')).toBe(true);
   await page.keyboard.press('Meta+k'); await expect.poll(() => focused('Search actions')).toBe(true);
   await page.keyboard.press('Backspace'); await expect.poll(() => focused('Name')).toBe(true);
   await page.keyboard.press('Shift+Tab'); await expect.poll(() => focused('Back')).toBe(true);
-  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Meta+a'); await page.keyboard.type('local storage'); await page.keyboard.press('Enter');
   await expect.poll(() => focused('Search storage keys')).toBe(true);
   await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option')).toBe(true);
@@ -3563,9 +3821,9 @@ test.describe(() => {
   await page.keyboard.press('Backspace');
   await expect.poll(async () => (await ax()).some(node => node.name?.value === 'JSON preview · copies original value')).toBe(true);
   await page.keyboard.press('Backspace'); await expect.poll(() => focused('Search storage keys')).toBe(true);
-  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Meta+a'); await page.keyboard.press('Backspace'); await page.keyboard.press('Backspace');
-  await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
+  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
 });
@@ -4062,7 +4320,7 @@ test.describe(() => {
   await worker.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 24 }, (_, index) => [
     `saved-script:geometry-${index}`, { title: `Geometry ${String(index).padStart(2, '0')}`, code: `// Script ${index}\n43` },
   ]))));
-  const root = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const root = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const geometry = () => surface.locator('.palette').evaluate(panel => {
     const box = (node: Element) => {
       const rect = node.getBoundingClientRect();
@@ -4957,7 +5215,7 @@ async function openNativePalette() {
   });
   await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
   const palette = context.pages().find(page => page.url().includes('popup.html#window='))!;
-  await expect(palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeFocused();
+  await expect(palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeFocused();
   return { source, palette };
 }
 
@@ -4983,7 +5241,7 @@ for (const mode of ['create', 'reuse'] as const) test.describe(() => {
     expect(popupWindow.type).toBe('popup');
     expect(popupWindow.id).not.toBe(owner);
     const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner);
-    const search = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const search = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await search.fill('extensions');
     await expect(palette.locator('#zing-results [role="option"]').first()).toHaveAttribute('id', 'zing-command:openExtensions');
     await search.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
@@ -5036,7 +5294,7 @@ test.describe(() => {
   expect(Math.abs(bounds.screenX + bounds.outerWidth / 2 - bounds.owner.left! - bounds.owner.width! / 2)).toBeLessThan(3);
   expect(bounds.innerWidth).toBe(expectedWidth);
   expect(Math.abs(bounds.innerHeight - Math.min(516, viewportHeight - topInset - 24))).toBeLessThanOrEqual(1);
-  const input = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('settings'); await input.press('Enter');
   await expect(palette.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await palette.keyboard.press('Escape'); await expect(input).toBeFocused();
@@ -5076,7 +5334,7 @@ for (const layer of ['root', 'group'] as const) test.describe(() => {
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
     });
     const surface = sourcePage.frameLocator('.zing-frame');
-    const root = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const root = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(root).toBeFocused();
     if (layer === 'root') {
       await root.fill('close tab');
@@ -5093,7 +5351,7 @@ for (const layer of ['root', 'group'] as const) test.describe(() => {
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), seeded.source)).toBe(false);
     await expect.poll(() => context.pages().filter(page => page.url().includes('popup.html#window=')).length).toBe(1);
     const palette = context.pages().find(page => page.url().includes('popup.html#window='))!;
-    const input = palette.getByRole('combobox', { name: layer === 'root' ? 'Search commands, tabs, and bookmarks' : 'Search tabs in this group…' });
+    const input = palette.getByRole('combobox', { name: layer === 'root' ? 'Search commands, tabs, bookmarks, and history' : 'Search tabs in this group…' });
     await expect(input).toHaveValue(layer === 'root' ? 'close tab' : 'member');
     await expect(input).toBeFocused();
     const ownWindow = await palette.evaluate(() => chrome.windows.getCurrent());
@@ -5123,7 +5381,7 @@ for (const layer of ['root', 'group'] as const) test.describe(() => {
     if (layer === 'group') {
       await expect(palette.locator('.palette-footer .footer-title-label')).toHaveText('Tab Group: Continuation Research');
       await palette.keyboard.press('Escape');
-      const restored = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+      const restored = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
       await expect(restored).toHaveValue('Continuation Research');
       await expect(restored).toBeFocused();
     }
@@ -5139,14 +5397,14 @@ test.describe(() => {
     });
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).status, successor)).toBe('complete');
     const { source, palette } = await openNativePalette();
-    const input = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('close tab');
     await expect(palette.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', 'zing-command:close');
     await input.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), source.tabId)).toBe(false);
     await expect.poll(() => context.pages().filter(page => page.url().includes('popup.html#window=')).length).toBe(1);
     const continued = context.pages().find(page => page.url().includes('popup.html#window='))!;
-    const search = continued.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const search = continued.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(search).toHaveValue('close tab');
     await expect(search).toBeFocused();
     await expect(continued.locator('#zing-results [aria-selected="true"]')).toHaveCount(0);
@@ -5173,7 +5431,7 @@ test.describe(() => {
     await palette.locator(`[id="zing-tab:${source.tabId}"]`).click({ button: 'right' });
     await palette.locator('[id="zing-actions-action:close"]').click();
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), source.tabId)).toBe(false);
-    const input = palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(input).toHaveValue(''); await expect(input).toBeFocused();
     await expect(palette.locator('#zing-results [aria-selected="true"]')).toHaveCount(0);
     await expect(palette.locator('.palette-footer .primary-action')).toBeDisabled();
@@ -5204,7 +5462,7 @@ test.describe(() => {
     }, origin);
     await ui.bringToFront();
     const { source, palette } = await openNativePalette();
-    await palette.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' }).fill('close tab');
+    await palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' }).fill('close tab');
     await worker.evaluate(id => chrome.tabs.remove(id), source.tabId);
     await expect.poll(() => palette.isClosed()).toBe(true);
     await expect.poll(() => context.pages().filter(page => page.url().includes('popup.html#window=')).length).toBe(0);
@@ -5249,7 +5507,7 @@ test.describe(() => {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
     }, seeded.source);
-    const input = page.frameLocator('.zing-frame').getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = page.frameLocator('.zing-frame').getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(input).toBeFocused(); await input.fill('close tab'); await input.press('Enter');
     await expect.poll(() => worker.evaluate(() => typeof (globalThis as unknown as { __cancelledClose: { release?: () => void } }).__cancelledClose.release)).toBe('function');
     await page.keyboard.press('Escape');
@@ -5268,8 +5526,8 @@ test.describe(() => {
     });
     await expect.poll(() => context.pages().filter(page => page.url().includes('popup.html#window=')).length).toBe(1);
     const reopened = context.pages().find(page => page.url().includes('popup.html#window='))!;
-    await expect(reopened.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toHaveValue('');
-    await expect(reopened.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeFocused();
+    await expect(reopened.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toHaveValue('');
+    await expect(reopened.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeFocused();
     expect(await worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { popups: number[] } }).__cancelledClose.popups)).toHaveLength(1);
     expect(await worker.evaluate(async () => (await chrome.storage.session.get<{ zingPaletteWindow: { sourceTabId: number } }>('zingPaletteWindow')).zingPaletteWindow.sourceTabId)).toBe(seeded.successor);
   });
@@ -5451,7 +5709,7 @@ test.describe(() => {
     return { id, a: a.id!, b: b.id! };
   }, origin);
   await ui.setViewportSize({ width: 750, height: 516 });
-  const root = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const root = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await root.fill('Research');
   await expect(ui.getByRole('option').filter({ hasText: 'Tab Group: Research' })).toBeVisible();
   const mainPanel = await ui.locator('.palette').boundingBox();
@@ -5541,7 +5799,7 @@ test('Chinese Tab Group labels and compact footer stay usable', async () => {
     const id = await chrome.tabs.group({ tabIds: [tab.id!] });
     await chrome.tabGroups.update(id, { title: '资料', color: 'green' }); return id;
   }, origin);
-  const root = ui.getByRole('combobox', { name: '搜索命令、标签页和书签' });
+  const root = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await root.fill('资料');
   await ui.getByRole('option').filter({ hasText: '标签组: 资料' }).click();
   await ui.setViewportSize({ width: 750, height: 516 });
@@ -5596,7 +5854,7 @@ test.describe(() => {
   await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-tab-group-narrow.png') });
   await page.keyboard.press('Meta+k'); await page.keyboard.press('Escape');
   await expect(surface.getByRole('combobox', { name: 'Search tabs in this group…' })).toBeFocused();
-  await page.keyboard.press('Escape'); await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeFocused();
+  await page.keyboard.press('Escape'); await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeFocused();
 });
 });
 
@@ -5608,7 +5866,7 @@ test.describe(() => {
     return { tabId: tab.id!, windowId: tab.windowId };
   }, origin);
   expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('undo tuck');
   await expect(ui.getByRole('option').first()).toContainText('Undo');
   await input.press('Enter');
@@ -5633,7 +5891,7 @@ test.describe(() => {
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
   const surface = page.frameLocator('.zing-frame');
-  const input = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   for (const menu of [false, true]) {
     expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
     await input.fill('undo tuck');
@@ -5694,7 +5952,7 @@ test.describe(() => {
 
   test('English keep-open failed mutation refreshes changes received while execution was pending', async () => {
     await seedManagementTabs();
-    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('Batch fixture');
     const rows = ui.locator('#zing-results .result');
     await expect(rows).toHaveCount(4);
@@ -5745,7 +6003,7 @@ test.describe(() => {
     await ui.locator('.error-banner button').click();
     await expect.poll(() => ui.evaluate(() => typeof (globalThis as unknown as { __retrySnapshot: { release?: () => void } }).__retrySnapshot.release)).toBe('function');
     await worker.evaluate(id => chrome.tabs.remove(id), target);
-    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('Batch fixture');
     await expect(ui.locator('#zing-results .result')).toHaveCount(3);
     await expect(ui.locator(`[id="zing-tab:${target}"]`)).toHaveCount(0);
@@ -5761,7 +6019,7 @@ test.describe(() => {
 
   test('English keep-open pending group mutation stays busy after Escape returns to root', async () => {
     const { ids } = await seedManagementTabs('Batch Research');
-    const root = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const root = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await root.fill('Batch Research');
     await root.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 7));
     await ui.getByRole('option').filter({ hasText: 'Tab Group: Batch Research' }).click();
@@ -5789,7 +6047,7 @@ test.describe(() => {
 
   test('English keep-open root mouse close preserves query and selects next then previous neighbor through empty results', async () => {
     const { ids } = await seedManagementTabs();
-    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     const rows = ui.locator('#zing-results .result');
     await input.fill('Batch fixture');
     await expect(rows).toHaveCount(4);
@@ -5824,7 +6082,7 @@ test.describe(() => {
 
   test('English keep-open root keyboard menu close restores caret and accepts continued typing', async () => {
     await seedManagementTabs();
-    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('Batch fixture');
     await expect(ui.locator('#zing-results .result')).toHaveCount(4);
     const order = await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
@@ -5854,7 +6112,7 @@ test.describe(() => {
   test('English keep-open pin and mute refresh selected tab badges and inverse menu labels', async () => {
     const { ids } = await seedManagementTabs();
     const target = ids[1];
-    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     const row = ui.locator(`[id="zing-tab:${target}"]`);
     await input.fill('Batch fixture');
     await expect(ui.locator('#zing-results .result')).toHaveCount(4);
@@ -5885,7 +6143,7 @@ test.describe(() => {
 
   test('English keep-open group close and ungroup retain query caret and next or previous neighbor', async () => {
     const { groupId } = await seedManagementTabs('Batch Research');
-    const root = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    const root = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await root.fill('Batch Research');
     await ui.getByRole('option').filter({ hasText: 'Tab Group: Batch Research' }).click();
     const input = ui.getByRole('combobox', { name: 'Search tabs in this group…' });
@@ -5926,7 +6184,7 @@ test.describe(() => {
   const a = await context.newPage(); await a.goto(`${origin}/Mouse-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Mouse-B`);
   await ui.bringToFront(); await ui.reload();
-  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+  const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('Mouse');
   const row = ui.getByRole('option').filter({ hasText: 'Mouse A' });
   await row.click({ button: 'right' });

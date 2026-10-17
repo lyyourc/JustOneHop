@@ -89,6 +89,7 @@
 .action-alias { margin-left: 10px; color: var(--muted); font-size: 11px; }
 .entry-meta { display: flex; gap: 6px; align-items: center; color: var(--muted); margin-left: 6px; }
 .kind-label { font-size: 11px; white-space: nowrap; }
+.history-metadata time { font-variant-numeric: tabular-nums; }
 .current-badge { font-size: 11px; font-weight: 500; padding: 2px 8px; background: var(--icon-well); color: var(--muted); border-radius: 999px; }
 .tucked-badge { font-size: 11px; white-space: nowrap; color: var(--muted); }
 
@@ -169,7 +170,7 @@ body.zing-popup { margin: 0; width: 750px; height: 516px; overflow: hidden; back
   .search-bar, .storage-search { padding: 2px 18px 0; gap: 8px; }
   .footer { gap: 6px; padding: 0 6px; }
   .footer-actions { gap: 3px; } .footer-actions button { padding: 4px 5px; } .footer-status { max-width: 88px; font-size: 9px; }
-  .entry-meta { gap: 4px; } .entry-subtitle { display: none; } .kind-label { font-size: 10px; }
+  .entry-meta { gap: 4px; } .history-metadata.has-time .history-kind { display: none; } .entry-subtitle { display: none; } .kind-label { font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .palette, .action-menu, .spinner { animation: none; } .main-surface { transition: none; } }
 

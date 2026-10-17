@@ -49,12 +49,12 @@ export function entries(snapshot: Snapshot): Entry[] {
     ...snapshot.tabs.map((tab): Entry => ({
       id: `tab:${tab.id}`, kind: 'tab', title: tab.title, subtitle: labelUrl(tab.url),
       groupTitle: groups.get(tab.groupId!)?.title, groupColor: groups.get(tab.groupId!)?.color,
-      keywords: `${tab.url}${tab.tucked ? ' tucked away 已收起' : ''}`, faviconPageUrl: tab.url, icon: 'tab', action: 'switch', tabId: tab.id,
+      keywords: `${tab.url}${tab.tucked ? ' tucked away 已收起' : ''}`, url: tab.url, faviconPageUrl: tab.url, icon: 'tab', action: 'switch', tabId: tab.id,
       active: tab.id === snapshot.currentTabId, pinned: tab.pinned, muted: tab.muted, tucked: tab.tucked, canTuck: tab.canTuck,
     })),
     ...snapshot.bookmarks.map((bookmark): Entry => ({
       id: `bookmark:${bookmark.id}`, kind: 'bookmark', title: bookmark.title,
-      subtitle: labelUrl(bookmark.url), faviconPageUrl: bookmark.url, keywords: `${bookmark.url} ${bookmark.folder}`,
+      subtitle: labelUrl(bookmark.url), url: bookmark.url, faviconPageUrl: bookmark.url, keywords: `${bookmark.url} ${bookmark.folder}`,
       icon: 'bookmark', action: 'openBookmark', bookmarkId: bookmark.id,
     })),
     ...(snapshot.tuckRecoveries || []).map((item): Entry => ({
@@ -169,7 +169,7 @@ function buildSearchIndex(items: Entry[]) {
     // Rank that identity like a name; paths, query strings and folders remain
     // auxiliary metadata and still receive no typo tolerance.
     let hostname = '';
-    if ((item.kind === 'tab' || item.kind === 'bookmark') && item.faviconPageUrl) {
+    if ((item.kind === 'tab' || item.kind === 'bookmark' || item.kind === 'history') && item.faviconPageUrl) {
       try { hostname = new URL(item.faviconPageUrl).hostname.toLowerCase().replace(/^www\./, ''); } catch { /* No domain identity. */ }
     }
     const names = [title, label, ...aliases, ...(hostname ? [hostname] : [])];
@@ -220,7 +220,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
         Math.abs(name.length - normalized.length) <= 1 && termMatches(name, normalized).length > 0)) return 6;
     return 7;
   };
-  const kindOrder = { tab: 0, bookmark: 1, command: 2, script: 3 };
+  const kindOrder = { tab: 0, bookmark: 1, history: 2, command: 3, script: 4 };
   const explicitExtensionReload = terms.includes('zing') || hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
   return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
     (!item.danger || item.action === 'deleteScript' || explicitClose) && terms.every(term =>
@@ -229,7 +229,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||
     item.title.includes(term) || termMatches(item.title, term).length > 0 || item.aliases.some(alias =>
       termMatches(alias, term, !pinyinAliases.has(alias)).length > 0)))
-    .map(result => ({ ...result, tier: tier(result.item), usage: usageScores.get(usageTarget(items[result.refIndex])) || 0,
+    .map(result => ({ ...result, tier: tier(result.item), usage: result.item.kind === 'history' ? 0 : usageScores.get(usageTarget(items[result.refIndex])) || 0,
       // More aliases should improve discovery, not multiply a command's rank.
       nameLength: result.item.kind === 'command'
         ? Math.min(Infinity, ...result.item.names.filter(name => terms.every(term => name.includes(term))).map(name => name.length)) : Infinity,
@@ -240,6 +240,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
       Number(b.item.kind === 'command') - Number(a.item.kind === 'command') ||
       Number(b.item.pinned) - Number(a.item.pinned) ||
       kindOrder[a.item.kind] - kindOrder[b.item.kind] ||
+      (a.item.kind === 'history' && b.item.kind === 'history' ? (items[b.refIndex].lastVisitTime || 0) - (items[a.refIndex].lastVisitTime || 0) : 0) ||
       (a.item.kind === 'command' && b.item.kind === 'command' ? a.nameLength - b.nameLength : 0) ||
       (a.tier > 1 ? (a.score ?? 1) - (b.score ?? 1) : 0) || a.refIndex - b.refIndex)
     .map(result => items[result.refIndex]);
@@ -258,6 +259,7 @@ export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
       ...(!builtin ? [{ ...entry, id: `${entry.id}:delete`, action: 'deleteScript' as const, icon: 'close' as const, title: t('deleteScript'), subtitle: '', keywords: 'delete remove 删除', danger: true }] : []),
     ];
   }
+  if (entry.kind === 'history') return [{ ...entry, title: t('openHistoryPage'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }];
   if (entry.kind === 'command') return [entry];
   if (entry.kind === 'bookmark') return [{ ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }];
   const tab = snapshot.tabs.find(item => item.id === entry.tabId);

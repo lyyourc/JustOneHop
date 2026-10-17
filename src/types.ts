@@ -1,5 +1,5 @@
 export type ChromePageAction = 'openExtensions' | 'openPasswords' | 'openDownloads' | 'openHistory' | 'openBookmarks' | 'openChromeSettings' | 'openExtensionShortcuts';
-export type ActionId = ChromePageAction | 'switch' | 'openBookmark' | 'newTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
+export type ActionId = ChromePageAction | 'switch' | 'openBookmark' | 'openHistoryPage' | 'newTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
 
 export interface TabItem {
   id: number;
@@ -16,6 +16,8 @@ export interface TabItem {
   groupId?: number;
 }
 export interface BookmarkItem { id: string; title: string; url: string; folder: string }
+export interface HistoryPage { id: string; url: string; title: string; lastVisitTime: number }
+export interface HistorySearchResult { items: HistoryPage[]; limited: boolean }
 export interface TuckRecoveryItem {
   id: string; title: string; urls: string[];
   candidates: { id: number; windowId: number; title: string; fingerprint: string;
@@ -23,6 +25,7 @@ export interface TuckRecoveryItem {
 }
 export interface TabGroupItem { id: number; windowId: number; title: string; color: chrome.tabGroups.TabGroup['color']; collapsed: boolean }
 export interface Snapshot {
+  incognito?: boolean;
   groups?: TabGroupItem[];
   windowId: number;
   currentTabId: number;
@@ -44,6 +47,7 @@ export interface Execution {
   windowId: number;
   tabId?: number;
   bookmarkId?: string;
+  url?: string;
   query?: string;
   recoveryId?: string;
   groupId?: number;
@@ -67,6 +71,7 @@ export type Request =
   | { source: 'zing'; type: 'run-saved-script'; payload: ScriptRun }
   | { source: 'zing'; type: 'open-script-settings' }
   | { source: 'zing'; type: 'snapshot' }
+  | { source: 'zing'; type: 'search-history'; payload: { query: string; scope: 'week' | 'all' } }
   | { source: 'zing'; type: 'palette-state' }
   | { source: 'zing'; type: 'cancel-palette-continuation' }
   | { source: 'zing'; type: 'read-page-storage'; payload: StorageRead }
@@ -81,13 +86,15 @@ export interface Entry {
   category?: 'tabGroup' | 'tab' | 'script' | 'storage' | 'settings' | 'chromePages' | 'zing';
   shortcut?: string;
   faviconPageUrl?: string;
+  url?: string;
+  lastVisitTime?: number;
   id: string;
-  kind: 'command' | 'tab' | 'bookmark' | 'script';
+  kind: 'command' | 'tab' | 'bookmark' | 'history' | 'script';
   title: string;
   subtitle: string;
   keywords: string;
   icon: IconName;
-  action: ActionId | 'settings' | 'help' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
+  action: ActionId | 'settings' | 'help' | 'searchAllHistory' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
   settingsSection?: SettingsSection;
   recoveryId?: string;
   groupId?: number;

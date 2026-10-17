@@ -10,9 +10,15 @@ A locally loaded extension for personal use. No account, backend, or telemetry.
 
 ### Command Palette
 
-Find tabs, bookmarks, and browser commands in one place. Matching text uses a heavier weight without added color or spacing, relevant commands take priority, and frequently chosen results move up based on your usage. Click a result or press Enter to run it, and use the Actions menu to manage the selected tab.
+Find tabs, bookmarks, browsing history, and browser commands in one place. Matching text uses a heavier weight without added color or spacing, relevant commands take priority, and frequently chosen results move up based on your usage. Click a result or press Enter to run it, and use the Actions menu to manage the selected tab.
 
 Closing, pinning, muting, and other organizing actions keep zing open with your search and caret preserved. Removing a result selects a neighboring item so you can keep working. Navigation, such as switching tabs or opening a page, closes the palette on success. If you close the tab hosting zing, your search continues in a separate panel for the same browser window, retaining the system title bar. Select a result again before continuing. Closing the source window or its last tab ends the session; it never follows you into another browser window.
+
+### Browsing history search
+
+Typing also searches the past week of Chrome history, including pages opened outside zing, with up to 100 history matches. The palette waits at most 100ms before presenting the combined results once; late history replies do not insert rows. Search All History occupies the fifth result slot, or follows the results when fewer than four exist. Explicit `history`, `search history`, or Chinese equivalents put it first and open an empty history search field. Click it or press Enter to search all time inside the panel; you can edit the query or go back while loading. Timeouts, no matches, and read failures have distinct messages. History pages open in a new tab in the source window; history candidates duplicating matching tabs or bookmarks are omitted. The `history` permission is requested at installation. zing only reads HTTP(S) history, keeps no history database cache or history-click learning records, and does not read ordinary history in incognito windows.
+
+Search results share icon, title/description, and right-side metadata rendering. History shows the last visit as just now, minutes ago, today/yesterday with time, or a date. Hover for the full local timestamp; narrow layouts retain the time.
 
 ### Chrome Pages
 

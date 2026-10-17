@@ -11,6 +11,7 @@
     "scripting",
     "tabs",
     "bookmarks",
+    "history",
     "sessions",
     "storage",
     "userScripts",

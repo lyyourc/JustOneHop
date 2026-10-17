@@ -3,7 +3,7 @@
     "message": "zing"
   },
   "extensionDescription": {
-    "message": "一个让日常浏览器操作更顺手的命令面板。轻松搜索标签页与书签，随时用快捷键或鼠标执行常用操作。"
+    "message": "一个让日常浏览器操作更顺手的命令面板。轻松搜索标签页、书签与历史，随时用快捷键或鼠标执行常用操作。"
   },
   "openPalette": {
     "message": "打开 zing 命令面板"
@@ -87,7 +87,7 @@
     "message": "执行命令"
   },
   "searchLabel": {
-    "message": "搜索命令、标签页和书签"
+    "message": "搜索命令、标签页、书签和历史"
   },
   "closePalette": {
     "message": "关闭面板"
@@ -232,7 +232,7 @@
   "helpStartTitle": { "message": "打开与搜索" },
   "toolbarShortcut": { "message": "打开 zing：$1 · 修改快捷键" },
   "helpStartBody": { "message": "点击工具栏的 zing 图标，或按启动快捷键打开面板（当前：$1）。可在「设置 → 键盘」中修改快捷键，或右键工具栏图标修改绑定、在新标签页打开本帮助。" },
-  "helpSearchBody": { "message": "直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「脚本」「主题」「下载」。" },
+  "helpSearchBody": { "message": "直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「脚本」「主题」「下载」。 最近一周的浏览历史也参与搜索。「搜索全部历史」位于第 5 条，结果较少时放末尾，可继续搜索全部时间；历史查询较慢时先显示其他结果，迟到的历史不再插入。" },
   "helpControlsTitle": { "message": "更多操作与返回" },
   "helpControlsBody": { "message": "右键点击结果、点击底栏「操作」或按 Cmd/Ctrl+K，可打开针对当前选中项的操作菜单。除方向键外，列表也支持 Ctrl+P / Ctrl+N 上下选择。" },
   "helpBackBody": { "message": "按 Esc、点击返回箭头，或在二级页的空搜索框中按 Backspace，均逐层返回并恢复原搜索与选中项；在主搜索层按 Esc 关闭面板。" },
@@ -247,7 +247,7 @@
   "helpQuestionsTitle": { "message": "常见问题" },
   "helpShortcutBody": { "message": "若快捷键未生效或存在冲突，可在「设置 → 键盘」中前往 Chrome 扩展快捷键页修改。由于浏览器限制，Ctrl+Tab 需手动配置，搜索「ctrl tab」即可查看配置代码与步骤。" },
   "helpWindowBody": { "message": "zing 在普通网页中以页面浮层打开；在 Chrome 内置页、扩展商店等受限页面或地址栏聚焦时，会自动切换为独立面板或工具栏弹窗。" },
-  "helpPrivacyBody": { "message": "zing 无账号、服务端或遥测。设置偏好、保存的脚本与搜索习惯仅保存在本机；网站存储值与脚本结果仅保留在当前面板内存中。" },
+  "helpPrivacyBody": { "message": "zing 无账号、服务端或遥测。设置偏好、保存的脚本与搜索习惯仅保存在本机；网站存储值与脚本结果仅保留在当前面板内存中。 浏览历史权限在安装时申请；zing 只读取、不持久保存历史副本，无痕窗口不搜索普通浏览历史。" },
   "settings": {
     "message": "设置"
   },
@@ -330,7 +330,7 @@
     "message": "设置保存失败，请重试。"
   },
   "searchPlaceholder": {
-    "message": "搜索标签页、书签和命令…"
+    "message": "搜索标签页、书签、历史和命令…"
   },
   "noResultsHint": {
     "message": "试试网页标题、网址域名、书签或命令名称"
@@ -815,5 +815,51 @@
   },
   "groupTabOne": {
     "message": "$1 个标签页"
-  }
+  },
+  "historyKind": {
+    "message": "历史"
+  },
+  "openHistoryPage": {
+    "message": "打开页面"
+  },
+  "searchAllHistory": {
+    "message": "搜索全部历史"
+  },
+  "errorHistorySearch": {
+    "message": "无法读取浏览历史，请重试。"
+  },
+  "historyExpandHint": {
+    "message": "扩大到全部时间"
+  },
+  "historyTimeoutHint": {
+    "message": "历史查询未完成，继续搜索"
+  },
+  "historyEmptyHint": {
+    "message": "最近一周无匹配，扩大范围"
+  },
+  "historyErrorHint": {
+    "message": "历史读取失败，搜索全部历史以重试"
+  },
+  "historyLimitedHint": {
+    "message": "历史结果已达上限，请缩小关键词范围"
+  },
+  "historyAllTime": {
+    "message": "全部时间"
+  },
+  "historySearchLabel": {
+    "message": "搜索浏览历史"
+  },
+  "historySearching": {
+    "message": "正在搜索全部历史…"
+  },
+  "historyNoResults": {
+    "message": "未找到匹配的历史"
+  },
+  "historyEnterQuery": {
+    "message": "输入标题或网址搜索历史"
+  },
+  "historySearchTimeout": {
+    "message": "历史搜索等待过久，请重试。"
+  },
+  "historyLastVisited": { "message": "最近访问：$1" }
 }

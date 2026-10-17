@@ -1,6 +1,6 @@
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { perform, snapshot } from '../src/browser.ts';
+import { historyWindow, perform, searchHistory, snapshot } from '../src/browser.ts';
 import { type UsageRecord, USAGE_STORAGE_KEY } from '../src/usage.ts';
 
 let calls: [string, ...unknown[]][];
@@ -17,6 +17,8 @@ beforeEach(() => {
     { id: 4, index: 0, windowId: 20, pinned: false, active: true, title: 'Other window' },
   ] as chrome.tabs.Tab[];
   globalThis.chrome = {
+    runtime: { id: 'zing', getURL: (path: string) => `chrome-extension://zing/${path}` },
+    history: { search: async () => [] },
     storage: { local: {
       get: async () => ({ [USAGE_STORAGE_KEY]: structuredClone(usage) }),
       set: async (value: Record<string, UsageRecord[]>) => { usage = structuredClone(value[USAGE_STORAGE_KEY]); },
@@ -33,6 +35,94 @@ beforeEach(() => {
     sessions: { getRecentlyClosed: async () => [{ tab: { sessionId: 'session' } }], restore: record('restore') },
   } as unknown as typeof chrome;
 });
+const historySender = (): chrome.runtime.MessageSender => ({ id: 'zing', url: 'chrome-extension://zing/popup.html' });
+
+test('history reads are uncached, bounded to 100 and use explicit week/all start times', async () => {
+  const searches: chrome.history.HistoryQuery[] = [];
+  chrome.history.search = async query => { searches.push(query); return []; };
+  const before = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  assert.deepEqual(await searchHistory({ query: 'guide', scope: 'week' }, historySender()), { items: [], limited: false });
+  const after = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  await searchHistory({ query: 'guide', scope: 'week' }, historySender());
+  await searchHistory({ query: 'guide', scope: 'all' }, historySender());
+  assert.equal(searches.length, 3);
+  assert.equal(searches[0].text, 'guide');
+  assert.equal(searches[0].maxResults, 100);
+  assert.ok(searches[0].startTime! >= before && searches[0].startTime! <= after);
+  assert.deepEqual(searches[2], { text: 'guide', startTime: 0, maxResults: 100 });
+  assert.deepEqual(usage, []);
+});
+
+test('history reads sanitize result fields and report the raw API cap', async () => {
+  chrome.history.search = async () => [
+    { id: 'good', url: 'https://example.com/path?q=one#two', title: 'Guide', lastVisitTime: 12 },
+    { id: 'fallback', url: 'http://example.com/', lastVisitTime: NaN },
+    ...Array.from({ length: 98 }, (_, i) => ({ id: String(i), url: 'javascript:alert(1)', title: 'Unsafe' })),
+  ];
+  assert.deepEqual(await searchHistory({ query: '', scope: 'all' }, historySender()), {
+    items: [
+      { id: 'good', url: 'https://example.com/path?q=one#two', title: 'Guide', lastVisitTime: 12 },
+      { id: 'fallback', url: 'http://example.com/', title: 'http://example.com/', lastVisitTime: 0 },
+    ], limited: true,
+  });
+});
+
+test('history refuses malformed payloads and untrusted or non-palette senders before reading', async () => {
+  chrome.history.search = async () => { calls.push(['history']); return []; };
+  for (const request of [null, {}, { query: 4, scope: 'week' }, { query: '', scope: 'forever' }]) {
+    await assert.rejects(searchHistory(request as never, historySender()));
+  }
+  tabs[1].url = 'https://source.example/';
+  const overlay = { id: 'zing', tab: { ...tabs[1] }, url: tabs[1].url, frameId: 0 };
+  assert.equal(await historyWindow(overlay), 10);
+  for (const sender of [
+    { ...historySender(), id: 'other-extension' },
+    { ...historySender(), url: 'chrome-extension://zing/help.html' },
+    { ...historySender(), frameId: 1 },
+    { ...overlay, frameId: 1 },
+    { ...overlay, url: 'https://unrelated.example/' },
+    { ...overlay, tab: { ...tabs[1], windowId: 20 } },
+    { ...overlay, tab: undefined },
+  ]) await assert.rejects(searchHistory({ query: 'guide', scope: 'week' }, sender));
+  await assert.rejects(historyWindow(overlay, 20));
+  assert.deepEqual(calls, []);
+});
+
+test('history rejects incognito, inactive and vanished source contexts', async () => {
+  chrome.history.search = async () => { calls.push(['history']); return []; };
+  for (const patch of [{ incognito: true }, { active: false }]) {
+    Object.assign(tabs[1], patch);
+    await assert.rejects(searchHistory({ query: 'guide', scope: 'week' }, historySender()));
+    tabs[1].incognito = false; tabs[1].active = true;
+  }
+  chrome.windows.get = async () => ({ id: 10, incognito: true }) as chrome.windows.Window;
+  await assert.rejects(searchHistory({ query: 'guide', scope: 'week' }, historySender()));
+  assert.equal((await snapshot(tabs[1])).incognito, true);
+  chrome.windows.get = async () => { throw new Error('No window'); };
+  await assert.rejects(searchHistory({ query: 'guide', scope: 'week' }, historySender()));
+  await assert.rejects(historyWindow({ ...historySender(), tab: { ...tabs[1], id: 99 } }));
+  assert.deepEqual(calls, []);
+});
+
+test('history opens a new tab in the validated window without learning its URL or query', async () => {
+  await perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/?q=one#two', query: 'private query' });
+  assert.deepEqual(calls, [['create', { windowId: 10, url: 'https://example.com/?q=one#two' }]]);
+  assert.deepEqual(usage, []);
+});
+
+test('history opening rejects unsafe URLs, malformed requests and private windows', async () => {
+  for (const url of [undefined, 42, '', 'not a url', 'javascript:alert(1)', 'data:text/html,hello', 'file:///tmp/test', 'chrome://history/', ' https://example.com', 'https://exa\nmple.com']) {
+    await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url } as never));
+  }
+  await assert.rejects(perform({ action: 'openHistoryPage', windowId: '10', url: 'https://example.com/' } as never));
+  chrome.windows.get = async () => ({ id: 10, incognito: true }) as chrome.windows.Window;
+  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/' }));
+  chrome.windows.get = async () => { throw new Error('No window'); };
+  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/' }));
+  assert.deepEqual(calls, []);
+  assert.deepEqual(usage, []);
+});
+
 test('snapshot only queries the source window and flattens bookmark folders', async () => {
   const data = await snapshot(tabs[1]);
   assert.deepEqual(data.tabs.map(t => t.id), [1, 3, 2]);

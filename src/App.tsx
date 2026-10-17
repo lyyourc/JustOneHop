@@ -1,22 +1,21 @@
+import { SearchResultItem, EntryGlyph as Glyph } from './SearchResultItem';
+import { HistoryView } from './HistoryView';
+import { useHistoryQuery } from './useHistoryQuery';
+import { historyEntries, mergeHistoryResults } from './historySearch';
+import { historySearchEntry, insertHistorySearch, isHistorySearchIntent } from './historyPresentation';
 import { TabGroupView } from './TabGroupView';
 import { keepsPaletteOpen } from './paletteActions';
 import { useResultSelection } from './useResultSelection';
 import { TuckRecoveryView } from './TuckRecoveryView';
-import { entrySearchQuery, entryTitle } from './entryPresentation';
 import { Favicon } from './Favicon';
-import { CurrentTabBadge } from './CurrentTabBadge';
-import { NavigationHint, Shortcut } from './Shortcut';
+import { NavigationHint } from './Shortcut';
 import { NavigationRoot, BackLayer } from './Navigation';
 import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
-import {
-  BookOpen, Code, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
-  Layers, LoaderCircle, Pin, Plus, RotateCcw, Puzzle, KeyRound, Download, History, Keyboard,
-  Settings2, Search, Volume2, VolumeX, X, PanelTop, AlertCircle,
-} from 'lucide-react';
+import { LoaderCircle, Search, AlertCircle } from 'lucide-react';
 import { getPreferences, subscribePreferences } from './preferences';
 import { getUsage, subscribeUsage } from './usageState';
 import { commandUsage, queryUsage } from './usage';
@@ -27,16 +26,10 @@ import { ScriptRunner } from './ScriptRunner';
 import { ScriptLibrary } from './ScriptLibrary';
 import { Settings } from './Settings';
 import { HelpView } from './HelpView';
-import { HighlightedText } from './HighlightedText';
 import { cancelPaletteContinuation, execute, getSnapshot } from './api';
 import { actionsFor, closeTargets, entries, homeEntries, matchingAlias, search } from './model';
-import type { Entry, IconName, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteState, Execution } from './types';
+import type { Entry, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteState, Execution } from './types';
 
-const icons = { help: BookOpen, extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
-  others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, script: Code, edit: Pencil, tuck: ArrowDownToLine };
-function Glyph({ name, size = 18 }: { name: IconName; size?: number }) {
-  const Icon = icons[name]; return <Icon size={size} strokeWidth={1.7} aria-hidden="true" />;
-}
 
 export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState }) {
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
@@ -54,6 +47,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [data, setData] = useState<Snapshot | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [query, setQuery] = useState(initialState?.query ?? '');
@@ -74,11 +68,22 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const mod = isMac ? '⌘' : 'Ctrl';
   const items = useMemo(() => data ? [...entries(data), ...scriptEntries(scripts)] : [], [data, preferences.language, scripts]);
-  const results = useMemo(() => query.trim() ? search(items, query, queryUsage(usage, query)) : homeEntries(items, commandUsage(usage)), [items, query, usage]);
-  const visible = results.slice(0, 100);
-  const grouped = !query.trim();
-  const { selected, selection, setSelection } = useResultSelection(visible, query, data?.currentTabId, initialState?.selection);
-  const liveTarget = actionTarget && items.find(item => item.id === actionTarget.id);
+  const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
+  const committed = useRef<{ query: string; results: Entry[]; visible: Entry[] }>({ query: '', results: [], visible: [] });
+  const nextResults = useMemo(() => {
+    if (!query.trim()) return homeEntries(items, commandUsage(usage));
+    const local = search(items, query, queryUsage(usage, query));
+    return search(mergeHistoryResults(local, historyEntries(history.outcome.items)), query, queryUsage(usage, query));
+  }, [items, query, usage, history.outcome]);
+  const nextVisible = query.trim() && data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults.slice(0, 100);
+  const results = history.pending ? committed.current.results : nextResults;
+  const visible = history.pending ? committed.current.visible : nextVisible;
+  const displayQuery = history.pending ? committed.current.query : query;
+  useLayoutEffect(() => { if (!history.pending) committed.current = { query, results: nextResults, visible: nextVisible }; });
+  const resultBusy = busy || history.pending;
+  const grouped = !displayQuery.trim();
+  const { selected, selection, setSelection } = useResultSelection(visible, displayQuery, data?.currentTabId, initialState?.selection);
+  const liveTarget = actionTarget && [...items, ...visible].find(item => item.id === actionTarget.id);
   const actionItems = useMemo(() => data && liveTarget ? actionsFor(liveTarget, data)
     .sort((a, b) => Number(a.action.startsWith('close')) - Number(b.action.startsWith('close'))) : [], [data, liveTarget, preferences.language]);
   const actions = useMemo(() => search(actionItems, actionQuery), [actionItems, actionQuery]);
@@ -161,15 +166,15 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
 
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.id, settingsOpen, helpOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  }, [selected?.id, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
   useLayoutEffect(() => {
-    if (busy || settingsOpen || helpOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
+    if (busy || settingsOpen || helpOpen || historyOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
     if (deleteTarget) { cancelDelete.current?.focus(); return; }
     if (!actionTarget) { input.current?.focus(); input.current?.setSelectionRange(...savedCaret.current); }
-  }, [actionTarget, settingsOpen, helpOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun, recoveryId, groupId, busy]);
+  }, [actionTarget, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun, recoveryId, groupId, busy]);
 
   function openSettings(section?: SettingsSection) {
-    if (busy || settingsOpen || helpOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
+    if (busy || settingsOpen || helpOpen || historyOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     closeActions(); setSettingsSection(section); setSettingsOpen(true); setError('');
   }
@@ -177,14 +182,18 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   useEffect(() => { if (actionTarget && !liveTarget && !busy) closeActions(); }, [actionTarget, liveTarget, busy]);
   function paletteState(): PaletteState { return { query, selection, caret: savedCaret.current }; }
   function toggleActions() {
-    if (busy) return;
+    if (resultBusy) return;
     if (actionTarget) closeActions();
     else if (selected) {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       setActionTarget(selected); setActionQuery(''); setActionSelection(''); setError(''); }
   }
   async function run(entry?: Entry) {
-    if (!entry || !data || busy) return;
+    if (!entry || !data || resultBusy) return;
+    if (entry.action === 'searchAllHistory') {
+      savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+      closeActions(); setError(''); setHistoryOpen(true); return;
+    }
     if (entry.action === 'help') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       closeActions(); setError(''); setNotice(''); setHelpOpen(true); return;
@@ -235,7 +244,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
         tabId: tab.id, windowId: data.windowId, expectedUrl: tab.url, query: learningQuery ?? '' });
       return;
     }
-    const execution = { action: entry.action, tabId: entry.tabId, bookmarkId: entry.bookmarkId, windowId: data.windowId, query: learningQuery };
+    const execution = { action: entry.action, tabId: entry.tabId, bookmarkId: entry.bookmarkId, url: entry.url, windowId: data.windowId, query: learningQuery };
     if (entry.action === 'settings') { openSettings(entry.settingsSection); void execute(execution).catch(() => {}); return; }
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     setBusy(true); setError(''); setNotice('');
@@ -259,14 +268,14 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   function hover(event: React.MouseEvent, id: string) {
     // Scrolling under a stationary pointer must not undo keyboard selection.
     const position = { x: event.screenX, y: event.screenY };
-    if (selection !== null && !busy && pointer.current && (pointer.current.x !== position.x || pointer.current.y !== position.y)) {
+    if (selection !== null && !resultBusy && pointer.current && (pointer.current.x !== position.x || pointer.current.y !== position.y)) {
       setSelection(id);
     }
     pointer.current = position;
   }
   function keyboard(event: KeyboardEvent) {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-    if ((helpOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
+    if ((helpOpen || historyOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
     const modifier = isMac ? event.metaKey : event.ctrlKey;
     if (modifier && !event.altKey && !event.shiftKey && event.key === ',') {
       event.preventDefault(); openSettings(); return;
@@ -275,7 +284,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
     if (modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault(); toggleActions(); return;
     }
-    if (busy) return;
+    if (resultBusy && event.key !== 'Tab') return;
     const pool = actionTarget ? actions : visible;
     const current = actionTarget ? selectedAction : selected;
     const setter = actionTarget ? setActionSelection : setSelection;
@@ -326,12 +335,12 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const current = actionTarget ? selectedAction : selected;
   const count = affected(current);
   const primaryLabel = current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
-    : current?.kind === 'script' && current.action === 'runScript' ? t('runScript') : current?.action === 'copyScript' ? t('copyScript') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
+    : current?.kind === 'history' ? t('openHistoryPage') : current?.kind === 'script' && current.action === 'runScript' ? t('runScript') : current?.action === 'copyScript' ? t('copyScript') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
   return <NavigationRoot><BackLayer onBack={dismiss}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else dismiss(); }
   }}>
-    {helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
+    {historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} windowId={data.windowId} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
       initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
       onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : scriptRun ? <ScriptRunner {...scriptRun} onBack={() => setScriptRun(null)} /> : scriptLibraryOpen ? <ScriptLibrary isMac={isMac} onBack={() => setScriptLibraryOpen(false)} onClose={onClose} /> : scriptEditor ? <ScriptLibrary initialScript={scriptEditor} isMac={isMac} onBack={() => setScriptEditor(null)} onClose={onClose}
       onComplete={message => { setScriptEditor(null); setNotice(message); }} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} isMac={isMac}
@@ -344,43 +353,26 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
             placeholder={t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
             aria-autocomplete="list" aria-expanded="true" aria-controls="zing-results"
             aria-describedby="zing-navigation"
-            aria-activedescendant={selected ? `zing-${selected.id}` : undefined}
+            aria-activedescendant={!history.pending && selected ? `zing-${selected.id}` : undefined}
             autoComplete="off" autoCorrect="off" spellCheck={false} disabled={busy} />
           <SearchDismissButton label={t('closePalette')} />
         </header>
-        <span className="sr-only result-status" role="status">{data ? countMessage('resultOne', 'resultMany', results.length) : loading && showLoading ? t('loading') : ''}</span>
-        <div className="results" ref={list} id="zing-results" role="listbox" aria-label={t('resultsLabel')}>
+        <span className="sr-only result-status" role="status">{data && !history.pending ? countMessage('resultOne', 'resultMany', visible.length) : loading && showLoading ? t('loading') : ''}</span>
+        <div className="results" ref={list} id="zing-results" role="listbox" aria-label={t('resultsLabel')} aria-busy={history.pending}>
           {loading && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={25} /><p>{t('preparing')}</p></div> : null}
-          {data && !visible.length ? <div className="empty"><Search size={30} /><strong>{t('noResults')}</strong>
+          {data && !history.pending && !visible.length ? <div className="empty"><Search size={30} /><strong>{t('noResults')}</strong>
             <p>{t('noResultsHint')}</p></div> : null}
           {visible.map((item, index) => <div className={`result-group ${grouped && index > 0 && item.kind !== visible[index - 1].kind ? 'section-start' : ''}`} key={item.id}>
-            <div id={`zing-${item.id}`} role="option" aria-selected={selected?.id === item.id}
-            className={`result ${item.kind} ${item.danger ? 'danger' : ''}`} title={`${entryTitle(item)} — ${item.subtitle}`} onMouseMove={event => hover(event, item.id)} onClick={() => { if (!busy) { setSelection(item.id); void run(item); } }}
+            <SearchResultItem entry={item} query={displayQuery} isMac={isMac} showKind={!grouped} suppressTabShortcuts={mode === 'popup'} id={`zing-${item.id}`} selected={!history.pending && selected?.id === item.id}
+            onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
-              if (busy) return;
+              if (resultBusy) return;
               savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
               setSelection(item.id); setActionTarget(item); setActionQuery(''); setActionSelection(''); setError('');
-            }}>
-            <span className={`entry-icon ${item.kind}`} data-color={item.groupColor}><Favicon pageUrl={item.faviconPageUrl} fallback={<Glyph name={item.icon} />} /></span>
-            <span className="entry-copy"><span className="entry-title"><HighlightedText text={entryTitle(item)} query={entrySearchQuery(query)} /></span><span className="entry-subtitle">
-              {item.kind === 'command' ? (matchingAlias(item, query)
-                ? <><HighlightedText text={matchingAlias(item, query)} query={entrySearchQuery(query)} />{item.action === 'closeOthers' || item.action === 'closeRight' ? ` · ${t('keepPinned')}` : ''}</>
-                : (item.action === 'closeOthers' || item.action === 'closeRight' ? t('keepPinned') : ''))
-                : <HighlightedText text={item.subtitle} query={query} allowTypos={false} />}
-            </span></span>
-            <span className="entry-meta">
-              {visibleShortcut(item) ? <Shortcut binding={visibleShortcut(item)!} isMac={isMac} /> : null}
-              {item.groupCount !== undefined ? <span className="kind-label">{countMessage('groupTabOne', 'groupTabCount', item.groupCount)}</span> : null}
-              {item.groupTitle ? <span className="tab-group-badge" data-color={item.groupColor}><HighlightedText text={item.groupTitle} query={query} /></span> : null}
-              {item.pinned ? <Pin size={12} aria-label={t('pinned')} /> : null}
-              {item.muted ? <VolumeX size={13} aria-label={t('muted')} /> : null}
-              <CurrentTabBadge current={!!item.active} />
-              {item.tucked && !item.groupTitle ? <span className="tucked-badge">{t('tucked')}</span> : null}
-              {!grouped && ['tab', 'bookmark'].includes(item.kind) ? <span className="kind-label">{t(item.kind === 'tab' ? 'tabKind' : 'bookmarkKind')}</span> : null}
-            </span>
-          </div></div>)}
-          {results.length > visible.length ? <p className="more-hint">{t('moreResults')}</p> : null}
+            }} />
+          </div>)}
+          {results.length > visible.filter(item => item.action !== 'searchAllHistory').length ? <p className="more-hint">{t('moreResults')}</p> : null}
         </div>
       </div>
 
@@ -408,8 +400,8 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
-        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || busy || !!deleteTarget, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        actions={{ open: !!actionTarget, disabled: !selected || busy || !!deleteTarget, onToggle: toggleActions }} />
+        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || resultBusy || !!deleteTarget, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
+        actions={{ open: !!actionTarget, disabled: !selected || resultBusy || !!deleteTarget, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}
   </div></BackLayer></NavigationRoot>;
