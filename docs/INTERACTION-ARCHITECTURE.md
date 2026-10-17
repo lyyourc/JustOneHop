@@ -12,7 +12,7 @@
 
 - 默认候选行左键单击、普通 Enter 与底栏主操作执行同一主动作，使用同一目标和可用性判断。脚本收藏按用户提供的 Raycast Snippets 截图采用明确的预览列表例外：单击只选择并更新只读预览，普通 Enter 与底栏主操作复制代码，编辑从操作菜单进入。收起恢复核对卡片也只选择，接管需从底栏或菜单显式确认。配备 `ActionMenu` 的列表提供 `onContextMenu`：先 `event.preventDefault()`、选中该项并保存输入框光标，再打开对应菜单。
 - 采用悬停选择的列表，其 `onMouseMove` 比对物理坐标 `event.screenX / event.screenY`，使键盘滚动时静止的指针不抢选中项。脚本收藏悬停不改变选择或预览，保证阅读稳定；Tab Switcher 悬停只展示可点击描边，不改变松开修饰键时的确认目标。
-- 所有关键词过滤列表（主搜索、Storage、Tab Group、Script Library、Script Runner 及 ActionMenu）使用 `HighlightedText` 渲染命中高亮。每个菜单动作同时提供 `icon` 与中英文 `keywords`，筛选同时匹配 `title` 和 `keywords`，支持跨界面语言检索。
+- 所有关键词过滤列表（主搜索、Storage、Tab Group、Script Library、Script Runner 及 ActionMenu）使用 `HighlightedText` 渲染命中高亮：仅以 600 字重强调，继承所在文字的颜色，背景透明且无内边距，避免词内命中被色块和额外间距切断。每个菜单动作同时提供 `icon` 与中英文 `keywords`，筛选同时匹配 `title` 和 `keywords`，支持跨界面语言检索。
 - 所有列表支持 ↑/↓ 与无额外修饰键的 Ctrl+P / Ctrl+N；选中项变化后调用 `scrollIntoView({ block: 'nearest' })`。长列表支持 PageUp / PageDown、Option+↑/↓ 翻页和 Cmd/Ctrl+↑/↓ 首尾跳转。
 - `isComposing` 或 `keyCode === 229` 期间，Enter / Escape / Backspace 留给输入法，不执行业务或返回。带修饰键或 `event.repeat` 的 Enter 不执行主动作；明确定义的 Cmd/Ctrl+Enter 保存除外，编辑字段的普通 Enter 保留编辑语义。
 

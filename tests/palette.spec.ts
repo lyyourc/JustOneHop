@@ -1214,7 +1214,9 @@ test('search highlights Chinese titles, translated command aliases, URLs and act
   await input.press('Meta+k');
   const action = ui.getByRole('combobox', { name: '搜索操作' });
   await action.fill('关闭');
-  await expect(ui.locator('.action-row mark')).toHaveText(['关闭', '关闭', '关闭']);
+  await expect(ui.locator('.action-row.danger mark')).toHaveText(['关闭', '关闭', '关闭']);
+  await expect(ui.locator('[id="zing-actions-action:mute"] .action-alias')).toHaveText('关闭声音');
+  await expect(ui.locator('[id="zing-actions-action:mute"] mark')).toHaveText('关闭');
   await action.fill('close right');
   await expect(ui.locator('.action-row').first().locator('.action-alias mark')).toHaveText(['close', 'right']);
   await ui.keyboard.press('Escape');

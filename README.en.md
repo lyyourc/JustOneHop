@@ -10,7 +10,7 @@ A locally loaded extension for personal use. No account, backend, or telemetry.
 
 ### Command Palette
 
-Find tabs, bookmarks, and browser commands in one place. Matching text is highlighted, relevant commands take priority, and frequently chosen results move up based on your usage. Click a result or press Enter to run it, and use the Actions menu to manage the selected tab.
+Find tabs, bookmarks, and browser commands in one place. Matching text uses a heavier weight without added color or spacing, relevant commands take priority, and frequently chosen results move up based on your usage. Click a result or press Enter to run it, and use the Actions menu to manage the selected tab.
 
 Closing, pinning, muting, and other organizing actions keep zing open with your search and caret preserved. Removing a result selects a neighboring item so you can keep working. Navigation, such as switching tabs or opening a page, closes the palette on success. If you close the tab hosting zing, your search continues in a separate panel for the same browser window, retaining the system title bar. Select a result again before continuing. Closing the source window or its last tab ends the session; it never follows you into another browser window.
 
