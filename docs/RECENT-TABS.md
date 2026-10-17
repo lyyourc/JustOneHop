@@ -4,9 +4,17 @@
 
 ## 当前交互
 
-普通 HTTP(S) 页面复用 Command Palette 的网页浮层容器，位置、宽度和高度一致：按页面视口水平居中、偏上，最大 750×516px，按可用视口缩小。无法聚焦网页、无法注入或 Chrome 原生页面使用独立窗口兜底，按来源标签页内容尺寸与缩放比例估算同一锚点与尺寸，并在 UI 渲染和就绪交接前校准自身原生边框；系统标题栏仍保留。源窗口限定为启动时的普通浏览器窗口。几何规则与近似边界见 [ADR 0010](adr/0010-content-anchor-panel-geometry.md)。
+### 面板内入口（2026-10-18）
 
-1. 已设置的 Ctrl+Tab（默认 Control+J）打开并高亮上一标签页；反向快捷键反向高亮。搜索框初始为空且原生 `disabled`，由候选列表接收焦点，显示本地化「搜索最近标签页… / Search recent tabs…」。
+首页推荐及中英文主搜索提供「Zing: Tab Switcher」（`tab switcher / 最近标签页 / 切换标签页`）。点击、Enter 或底栏主操作只在当前 palette host 内导航到共享 `RecentSwitcherView`，不启动快捷键会话、不另开窗口，入口本身不学习。搜索初始启用并聚焦；按来源窗口 MRU 展示其他页、来源页置末，可直接按标题／URL 筛选。点击候选、普通 Enter 或底栏「切换」明确确认并关闭面板；没有松键确认或 150ms 快速切换展示延迟。切换未提供学习查询，不记录搜索习惯。
+
+取消、Esc、搜索尾部 esc 与底栏返回共用父面板的 `BackLayer`，恢复主搜索 query、selection、caret／选区及选中项可见位置；子页不建立独立 `NavigationRoot`。列表、筛选、当前标记、键盘保护与底栏复用共享组件，初始焦点和退出行为由入口区分。主搜索首页现为最多 10 项的混合推荐，不是 MRU；立即 Enter 执行第一条推荐，最近使用顺序由本切换器提供。
+
+### 快捷键启动
+
+原快捷键路径保持以下行为。普通 HTTP(S) 页面复用 Command Palette 的网页浮层容器，位置、宽度和高度一致：按页面视口水平居中、偏上，最大 750×516px，按可用视口缩小。无法聚焦网页、无法注入或 Chrome 原生页面使用独立窗口兜底，按来源标签页内容尺寸与缩放比例估算同一锚点与尺寸，并在 UI 渲染和就绪交接前校准自身原生边框；系统标题栏仍保留。源窗口限定为启动时的普通浏览器窗口。几何规则与近似边界见 [ADR 0010](adr/0010-content-anchor-panel-geometry.md)。
+
+1. 当前绑定的快捷键（默认 macOS 为 Control+J，Windows/Linux 为 Ctrl+,，也可配置 Ctrl+Tab）打开并高亮上一标签页；反向快捷键反向高亮。搜索框初始为空且原生 `disabled`，由候选列表接收焦点，显示本地化「搜索最近标签页… / Search recent tabs…」。
 2. ↑/↓、Ctrl+N/P、Tab / Shift+Tab 循环选择；PageUp/PageDown、Alt（Option）+↑/↓ 按页移动，Ctrl/Cmd+↑/↓ 跳到首尾。重复启动快捷键仍可连续选择，导航不切页。
 3. 普通 Enter、点击候选项或底栏「切换」才激活最终目标、关闭切换器并返回源窗口；未进入搜索时，松开启动修饰键同样确认。所有带修饰键、长按重复及输入法组合期间的 Enter 均不执行。
 4. Esc 通过 `NavigationRoot` + `BackLayer` 取消，加载期间也有效；点击浮层外部、失焦或最小化同样取消，不切页、不抢回焦点；源窗口或源标签页关闭/移走时也取消。
@@ -22,9 +30,9 @@
 
 ## 共用搜索、底栏与布局
 
-网页浮层与独立窗口共用 `RecentSwitcherView`，首行使用与主搜索相同的 `.search-bar` 输入胶囊，候选区复用 `.results`、`.result` 和 `.entry-copy`。输入框以 `combobox` 关联列表；默认焦点和 `aria-activedescendant` 属于列表，启用搜索后由输入框的 `aria-controls` 与 `aria-activedescendant` 表达当前候选；标题和 URL 使用 `HighlightedText` 高亮匹配文字，不启用拼写容错。搜索栏右侧提供取消按钮，实际启动快捷键仍放在 `header` 的 `title` 属性，未绑定时不提供该提示。
+内嵌子页、快捷键网页浮层与独立窗口共用 `RecentSwitcherView`；内嵌子页初始即为搜索状态，底栏额外提供返回父页的共享导航按钮，其余两种承载的初始列表焦点与松键提示保持不变。首行使用与主搜索相同的 `.search-bar` 输入胶囊，候选区复用 `.results`、`.result` 和 `.entry-copy`。输入框以 `combobox` 关联列表；快捷键启动时默认焦点和 `aria-activedescendant` 属于列表，启用搜索后由输入框的 `aria-controls` 与 `aria-activedescendant` 表达当前候选；标题和 URL 使用 `HighlightedText` 高亮匹配文字，不启用拼写容错。搜索栏右侧提供取消按钮，实际启动快捷键仍放在 `header` 的 `title` 属性，未绑定时不提供该提示。
 
-底栏统一由 `PaletteFooter` 渲染，固定 44px 且不随列表滚动，不另加 `recent-help` 行。左侧 `title` 在快速切换时使用本地化 `recentRelease`（如「松开 Ctrl 切换」），按 `releaseKey` 显示对应修饰键；显式进入搜索后改为 `recentSwitcher`（「切换最近标签页 / Switch Recent Tabs」）；`context={<NavigationHint />}` 与根 `App` 完全相同，共用本地化「选择 / Navigate」与 `↑ Ctrl P ↓ Ctrl N`、`navigationHelp` 悬浮提示及 11px / 400 / 16px 辅助文字样式。宽度 ≤520px 时隐藏导航提示，仍保留底栏 `title` 中的松键提示或搜索状态标题。
+底栏统一由 `PaletteFooter` 渲染，固定 44px 且不随列表滚动，不另加 `recent-help` 行。左侧 `title` 在快速切换时使用本地化 `recentRelease`（如「松开 Ctrl 切换」），按 `releaseKey` 显示对应修饰键；显式进入搜索后改为 `recentSwitcher`（中英文均使用「Tab Switcher」术语）；`context={<NavigationHint />}` 与根 `App` 完全相同，共用本地化「选择 / Navigate」与 `↑ Ctrl P ↓ Ctrl N`、`navigationHelp` 悬浮提示及 11px / 400 / 16px 辅助文字样式。宽度 ≤520px 时隐藏导航提示，仍保留底栏 `title` 中的松键提示或搜索状态标题。
 
 右侧 `primary` 为「切换 ↵」，`secondary` 为「取消 esc」，均复用共享按钮样式、文字在前且键帽在后。未加载、无有效选中项或关闭期间禁用主操作，取消调用共享回调。
 

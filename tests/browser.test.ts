@@ -134,6 +134,21 @@ test('history opening rejects unsafe URLs, malformed requests and private window
   assert.deepEqual(usage, []);
 });
 
+test('snapshot reads the actual forward switcher binding on each refresh and never invents one', async () => {
+  for (const shortcut of ['Ctrl+J', 'Alt+Shift+Y', '']) {
+    chrome.commands.getAll = async () => [
+      { name: 'toggle-palette', shortcut: 'Ctrl+Shift+P' },
+      { name: 'switch-recent-back', shortcut: 'Ctrl+Shift+J' },
+      { name: 'switch-recent', shortcut },
+    ];
+    const value = await snapshot();
+    assert.equal(value.shortcut, 'Ctrl+Shift+P');
+    assert.equal(value.tabSwitcherShortcut, shortcut);
+  }
+  chrome.commands.getAll = async () => [{ name: 'switch-recent-back', shortcut: 'Ctrl+Shift+J' }];
+  assert.equal((await snapshot()).tabSwitcherShortcut, '');
+});
+
 test('snapshot only queries the source window and flattens bookmark folders', async () => {
   const data = await snapshot(tabs[1]);
   assert.deepEqual(data.tabs.map(t => t.id), [1, 3, 2]);
@@ -363,10 +378,14 @@ test('failed browser operations never train, and failed learning never retries s
   assert.deepEqual(calls, [['create', { windowId: 10 }]]);
 });
 
-test('empty searches train commands but not tabs or bookmarks; private windows never train', async () => {
-  await perform({ action: 'switch', windowId: 10, tabId: 1, query: '' });
+test('home page choices train while unqueried navigation and private windows do not', async () => {
+  await perform({ action: 'switch', windowId: 10, tabId: 1 });
   await perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b' });
   assert.equal(usage.length, 0);
+  await perform({ action: 'switch', windowId: 10, tabId: 1, query: '' });
+  assert.ok(usage.some(record => record.query === '' && record.target === `tab:${tabs[0].url}`));
+  await perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b', query: '' });
+  assert.ok(usage.some(record => record.query === '' && record.target === 'bookmark:b'));
   await perform({ action: 'newTab', windowId: 10, query: '' });
   assert.equal(usage[0].target, 'command:newTab');
   assert.equal(usage[0].query, '');

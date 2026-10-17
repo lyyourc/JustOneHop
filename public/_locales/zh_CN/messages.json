@@ -12,7 +12,7 @@
     "message": "zing 浏览器命令面板"
   },
   "togglePalette": {
-    "message": "打开 / 关闭命令面板"
+    "message": "命令面板 — 打开 / 关闭"
   },
   "languageTag": {
     "message": "zh-CN"
@@ -232,13 +232,13 @@
   "helpStartTitle": { "message": "打开与搜索" },
   "toolbarShortcut": { "message": "打开 zing：$1 · 修改快捷键" },
   "helpStartBody": { "message": "点击工具栏的 zing 图标，或按启动快捷键打开面板（当前：$1）。可在「设置 → 键盘」中修改快捷键，或右键工具栏图标修改绑定、在新标签页打开本帮助。" },
-  "helpSearchBody": { "message": "直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「脚本」「主题」「下载」。最近一周的浏览历史也参与搜索。「搜索全部历史」位于第 7 条，结果较少时放末尾，可继续搜索全部时间；历史查询较慢时先显示其他结果，迟到的历史不再插入。成功打开的历史结果与相同网站地址的标签页共用偏好。主搜索与全部历史子页均只在同词同相关性等级内按习惯排序，有偏好记录时显示历史图标。悬停或聚焦图标可查看原因和删除范围，点击即可忘记，也可按 Shift+Backspace 忘记选中项。忘记对历史与标签页共同生效。" },
+  "helpSearchBody": { "message": "首页最多推荐 10 个页面与命令，依据在 zing 中成功使用的习惯，记录不足时展示精选命令；推荐顺序下次打开时更新。直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「脚本」「主题」「下载」。最近一周的浏览历史也参与搜索。「搜索全部历史」位于第 7 条，结果较少时放末尾，可继续搜索全部时间；历史查询较慢时先显示其他结果，迟到的历史不再插入。成功打开的历史结果与相同网站地址的标签页共用偏好。主搜索与全部历史子页均只在同词同相关性等级内按习惯排序，有偏好记录时显示历史图标。悬停或聚焦图标可查看原因和删除范围，点击即可忘记，也可按 Shift+Backspace 忘记选中项。忘记对历史与标签页共同生效。" },
   "helpControlsTitle": { "message": "更多操作与返回" },
   "helpControlsBody": { "message": "右键点击结果、点击底栏「操作」或按 Cmd/Ctrl+K，可打开针对当前选中项的操作菜单。除方向键外，列表也支持 Ctrl+P / Ctrl+N 上下选择。" },
   "helpBackBody": { "message": "按 Esc、点击返回箭头，或在二级页的空搜索框中按 Backspace，均逐层返回并恢复原搜索与选中项；在主搜索层按 Esc 关闭面板。" },
   "helpTabsTitle": { "message": "整理与切换标签页" },
-  "helpTabsBody": { "message": "对搜索结果执行固定、静音或关闭时，直接作用于所选标签页且面板保持打开，便于连续整理；批量关闭会自动保留固定标签页。搜索标签组名称可进入组管理。使用最近标签页切换器时，按住修饰键选择、松开即切换；若点击搜索框或按 Cmd/Ctrl+F 进入筛选，则暂停松键切换，改由输入后按 Enter 或点击确认。" },
-  "helpTuckBody": { "message": "「收起标签页」将页面移入窗口末尾的折叠组，不关闭或主动卸载页面；随时搜索并切换到该页即可移回标签栏。可在设置中开启「自动收起闲置标签页」，自动收起 7 天未使用的页面。浏览器重启后若有无法自动确认归属的收起组，搜索「恢复收起组」核对即可。" },
+  "helpTabsBody": { "message": "对搜索结果执行固定、静音或关闭时，直接作用于所选标签页且面板保持打开，便于连续整理；批量关闭会自动保留固定标签页。搜索标签组名称可进入组管理。选择「Zing: Tab Switcher」可在面板内筛选最近标签页，点击或 Enter 确认切换，取消则返回原搜索。通过快捷键启动切换器时，按住修饰键选择、松开即切换；若点击搜索框或按 Cmd/Ctrl+F 进入筛选，则暂停松键切换，改由输入后按 Enter 或点击确认。" },
+  "helpTuckBody": { "message": "「收起标签页」将页面移入窗口末尾的折叠组，不关闭或主动卸载页面；随时搜索并切换到该页即可移回标签栏。可在设置中开启「自动收起标签页」，自动收起 7 天未使用的页面。浏览器重启后若有无法自动确认归属的收起组，搜索「恢复收起组」核对即可。" },
   "helpScriptsTitle": { "message": "保存与运行脚本" },
   "helpScriptsBody": { "message": "搜索「脚本」管理本机保存的 JavaScript：选中可预览并复制代码，从「操作」菜单编辑、新建或删除（Cmd/Ctrl+Enter 保存）。在目标网页直接搜索脚本名称或「运行脚本」，即可显式运行一次；代码最后一个表达式的值（支持 Promise）会显示在当前面板中。脚本不会随网页加载自动执行。" },
   "helpScriptPermissionBody": { "message": "运行脚本需要 Chrome 135+，且仅支持普通 HTTP/HTTPS 网页。首次使用前，请在 Chrome 的 zing 扩展详情中开启「允许用户脚本」（Chrome 135–137 需开启开发者模式）。" },
@@ -265,7 +265,7 @@
   "searchSettings": { "message": "搜索设置" },
   "searchSettingsPlaceholder": { "message": "搜索设置…" },
   "clearSettingsSearch": { "message": "清空搜索" },
-  "ctrlTabSetting": { "message": "切换最近标签页" },
+  "ctrlTabSetting": { "message": "Tab Switcher" },
   "setUpShortcut": { "message": "前往配置" },
   "preferences": { "message": "偏好设置" },
   "experimentalFeatures": { "message": "实验性功能" },
@@ -339,7 +339,7 @@
     "message": "搜索排序"
   },
   "searchRankingHint": {
-    "message": "同一搜索词下，习惯只调整同级结果。悬停历史图标查看原因，点击即可忘记偏好。"
+    "message": "使用习惯用于首页推荐，搜索时只调整同级结果。悬停历史图标查看原因，点击即可忘记偏好。"
   },
   "resetSearchRanking": {
     "message": "重置搜索排序"
@@ -351,6 +351,9 @@
   "rankingRecordedHint": { "message": "已记住偏好，位置未变。" },
   "forgetQueryRanking": { "message": "忘记此搜索词的偏好" },
   "forgetCommandRanking": { "message": "忘记此命令的偏好" },
+  "forgetPageRanking": { "message": "忘记此页面的偏好" },
+  "suggested": { "message": "推荐" },
+  "tabSwitcherHint": { "message": "Switch tabs like in VS Code" },
   "rankingForgotten": { "message": "已忘记排序偏好。" },
   "errorForgetRanking": { "message": "未能忘记此偏好，请重试。" },
   "navigate": {
@@ -468,7 +471,7 @@
     "message": "申请访问权限失败，请在目标网站重新打开 zing。"
   },
   "recentSwitcher": {
-    "message": "切换最近标签页"
+    "message": "Tab Switcher"
   },
   "recentSearch": {
     "message": "搜索最近标签页…"
@@ -476,8 +479,11 @@
   "recentSearchHelp": {
     "message": "点击或按 Ctrl/Cmd+F 开始搜索，然后松开快捷键并输入。"
   },
+  "recentSwitcherCommand": {
+    "message": "Tab Switcher — Switch tabs like in VS Code"
+  },
   "recentSwitcherBack": {
-    "message": "反向选择最近标签页"
+    "message": "Tab Switcher — 反向切换"
   },
   "recentCurrent": {
     "message": "当前"
@@ -507,7 +513,7 @@
     "message": "设置 Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "通过一次性配置代码，设置 Ctrl+Tab 切换最近标签页。"
+    "message": "使用右侧快捷键，像在 VS Code 中一样切换标签页。也可通过一次配置改用 Ctrl+Tab。"
   },
   "bindingEffect": {
     "message": "借助 Chrome 内部设置接口，将 Ctrl+Tab 和 Ctrl+Shift+Tab 绑定到 zing 的最近标签页切换。"
@@ -588,14 +594,8 @@
   "cancelScriptDelete": {
     "message": "取消"
   },
-  "changeLanguage": {
-    "message": "切换语言"
-  },
-  "changeTheme": {
-    "message": "切换主题"
-  },
   "keyboardShortcuts": {
-    "message": "快捷键设置"
+    "message": "快捷键"
   },
   "runScript": {
     "message": "运行脚本"
@@ -688,7 +688,7 @@
     "message": "标签页"
   },
   "autoTuck": {
-    "message": "自动收起闲置标签页"
+    "message": "自动收起标签页"
   },
   "autoTuckHint": {
     "message": "将闲置满 7 天的标签页移入折叠的「已收起」分组，不关闭页面。"

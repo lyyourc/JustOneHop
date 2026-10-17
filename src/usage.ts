@@ -1,6 +1,6 @@
 import type { Entry, SettingsSection } from './types';
 
-/** Local selections; an empty query represents commands run without a search. */
+/** Local selections; an explicit empty query represents a home/action selection. */
 export interface UsageRecord { query: string; target: string; weight: number; lastUsed: number }
 export const USAGE_STORAGE_KEY = 'searchUsage';
 const HALF_LIFE = 14 * 24 * 60 * 60 * 1000;
@@ -19,7 +19,7 @@ export function usageTarget(entry: Entry): string {
   if (entry.kind !== 'command') return '';
   if (entry.action === 'settings') return settingsUsageTarget(entry.settingsSection);
   // Only actions with a successful-execution recording path can learn.
-  if (['help', 'manageGroup', 'reviewTuck', 'runScript', 'runCopyScript', 'newScript', 'scriptLibrary', 'reloadExtension', 'searchAllHistory'].includes(entry.action)) return '';
+  if (['help', 'tabSwitcher', 'manageGroup', 'reviewTuck', 'runScript', 'runCopyScript', 'newScript', 'scriptLibrary', 'reloadExtension', 'searchAllHistory'].includes(entry.action)) return '';
   return `command:${entry.action}`;
 }
 
@@ -47,7 +47,7 @@ export function normalizeUsage(value: unknown, now = Date.now()): UsageRecord[] 
     Number.isFinite(record.weight) && record.weight > 0 && record.weight <= 100 &&
     Number.isFinite(record.lastUsed) && record.lastUsed > now - MAX_AGE && record.lastUsed <= now)
     .map(record => ({ query: usageQuery(record.query), target: record.target, weight: record.weight, lastUsed: record.lastUsed }))
-    .filter(record => record.query.length > 0 || record.target.startsWith('command:'))
+    .filter(record => record.query.length > 0 || /^(command|tab|bookmark):.+/.test(record.target))
     .sort((a, b) => b.lastUsed - a.lastUsed)
     .filter(record => {
       const key = JSON.stringify([record.query, record.target]);
@@ -59,7 +59,7 @@ export function normalizeUsage(value: unknown, now = Date.now()): UsageRecord[] 
 export function addUsage(value: unknown, query: string, target: string, now = Date.now()): UsageRecord[] {
   const history = normalizeUsage(value, now);
   const normalized = usageQuery(query);
-  if ((!normalized && !target.startsWith('command:')) || normalized.length > 200 || !target || target.length > 4096) return history;
+  if ((!normalized && !/^(command|tab|bookmark):.+/.test(target)) || normalized.length > 200 || !target || target.length > 4096) return history;
   const previous = history.find(record => record.query === normalized && record.target === target);
   return [{ query: normalized, target, weight: Math.min(100, (previous ? usageWeight(previous, now) : 0) + 1), lastUsed: now },
     ...history.filter(record => record !== previous)].slice(0, MAX_RECORDS);
@@ -71,13 +71,15 @@ export function queryUsage(history: UsageRecord[], query: string, now = Date.now
     .map(record => [record.target, usageWeight(record, now)]));
 }
 
-/** Sum each selection once across queries, including commands run from home/actions. */
-export function commandUsage(history: UsageRecord[], now = Date.now()): Map<string, number> {
+/** Sum each selection once across queries, including explicit home selections. */
+export function homeUsage(history: UsageRecord[], now = Date.now()): Map<string, number> {
   const scores = new Map<string, number>();
   for (const record of normalizeUsage(history, now)) {
-    if (record.target.startsWith('command:')) {
-      scores.set(record.target, (scores.get(record.target) || 0) + usageWeight(record, now));
-    }
+    scores.set(record.target, (scores.get(record.target) || 0) + usageWeight(record, now));
   }
   return scores;
+}
+
+export function commandUsage(history: UsageRecord[], now = Date.now()): Map<string, number> {
+  return new Map([...homeUsage(history, now)].filter(([target]) => target.startsWith('command:')));
 }

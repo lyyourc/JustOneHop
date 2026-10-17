@@ -32,7 +32,7 @@ export function commands(current?: TabItem): Entry[] {
       : ['mute', 'mute tab', '静音', '静音标签页', '关闭声音']) : undefined,
     shortcut: ({ newTab: 'Mod+T', close: 'Mod+W', restore: 'Mod+Shift+T', reload: 'Mod+R' } as Partial<Record<ActionId, string>>)[action],
     tabId: current?.id,
-    searchOnly: action === 'tuck' || undefined,
+    searchOnly: action === 'tuck' || action === 'mute' || action === 'restore' || undefined,
     subtitle: action === 'newTab' ? t('newTabHint') : action === 'restore' ? t('restoreHint') :
       action === 'closeOthers' || action === 'closeRight' ? t('closeHint') : current?.title || t('currentTab'),
   }));
@@ -65,7 +65,10 @@ export function entries(snapshot: Snapshot): Entry[] {
     ...commands(snapshot.tabs.find(tab => tab.id === snapshot.currentTabId)),
     { id: 'command:help', kind: 'command', category: 'zing', action: 'help', icon: 'help',
       title: t('help'), subtitle: t('helpHint'), keywords: 'help guide 帮助 使用说明 使用指南',
-      aliases: ['help', 'user guide', '帮助', '使用帮助', '使用说明', '使用指南'], searchOnly: true },
+      aliases: ['help', 'user guide', '帮助', '使用帮助', '使用说明', '使用指南'] },
+    { id: 'command:tabSwitcher', kind: 'command', category: 'zing', action: 'tabSwitcher', icon: 'others',
+      title: t('recentSwitcher'), subtitle: t('tabSwitcherHint'), shortcut: snapshot.tabSwitcherShortcut || undefined, keywords: '',
+      aliases: ['tab switcher', 'switch tabs', 'recent tabs', 'Switch tabs like in VS Code', 'VSCode style tab switching', 'VSCode 风格标签切换', '最近标签页', '切换标签页', '标签切换器'] },
     { id: 'command:reloadExtension', kind: 'command', category: 'zing', action: 'reloadExtension', icon: 'reload',
       title: t('reloadExtension'), subtitle: t('reloadExtensionHint'), searchOnly: true,
       keywords: 'reload restart zing extension extention 重载 重新加载 重启 扩展',
@@ -84,10 +87,10 @@ export function entries(snapshot: Snapshot): Entry[] {
     { id: 'command:newScript', kind: 'command', category: 'script', action: 'newScript', icon: 'plus', title: t('newScript'), subtitle: '',
       keywords: 'javascript js snippet 脚本 代码 新增 添加', aliases: ['new script', 'create script', 'add script', '新建脚本', '添加脚本'], searchOnly: true },
     { id: 'command:scriptLibrary', kind: 'command', category: 'script', action: 'scriptLibrary', icon: 'script', title: t('manageScripts'), subtitle: '',
-      keywords: 'scripts snippets javascript js 收藏 脚本', aliases: ['scripts', 'script library', 'manage scripts', '脚本', '脚本收藏', '管理脚本'], searchOnly: true },
+      keywords: 'scripts snippets javascript js 收藏 脚本', aliases: ['scripts', 'script library', 'manage scripts', '脚本', '脚本收藏', '管理脚本'] },
     ...([
-      ['language', 'changeLanguage', ['language', 'change language', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
-      ['theme', 'changeTheme', ['theme', 'appearance', 'change theme', 'dark mode', 'light mode', '深色模式', '浅色模式', '主题', '外观', '换主题', '切换主题']],
+      ['language', 'language', ['language', 'change language', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
+      ['theme', 'theme', ['theme', 'appearance', 'change theme', 'dark mode', 'light mode', '深色模式', '浅色模式', '主题', '外观', '换主题', '切换主题']],
       ['keyboard', 'keyboardShortcuts', ['hotkey', 'shortcut', 'keyboard shortcuts', '快捷键', '快捷键设置']],
       ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '重置排序', '清除排序', '使用习惯']],
       ['tabs', 'autoTuck', ['auto tuck tabs', 'auto tuck', 'automatic tuck', '自动收起闲置标签页', '自动收起', '收起设置']],
@@ -96,26 +99,74 @@ export function entries(snapshot: Snapshot): Entry[] {
       title: t(title), subtitle: '', keywords: '', aliases: [...aliases], searchOnly: true,
     })),
     ...(['localStorage', 'sessionStorage', 'cookies'] as const).map((action): Entry => ({
-      id: `command:${action}`, kind: 'command', category: 'storage', action, icon: action === 'cookies' ? 'cookie' : 'database',
+      id: `command:${action}`, kind: 'command', category: 'storage', action, icon: action === 'cookies' ? 'cookie' : 'database', searchOnly: action === 'sessionStorage' || undefined,
       title: t(action), subtitle: '', keywords: action === 'localStorage' ? 'local storage 本地存储' : action === 'sessionStorage' ? 'session storage 会话存储' : 'cookie cookies 浏览器 网站',
     })),
     {
-      id: 'command:settings', kind: 'command', shortcut: 'Mod+,', action: 'settings', icon: 'settings',
+      id: 'command:settings', kind: 'command', category: 'zing', shortcut: 'Mod+,', action: 'settings', icon: 'settings',
       title: t('settings'), subtitle: t('settingsHint'), keywords: 'settings preferences language theme hotkey 设置 偏好 语言 主题 快捷键 shezhi',
     },
   ];
 }
 
+export interface HomeRecommendations {
+  /** Identical candidate sets before the display limit, with and without usage ordering. */
+  results: Entry[];
+  baseline: Entry[];
+  /** Combined page scores keyed by the representative entry's usage target. */
+  scores: Map<string, number>;
+  /** All identities behind each recommendation, for forgetting across queries. */
+  targets: Map<string, string[]>;
+}
+
+const homeCommandOrder = ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'searchAllHistory', 'newTab', 'reload', 'pin', 'localStorage', 'cookies'];
+const stableTextOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+
+export function homeRecommendations(items: Entry[], usageScores: ReadonlyMap<string, number> = new Map()): HomeRecommendations {
+  const scores = new Map<string, number>();
+  const targets = new Map<string, string[]>();
+  const score = (target: string) => Math.max(0, usageScores.get(target) || 0);
+  const baseline = items.filter(item => item.kind === 'command' && !item.danger && !item.searchOnly &&
+    !['mute', 'restore', 'sessionStorage'].includes(item.action)).sort((a, b) => {
+    const aOrder = homeCommandOrder.indexOf(a.action);
+    const bOrder = homeCommandOrder.indexOf(b.action);
+    return (aOrder < 0 ? homeCommandOrder.length : aOrder) - (bOrder < 0 ? homeCommandOrder.length : bOrder) || stableTextOrder(a.id, b.id);
+  });
+  for (const entry of baseline) {
+    const target = usageTarget(entry);
+    scores.set(target, score(target));
+    targets.set(entry.id, target ? [target] : []);
+  }
+
+  // Snapshots contain current-window tabs. Do not pull history or fall back to MRU.
+  const currentUrls = new Set(items.filter(item => item.kind === 'tab' && item.active).map(item => item.url));
+  const pages = new Map<string, { entry: Entry; targets: Set<string> }>();
+  for (const entry of items) {
+    if ((entry.kind !== 'tab' && entry.kind !== 'bookmark') || entry.danger || entry.searchOnly || !entry.url || entry.active || currentUrls.has(entry.url)) continue;
+    let page = pages.get(entry.url);
+    if (!page) {
+      page = { entry, targets: new Set([`tab:${entry.url}`]) };
+      pages.set(entry.url, page);
+    }
+    const target = usageTarget(entry);
+    if (target) page.targets.add(target);
+    // Prefer an open tab, then its stable ID, never the snapshot's MRU position.
+    if ((entry.kind === 'tab' && page.entry.kind !== 'tab') || (entry.kind === page.entry.kind &&
+      (entry.kind === 'tab' ? (entry.tabId ?? 0) < (page.entry.tabId ?? 0) : stableTextOrder(entry.id, page.entry.id) < 0))) page.entry = entry;
+  }
+  for (const [, page] of [...pages].sort(([a], [b]) => stableTextOrder(a, b))) {
+    const combined = [...page.targets].reduce((total, target) => total + score(target), 0);
+    if (!combined) continue;
+    baseline.push(page.entry);
+    scores.set(usageTarget(page.entry), combined);
+    targets.set(page.entry.id, [...page.targets].filter(target => score(target) > 0 || target === `tab:${page.entry.url}` || target === usageTarget(page.entry)).sort(stableTextOrder));
+  }
+  const results = [...baseline].sort((a, b) => (scores.get(usageTarget(b)) || 0) - (scores.get(usageTarget(a)) || 0));
+  return { results, baseline, scores, targets };
+}
+
 export function homeEntries(items: Entry[], usageScores: ReadonlyMap<string, number> = new Map()): Entry[] {
-  const tabs = items.filter(item => item.kind === 'tab');
-  const current = tabs.find(item => item.active);
-  const recent = tabs.slice(0, 6);
-  if (current && !recent.includes(current)) recent.splice(5, 1, current);
-  return [
-    ...recent,
-    ...items.filter(item => item.kind === 'command' && !item.danger && !item.searchOnly)
-      .sort((a, b) => (usageScores.get(usageTarget(b)) || 0) - (usageScores.get(usageTarget(a)) || 0)),
-  ];
+  return homeRecommendations(items, usageScores).results.slice(0, 10);
 }
 
 // Intent aliases are phrases, not the loose keyword bag. Keep them independent

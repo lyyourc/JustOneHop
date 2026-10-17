@@ -80,8 +80,8 @@ function Choice<T extends string>({ label, value, options, onChange, query }: {
   </div></BackLayer>;
 }
 
-export function Settings({ preferences, shortcut, onBack, onClose, isMac, initialSection }: {
-  initialSection?: SettingsSection; preferences: Preferences; shortcut: string; onBack: () => void; onClose: () => void; isMac: boolean;
+export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, onClose, isMac, initialSection, onRankingReset }: {
+  initialSection?: SettingsSection; preferences: Preferences; shortcut: string; tabSwitcherShortcut: string; onBack: () => void; onClose: () => void; isMac: boolean; onRankingReset?: () => void;
 }) {
   const back = useNavigateBack();
   const [library, setLibrary] = useState<'all' | 'binding' | null>(null);
@@ -98,7 +98,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
   const [query, setQuery] = useState('');
   const matches = matchingSettings(query);
   const paletteHotkeyHelp = `${shortcut ? describeShortcut(shortcut) : t('notAssigned')} — ${t('paletteHotkey')}. ${t('hotkeyHint')}`;
-  const bindingHelp = `Control + Tab (Ctrl+Tab) — ${t('bindingHint')}`;
+  const bindingHelp = `${tabSwitcherShortcut ? describeShortcut(tabSwitcherShortcut) : t('notAssigned')} — ${t('bindingHint')}`;
   const highlight = (text: string) => <HighlightedText text={text} query={query} allowTypos={false} />;
   function openLibrary(mode: 'all' | 'binding') {
     returnTo.current = mode === 'all' ? 'scripts' : 'binding';
@@ -129,7 +129,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
   async function resetRanking() {
     if (rankingReset === 'busy') return;
     setError(false); setRankingReset('busy');
-    try { await resetSearchRanking(); setRankingReset('done'); }
+    try { await resetSearchRanking(); onRankingReset?.(); setRankingReset('done'); }
     catch { setError(true); setRankingReset('idle'); }
   }
   return <BackLayer onBack={onBack}>{helpOpen ? <HelpView shortcut={shortcut} onBack={() => setHelpOpen(false)} /> : library ? <ScriptLibrary initialBinding={library === 'binding'} onBack={() => setLibrary(null)} onClose={onClose} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
@@ -178,7 +178,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
             </div>
           </div> : null}
           {matches.has('binding') ? <div className="setting-row" data-setting="binding"><div className="setting-copy"><label>{highlight(t('ctrlTabSetting'))}</label><p>{highlight(t('bindingHint'))}</p></div>
-            <div className="hotkey-controls"><kbd className="hotkey-value" title={bindingHelp} aria-label={bindingHelp}>{highlight(isMac ? '⌃Tab' : 'Ctrl+Tab')}</kbd>
+            <div className="hotkey-controls"><kbd className="hotkey-value" title={bindingHelp} aria-label={bindingHelp}>{tabSwitcherShortcut || t('notAssigned')}</kbd>
               <button className="ranking-reset" onClick={() => openLibrary('binding')}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
         </div>
       </> : null}

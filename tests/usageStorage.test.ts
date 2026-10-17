@@ -28,13 +28,28 @@ test('a failed history write does not poison later saves', async () => {
   assert.equal(stored[USAGE_STORAGE_KEY][0].weight, 1);
 });
 
-test('reset is ordered with pending writes and blank tab queries never write', async () => {
+test('reset is ordered with pending writes and explicit home page selections persist', async () => {
   await Promise.all([recordUsage('iam', 'tab:first'), resetUsage()]);
   assert.deepEqual(stored, {});
   await recordUsage(' ', 'tab:first');
+  await recordUsage('', 'bookmark:second');
+  assert.deepEqual(new Set(stored[USAGE_STORAGE_KEY].map(record => record.target)), new Set(['tab:first', 'bookmark:second']));
+  assert.ok(stored[USAGE_STORAGE_KEY].every(record => record.query === ''));
+  await forgetUsage('tab:first');
+  assert.deepEqual(stored[USAGE_STORAGE_KEY].map(record => record.target), ['bookmark:second']);
+  await resetUsage();
   assert.deepEqual(stored, {});
-  await recordUsage('iam', 'tab:second');
-  assert.equal(stored[USAGE_STORAGE_KEY][0].target, 'tab:second');
+});
+
+test('omitted queries and invalid home targets never access storage', async () => {
+  let reads = 0;
+  chrome.storage.local.get = (async () => { reads++; return {}; }) as typeof chrome.storage.local.get;
+  await recordUsage(undefined as never, 'tab:first');
+  await recordUsage(null as never, 'command:reload');
+  await recordUsage('', 'script:first');
+  await recordUsage('', 'tab:');
+  assert.equal(reads, 0);
+  assert.deepEqual(stored, {});
 });
 
 test('home command selections persist through the same queue and reset', async () => {
@@ -57,6 +72,40 @@ test('forgetting a target without a query removes all its queries and preserves 
   assert.deepEqual(stored[USAGE_STORAGE_KEY], retained);
   await forgetUsage('command:settings:theme');
   assert.deepEqual(stored[USAGE_STORAGE_KEY], retained);
+});
+
+test('forgetting a page recommendation atomically removes every contributing identity across queries', async () => {
+  await Promise.all([
+    recordUsage('', 'tab:https://example.com/'), recordUsage('example', 'tab:https://example.com/'),
+    recordUsage('', 'bookmark:a'), recordUsage('saved', 'bookmark:a'), recordUsage('other', 'bookmark:b'),
+    recordUsage('keep', 'bookmark:unrelated'),
+  ]);
+  const saved = structuredClone(stored);
+  const targets = ['tab:https://example.com/', 'bookmark:a', 'bookmark:b'];
+  const set = chrome.storage.local.set;
+  let writes = 0;
+  chrome.storage.local.set = async () => { writes++; throw new Error('Disk unavailable'); };
+  await assert.rejects(forgetUsage(targets), /Disk unavailable/);
+  assert.equal(writes, 1);
+  assert.deepEqual(stored, saved);
+  chrome.storage.local.set = (async value => { writes++; await set(value); }) as typeof set;
+  await forgetUsage(targets);
+  assert.equal(writes, 2);
+  assert.deepEqual(stored[USAGE_STORAGE_KEY].map(record => record.target), ['bookmark:unrelated']);
+});
+
+test('multi-target forgetting preserves query scope and validates the whole set before storage', async () => {
+  await Promise.all([recordUsage('same', 'bookmark:a'), recordUsage('other', 'bookmark:a'), recordUsage('same', 'tab:a')]);
+  let reads = 0;
+  const get = chrome.storage.local.get;
+  chrome.storage.local.get = (async () => { reads++; return structuredClone(stored); }) as typeof get;
+  for (const targets of [[], ['bookmark:a', ''], ['bookmark:a', null], ['bookmark:a', 3], Array(503).fill('bookmark:a')]) {
+    await assert.rejects(forgetUsage(targets as never), /Invalid usage target/);
+  }
+  assert.equal(reads, 0);
+  await forgetUsage(['bookmark:a', 'tab:a'], ' SAME ');
+  assert.equal(reads, 1);
+  assert.deepEqual(stored[USAGE_STORAGE_KEY].map(record => [record.query, record.target]), [['other', 'bookmark:a']]);
 });
 
 test('forgetting a normalized query only removes its exact target and query pair', async () => {

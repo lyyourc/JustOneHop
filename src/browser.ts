@@ -101,6 +101,7 @@ export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
     tabs: tabs.sort((a, b) => Number(a.id === active.id) - Number(b.id === active.id) ||
       (b.lastAccessed || 0) - (a.lastAccessed || 0) || a.index - b.index).map(toTab), bookmarks,
     shortcut: bindings.find(binding => binding.name === 'toggle-palette')?.shortcut || '',
+    tabSwitcherShortcut: bindings.find(binding => binding.name === 'switch-recent')?.shortcut || '',
   };
 }
 
@@ -110,7 +111,9 @@ export async function perform(payload: Execution, onPerformed?: () => void): Pro
   // Let the panel refresh or dismiss as soon as Chrome finishes the action,
   // while this promise still owns queued persistence in the service worker.
   onPerformed?.();
-  if (target) {
+  // An explicit empty query is a home choice; switcher navigation omits it.
+  if (target && (typeof payload.query === 'string' || target.startsWith('command:')) &&
+      (payload.action !== 'openHistoryPage' || payload.query?.trim())) {
     // Learning is secondary: a storage failure must not turn a successful browser
     // action into an error or encourage the user to execute it a second time.
     await recordUsage(typeof payload.query === 'string' ? payload.query : '', target).catch(() => {});

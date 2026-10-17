@@ -29,7 +29,7 @@ export function SearchResultItem({ entry, query, ranking, onForget, disabled = f
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const alias = entry.kind === 'command' ? matchingAlias(entry, query) : '';
   const protectPinned = entry.action === 'closeOthers' || entry.action === 'closeRight';
-  const subtitle = entry.kind !== 'command' || entry.action === 'searchAllHistory' ? entry.subtitle
+  const subtitle = entry.kind !== 'command' || entry.action === 'searchAllHistory' || entry.action === 'tabSwitcher' ? entry.subtitle
     : alias ? <><HighlightedText text={alias} query={entrySearchQuery(query)} />{protectPinned ? ` · ${t('keepPinned')}` : ''}</>
       : protectPinned ? t('keepPinned') : '';
   const shortcut = suppressTabShortcuts && ['close', 'reload'].includes(entry.action) ? undefined : entry.shortcut;
@@ -59,7 +59,7 @@ export function SearchResultItem({ entry, query, ranking, onForget, disabled = f
           : showKind && (entry.kind === 'tab' || entry.kind === 'bookmark') ? <span className="kind-label">{t(entry.kind === 'tab' ? 'tabKind' : 'bookmarkKind')}</span> : null}
         <CurrentTabBadge current={!!entry.active} />
         {entry.action === 'searchAllHistory' ? <ArrowRight size={14} /> : null}
-        {ranking?.learned && onForget ? <RankingButton query={query} ranking={ranking} selected={selected} disabled={disabled} onForget={onForget} /> : null}
+        {ranking?.learned && onForget ? <RankingButton query={query} page={entry.kind === 'tab' || entry.kind === 'bookmark' || entry.kind === 'history'} ranking={ranking} selected={selected} disabled={disabled} onForget={onForget} /> : null}
         {shortcut ? <Shortcut binding={shortcut} isMac={isMac} /> : null}
       </>} />
   </div>;

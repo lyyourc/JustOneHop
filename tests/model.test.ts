@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, closeTargets, entries, homeEntries, search } from '../src/model.ts';
+import { actionsFor, closeTargets, entries, homeEntries, homeRecommendations, search } from '../src/model.ts';
 import type { Snapshot, TabItem } from '../src/types.ts';
 import { entryTitle } from '../src/entryPresentation.ts';
 import { usageTarget } from '../src/usage.ts';
@@ -14,25 +14,101 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
   bookmarks: [{ id: 'b', title: 'GitHub Docs', url: 'https://docs.github.com', folder: '开发' }],
 };
 
-test('one index contains tabs, bookmarks and commands; home prioritizes recent tabs', () => {
+test('one search index contains every source while cold home contains only nine safe defaults', () => {
   const items = entries(data);
-  assert.equal(items.length, 34);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 30);
+  assert.equal(items.length, 35);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 31);
   const home = homeEntries(items);
-  assert.deepEqual(home.slice(0, 3).map(entry => entry.kind), ['tab', 'tab', 'tab']);
-  assert.ok(home.slice(3).every(entry => entry.kind === 'command' && !entry.danger));
-  assert.ok(!home.some(entry => entry.kind === 'bookmark'));
+  assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
+  assert.ok(home.every(entry => entry.kind === 'command' && !entry.danger && !entry.searchOnly));
+  assert.deepEqual(home.slice(0, 2).map(entryTitle), ['Zing: Settings', 'Zing: Help']);
+  const learned = homeEntries(items, new Map([['command:pin', 10]]));
+  assert.deepEqual(learned.slice(0, 3).map(entry => entry.id), ['command:pin', 'command:settings', 'command:help']);
   const many = entries({ ...data, tabs: Array.from({ length: 12 }, (_, i) => tab(i + 1, i)) });
-  assert.equal(homeEntries(many).filter(entry => entry.kind === 'tab').length, 6);
+  assert.deepEqual(homeEntries(many).map(entry => entry.id), home.map(entry => entry.id));
   assert.equal(search(many, 'Page 12')[0].tabId, 12);
+  assert.equal(search(items, 'GitHub Docs')[0].bookmarkId, 'b');
 });
-test('home retains the source tab beyond the six-tab limit and marks only that tab current', () => {
-  const tabs = Array.from({ length: 10 }, (_, i) => tab(i + 1, i));
-  const items = entries({ ...data, tabs, currentTabId: 10 });
+
+test('home excludes the source tab and its exact URL even when another tab or bookmark learned it', () => {
+  const url = 'https://example.com/current?q=one#section';
+  const items = entries({ ...data, currentTabId: 10,
+    tabs: [{ ...tab(10, 0), url }, { ...tab(1, 1), url }, { ...tab(3, 2), url: `${url}-other` }],
+    bookmarks: [{ id: 'same', title: 'Current bookmark', url, folder: '' }] });
+  const scores = new Map([[`tab:${url}`, 100], ['bookmark:same', 100], [`tab:${url}-other`, 1]]);
   assert.deepEqual(items.filter(item => item.kind === 'tab' && item.active).map(item => item.tabId), [10]);
-  assert.deepEqual(homeEntries(items).filter(item => item.kind === 'tab').map(item => item.tabId), [1, 2, 3, 4, 5, 10]);
-  assert.deepEqual(homeEntries(entries({ ...data, tabs, currentTabId: 2 })).filter(item => item.kind === 'tab').map(item => item.tabId), [1, 2, 3, 4, 5, 6]);
-  assert.equal(homeEntries(entries({ ...data, tabs: [] })).filter(item => item.kind === 'tab').length, 0);
+  assert.deepEqual(homeEntries(items, scores).filter(item => item.kind !== 'command').map(item => item.id), ['tab:3']);
+});
+
+test('home mixes learned pages and commands in a single list capped at ten without padding', () => {
+  const items = entries({ ...data, tabs: Array.from({ length: 12 }, (_, i) => tab(i + 1, i)) });
+  const scores = new Map(items.filter(item => item.kind === 'tab').map(item => [usageTarget(item), 3]));
+  scores.set('command:pin', 4);
+  scores.set('bookmark:b', 5);
+  const result = homeEntries(items, scores);
+  assert.equal(result.length, 10);
+  assert.deepEqual(result.slice(0, 3).map(item => item.id), ['bookmark:b', 'command:pin', 'tab:1']);
+  assert.equal(homeEntries(items, new Map([['bookmark:b', 1]])).length, 10);
+  assert.ok(!result.some(item => item.active));
+  assert.equal(homeRecommendations(items, scores).results.length, 21);
+});
+
+test('home deduplicates exact full URLs, preferring open tabs and counting each learned identity once', () => {
+  const url = 'https://example.com/docs?q=one#section';
+  const items = entries({ ...data,
+    tabs: [{ ...tab(9, 0), url }, { ...tab(3, 1), url }, tab(2, 2)],
+    bookmarks: [
+      { id: 'a', title: 'Docs A', url, folder: '' }, { id: 'b', title: 'Docs B', url, folder: '' },
+      { id: 'query', title: 'Other query', url: url.replace('one', 'two'), folder: '' },
+      { id: 'hash', title: 'Other fragment', url: url.replace('section', 'other'), folder: '' },
+    ] });
+  const usage = new Map([[`tab:${url}`, 2], ['bookmark:a', 3], ['bookmark:b', 4], ['bookmark:query', 1], ['bookmark:hash', 1]]);
+  const home = homeRecommendations(items, usage);
+  assert.deepEqual(home.results.filter(item => item.url === url).map(item => item.id), ['tab:3']);
+  assert.equal(home.scores.get(`tab:${url}`), 9);
+  assert.deepEqual(home.targets.get('tab:3'), ['bookmark:a', 'bookmark:b', `tab:${url}`]);
+  assert.equal(home.results.filter(item => item.kind !== 'command').length, 3);
+  assert.equal(homeEntries(items, new Map([['bookmark:b', 1]]))[0].id, 'tab:3');
+  const bookmarksOnly = items.filter(item => item.kind !== 'tab' || item.active);
+  assert.equal(homeEntries(bookmarksOnly, new Map([[`tab:${url}`, 1]]))[0].id, 'bookmark:a');
+  assert.deepEqual(homeRecommendations(bookmarksOnly, new Map([['bookmark:a', 1]])).targets.get('bookmark:a'), ['bookmark:a', `tab:${url}`]);
+});
+
+test('home ties and duplicate representatives remain stable when snapshot MRU order changes', () => {
+  const tabs = [tab(9, 0), tab(3, 1), tab(2, 2), { ...tab(5, 3), url: 'https://example.com/3' }];
+  const scores = new Map(tabs.map(item => [`tab:${item.url}`, 1]));
+  const first = homeEntries(entries({ ...data, tabs }), scores);
+  const reversed = homeEntries(entries({ ...data, tabs: [...tabs].reverse() }), scores);
+  assert.deepEqual(first.map(item => item.id), reversed.map(item => item.id));
+  assert.deepEqual(first.filter(item => item.kind === 'tab').map(item => item.id), ['tab:3', 'tab:9']);
+});
+
+test('learned history-only pages and unavailable targets never create home candidates', () => {
+  const items = entries(data);
+  const history = { ...items[0], id: 'history:1', kind: 'history' as const, action: 'openHistoryPage' as const, url: 'https://history.example/' };
+  const scores = new Map([['tab:https://history.example/', 100], ['tab:https://missing.example/', 100], ['bookmark:missing', 100]]);
+  assert.deepEqual(homeEntries([...items, history], scores), homeEntries(items));
+});
+
+test('less-used commands stay searchable and out of home even with learned preferences', () => {
+  const scores = new Map(['mute', 'restore', 'sessionStorage'].map(action => [`command:${action}`, 1e9]));
+  for (const muted of [false, true]) {
+    const snapshot = { ...data, tabs: data.tabs.map(tab => ({ ...tab, muted })) };
+    const items = entries(snapshot);
+    assert.deepEqual(homeEntries(items, scores).filter(item => item.kind === 'command').map(item => item.action),
+      ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
+    for (const [action, queries] of [
+      ['mute', muted ? ['unmute', '取消静音'] : ['mute', '静音']],
+      ['restore', ['reopen closed tab', '恢复关闭的标签页']],
+      ['sessionStorage', ['session storage', '会话存储']],
+    ] as const) {
+      for (const query of queries) assert.equal(search(items, query, scores)[0]?.action, action, query);
+    }
+    const selected = items.find(item => item.id === 'tab:3')!;
+    const menu = actionsFor(selected, snapshot);
+    assert.equal(menu.find(item => item.action === 'mute')?.tabId, 3);
+    assert.equal(search(menu, muted ? 'unmute' : 'mute')[0]?.action, 'mute');
+  }
 });
 
 test('Chinese and English command terms are searchable', () => {
@@ -275,10 +351,34 @@ test('script actions retain the target and allow searching delete in both langua
   assert.deepEqual(actionsFor({ ...entry, scriptId: 'builtin-ctrl-tab' }, data).map(action => action.action), ['copyScript', 'editScript']);
 });
 
-test('feature commands are discoverable by intent without changing the empty-search home', () => {
+test('Tab Switcher describes VSCode style switching and displays only the actual binding', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      const items = entries({ ...data, tabSwitcherShortcut: 'Alt+Shift+Y' });
+      const command = items.find(item => item.action === 'tabSwitcher')!;
+      assert.equal(entryTitle(command), 'Zing: Tab Switcher');
+      assert.equal(command.subtitle, 'Switch tabs like in VS Code');
+      assert.equal(command.shortcut, 'Alt+Shift+Y');
+      for (const query of ['VSCode', 'Switch tabs like in VS Code', 'VSCode style tab switching', 'VSCode 风格标签切换']) {
+        assert.equal(search(items, query)[0]?.action, 'tabSwitcher', `${locale}: ${query}`);
+      }
+      for (const tabSwitcherShortcut of ['', undefined]) {
+        assert.equal(entries({ ...data, tabSwitcherShortcut }).find(item => item.action === 'tabSwitcher')?.shortcut, undefined);
+      }
+    }
+  } finally { globalThis.chrome = original; }
+});
+
+test('feature commands are discoverable by intent and help is available on home', () => {
   const items = entries(data);
   for (const [query, id] of [
     ['help', 'command:help'], ['帮助', 'command:help'], ['使用说明', 'command:help'],
+    ['tab switcher', 'command:tabSwitcher'], ['recent tabs', 'command:tabSwitcher'], ['最近标签页', 'command:tabSwitcher'], ['标签切换器', 'command:tabSwitcher'],
+    ['Zing: Help', 'command:help'], ['Zing: Settings', 'command:settings'],
+    ['Settings: Theme', 'command:settings:theme'], ['change theme', 'command:settings:theme'],
+    ['Settings: Language', 'command:settings:language'], ['change language', 'command:settings:language'],
     ['new script', 'command:newScript'], ['新建脚本', 'command:newScript'],
     ['scripts', 'command:scriptLibrary'], ['脚本', 'command:scriptLibrary'], ['管理脚本', 'command:scriptLibrary'],
     ['language', 'command:settings:language'], ['语言', 'command:settings:language'],

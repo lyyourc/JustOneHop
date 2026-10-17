@@ -8,17 +8,18 @@ import { NavigationHint } from './Shortcut';
 import { SearchDismissButton } from './SearchDismissButton';
 import { t } from './i18n';
 
-export function RecentSwitcherView({ tabs, index, query, onQueryChange, searching, onSearch, sourceId, loaded, closing, error, shortcut, releaseKey, theme, listRef, onSelect, onConfirm, onCancel }: {
+export function RecentSwitcherView({ tabs, index, query, onQueryChange, searching, onSearch, sourceId, loaded, closing, error, shortcut, releaseKey, theme, listRef, onSelect, onConfirm, onCancel, onBack }: {
   tabs: chrome.tabs.Tab[]; index: number; query: string; onQueryChange: (query: string) => void;
   searching: boolean; onSearch: () => void;
   sourceId: number; loaded: boolean; closing: boolean;
   error: string; shortcut: string; releaseKey: string; theme: string;
   listRef: RefObject<HTMLDivElement | null>; onSelect: (index: number) => void; onConfirm: () => void; onCancel: () => void;
+  onBack?: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   useLayoutEffect(() => { (searching ? input.current : listRef.current)?.focus(); }, [searching, listRef]);
   const activateSearch = () => { onSearch(); input.current?.focus(); };
-  return <main className="zing-app recent-switcher" data-theme={theme} onKeyDownCapture={event => {
+  return <main className="zing-app recent-switcher" data-theme={theme} style={onBack ? { flex: 1, minHeight: 0, height: 'auto' } : undefined} onKeyDownCapture={event => {
     if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
       event.preventDefault(); event.stopPropagation(); activateSearch();
     }
@@ -31,7 +32,7 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
         onContextMenu={event => event.preventDefault()} aria-label={t('recentSearch')} title={t('recentSearchHelp')}><Search size={20} /></button>
       <span className="recent-search-field" onPointerDown={event => { if (!searching) { event.preventDefault(); activateSearch(); } }}
         onContextMenu={event => { if (!searching || event.ctrlKey) event.preventDefault(); }} title={t('recentSearchHelp')}>
-        <input ref={input} disabled={!searching} value={query} onChange={event => onQueryChange(event.target.value)} placeholder={t('recentSearch')}
+        <input ref={input} data-back-on-empty={onBack ? true : undefined} disabled={!searching} value={query} onChange={event => onQueryChange(event.target.value)} placeholder={t('recentSearch')}
           aria-label={t('recentSearch')} role="combobox" aria-expanded="true" aria-controls="recent-results" aria-autocomplete="list"
           aria-activedescendant={searching && tabs[index] ? `recent-${tabs[index].id}` : undefined} aria-describedby="recent-navigation"
           autoComplete="off" spellCheck={false} />
@@ -48,7 +49,8 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
       </div>)}
     </div>
     {error ? <p role="alert" className="recent-error">{error}</p> : null}
-    <PaletteFooter title={searching ? t('recentSwitcher') : t('recentRelease', releaseKey === 'Meta' ? '⌘' : releaseKey === 'Alt' ? '⌥' : 'Ctrl')}
+    <PaletteFooter navigation={onBack ? { kind: 'back', label: `${t('back')} · ${t('recentSwitcher')}`, tooltip: `${t('back')} (Esc)`, onAction: onBack } : undefined}
+      title={searching ? t('recentSwitcher') : t('recentRelease', releaseKey === 'Meta' ? '⌘' : releaseKey === 'Alt' ? '⌥' : 'Ctrl')}
       context={<NavigationHint />}
       primary={{ label: t('recentConfirm'), keys: ['↵'], disabled: !loaded || !tabs[index] || closing, onAction: onConfirm }}
       secondary={{ label: t('recentCancel'), keys: ['esc'], onAction: onCancel }} />

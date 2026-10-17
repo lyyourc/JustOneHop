@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { entries, homeEntries, search } from '../src/model.ts';
-import { addUsage, commandUsage, queryUsage, rankingInfo, usageTarget } from '../src/usage.ts';
+import { entries, homeRecommendations, search } from '../src/model.ts';
+import { addUsage, homeUsage, queryUsage, rankingInfo, usageTarget } from '../src/usage.ts';
 import type { Snapshot } from '../src/types.ts';
 
 const now = Date.now();
@@ -46,21 +46,42 @@ test('settings destinations learn independently and legacy generic records do no
   assert.equal(new Set(items.map(usageTarget)).size, items.length);
 });
 
-test('home explains command aggregation without treating recently accessed tabs as learned', () => {
+test('home explains command aggregation without treating unlearned pages as candidates', () => {
   const items = entries(snapshot);
-  const history = addUsage(addUsage([], 'mute', 'command:mute', now), '', 'command:mute', now);
-  const scores = commandUsage(history, now);
-  const ranked = homeEntries(items, scores);
-  const baseline = homeEntries(items);
-  const info = rankingInfo(ranked, baseline, scores);
-  assert.equal(ranked.find(item => item.kind === 'command')?.action, 'mute');
-  assert.deepEqual(info.get('command:mute'), { learned: true, promoted: true });
-  assert.equal(info.get('tab:1')?.learned, false);
+  const history = addUsage(addUsage([], 'pin', 'command:pin', now), '', 'command:pin', now);
+  const home = homeRecommendations(items, homeUsage(history, now));
+  const info = rankingInfo(home.results, home.baseline, home.scores);
+  assert.equal(home.results[0]?.action, 'pin');
+  assert.deepEqual(info.get('command:pin'), { learned: true, promoted: true });
+  assert.equal(info.has('tab:1'), false);
+  assert.deepEqual(info.get('command:settings'), { learned: false, promoted: false });
+});
+
+test('home ranking compares identical pre-limit candidates and explains bookmark-to-tab learning', () => {
+  const items = entries({ ...snapshot,
+    bookmarks: [{ id: 'beta', title: 'Saved Beta', url: snapshot.tabs[1].url, folder: '' }] });
+  const history = addUsage([], 'saved beta', 'bookmark:beta', now);
+  const home = homeRecommendations(items, homeUsage(history, now));
+  assert.deepEqual(new Set(home.results.map(item => item.id)), new Set(home.baseline.map(item => item.id)));
+  assert.equal(home.results[0].id, 'tab:2');
+  assert.equal(home.baseline.at(-1)?.id, 'tab:2');
+  assert.equal(home.scores.get(usageTarget(home.results[0])), 1);
+  assert.deepEqual(rankingInfo(home.results, home.baseline, home.scores).get('tab:2'), { learned: true, promoted: true });
+  assert.deepEqual(home.targets.get('tab:2'), ['bookmark:beta', `tab:${snapshot.tabs[1].url}`]);
+  const reset = homeRecommendations(items);
+  assert.ok(!reset.results.some(item => item.kind === 'tab'));
+  assert.deepEqual(rankingInfo(home.results, home.baseline, reset.scores).get('tab:2'), { learned: false, promoted: false });
+});
+
+test('home defaults at the top can be learned without an inaccurate promotion claim', () => {
+  const home = homeRecommendations(entries(snapshot), new Map([['command:settings', 3]]));
+  assert.deepEqual(home.results, home.baseline);
+  assert.deepEqual(rankingInfo(home.results, home.baseline, home.scores).get('command:settings'), { learned: true, promoted: false });
 });
 
 test('unsupported results cannot inherit phantom action preferences', () => {
   const items = entries(snapshot);
-  for (const action of ['help', 'runScript', 'runCopyScript', 'scriptLibrary', 'newScript', 'reloadExtension']) {
+  for (const action of ['help', 'tabSwitcher', 'runScript', 'runCopyScript', 'scriptLibrary', 'newScript', 'reloadExtension']) {
     assert.equal(usageTarget(items.find(item => item.action === action)!), '');
   }
   const script = { ...items[0], id: 'script:a', kind: 'script' as const, action: 'runScript' as const, scriptId: 'a' };

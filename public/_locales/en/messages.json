@@ -12,7 +12,7 @@
     "message": "zing browser command palette"
   },
   "togglePalette": {
-    "message": "Open / Close command palette"
+    "message": "Command Palette — Open / Close"
   },
   "languageTag": {
     "message": "en"
@@ -232,13 +232,13 @@
   "helpStartTitle": { "message": "Open and search" },
   "toolbarShortcut": { "message": "Open zing: $1 · Change shortcut" },
   "helpStartBody": { "message": "Click the zing toolbar icon or press the launch shortcut to open the palette (current: $1). Change the shortcut in Settings → Keyboard, or right-click the toolbar icon to edit the binding or open this guide in a new tab." },
-  "helpSearchBody": { "message": "Search tabs, bookmarks, commands, and settings in one place using English or Chinese keywords, without mode prefixes. Combine page titles, domains, tab groups, or bookmark folders in any order—for example, “new tab”, “reopen last tab”, “scripts”, “theme”, or “downloads”. Browsing history from the past week joins search results. Search All History appears seventh, or at the end of shorter lists, to search all time. A slow history query does not block other results; late replies do not insert rows. Successfully opened history results share preferences with tabs at the same website address. Main search and Search All History apply habits only within the same relevance tier for the same query, show a history icon for remembered preferences. Hover or focus the icon to see why and what will be forgotten; click it to forget. You can also press Shift+Backspace on the selected result. Forgetting affects both history and tab results." },
+  "helpSearchBody": { "message": "The empty home shows up to 10 suggested pages and commands based on successful use in zing, with curated commands when there is little history. Recommendations keep their order until the next opening. Search tabs, bookmarks, commands, and settings in one place using English or Chinese keywords, without mode prefixes. Combine page titles, domains, tab groups, or bookmark folders in any order—for example, “new tab”, “reopen last tab”, “scripts”, “theme”, or “downloads”. Browsing history from the past week joins search results. Search All History appears seventh, or at the end of shorter lists, to search all time. A slow history query does not block other results; late replies do not insert rows. Successfully opened history results share preferences with tabs at the same website address. Main search and Search All History apply habits only within the same relevance tier for the same query, show a history icon for remembered preferences. Hover or focus the icon to see why and what will be forgotten; click it to forget. You can also press Shift+Backspace on the selected result. Forgetting affects both history and tab results." },
   "helpControlsTitle": { "message": "Actions and going back" },
   "helpControlsBody": { "message": "Right-click a result, click Actions in the footer, or press Cmd/Ctrl+K to open actions for the selected item. Lists also support Ctrl+P and Ctrl+N alongside the arrow keys." },
   "helpBackBody": { "message": "Press Esc, click the back arrow, or press Backspace in an empty secondary search field to go back one level with your search and selection restored. At the main search, Esc closes zing." },
   "helpTabsTitle": { "message": "Manage and switch tabs" },
-  "helpTabsBody": { "message": "Pin, mute, and close actions apply directly to the selected result and keep the palette open for continuous cleanup; bulk close preserves pinned tabs. Search a tab group’s name to manage its tabs. In the recent-tab switcher, hold the modifier key to select and release to switch; click the search field or press Cmd/Ctrl+F to pause release-to-switch and filter by text instead." },
-  "helpTuckBody": { "message": "“Tuck Away Tab” moves a tab into a collapsed group at the end of the window without closing or discarding it; switch to the tab from search anytime to bring it back. Enable “Auto Tuck Idle Tabs” in Settings to automatically tuck tabs unused for 7 days. If a group needs confirmation after a browser restart, search for “recover tucked tabs”." },
+  "helpTabsBody": { "message": "Pin, mute, and close actions apply directly to the selected result and keep the palette open for continuous cleanup; bulk close preserves pinned tabs. Search a tab group’s name to manage its tabs. Choose Zing: Tab Switcher to filter recent tabs inside the palette, then click a row or press Enter to switch; Cancel returns to your search. When launching the switcher with its shortcut, hold the modifier key to select and release to switch; click the search field or press Cmd/Ctrl+F to pause release-to-switch and filter by text instead." },
+  "helpTuckBody": { "message": "“Tuck Away Tab” moves a tab into a collapsed group at the end of the window without closing or discarding it; switch to the tab from search anytime to bring it back. Enable “Auto Tuck Tabs” in Settings to automatically tuck tabs unused for 7 days. If a group needs confirmation after a browser restart, search for “recover tucked tabs”." },
   "helpScriptsTitle": { "message": "Save and run scripts" },
   "helpScriptsBody": { "message": "Search for “scripts” to manage saved JavaScript snippets: select a script to preview and copy its code, or use Actions to edit, create, or delete it (save with Cmd/Ctrl+Enter). On a target webpage, search the script name or “run script” to run it once; the value of the final expression (including Promises) is shown in the current panel. Scripts never run automatically on page load." },
   "helpScriptPermissionBody": { "message": "Running scripts requires Chrome 135+ and works on ordinary HTTP/HTTPS webpages. Before first use, enable “Allow user scripts” in Chrome’s zing extension details (or Developer mode on Chrome 135–137)." },
@@ -265,7 +265,7 @@
   "searchSettings": { "message": "Search settings" },
   "searchSettingsPlaceholder": { "message": "Search settings…" },
   "clearSettingsSearch": { "message": "Clear search" },
-  "ctrlTabSetting": { "message": "Switch Recent Tabs" },
+  "ctrlTabSetting": { "message": "Tab Switcher" },
   "setUpShortcut": { "message": "Set Up" },
   "preferences": { "message": "Preferences" },
   "experimentalFeatures": { "message": "Experimental Features" },
@@ -339,7 +339,7 @@
     "message": "Search Ranking"
   },
   "searchRankingHint": {
-    "message": "Habits reorder equally relevant results for the same query. Hover the history icon for details; click it to forget."
+    "message": "Habits personalize home and reorder equally relevant search results. Hover the history icon for details; click it to forget."
   },
   "resetSearchRanking": {
     "message": "Reset Ranking"
@@ -351,6 +351,9 @@
   "rankingRecordedHint": { "message": "Preference saved; position unchanged." },
   "forgetQueryRanking": { "message": "Forget Preference for This Query" },
   "forgetCommandRanking": { "message": "Forget This Command’s Preferences" },
+  "forgetPageRanking": { "message": "Forget This Page’s Preferences" },
+  "suggested": { "message": "Suggested" },
+  "tabSwitcherHint": { "message": "Switch tabs like in VS Code" },
   "rankingForgotten": { "message": "Ranking preference forgotten." },
   "errorForgetRanking": { "message": "Could not forget this preference. Try again." },
   "navigate": {
@@ -468,7 +471,7 @@
     "message": "Unable to request access. Please reopen zing on the website."
   },
   "recentSwitcher": {
-    "message": "Switch Recent Tabs"
+    "message": "Tab Switcher"
   },
   "recentSearch": {
     "message": "Search recent tabs…"
@@ -476,8 +479,11 @@
   "recentSearchHelp": {
     "message": "Click to search, or press Ctrl/Cmd+F. Then release the shortcut key and type."
   },
+  "recentSwitcherCommand": {
+    "message": "Tab Switcher — Switch tabs like in VS Code"
+  },
   "recentSwitcherBack": {
-    "message": "Previous Recent Tab"
+    "message": "Tab Switcher — Cycle backward"
   },
   "recentCurrent": {
     "message": "Current"
@@ -507,7 +513,7 @@
     "message": "Set Up Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "Set up Ctrl+Tab to switch recent tabs with a one-time snippet."
+    "message": "Switch tabs like in VS Code using the shortcut shown. Prefer Ctrl+Tab? Set it up once."
   },
   "bindingEffect": {
     "message": "Uses Chrome’s internal settings API to bind Ctrl+Tab and Ctrl+Shift+Tab to zing’s recent tab switcher."
@@ -587,12 +593,6 @@
   },
   "cancelScriptDelete": {
     "message": "Cancel"
-  },
-  "changeLanguage": {
-    "message": "Change Language"
-  },
-  "changeTheme": {
-    "message": "Change Theme"
   },
   "keyboardShortcuts": {
     "message": "Keyboard Shortcuts"
@@ -688,7 +688,7 @@
     "message": "Tabs"
   },
   "autoTuck": {
-    "message": "Auto Tuck Idle Tabs"
+    "message": "Auto Tuck Tabs"
   },
   "autoTuckHint": {
     "message": "Move tabs idle for 7 days into a collapsed Tucked Away group."

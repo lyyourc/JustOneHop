@@ -14,7 +14,7 @@ export const execute = (payload: Execution) => send<void>({ source: 'zing', type
 
 export const openShortcuts = () => send<void>({ source: 'zing', type: 'open-shortcuts' });
 export const resetSearchRanking = () => send<void>({ source: 'zing', type: 'reset-usage' });
-export const forgetSearchRanking = (target: string, query?: string) => send<void>({ source: 'zing', type: 'forget-usage', payload: { target, query } });
+export const forgetSearchRanking = (target: string | string[], query?: string) => send<void>({ source: 'zing', type: 'forget-usage', payload: { target, query } });
 
 export const readPageStorage = (payload: StorageRead) => send<PageStorage>({ source: 'zing', type: 'read-page-storage', payload });
 

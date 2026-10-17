@@ -5,15 +5,15 @@ import { t } from './i18n';
 import type { RankingInfo } from './usage';
 
 /** A quiet history marker becomes the direct forget control on hover or focus. */
-export function RankingButton({ query, ranking, selected, disabled, onForget }: {
-  query: string; ranking: RankingInfo; selected: boolean; disabled: boolean; onForget: () => void;
+export function RankingButton({ query, ranking, selected, disabled, onForget, page = false }: {
+  query: string; ranking: RankingInfo; selected: boolean; disabled: boolean; onForget: () => void; page?: boolean;
 }) {
   const id = useId();
   const button = useRef<HTMLButtonElement>(null);
   const tooltip = useRef<HTMLSpanElement>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
-  const label = t(query.trim() ? 'forgetQueryRanking' : 'forgetCommandRanking');
+  const label = t(query.trim() ? 'forgetQueryRanking' : page ? 'forgetPageRanking' : 'forgetCommandRanking');
   const open = !disabled && (hovered || focused);
   useLayoutEffect(() => {
     const tip = tooltip.current;

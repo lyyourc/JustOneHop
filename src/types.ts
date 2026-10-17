@@ -32,6 +32,7 @@ export interface Snapshot {
   tabs: TabItem[];
   bookmarks: BookmarkItem[];
   shortcut: string;
+  tabSwitcherShortcut?: string;
   canUndoTuck?: boolean;
   tuckRecoveries?: TuckRecoveryItem[];
 }
@@ -79,7 +80,7 @@ export type Request =
   | { source: 'zing'; type: 'open-cookie-access'; payload: CookieAccessRequest }
   | { source: 'zing'; type: 'open-shortcuts' }
   | { source: 'zing'; type: 'reset-usage' }
-  | { source: 'zing'; type: 'forget-usage'; payload: { target: string; query?: string } }
+  | { source: 'zing'; type: 'forget-usage'; payload: { target: string | string[]; query?: string } }
   | { source: 'zing'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
 export type IconName = 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
@@ -96,7 +97,7 @@ export interface Entry {
   subtitle: string;
   keywords: string;
   icon: IconName;
-  action: ActionId | 'copyUrl' | 'settings' | 'help' | 'searchAllHistory' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
+  action: ActionId | 'copyUrl' | 'settings' | 'help' | 'tabSwitcher' | 'searchAllHistory' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
   settingsSection?: SettingsSection;
   recoveryId?: string;
   groupId?: number;

@@ -1,5 +1,6 @@
 import { SearchResultItem, EntryGlyph as Glyph } from './SearchResultItem';
 import { HistoryView } from './HistoryView';
+import { PaletteTabSwitcher } from './PaletteTabSwitcher';
 import { useHistoryQuery } from './useHistoryQuery';
 import { historyEntries, mergeHistoryResults } from './historySearch';
 import { historySearchEntry, insertHistorySearch, isHistorySearchIntent } from './historyPresentation';
@@ -17,8 +18,8 @@ import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { LoaderCircle, Search, AlertCircle } from 'lucide-react';
 import { getPreferences, subscribePreferences } from './preferences';
-import { getUsage, subscribeUsage } from './usageState';
-import { commandUsage, queryUsage, rankingInfo, usageTarget, type RankingInfo } from './usage';
+import { getUsage, subscribeUsage, usageReady } from './usageState';
+import { homeUsage, queryUsage, rankingInfo, usageTarget, type RankingInfo } from './usage';
 import { StorageView } from './StorageView';
 import { bindingScript, deleteScript, type SavedScript, getScripts, scriptEntries, scriptsReady, subscribeScripts } from './scripts';
 import { copyText } from './clipboard';
@@ -27,9 +28,10 @@ import { ScriptLibrary } from './ScriptLibrary';
 import { Settings } from './Settings';
 import { HelpView } from './HelpView';
 import { cancelPaletteContinuation, execute, forgetSearchRanking, getSnapshot } from './api';
-import { actionsFor, closeTargets, entries, homeEntries, matchingAlias, search } from './model';
+import { actionsFor, closeTargets, entries, homeRecommendations, matchingAlias, search } from './model';
 import type { Entry, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteState, Execution } from './types';
 
+const emptyScores: ReadonlyMap<string, number> = new Map();
 
 export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState }) {
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
@@ -39,6 +41,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const [groupId, setGroupId] = useState<number | undefined>(initialState?.group?.id);
   const [recoveryId, setRecoveryId] = useState<string>();
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
+  const [homeSession, setHomeSession] = useState<{ sourceId: number; scores: ReadonlyMap<string, number> } | null>(null);
   const [scriptRun, setScriptRun] = useState<{ target: Omit<ScriptRun, 'scriptId'>; initialScriptId?: string; autoCopy: boolean } | null>(null);
   const [storage, setStorage] = useState<StorageRead | null>(null);
   const [scriptLibraryOpen, setScriptLibraryOpen] = useState(false);
@@ -49,6 +52,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false);
   const [data, setData] = useState<Snapshot | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [query, setQuery] = useState(initialState?.query ?? '');
@@ -71,22 +75,25 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const items = useMemo(() => data ? [...entries(data), ...scriptEntries(scripts)] : [], [data, preferences.language, scripts]);
   const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
   const committed = useRef<{ query: string; results: Entry[]; visible: Entry[]; ranking: Map<string, RankingInfo> }>({ query: '', results: [], visible: [], ranking: new Map() });
-  const liveScores = useMemo(() => query.trim() ? queryUsage(usage, query) : commandUsage(usage), [usage, query]);
-  // Forget preserves only the current query's scores; browser/history candidates remain live.
-  const scores = frozenRanking?.query === query ? frozenRanking.scores : liveScores;
+  const liveHomeScores = useMemo(() => data?.incognito ? emptyScores : homeUsage(usage), [usage, data?.incognito]);
+  const liveScores = useMemo(() => data?.incognito ? emptyScores : query.trim() ? queryUsage(usage, query) : liveHomeScores, [usage, query, data?.incognito, liveHomeScores]);
+  // Home habits are captured once per source session; live browser data still refreshes.
+  const homeScores = homeSession && homeSession.sourceId === data?.currentTabId ? homeSession.scores : emptyScores;
+  const scores = query.trim() ? (frozenRanking?.query === query ? frozenRanking.scores : liveScores) : homeScores;
+  const homeItems = useMemo(() => data && !data.incognito
+    ? [...items, historySearchEntry({ items: [], limited: false, state: 'ready' }, 'history')] : items, [items, data?.incognito]);
+  const recommendations = useMemo(() => homeRecommendations(homeItems, homeScores), [homeItems, homeScores]);
+  const liveRecommendations = useMemo(() => homeRecommendations(homeItems, liveHomeScores), [homeItems, liveHomeScores]);
   const next = useMemo(() => {
-    if (!query.trim()) {
-      const results = homeEntries(items, scores);
-      return { results, baseline: homeEntries(items) };
-    }
+    if (!query.trim()) return recommendations;
     const candidates = mergeHistoryResults(search(items, query), historyEntries(history.outcome.items));
     const baseline = search(candidates, query);
     const results = scores.size ? search(candidates, query, scores) : baseline;
     return { results, baseline };
-  }, [items, query, scores, history.outcome]);
+  }, [items, query, scores, history.outcome, recommendations]);
   const nextResults = next.results;
-  const nextRanking = useMemo(() => rankingInfo(nextResults, next.baseline, liveScores), [next, liveScores]);
-  const nextVisible = query.trim() && data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults.slice(0, 100);
+  const nextRanking = useMemo(() => rankingInfo(nextResults, next.baseline, query.trim() ? liveScores : liveRecommendations.scores), [next, liveScores, liveRecommendations, query]);
+  const nextVisible = !query.trim() ? nextResults.slice(0, 10) : data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults.slice(0, 100);
   const results = history.pending ? committed.current.results : nextResults;
   const visible = history.pending ? committed.current.visible : nextVisible;
   const displayQuery = history.pending ? committed.current.query : query;
@@ -130,8 +137,13 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   async function refreshSnapshot() {
     const version = ++refreshVersion.current;
     try {
-      const value = await getSnapshot();
-      if (mounted.current && version === refreshVersion.current) setData(value);
+      const [value] = await Promise.all([getSnapshot(), usageReady]);
+      if (mounted.current && version === refreshVersion.current) {
+        setHomeSession(previous => previous?.sourceId === value.currentTabId ? previous : {
+          sourceId: value.currentTabId, scores: value.incognito ? emptyScores : homeUsage(getUsage()),
+        });
+        setData(value);
+      }
     } catch (reason) {
       if (mounted.current && version === refreshVersion.current) throw reason;
     }
@@ -181,21 +193,21 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   }, []);
 
   useEffect(() => {
-    if (frozenRanking && (frozenRanking.query !== query || settingsOpen || helpOpen || historyOpen || storage || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined)) {
+    if (frozenRanking && (frozenRanking.query !== query || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || storage || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined)) {
       setFrozenRanking(null);
     }
-  }, [frozenRanking, query, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  }, [frozenRanking, query, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.id, nextResults, actionTarget, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  }, [selected?.id, nextResults, actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
   useLayoutEffect(() => {
-    if (busy || settingsOpen || helpOpen || historyOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
+    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
     if (deleteTarget) { cancelDelete.current?.focus(); return; }
     if (!actionTarget) { input.current?.focus(); input.current?.setSelectionRange(...savedCaret.current); }
-  }, [actionTarget, settingsOpen, helpOpen, historyOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun, recoveryId, groupId, busy]);
+  }, [actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, scriptRun, recoveryId, groupId, busy]);
 
   function openSettings(section?: SettingsSection) {
-    if (busy || settingsOpen || helpOpen || historyOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
+    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     closeActions(); setSettingsSection(section); setSettingsOpen(true); setError('');
   }
@@ -217,7 +229,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
     setFrozenRanking({ query, scores });
     setSelection(entry.id); setBusy(true); setError(''); setNotice('');
     try {
-      await forgetSearchRanking(usageTarget(entry), query.trim() ? query : undefined);
+      await forgetSearchRanking(query.trim() ? usageTarget(entry) : liveRecommendations.targets.get(entry.id) ?? usageTarget(entry), query.trim() ? query : undefined);
       setNotice(t('rankingForgotten'));
     } catch { setFrozenRanking(previousRanking); setError(t('errorForgetRanking')); }
     finally { executing.current = false; setBusy(false); }
@@ -238,6 +250,10 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
     if (entry.action === 'searchAllHistory') {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       closeActions(); setError(''); setHistoryOpen(true); return;
+    }
+    if (entry.action === 'tabSwitcher') {
+      if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
+      closeActions(); setError(''); setNotice(''); setTabSwitcherOpen(true); return;
     }
     if (entry.action === 'help') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
@@ -320,7 +336,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   }
   function keyboard(event: KeyboardEvent) {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-    if ((helpOpen || historyOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
+    if ((helpOpen || historyOpen || tabSwitcherOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
     const modifier = isMac ? event.metaKey : event.ctrlKey;
     if (modifier && !event.altKey && !event.shiftKey && event.key === ',') {
       event.preventDefault(); openSettings(); return;
@@ -348,13 +364,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
       const delta = down ? 1 : -1;
       let next = index < 0 ? (down ? 0 : pool.length - 1) : (index + delta + pool.length) % pool.length;
       if (arrow && modifier) {
-        // The home view has recent tabs and common commands; other lists jump to an edge.
         next = down ? pool.length - 1 : 0;
-        if (grouped && !actionTarget) {
-          const boundaries = pool.map((item, i) => i === 0 || item.kind !== pool[i - 1].kind ? i : -1).filter(i => i >= 0);
-          next = down ? boundaries.find(i => i > index) ?? pool.length - 1
-            : [...boundaries].reverse().find(i => i < index) ?? 0;
-        }
       } else if (event.altKey || event.key.startsWith('Page')) {
         const viewport = list.current;
         const row = viewport?.querySelector<HTMLElement>('[role="option"]');
@@ -382,7 +392,8 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
     const tab = data.tabs.find(item => item.id === entry.tabId);
     return tab ? closeTargets(data.tabs, tab, entry.action).length : 0;
   }
-  const visibleShortcut = (entry: Entry) => mode === 'popup' && ['close', 'reload'].includes(entry.action) ? undefined : entry.shortcut;
+  // The switcher's Chrome binding launches its held-key flow, not this menu action.
+  const visibleShortcut = (entry: Entry) => entry.action === 'tabSwitcher' || (mode === 'popup' && ['close', 'reload'].includes(entry.action)) ? undefined : entry.shortcut;
   const current = actionTarget ? selectedAction : selected;
   const count = affected(current);
   const primaryLabel = current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
@@ -391,11 +402,11 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   return <NavigationRoot><BackLayer onBack={dismiss}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else dismiss(); }
   }}>
-    {historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} windowId={data.windowId} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
+    {tabSwitcherOpen && data ? <PaletteTabSwitcher data={data} theme={preferences.theme} onBack={() => setTabSwitcherOpen(false)} onClose={onClose} /> : historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} windowId={data.windowId} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
       initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
       onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : scriptRun ? <ScriptRunner {...scriptRun} onBack={() => setScriptRun(null)} /> : scriptLibraryOpen ? <ScriptLibrary isMac={isMac} onBack={() => setScriptLibraryOpen(false)} onClose={onClose} /> : scriptEditor ? <ScriptLibrary initialScript={scriptEditor} isMac={isMac} onBack={() => setScriptEditor(null)} onClose={onClose}
-      onComplete={message => { setScriptEditor(null); setNotice(message); }} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} isMac={isMac}
-      onBack={() => setSettingsOpen(false)} onClose={onClose} /> : <section tabIndex={-1} className="palette" aria-label="zing" aria-busy={busy}>
+      onComplete={message => { setScriptEditor(null); setNotice(message); }} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} tabSwitcherShortcut={data?.tabSwitcherShortcut || ''} isMac={isMac}
+      onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label="zing" aria-busy={busy}>
       <span className="sr-only" id="zing-navigation">{t('navigationHelp')}</span>
       <div className={`main-surface ${actionTarget ? 'subdued' : ''}`} inert={actionTarget ? true : undefined}>
         <header className="search-bar">
@@ -409,12 +420,13 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
           <SearchDismissButton label={t('closePalette')} />
         </header>
         <span className="sr-only result-status" role="status">{data && !history.pending ? countMessage('resultOne', 'resultMany', visible.length) : loading && showLoading ? t('loading') : ''}</span>
-        <div className="results" ref={list} id="zing-results" role="listbox" aria-label={t('resultsLabel')} aria-busy={history.pending}>
+        <div className="results" ref={list} id="zing-results" role="listbox" aria-label={t(grouped ? 'suggested' : 'resultsLabel')} aria-busy={history.pending}>
           {loading && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={25} /><p>{t('preparing')}</p></div> : null}
           {data && !history.pending && !visible.length ? <div className="empty"><Search size={30} /><strong>{t('noResults')}</strong>
             <p>{t('noResultsHint')}</p></div> : null}
-          {visible.map((item, index) => <div className={`result-group ${grouped && index > 0 && item.kind !== visible[index - 1].kind ? 'section-start' : ''}`} key={item.id}>
-            <SearchResultItem entry={item} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} showKind={!grouped} suppressTabShortcuts={mode === 'popup'} id={`zing-${item.id}`} selected={!history.pending && selected?.id === item.id}
+          {data && grouped ? <div className="suggested-label" role="presentation">{t('suggested')}</div> : null}
+          {visible.map(item => <div className="result-group" key={item.id}>
+            <SearchResultItem entry={item} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} suppressTabShortcuts={mode === 'popup'} id={`zing-${item.id}`} selected={!history.pending && selected?.id === item.id}
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
@@ -423,7 +435,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
               setSelection(item.id); setActionTarget(item); setActionQuery(''); setActionSelection(''); setError('');
             }} />
           </div>)}
-          {results.length > visible.filter(item => item.action !== 'searchAllHistory').length ? <p className="more-hint">{t('moreResults')}</p> : null}
+          {!grouped && results.length > visible.filter(item => item.action !== 'searchAllHistory').length ? <p className="more-hint">{t('moreResults')}</p> : null}
         </div>
       </div>
 

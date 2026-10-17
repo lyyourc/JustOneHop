@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addUsage, commandUsage, normalizeUsage, queryUsage, rankingInfo, usageTarget } from '../src/usage.ts';
+import { addUsage, commandUsage, homeUsage, normalizeUsage, queryUsage, usageTarget } from '../src/usage.ts';
 import { entries, homeEntries, search } from '../src/model.ts';
 
 const now = 1_800_000_000_000;
@@ -24,9 +24,20 @@ test('frequent selections beat a single choice and recent habits can replace sta
   assert.ok(queryUsage(history, 'guide', now).get('old')! > queryUsage(history, 'guide', now).get('new')!);
 });
 
-test('blank tab searches do not train and malformed or expired data is ignored', () => {
-  assert.deepEqual(addUsage([], ' ', 'tab:https://example.com', now), []);
-  assert.deepEqual(addUsage([], '', 'bookmark:1', now), []);
+test('explicit empty queries learn home pages and reject unsupported blank-query identities', () => {
+  let history = addUsage([], ' ', 'tab:https://example.com', now);
+  history = addUsage(history, '', 'bookmark:1', now);
+  history = addUsage(history, '\n', 'tab:https://example.com', now);
+  assert.equal(history.length, 2);
+  assert.deepEqual(new Set(normalizeUsage(history, now).map(record => record.query)), new Set(['']));
+  assert.equal(queryUsage(history, '', now).get('tab:https://example.com'), 2);
+  assert.equal(queryUsage(history, 'example', now).size, 0);
+  for (const target of ['', 'tab:', 'bookmark:', 'command:', 'script:one', 'unknown']) {
+    assert.deepEqual(addUsage([], '', target, now), []);
+  }
+});
+
+test('malformed or expired usage data is ignored', () => {
   assert.deepEqual(normalizeUsage([{ query: 'x', target: 'y', weight: NaN, lastUsed: now },
     { query: 'x', target: 'y', weight: 1, lastUsed: now + 1 },
     { query: 'x', target: 'y', weight: 1, lastUsed: now - 91 * day }, null], now), []);
@@ -42,6 +53,7 @@ test('home command scores reuse prior queries and count empty-query executions o
   const scores = commandUsage(history, now);
   assert.equal(scores.size, 1);
   assert.equal(scores.get('command:reload'), 3);
+  assert.deepEqual(homeUsage(history, now), new Map([['command:reload', 3], ['tab:https://iam.example', 1], ['bookmark:1', 1]]));
   assert.equal(queryUsage(history, 'refresh', now).get('command:reload'), 1);
   assert.equal(queryUsage(history, 'unrelated', now).size, 0);
   assert.equal(normalizeUsage(history, now).find(record => record.query === '')?.weight, 1);
@@ -58,18 +70,35 @@ test('home command habits decay and expired records do not influence ordering', 
   assert.ok(!scores.has('command:mute'));
 });
 
-test('home learns command order while retaining recent tabs, safe defaults and live labels', () => {
+test('home aggregates page frequency across queries and lets recent choices replace stale habits', () => {
+  const items = entries({ currentTabId: 1, windowId: 1, shortcut: '', bookmarks: [],
+    tabs: [1, 2, 3].map(id => ({ id, index: id - 1, windowId: 1, title: `Page ${id}`, url: `https://example.com/${id}`,
+      active: id === 1, pinned: false, muted: false, audible: false })) });
+  let history = addUsage([], 'old', 'tab:https://example.com/2', now - 42 * day);
+  history = addUsage(history, '', 'tab:https://example.com/2', now - 42 * day);
+  history = addUsage(history, 'new', 'tab:https://example.com/3', now);
+  assert.equal(homeUsage(history, now).get('tab:https://example.com/2'), 0.25);
+  assert.equal(homeEntries(items, homeUsage(history, now))[0].id, 'tab:3');
+  history = addUsage(history, 'different query', 'tab:https://example.com/2', now);
+  assert.equal(homeUsage(history, now).get('tab:https://example.com/2'), 1.25);
+  assert.equal(homeEntries(items, homeUsage(history, now))[0].id, 'tab:2');
+  assert.equal(queryUsage(history, 'different query', now).get('tab:https://example.com/2'), 1);
+  assert.equal(queryUsage(history, 'new', now).has('tab:https://example.com/2'), false);
+  history.push({ query: '', target: 'bookmark:expired', weight: 100, lastUsed: now - 91 * day });
+  assert.equal(homeUsage(history, now).has('bookmark:expired'), false);
+});
+
+test('home learns mixed page and command order while retaining safe defaults and live labels', () => {
   const items = entries({ currentTabId: 3, windowId: 1, shortcut: '', bookmarks: [],
     tabs: Array.from({ length: 8 }, (_, i) => ({ id: i + 1, windowId: 1, index: i,
       title: `Page ${i}`, url: `https://example.com/${i}`, active: i === 2, pinned: true, muted: true, audible: false })) });
   const original = homeEntries(items);
   const before = items.map(item => item.id);
   const learned = homeEntries(items, new Map([['command:mute', 5], ['command:pin', 3], ['command:closeOthers', 100], ['tab:https://example.com/7', 100]]));
-  assert.deepEqual(learned.slice(0, 6), original.slice(0, 6));
-  assert.deepEqual(learned.slice(6).map(item => item.action), ['mute', 'pin', 'newTab', 'restore', 'reload', 'localStorage', 'sessionStorage', 'cookies', 'settings']);
-  assert.equal(learned[6].title, 'Unmute Tab');
-  assert.equal(learned[7].title, 'Unpin Tab');
-  assert.ok(learned.slice(6).every(item => item.tabId === 3 || ['settings', 'localStorage', 'sessionStorage', 'cookies'].includes(item.action)));
+  assert.equal(learned[0].id, 'tab:8');
+  assert.deepEqual(learned.slice(1).map(item => item.action), ['pin', 'settings', 'help', 'tabSwitcher', 'scriptLibrary', 'newTab', 'reload', 'localStorage', 'cookies']);
+  assert.equal(learned[1].title, 'Unpin Tab');
+  assert.ok(learned.slice(1).every(item => item.tabId === 3 || ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'localStorage', 'cookies'].includes(item.action)));
   assert.deepEqual(items.map(item => item.id), before);
   assert.deepEqual(homeEntries(items, commandUsage([], now)), original);
 });

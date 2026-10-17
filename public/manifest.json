@@ -49,7 +49,7 @@
         "default": "Ctrl+Comma",
         "mac": "MacCtrl+J"
       },
-      "description": "__MSG_recentSwitcher__"
+      "description": "__MSG_recentSwitcherCommand__"
     },
     "switch-recent-back": {
       "suggested_key": {
