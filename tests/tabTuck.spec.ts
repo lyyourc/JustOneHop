@@ -1,8 +1,10 @@
-import { test, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { test as base, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
 import { access, cp, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+
+const test = base.extend<{ startupStorageFailure: boolean }>({ startupStorageFailure: [false, { option: true }] });
 
 let server: Server;
 let origin: string;
@@ -37,7 +39,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => { server.close(); });
 
-test.beforeEach(async ({}, testInfo) => {
+test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
   profile = await mkdtemp(join(tmpdir(), 'zing-tuck-e2e-'));
   const extension = join(profile, 'extension');
   await cp(resolve('dist'), extension, { recursive: true });
@@ -53,7 +55,7 @@ test.beforeEach(async ({}, testInfo) => {
     chrome.alarms.onAlarm.addListener = callback => { globalThis.__tuckAlarms.push(callback); addAlarm(callback); };
     chrome.idle.queryState = async () => 'idle';
   `;
-  const failure = testInfo.title.includes('startup storage failure') ? `
+  const failure = startupStorageFailure ? `
     const readSession = chrome.storage.session.get.bind(chrome.storage.session);
     let failedSessionRead = false;
     chrome.storage.session.get = async (...args) => {
@@ -74,6 +76,10 @@ test.beforeEach(async ({}, testInfo) => {
   popupUrl = worker.url().replace('background.js', 'popup.html');
   ui = await context.newPage();
   await ui.goto(popupUrl);
+  const session = await context.newCDPSession(ui);
+  testInfo.annotations.push({ type: 'browser-version', description: (await session.send('Browser.getVersion')).product },
+    { type: 'browser-environment', description: JSON.stringify({ locale: 'en-US', startupStorageFailure, shadow: 'closed', headed: false }) });
+  await session.detach();
   await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeVisible();
   windowId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
   for (const page of context.pages()) if (page !== ui) await page.close();
@@ -312,13 +318,16 @@ test('English disabling tuck releases other pages after a transient failure and 
   await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.getAll()).length)).toBe(0);
 });
 
-test('English startup storage failure leaves the command palette available', async () => {
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
-  await search.fill('new tab');
-  await expect(ui.getByRole('option').first()).toContainText('New Tab');
-  const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
-  expect(snapshot.ok).toBe(true);
-  expect(snapshot.data.tabs.length).toBeGreaterThan(0);
+test.describe(() => {
+  test.use({ startupStorageFailure: true });
+  test('English startup storage failure leaves the command palette available', async () => {
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
+    await search.fill('new tab');
+    await expect(ui.getByRole('option').first()).toContainText('New Tab');
+    const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
+    expect(snapshot.ok).toBe(true);
+    expect(snapshot.data.tabs.length).toBeGreaterThan(0);
+  });
 });
 
 test('English tuck gives a long-running active page a fresh grace period when the user leaves it', async () => {
@@ -398,13 +407,13 @@ test('English actual Chrome restart retains records and safely resumes a group w
     await expect(ui.getByRole('dialog')).toBeVisible();
     await ui.keyboard.press('Escape');
     await expect(ui.getByRole('heading', { name: 'Review Tucked Away Groups' })).toBeVisible();
-    await ui.screenshot({ path: '/private/tmp/zing-tuck-recovery.png' });
+    await ui.screenshot({ path: test.info().outputPath('zing-tuck-recovery.png') });
     await ui.evaluate(async () => {
       const { preferences } = await chrome.storage.local.get('preferences');
       await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), language: 'zh' } });
     });
     await expect(ui.getByRole('button', { name: /继续管理这组/ })).toBeVisible();
-    await ui.screenshot({ path: '/private/tmp/zing-tuck-recovery-zh.png' });
+    await ui.screenshot({ path: test.info().outputPath('zing-tuck-recovery-zh.png') });
     await ui.keyboard.press('Control+n');
     await ui.keyboard.press('Control+p');
     await ui.keyboard.press('Enter');

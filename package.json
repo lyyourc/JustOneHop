@@ -8,8 +8,8 @@
     "dev": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm test && npm run build && npm run test:e2e"
+    "test:e2e": "tsx scripts/run-e2e.ts",
+    "check": "npm run typecheck && npm test && npm run test:e2e"
   },
   "dependencies": {
     "fuse.js": "^7.5.0",

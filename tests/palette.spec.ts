@@ -1,9 +1,24 @@
-import { test, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { test as base, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { focusClosedButton, pressNativeEnter } from './support/nativeInput';
 import { mkdtemp, mkdir, rm, readdir, access, cp, readFile, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { UsageRecord } from '../src/usage';
+
+type Environment = {
+  locale: 'en-US' | 'zh-CN' | 'zh-TW' | 'fr-FR';
+  shadow: 'closed' | 'open';
+  pageAccess: boolean;
+  cookieDomains: boolean;
+  commands: boolean;
+  headed: boolean;
+  verticalTabs: boolean;
+  vimium: boolean;
+};
+const defaults: Environment = { locale: 'zh-CN', shadow: 'closed', pageAccess: false,
+  cookieDomains: false, commands: false, headed: false, verticalTabs: false, vimium: false };
+const test = base.extend<{ environment: Environment }>({ environment: [defaults, { option: true }] });
 
 let server: Server;
 let origin: string;
@@ -13,6 +28,8 @@ let worker: Worker;
 let profile: string;
 let popupUrl: string;
 let testExtension: string | undefined;
+let nativeWindowEvents: { event: string; url: string; at: number }[] = [];
+let browserStarted = false;
 
 async function browserPath() {
   if (process.env.ZING_CHROMIUM_PATH) return process.env.ZING_CHROMIUM_PATH;
@@ -40,32 +57,41 @@ test.beforeAll(async () => {
   origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
 test.afterAll(async () => { server.close(); });
-test.beforeEach(async ({}, testInfo) => {
+test.beforeEach(async ({ environment }, testInfo) => {
+  browserStarted = false;
+  profile = '';
+  testExtension = undefined;
+  nativeWindowEvents = [];
+  testInfo.annotations.push({ type: 'browser-environment', description: JSON.stringify(environment) });
+  test.skip(environment.vimium && !process.env.ZING_VIMIUM_PATH, 'Vimium compatibility requires ZING_VIMIUM_PATH pointing to an unpacked extension.');
+  if (environment.vimium && environment.shadow === 'open') throw new Error('Vimium compatibility requires production closed shadow roots.');
   profile = await mkdtemp(join(tmpdir(), 'zing-e2e-'));
-  const verticalTabs = testInfo.title.includes('vertical tabs');
+  const { verticalTabs } = environment;
   if (verticalTabs) {
     await mkdir(join(profile, 'Default'));
     await writeFile(join(profile, 'Default/Preferences'), JSON.stringify({ vertical_tabs: { enabled: true } }));
   }
   let extension = resolve('dist');
   testExtension = undefined;
-  if ((testInfo.title.includes('overlay') || testInfo.title.includes('storage'))) {
+  if (environment.pageAccess || environment.shadow === 'open' || environment.cookieDomains) {
     testExtension = `${profile}-extension`;
     await cp(extension, testExtension, { recursive: true });
     const manifest = JSON.parse(await readFile(join(testExtension, 'manifest.json'), 'utf8'));
     // Headless Chrome cannot press the toolbar accelerator that grants activeTab.
     // Grant only the loopback fixture in this temporary test copy; production is unchanged.
     manifest.host_permissions = ['*://127.0.0.1/*'];
-    if (testInfo.title.includes('cookie domains')) manifest.host_permissions.push('*://app.example.test/*', '*://example.test/*');
+    if (environment.cookieDomains) manifest.host_permissions.push('*://app.example.test/*', '*://example.test/*');
     await writeFile(join(testExtension, 'manifest.json'), JSON.stringify(manifest));
-    if (testInfo.title.includes('storage') && !testInfo.title.includes('closed storage')) {
+    if (environment.shadow === 'open') {
       // Open only the test copy's shadow roots so Playwright can inspect the real iframe UI.
       const content = join(testExtension, 'content.js');
-      await writeFile(content, (await readFile(content, 'utf8')).replaceAll('mode:"closed"', 'mode:"open"'));
+      const source = await readFile(content, 'utf8');
+      expect(source.match(/mode:"closed"/g), 'Both production shadow roots must be patched in the visual fixture').toHaveLength(2);
+      await writeFile(content, source.replaceAll('mode:"closed"', 'mode:"open"'));
     }
     extension = testExtension;
   }
-  if (testInfo.title.includes('recent bridge') || testInfo.title.includes('palette launch')) {
+  if (environment.commands) {
     if (!testExtension) {
       testExtension = `${profile}-extension`;
       await cp(extension, testExtension, { recursive: true });
@@ -77,7 +103,7 @@ test.beforeEach(async ({}, testInfo) => {
     await writeFile(background, hook + await readFile(background, 'utf8'));
     extension = testExtension;
   }
-  const locale = testInfo.title.includes('English') ? 'en-US' : testInfo.title.includes('fallback') ? 'fr-FR' : testInfo.title.includes('Taiwan') ? 'zh-TW' : 'zh-CN';
+  const { locale } = environment;
   let executablePath = await browserPath();
   if (process.platform === 'darwin') {
     // macOS Chrome takes its UI locale from Cocoa, not --lang or navigator.language.
@@ -89,21 +115,64 @@ test.beforeEach(async ({}, testInfo) => {
   }
   // Open shadow roots used by visual storage tests change Vimium's focus detection.
   // The separate closed storage test exercises production isolation with Vimium.
-  const vimium = testInfo.title.includes('storage') && !testInfo.title.includes('closed storage') ? undefined : process.env.ZING_VIMIUM_PATH;
+  const vimium = environment.vimium ? resolve(process.env.ZING_VIMIUM_PATH!) : undefined;
+  if (vimium) {
+    const manifest = JSON.parse(await readFile(join(vimium, 'manifest.json'), 'utf8'));
+    expect(JSON.stringify(manifest), 'ZING_VIMIUM_PATH must identify Vimium').toMatch(/vimium/i);
+  }
   context = await chromium.launchPersistentContext(profile, {
     ignoreDefaultArgs: process.platform === 'darwin' ? ['about:blank'] : [],
-    locale, headless: !testInfo.title.includes('palette launch native'), reducedMotion: 'reduce', executablePath, viewport: testInfo.title.includes('palette launch native') ? null : { width: 1100, height: 760 },
+    locale, headless: !environment.headed, reducedMotion: 'reduce', executablePath, viewport: environment.headed ? null : { width: 1100, height: 760 },
     args: [...(verticalTabs ? ['--enable-features=VerticalTabs'] : []), `--lang=${locale}`, `--disable-extensions-except=${[extension, vimium].filter(Boolean).join(',')}`, `--load-extension=${[extension, vimium].filter(Boolean).join(',')}`],
   });
-  worker = context.serviceWorkers().find(worker => worker.url().endsWith('/background.js')) || await context.waitForEvent('serviceworker', worker => worker.url().endsWith('/background.js'));
+  browserStarted = true;
+  if (environment.headed) context.on('page', page => {
+    nativeWindowEvents.push({ event: 'created', url: page.url(), at: Date.now() });
+    page.on('framenavigated', frame => {
+      if (frame === page.mainFrame()) nativeWindowEvents.push({ event: 'navigated', url: page.url(), at: Date.now() });
+    });
+    page.on('close', () => nativeWindowEvents.push({ event: 'closed', url: page.url(), at: Date.now() }));
+  });
+  let zingWorker: Worker | undefined;
+  await expect.poll(async () => {
+    for (const candidate of context.serviceWorkers()) {
+      const isZing = await candidate.evaluate(() => Boolean(chrome.runtime.getManifest().commands?.['toggle-palette'])).catch(() => false);
+      if (isZing) { zingWorker = candidate; return true; }
+    }
+    return false;
+  }).toBe(true);
+  worker = zingWorker!;
+  const session = await context.newCDPSession(context.pages()[0] || await context.newPage());
+  const browser = await session.send('Browser.getVersion');
+  testInfo.annotations.push({ type: 'browser-version', description: browser.product });
+  await session.detach();
+  if (vimium) {
+    await expect.poll(async () => Promise.all(context.serviceWorkers().map(candidate => candidate.evaluate(() => chrome.runtime.getManifest().name).catch(() => '')))).toContain('Vimium');
+    testInfo.annotations.push({ type: 'compatibility', description: 'Vimium service worker loaded' });
+  }
   popupUrl = worker.url().replace('background.js', 'popup.html');
   ui = await context.newPage();
   await ui.goto(popupUrl);
   await expect(ui.locator('.result.command')).toHaveCount(9);
 });
-test.afterEach(async () => {
-  await context?.close(); await rm(profile, { recursive: true, force: true });
-  if (testExtension) await rm(testExtension, { recursive: true, force: true });
+test.afterEach(async ({ environment }, testInfo) => {
+  try {
+    if (browserStarted && environment.headed && testInfo.status !== testInfo.expectedStatus) {
+      const state = await worker.evaluate(async () => ({
+        windows: await chrome.windows.getAll({ populate: true }),
+        session: await chrome.storage.session.get(['zingPaletteWindow']),
+      })).catch(error => ({ error: String(error) }));
+      const path = testInfo.outputPath('native-window-lifecycle.json');
+      await writeFile(path, JSON.stringify({ events: nativeWindowEvents, state }, null, 2));
+      await testInfo.attach('native-window-lifecycle', { path, contentType: 'application/json' });
+    }
+  } finally {
+    try { if (browserStarted) await context.close(); }
+    finally {
+      if (profile) await rm(profile, { recursive: true, force: true });
+      if (testExtension) await rm(testExtension, { recursive: true, force: true });
+    }
+  }
 });
 
 test('unified bilingual search, action menu, Esc and empty results', async () => {
@@ -204,10 +273,12 @@ test('IME Enter does not execute and the popup has no horizontal overflow', asyn
   await input.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 229, isComposing: true, bubbles: true });
   expect(await ui.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length))).toBe(count);
   expect(await ui.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(750);
-  await ui.locator('.palette').screenshot({ path: 'test-results/palette.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('palette.png') });
 });
 
-test('overlay isolates page styles and restores real typing focus after Escape', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, pageAccess: true } });
+  test('overlay isolates page styles and restores real typing focus after Escape', async () => {
   const page = await context.newPage();
   await page.goto(`${origin}/Focus-fixture`);
   await page.addStyleTag({ content: 'dialog { display:none!important } button {color:red!important}' });
@@ -227,17 +298,17 @@ test('overlay isolates page styles and restores real typing focus after Escape',
     return combo ? combo.value?.value ?? '' : undefined;
   };
   await expect.poll(comboValue).toBe('');
-  await page.screenshot({ path: 'test-results/overlay-refined.png', animations: 'disabled' });
+  await page.screenshot({ path: test.info().outputPath('overlay-refined.png'), animations: 'disabled' });
   await page.keyboard.type('example');
   await expect.poll(comboValue).toBe('example');
   await page.keyboard.press('Meta+a');
   await page.keyboard.type('close right');
   await expect.poll(comboValue).toBe('close right');
-  await page.screenshot({ path: 'test-results/overlay.png', animations: 'disabled' });
+  await page.screenshot({ path: test.info().outputPath('overlay.png'), animations: 'disabled' });
   await page.setViewportSize({ width: 390, height: 400 });
   await page.keyboard.press('Meta+k');
   await expect.poll(comboValue).toBe('');
-  await page.screenshot({ path: 'test-results/overlay-narrow-actions.png', animations: 'disabled' });
+  await page.screenshot({ path: test.info().outputPath('overlay-narrow-actions.png'), animations: 'disabled' });
   await page.keyboard.press('Escape');
   await expect.poll(comboValue).toBe('close right');
   await page.keyboard.press('Escape');
@@ -253,6 +324,7 @@ test('overlay isolates page styles and restores real typing focus after Escape',
   await page.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length))).toBe(tabCount + 1);
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+});
 });
 
 test('Raycast navigation pages, jumps sections and restores caret when actions close', async () => {
@@ -313,20 +385,22 @@ test('light and dark surfaces, compact rows and bottom action search fit without
     await input.fill('');
     expect((await ui.locator('.result').first().boundingBox())!.height).toBe(40);
     await expect(ui.locator('.section-start')).toHaveCount(1);
-    await ui.locator('.palette').screenshot({ path: `test-results/palette-${theme}.png` });
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`palette-${theme}.png`) });
     await input.fill('Design System');
     await expect(ui.locator('.result')).toHaveCount(1);
     await input.press('Meta+k');
     const searchBox = await ui.locator('.action-search').boundingBox();
     const actionList = await ui.locator('.action-list').boundingBox();
     expect(searchBox!.y).toBeGreaterThanOrEqual(actionList!.y + actionList!.height - 1);
-    await ui.locator('.palette').screenshot({ path: `test-results/actions-${theme}.png` });
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`actions-${theme}.png`) });
     await ui.keyboard.press('Escape');
   }
 });
 
 for (const variant of ['English', 'fallback', 'Taiwan']) {
-  test(`${variant} locale resolves manifest, commands, actions, counts and errors`, async () => {
+  test.describe(() => {
+    test.use({ environment: { ...defaults, locale: variant === 'English' ? 'en-US' : variant === 'fallback' ? 'fr-FR' : 'zh-TW' } });
+    test(`${variant} locale resolves manifest, commands, actions, counts and errors`, async () => {
     const chinese = variant === 'Taiwan';
     const input = ui.getByRole('combobox', { name: chinese ? '搜索命令、标签页和书签' : 'Search commands, tabs, and bookmarks' });
     await expect(input).toBeFocused();
@@ -354,7 +428,8 @@ for (const variant of ['English', 'fallback', 'Taiwan']) {
     const footer = await ui.locator('.footer').boundingBox();
     const button = await ui.getByRole('button', { name: chinese ? '打开操作菜单' : 'Open action menu' }).boundingBox();
     expect(button!.x + button!.width).toBeLessThanOrEqual(footer!.x + footer!.width);
-    await ui.locator('.palette').screenshot({ path: `test-results/i18n-${variant.toLowerCase()}.png` });
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`i18n-${variant.toLowerCase()}.png`) });
+  });
   });
 }
 
@@ -382,7 +457,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await ui.getByRole('option', { name: 'Dark', exact: true }).click();
   await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', 'dark');
   await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(41, 42, 45)');
-  await ui.locator('.palette').screenshot({ path: 'test-results/settings-dark.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-dark.png') });
   await theme.press('Escape');
   const englishInput = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await expect(englishInput).toHaveValue('reload');
@@ -414,14 +489,16 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await second.close();
 });
 
-test('English settings entries, narrow layout and Chrome hotkey settings', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English settings entries, narrow layout and Chrome hotkey settings', async () => {
   const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await input.fill('设置');
   await expect(ui.locator('.result').first()).toContainText('Settings');
   await input.press('Enter');
   await expect(ui.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await expect(ui.locator('.hotkey-value')).toHaveText(await worker.evaluate(async () => (await chrome.commands.getAll()).find(c => c.name === 'toggle-palette')!.shortcut!));
-  await ui.locator('.palette').screenshot({ path: 'test-results/settings-light.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-light.png') });
   // Keyboard Tab stays within settings, including reverse wrap from the back button.
   await ui.getByRole('button', { name: 'Back', exact: true }).press('Shift+Tab');
   await expect(ui.getByRole('button', { name: 'Manage Scripts' })).toBeFocused();
@@ -441,14 +518,17 @@ test('English settings entries, narrow layout and Chrome hotkey settings', async
   expect(menu!.y + menu!.height).toBeLessThanOrEqual(body!.y + body!.height);
   await ui.getByRole('option', { name: '简体中文', exact: true }).click();
   await expect(ui.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
-  await ui.locator('.palette').screenshot({ path: 'test-results/settings-narrow.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-narrow.png') });
   const nextPage = context.waitForEvent('page');
   await ui.getByRole('button', { name: '前往修改' }).click();
   const shortcuts = await nextPage;
   await expect(shortcuts).toHaveURL('chrome://extensions/shortcuts');
 });
+});
 
-test('English override localizes errors and reverting language follows Chrome', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English override localizes errors and reverting language follows Chrome', async () => {
   // Override the browser's English locale without changing the browser itself.
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
   await ui.getByRole('combobox', { name: 'Language', exact: true }).click();
@@ -463,8 +543,11 @@ test('English override localizes errors and reverting language follows Chrome', 
   await expect(ui.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await expect(ui.getByText('System language: English (Chrome interface)')).toBeVisible();
 });
+});
 
-test('overlay settings keyboard navigation and preferences work in the isolated frame', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, pageAccess: true } });
+  test('overlay settings keyboard navigation and preferences work in the isolated frame', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Settings-fixture`);
   await page.getByRole('textbox', { name: 'Page input' }).fill('before');
   const tabId = await worker.evaluate(async base => (await chrome.tabs.query({})).find(tab => tab.url === `${base}/Settings-fixture`)!.id!, origin);
@@ -492,15 +575,18 @@ test('overlay settings keyboard navigation and preferences work in the isolated 
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences)).toEqual({ language: 'en', theme: 'dark', autoTuck: false });
-  await page.screenshot({ path: 'test-results/settings-overlay.png' });
+  await page.screenshot({ path: test.info().outputPath('settings-overlay.png') });
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await ax()).find(n => n.role?.value === 'combobox')?.value?.value).toBe('reload');
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
   await expect(page.getByRole('textbox', { name: 'Page input' })).toBeFocused();
 });
+});
 
-test('English settings report failed saves and allow retry without losing current preferences', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English settings report failed saves and allow retry without losing current preferences', async () => {
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
   await ui.evaluate(() => {
     const original = chrome.storage.local.set.bind(chrome.storage.local);
@@ -519,6 +605,7 @@ test('English settings report failed saves and allow retry without losing curren
   await ui.getByRole('option', { name: '简体中文', exact: true }).click();
   await expect(ui.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
   await expect(ui.getByRole('alert')).toHaveCount(0);
+});
 });
 
 test('unified results mix tabs bookmarks and commands; recent tabs switch with Enter', async () => {
@@ -546,7 +633,7 @@ test('unified results mix tabs bookmarks and commands; recent tabs switch with E
   await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
   await expect(ui.locator('.result').first()).toHaveAttribute('aria-selected', 'true');
   await expect(ui.locator('.kind-label').filter({ hasText: '书签' })).toBeVisible();
-  await ui.locator('.palette').screenshot({ path: 'test-results/unified-search.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('unified-search.png') });
   await input.fill('New Tab Notes');
   await expect(ui.locator('.result')).toHaveCount(1);
   await input.press('Meta+k');
@@ -561,7 +648,9 @@ test('unified results mix tabs bookmarks and commands; recent tabs switch with E
   expect(await worker.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length))).toBe(count - 1); // The standalone test popup closes after execution.
 });
 
-test('English exact command intent wins over identical page titles and Enter runs the command', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English exact command intent wins over identical page titles and Enter runs the command', async () => {
   const page = await context.newPage();
   await page.goto(`${origin}/New-Tab`);
   await ui.evaluate(async base => { await chrome.bookmarks.create({ title: 'New Tab', url: base }); }, origin);
@@ -578,6 +667,7 @@ test('English exact command intent wins over identical page titles and Enter run
   await expect(newTab).toHaveURL(/^chrome:\/\/(?:newtab|new-tab-page)\/$/);
   await expect.poll(() => worker.evaluate(() => chrome.tabs.query({ active: true }).then(tabs => tabs.some(tab => tab.url === 'chrome://newtab/')))).toBe(true);
 });
+});
 
 test('search highlights Chinese titles, translated command aliases, URLs and action menu matches in both themes', async () => {
   const page = await context.newPage();
@@ -593,7 +683,7 @@ test('search highlights Chinese titles, translated command aliases, URLs and act
   for (const theme of ['light', 'dark']) {
     await ui.evaluate(async theme => { await chrome.storage.local.set({ preferences: { language: 'zh', theme } }); }, theme);
     await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', theme);
-    await ui.locator('.palette').screenshot({ path: `test-results/highlight-${theme}.png` });
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`highlight-${theme}.png`) });
   }
   await input.fill('127.0.0.1');
   await expect(ui.locator('.result.tab .entry-subtitle mark')).toHaveText('127.0.0.1');
@@ -612,7 +702,9 @@ test('search highlights Chinese titles, translated command aliases, URLs and act
   await expect(ui.locator('.result mark')).toHaveCount(0);
 });
 
-test('English title highlighting preserves text and fuzzy matches remain visible', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English title highlighting preserves text and fuzzy matches remain visible', async () => {
   const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await input.fill('new tab');
   await expect(ui.locator('.result.command .entry-title')).toHaveText('Tab: New Tab');
@@ -622,8 +714,11 @@ test('English title highlighting preserves text and fuzzy matches remain visible
   await expect(ui.locator('.result.command').first()).toContainText('Reload Current Tab');
   await expect(ui.locator('.result.command').first().locator('mark').first()).toBeVisible();
 });
+});
 
-for (const language of ['Chinese', 'English']) test(`${language} short queries reject noise while command typos and exact aliases still work`, async () => {
+for (const language of ['Chinese', 'English']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
+  test(`${language} short queries reject noise while command typos and exact aliases still work`, async () => {
   const chinese = language === 'Chinese';
   const page = await context.newPage();
   await page.goto(`${origin}/EchoTech-IAM`);
@@ -641,7 +736,7 @@ for (const language of ['Chinese', 'English']) test(`${language} short queries r
   await expect(ui.locator('.result.bookmark .entry-title')).toHaveText('IAM Handbook');
   await expect(ui.locator('.result.command')).toHaveCount(0);
   await expect(ui.locator('.result .entry-title mark')).toHaveText(['IAM', 'IAM']);
-  await ui.locator('.palette').screenshot({ path: `test-results/strict-search-${language.toLowerCase()}.png` });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath(`strict-search-${language.toLowerCase()}.png`) });
   await input.fill('iam nonexistent');
   await expect(ui.locator('.result')).toHaveCount(0);
   await input.fill('xinjiam');
@@ -661,8 +756,11 @@ for (const language of ['Chinese', 'English']) test(`${language} short queries r
   await action.fill('reloda');
   await expect(ui.locator('.action-row').first()).toContainText(chinese ? '刷新' : 'Reload');
 });
+});
 
-test('English learned ranking follows successful selections, survives reopening tabs, and resets across palettes', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English learned ranking follows successful selections, survives reopening tabs, and resets across palettes', async () => {
   const target = await context.newPage();
   await target.goto(`${origin}/EchoTech-IAM`);
   await ui.evaluate(async base => { await chrome.bookmarks.create({ title: 'IAM Handbook', url: `${base}/Handbook` }); }, origin);
@@ -691,7 +789,7 @@ test('English learned ranking follows successful selections, survives reopening 
   const restored = await context.newPage(); await restored.goto(`${origin}/EchoTech-IAM`);
   await reopen();
   await expect(ui.locator('.result').first()).toContainText('EchoTech IAM');
-  await ui.locator('.palette').screenshot({ path: 'test-results/learned-ranking.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('learned-ranking.png') });
   await ui.reload();
   await ui.getByRole('combobox').fill(' IAM ');
   await expect(ui.locator('.result').first()).toContainText('EchoTech IAM');
@@ -704,10 +802,13 @@ test('English learned ranking follows successful selections, survives reopening 
   await expect(observer.locator('.result').first()).toContainText('IAM Handbook');
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage)).toBeUndefined();
   await ui.getByRole('button', { name: 'Reset Ranking', exact: true }).scrollIntoViewIfNeeded();
-  await ui.locator('.palette').screenshot({ path: 'test-results/ranking-settings.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('ranking-settings.png') });
+});
 });
 
-test('English canceled and failed selections do not train, while opening settings does', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English canceled and failed selections do not train, while opening settings does', async () => {
   const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await input.fill('new tab');
   await input.press('ArrowDown'); // Highlighting alone is not a selection.
@@ -728,8 +829,11 @@ test('English canceled and failed selections do not train, while opening setting
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.target)).toBe('command:settings');
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.query)).toBe('language');
 });
+});
 
-test('overlay learning survives reloading the page that owns the palette', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, pageAccess: true } });
+  test('overlay learning survives reloading the page that owns the palette', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Usage-fixture`);
   await page.bringToFront();
   const tabId = await worker.evaluate(async base => (await chrome.tabs.query({})).find(tab => tab.url === `${base}/Usage-fixture`)!.id!, origin);
@@ -751,8 +855,11 @@ test('overlay learning survives reloading the page that owns the palette', async
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.target)).toBe('command:reload');
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.query)).toBe('reload');
 });
+});
 
-for (const language of ['Chinese', 'English']) test(`${language} home commands learn from search, home and actions while preserving recent tabs`, async () => {
+for (const language of ['Chinese', 'English']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
+  test(`${language} home commands learn from search, home and actions while preserving recent tabs`, async () => {
   const chinese = language === 'Chinese';
   const target = await context.newPage(); await target.goto(`${origin}/Home-fixture`);
   await ui.bringToFront();
@@ -794,7 +901,7 @@ for (const language of ['Chinese', 'English']) test(`${language} home commands l
   await ui.reload();
   await expect(ui.locator('.result.command')).toHaveCount(9);
   expect(await commandIds()).toEqual(beforeReload);
-  await ui.locator('.palette').screenshot({ path: `test-results/home-habits-${language.toLowerCase()}.png` });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath(`home-habits-${language.toLowerCase()}.png`) });
   const beforeReset = await tabIds();
   await ui.getByRole('button', { name: chinese ? '设置' : 'Settings', exact: true }).click();
   await ui.getByRole('button', { name: chinese ? '重置搜索排序' : 'Reset Ranking', exact: true }).click();
@@ -804,8 +911,11 @@ for (const language of ['Chinese', 'English']) test(`${language} home commands l
   await expect.poll(commandIds).toEqual(defaultCommands);
   expect(await tabIds()).toEqual(beforeReset);
 });
+});
 
-for (const language of ['Chinese', 'English']) test(`${language} quiet layout exposes Ctrl P N navigation in results and actions at narrow widths`, async () => {
+for (const language of ['Chinese', 'English']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
+  test(`${language} quiet layout exposes Ctrl P N navigation in results and actions at narrow widths`, async () => {
   const chinese = language === 'Chinese';
   const page = await context.newPage(); await page.goto(`${origin}/Navigation-fixture`);
   await ui.bringToFront();
@@ -850,7 +960,7 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await input.fill('');
   for (const theme of ['light', 'dark'] as const) {
     await ui.emulateMedia({ colorScheme: theme });
-    await ui.locator('.palette').screenshot({ path: `test-results/quiet-${language.toLowerCase()}-${theme}.png` });
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-${theme}.png`) });
   }
   await ui.setViewportSize({ width: 390, height: 600 });
   await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
@@ -862,7 +972,8 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   expect(locationBox!.x + locationBox!.width).toBeLessThanOrEqual(actionsBox!.x);
   await input.press('Control+n');
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
-  await ui.locator('.palette').screenshot({ path: `test-results/quiet-${language.toLowerCase()}-narrow.png` });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-narrow.png`) });
+});
 });
 
 async function openStorageOverlay(page: Page) {
@@ -877,7 +988,9 @@ async function openStorageOverlay(page: Page) {
   return surface;
 }
 
-for (const language of ['English', 'Chinese']) test(`${language} storage and Tab Group layers preserve main palette geometry`, async () => {
+for (const language of ['English', 'Chinese']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN', pageAccess: true, shadow: 'open' } });
+  test(`${language} storage and Tab Group layers preserve main palette geometry`, async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Layout-host`);
   await page.evaluate(() => { localStorage.setItem('layout.key', 'preview value'); });
   await worker.evaluate(async origin => {
@@ -914,7 +1027,7 @@ for (const language of ['English', 'Chinese']) test(`${language} storage and Tab
     await root.fill('local storage');
     await expect(surface.getByRole('option').first()).toBeVisible();
     const main = await geometry();
-    await surface.locator('.palette-footer').screenshot({ path: `test-results/footer-main-${language}-${size.width}x${size.height}.png` });
+    await surface.locator('.palette-footer').screenshot({ path: test.info().outputPath(`footer-main-${language}-${size.width}x${size.height}.png`) });
     expect(main.footer.height).toBe(44);
     expect(main.search.height).toBe(56);
     expect(main.row.height).toBe(40);
@@ -922,7 +1035,7 @@ for (const language of ['English', 'Chinese']) test(`${language} storage and Tab
     await root.press('Enter');
     await expect(surface.locator('.storage-row')).toHaveCount(1);
     const storage = await geometry();
-    await surface.locator('.palette-footer').screenshot({ path: `test-results/footer-storage-${language}-${size.width}x${size.height}.png` });
+    await surface.locator('.palette-footer').screenshot({ path: test.info().outputPath(`footer-storage-${language}-${size.width}x${size.height}.png`) });
     for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(storage[key]).toEqual(main[key]);
     expect(storage.input.x).toBe(main.input.x);
     expect(storage.input.y).toBe(main.input.y);
@@ -943,8 +1056,11 @@ for (const language of ['English', 'Chinese']) test(`${language} storage and Tab
     await page.keyboard.press('Escape'); await expect(root).toBeFocused();
   }
 });
+});
 
-for (const language of ['English', 'Chinese']) test(`${language} storage list copies exact values, details, names and restores navigation`, async () => {
+for (const language of ['English', 'Chinese']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN', pageAccess: true, shadow: 'open' } });
+  test(`${language} storage list copies exact values, details, names and restores navigation`, async () => {
   const chinese = language === 'Chinese';
   const page = await context.newPage(); await page.goto(`${origin}/Storage-fixture`);
   const raw = '{"message":"你好\\nworld","enabled":true}';
@@ -985,7 +1101,7 @@ for (const language of ['English', 'Chinese']) test(`${language} storage list co
   await expect(surface.locator('.storage-detail')).toBeFocused();
   await page.keyboard.press('Enter');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(raw);
-  await surface.locator('.palette').screenshot({ path: `test-results/storage-detail-${language}.png` });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`storage-detail-${language}.png`) });
   await page.keyboard.press('Escape');
   await expect(input).toHaveValue('config'); await expect(input).toBeFocused();
   // The footer chevron is the mouse path out of the deepest layer: one click, same as Escape.
@@ -999,13 +1115,13 @@ for (const language of ['English', 'Chinese']) test(`${language} storage list co
   await input.fill('absent'); await expect(surface.locator('.empty')).toContainText(chinese ? '没有找到' : 'No results found');
   await input.fill('');
   await page.emulateMedia({ colorScheme: 'dark' });
-  await surface.locator('.palette').screenshot({ path: `test-results/storage-dark-${language}.png` });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`storage-dark-${language}.png`) });
   await page.emulateMedia({ colorScheme: 'light' });
-  await surface.locator('.palette').screenshot({ path: `test-results/storage-light-${language}.png` });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`storage-light-${language}.png`) });
   await page.setViewportSize({ width: 390, height: 600 });
 
   expect(await surface.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await surface.locator('.palette').screenshot({ path: `test-results/storage-narrow-${language}.png` });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`storage-narrow-${language}.png`) });
   await input.press('Escape');
   await expect(rootInput).toHaveValue('local storage'); await expect(rootInput).toBeFocused();
   // Preserve the source page as Chrome's active tab for the next root command.
@@ -1018,8 +1134,11 @@ for (const language of ['English', 'Chinese']) test(`${language} storage list co
   expect(JSON.stringify(saved)).not.toContain('app.config');
   expect(JSON.stringify(saved)).not.toContain('session-value');
 });
+});
 
-test('English storage cookies expose HttpOnly and same-name paths, refresh, empty and changed-page errors', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English storage cookies expose HttpOnly and same-name paths, refresh, empty and changed-page errors', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Storage/nested`);
   await context.addCookies([
     { name: 'token', value: 'root-token', url: origin, httpOnly: true },
@@ -1033,7 +1152,7 @@ test('English storage cookies expose HttpOnly and same-name paths, refresh, empt
   await page.keyboard.press('Enter'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('root-token');
   await page.keyboard.press('Meta+k'); await surface.locator('.action-search input').fill('details'); await page.keyboard.press('Enter');
   await expect(surface.locator('.cookie-metadata')).toContainText('true / false');
-  await surface.locator('.palette').screenshot({ path: 'test-results/storage-cookie-detail.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('storage-cookie-detail.png') });
   await page.keyboard.press('Escape');
   await context.clearCookies();
   await page.keyboard.press('Meta+k'); await surface.locator('.action-search input').fill('refresh'); await page.keyboard.press('Enter');
@@ -1042,8 +1161,11 @@ test('English storage cookies expose HttpOnly and same-name paths, refresh, empt
   await page.keyboard.press('Meta+k'); await surface.locator('.action-search input').fill('refresh'); await page.keyboard.press('Enter');
   await expect(surface.locator('.storage-error')).toContainText('The page changed');
 });
+});
 
-test('English storage restricted pages show a recoverable explanation', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English storage restricted pages show a recoverable explanation', async () => {
   await ui.locator('.search-bar input').fill('local storage'); await ui.keyboard.press('Enter');
   await expect(ui.locator('.storage-error')).toContainText('HTTP or HTTPS');
   await ui.keyboard.press('Enter');
@@ -1051,8 +1173,11 @@ test('English storage restricted pages show a recoverable explanation', async ()
   await ui.keyboard.press('Escape');
   await expect(ui.locator('.search-bar input')).toBeFocused();
 });
+});
 
-test('English storage long values scroll, refresh preserves query, and session storage stays with the source tab', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English storage long values scroll, refresh preserves query, and session storage stays with the source tab', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Storage-long`);
   const raw = Array.from({ length: 2000 }, (_, i) => `line ${i}: 你好 ☀`).join('\n');
   await page.evaluate(value => { localStorage.setItem('long.value', value); sessionStorage.setItem('source', 'source-session'); }, raw);
@@ -1086,8 +1211,11 @@ test('English storage long values scroll, refresh preserves query, and session s
   await input.press('Escape'); await rootInput.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English closed storage overlay preserves Vimium keyboard isolation through every layer', async () => {
+for (const vimium of [false, true]) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, vimium } });
+  test(`English closed storage overlay preserves ${vimium ? 'Vimium' : 'production'} keyboard isolation through every layer`, async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Closed-storage`);
   await page.evaluate(() => { localStorage.setItem('config', '{"native":true}'); localStorage.setItem('empty', ''); });
   await context.grantPermissions(['clipboard-read']);
@@ -1126,15 +1254,18 @@ test('English closed storage overlay preserves Vimium keyboard isolation through
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await combo())?.name?.value).toBe('Search storage keys');
   await page.setViewportSize({ width: 390, height: 600 });
-  await page.screenshot({ path: 'test-results/storage-closed-vimium.png' });
+  await page.screenshot({ path: test.info().outputPath('storage-closed-vimium.png') });
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await combo())?.name?.value).toBe('Search commands, tabs, and bookmarks');
   await expect.poll(async () => (await combo())?.value?.value).toBe('local storage');
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English cookie authorization handles missing grants, denial, navigation and exact website requests', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English cookie authorization handles missing grants, denial, navigation and exact website requests', async () => {
   const source = await context.newPage(); await source.goto(`${origin}/Cookie-permission`);
   const target = await worker.evaluate(async url => {
     const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
@@ -1169,8 +1300,11 @@ test('English cookie authorization handles missing grants, denial, navigation an
   await expect.poll(() => accepted.isClosed()).toBe(true);
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.some(record => record.target === 'command:cookies') || false)).toBe(false);
 });
+});
 
-test('English storage cookie domains include parent, Secure, ordinary and current-partition cookies only', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', cookieDomains: true } });
+  test('English storage cookie domains include parent, Secure, ordinary and current-partition cookies only', async () => {
   const site = 'https://app.example.test/nested';
   await context.route('https://app.example.test/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Cookie domains fixture</title>' }));
   const source = await context.newPage(); await source.goto(site);
@@ -1189,8 +1323,11 @@ test('English storage cookie domains include parent, Secure, ordinary and curren
   expect(reply.data.entries.find((entry: { name: string }) => entry.name === 'parent').cookie.httpOnly).toBe(true);
   expect(reply.data.entries.find((entry: { name: string }) => entry.name === 'partitioned').cookie.partitionKey.topLevelSite).toBe('https://example.test');
 });
+});
 
-test('English cookie native permission request accepts the production manifest patterns', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English cookie native permission request accepts the production manifest patterns', async () => {
   // Exercise Chrome itself: two separate scheme declarations do not authorize a
   // wildcard-scheme request, even though they appear to cover the same URLs.
   const result = await ui.evaluate(() => Promise.race([
@@ -1198,6 +1335,7 @@ test('English cookie native permission request accepts the production manifest p
     new Promise<{ pending: true }>(resolve => setTimeout(() => resolve({ pending: true }), 750)),
   ]));
   expect(result).not.toHaveProperty('error');
+});
 });
 
 // A separate Chrome window stays focused while source-window tabs change.
@@ -1223,7 +1361,9 @@ async function recentPopup(source: Page, direction = 1) {
   return { target, own: own!, page, read, key, selected: () => read("document.querySelector('[aria-selected=true]')?.id"), closed: async () => page.isClosed(), active };
 }
 
-test('English recent switcher keeps the source active while selecting and switches only on release', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English recent switcher keeps the source active while selecting and switches only on release', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
   const c = await context.newPage(); await c.goto(`${origin}/Recent-C`);
@@ -1249,8 +1389,11 @@ test('English recent switcher keeps the source active while selecting and switch
   expect(await popup.active()).toBe(Number(order[1].replace('recent-', '')));
   await expect.poll(() => worker.evaluate(async () => (await chrome.windows.getLastFocused()).id)).toBe(popup.target.windowId);
 });
+});
 
-test('English recent switcher keeps search disabled and neutral during ordinary typing and navigation', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English recent switcher keeps search disabled and neutral during ordinary typing and navigation', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
   const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
   const popup = await recentPopup(a);
@@ -1283,9 +1426,12 @@ test('English recent switcher keeps search disabled and neutral during ordinary 
   await popup.key('keyDown', 'Escape', 'Escape', 27);
   await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(popup.target.id);
 });
+});
 
 for (const confirm of ['Enter', 'row', 'footer'] as const) {
-  test(`English recent switcher search filters visible targets and confirms with ${confirm}`, async () => {
+  test.describe(() => {
+    test.use({ environment: { ...defaults, locale: 'en-US' } });
+    test(`English recent switcher search filters visible targets and confirms with ${confirm}`, async () => {
     const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
     const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
     const c = await context.newPage(); await c.goto(`${origin}/Filter-Two`);
@@ -1313,9 +1459,12 @@ for (const confirm of ['Enter', 'row', 'footer'] as const) {
     await expect.poll(popup.closed).toBe(true);
     expect(await popup.active()).toBe(target);
   });
+  });
 }
 
-for (const method of ['wrapper', 'icon', 'Control+f', 'Meta+f'] as const) test(`English recent switcher search accepts ordinary typing after ${method} and modifier release`, async () => {
+for (const method of ['wrapper', 'icon', 'Control+f', 'Meta+f'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test(`English recent switcher search accepts ordinary typing after ${method} and modifier release`, async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
   const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
   const popup = await recentPopup(a);
@@ -1345,8 +1494,11 @@ for (const method of ['wrapper', 'icon', 'Control+f', 'Meta+f'] as const) test(`
   await popup.key('keyDown', 'Enter', 'Enter', 13);
   await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(target);
 });
+});
 
-test('English recent switcher search handles empty results, composition and removed filtered selection safely', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English recent switcher search handles empty results, composition and removed filtered selection safely', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Search-Source`);
   const b = await context.newPage(); await b.goto(`${origin}/Filter-One`);
   const c = await context.newPage(); await c.goto(`${origin}/Filter-Two`);
@@ -1397,8 +1549,11 @@ test('English recent switcher search handles empty results, composition and remo
   await popup.page.locator('.primary-action').click();
   await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(remaining);
 });
+});
 
-test('English recent switcher missed release keeps the original tab and Enter confirms the reverse selection', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English recent switcher missed release keeps the original tab and Enter confirms the reverse selection', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
   const popup = await recentPopup(a, -1);
@@ -1409,6 +1564,7 @@ test('English recent switcher missed release keeps the original tab and Enter co
   await popup.key('keyDown', 'Enter', 'Enter', 13);
   await expect.poll(popup.closed).toBe(true);
   expect(await popup.active()).toBe(Number(order.at(-1)!.replace('recent-', '')));
+});
 });
 
 test('Chinese recent switcher Escape and focus loss cancel without switching or stealing focus', async () => {
@@ -1427,7 +1583,9 @@ test('Chinese recent switcher Escape and focus loss cancel without switching or 
   expect(await worker.evaluate(async () => (await chrome.windows.getLastFocused()).id)).toBe(other!.id);
 });
 
-test('English recent switcher removes closed or moved candidates without activating another window', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English recent switcher removes closed or moved candidates without activating another window', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
   const c = await context.newPage(); await c.goto(`${origin}/Recent-C`);
@@ -1449,8 +1607,11 @@ test('English recent switcher removes closed or moved candidates without activat
   await expect.poll(popup.closed).toBe(true);
   expect(await popup.active()).toBe(finalId);
 });
+});
 
-test('English recent switcher rapid navigation then release preserves the final selection', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English recent switcher rapid navigation then release preserves the final selection', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
   const popup = await recentPopup(a);
@@ -1460,8 +1621,11 @@ test('English recent switcher rapid navigation then release preserves the final 
   await expect.poll(popup.closed).toBe(true);
   expect(await popup.active()).toBe(Number(order[10 % order.length].replace('recent-', '')));
 });
+});
 
-test('English recent switcher closes when source window closes and never changes toolbar popup', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English recent switcher closes when source window closes and never changes toolbar popup', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
   const popup = await recentPopup(a);
@@ -1469,13 +1633,17 @@ test('English recent switcher closes when source window closes and never changes
   await worker.evaluate(id => chrome.windows.remove(id), popup.target.windowId);
   await expect.poll(popup.closed).toBe(true);
 });
+});
 
- test('English recent switcher cancels when its original tab is closed', async () => {
+ test.describe(() => {
+   test.use({ environment: { ...defaults, locale: 'en-US' } });
+   test('English recent switcher cancels when its original tab is closed', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
   const popup = await recentPopup(a);
   await worker.evaluate(id => chrome.tabs.remove(id), popup.target.id);
   await expect.poll(popup.closed).toBe(true);
+ });
  });
 
 async function bridgeFixture() {
@@ -1493,7 +1661,9 @@ async function bridgeFixture() {
   return { a, b, ids, open, active, windows };
 }
 
-test('English recent bridge accepts a quick tap released before the command handler starts', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge accepts a quick tap released before the command handler starts', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control');
   await f.a.keyboard.up('Control');
@@ -1507,8 +1677,11 @@ test('English recent bridge accepts a quick tap released before the command hand
   await f.open();
   await expect.poll(f.active).toBe(f.ids.source);
 });
+});
 
-test('English recent bridge buffers release while the independent window is loading', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge buffers release while the independent window is loading', async () => {
   const f = await bridgeFixture();
   let resume!: () => void;
   const gate = new Promise<void>(resolve => { resume = resolve; });
@@ -1523,8 +1696,11 @@ test('English recent bridge buffers release while the independent window is load
   await expect.poll(f.active).toBe(f.ids.previous);
   await expect.poll(() => popup.isClosed()).toBe(true);
 });
+});
 
-test('English recent bridge hands held Control to the window for navigation and release', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge hands held Control to the window for navigation and release', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control');
   const created = context.waitForEvent('page');
@@ -1547,8 +1723,11 @@ test('English recent bridge hands held Control to the window for navigation and 
   await expect.poll(f.active).toBe(Number(selected!.replace('recent-', '')));
   await expect.poll(() => next.isClosed()).toBe(true);
 });
+});
 
-test('English recent bridge Escape cancels the independent switcher during asynchronous startup', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge Escape cancels the independent switcher during asynchronous startup', async () => {
   const f = await bridgeFixture();
   const script = await readFile(resolve('dist/switcher.js'), 'utf8');
   await context.route('**/switcher.js', async route => {
@@ -1564,8 +1743,11 @@ test('English recent bridge Escape cancels the independent switcher during async
   await expect.poll(() => popup.isClosed()).toBe(true);
   expect(await f.active()).toBe(f.ids.source);
 });
+});
 
-test('English recent bridge replays paging, jumps and command steps in order after asynchronous startup', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge replays paging, jumps and command steps in order after asynchronous startup', async () => {
   const f = await bridgeFixture();
   await worker.evaluate(async ({ windowId, base }) => {
     for (let at = 0; at < 20; at++) await chrome.tabs.create({ windowId, url: `${base}/Startup-${at}`, active: false });
@@ -1602,8 +1784,11 @@ test('English recent bridge replays paging, jumps and command steps in order aft
   await expect.poll(() => popup.isClosed()).toBe(true);
   await expect.poll(f.active).toBe(Number(target!.replace('recent-', '')));
 });
+});
 
-test('English recent bridge search during asynchronous startup supersedes buffered release', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge search during asynchronous startup supersedes buffered release', async () => {
   const f = await bridgeFixture();
   const script = await readFile(resolve('dist/switcher.js'), 'utf8');
   await context.route('**/switcher.js', async route => {
@@ -1627,8 +1812,11 @@ test('English recent bridge search during asynchronous startup supersedes buffer
   await popup.locator('.primary-action').click();
   await expect.poll(() => popup.isClosed()).toBe(true); await expect.poll(f.active).toBe(f.ids.previous);
 });
+});
 
-test('English recent bridge cancels when focus is lost before the window becomes ready', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge cancels when focus is lost before the window becomes ready', async () => {
   const f = await bridgeFixture();
   let resume!: () => void;
   const gate = new Promise<void>(resolve => { resume = resolve; });
@@ -1641,8 +1829,11 @@ test('English recent bridge cancels when focus is lost before the window becomes
   expect(await f.active()).toBe(f.ids.source);
   expect(await worker.evaluate(async () => (await chrome.windows.getLastFocused()).id)).toBe(other!.id);
 });
+});
 
-test('English recent bridge ignores synthetic page releases and leaves typing unchanged', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge ignores synthetic page releases and leaves typing unchanged', async () => {
   const f = await bridgeFixture();
   const input = f.a.getByRole('textbox');
   await input.fill('ordinary text');
@@ -1655,8 +1846,11 @@ test('English recent bridge ignores synthetic page releases and leaves typing un
   await expect.poll(() => popup.isClosed()).toBe(true);
   await expect(input).toHaveValue('ordinary text');
 });
+});
 
-test('English recent bridge catches a quick release inside a focused child frame', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge catches a quick release inside a focused child frame', async () => {
   const f = await bridgeFixture();
   await f.a.evaluate(url => { const frame = document.createElement('iframe'); frame.src = url; document.body.append(frame); }, `${origin}/Child-frame`);
   const input = f.a.frameLocator('iframe').getByRole('textbox');
@@ -1666,8 +1860,11 @@ test('English recent bridge catches a quick release inside a focused child frame
   await expect.poll(f.active).toBe(f.ids.previous);
   expect(await f.windows()).toBe(0);
 });
+});
 
-test('English recent bridge does not infer release on pages without an injected listener', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge does not infer release on pages without an injected listener', async () => {
   const f = await bridgeFixture();
   await f.a.goto('about:blank');
   const created = context.waitForEvent('page'); await f.open(); const popup = await created;
@@ -1677,8 +1874,11 @@ test('English recent bridge does not infer release on pages without an injected 
   await expect.poll(() => popup.isClosed()).toBe(true);
   expect(await f.active()).toBe(f.ids.source);
 });
+});
 
-test('English recent bridge preserves repeated command steps during delayed window startup', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge preserves repeated command steps during delayed window startup', async () => {
   const f = await bridgeFixture();
   let resume!: () => void;
   const gate = new Promise<void>(resolve => { resume = resolve; });
@@ -1695,8 +1895,11 @@ test('English recent bridge preserves repeated command steps during delayed wind
   await expect.poll(f.active).toBe(order[3 % order.length]);
   await expect.poll(() => popup.isClosed()).toBe(true);
 });
+});
 
-test('English recent bridge closes a loading popup when its source window is removed', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English recent bridge closes a loading popup when its source window is removed', async () => {
   const f = await bridgeFixture();
   let resume!: () => void;
   const gate = new Promise<void>(resolve => { resume = resolve; });
@@ -1707,8 +1910,11 @@ test('English recent bridge closes a loading popup when its source window is rem
   resume();
   await expect.poll(f.windows).toBe(0);
 });
+});
 
-test('English script library saves edits searches copies and deletes without executing code', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English script library saves edits searches copies and deletes without executing code', async () => {
   await context.grantPermissions(['clipboard-read']);
   const code = 'globalThis.__zingSavedScriptExecuted = true;\nconst text = "<script> & Unicode 中文";\n\n';
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -1746,8 +1952,11 @@ test('English script library saves edits searches copies and deletes without exe
   await expect(ui.getByRole('button', { name: 'Storage helper renamed Edit Script' })).toHaveCount(0);
   expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')))).toEqual([]);
 });
+});
 
-test('English script binding guide copies this installation ID and opens Chrome shortcuts', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English script binding guide copies this installation ID and opens Chrome shortcuts', async () => {
   await context.grantPermissions(['clipboard-read']);
   const before = await worker.evaluate(() => chrome.commands.getAll());
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -1768,10 +1977,11 @@ test('English script binding guide copies this installation ID and opens Chrome 
   await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   expect(await ui.locator('.settings-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await ui.getByRole('button', { name: 'Copy Code', exact: true }).scrollIntoViewIfNeeded();
-  await ui.locator('.palette').screenshot({ path: 'test-results/script-binding-guide.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('script-binding-guide.png') });
   const created = context.waitForEvent('page');
   await ui.getByRole('button', { name: 'Open Chrome Shortcuts' }).click();
   await expect(await created).toHaveURL('chrome://extensions/shortcuts');
+});
 });
 
 test('Chinese script library supports keyboard editing and nested Escape', async () => {
@@ -1798,7 +2008,9 @@ test('Chinese script library supports keyboard editing and nested Escape', async
   await expect(ui.getByRole('combobox', { name: '搜索命令、标签页和书签' })).toBeFocused();
 });
 
-test('English script overlay copies from unified search inside the closed keyboard frame', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true } });
+  test('English script overlay copies from unified search inside the closed keyboard frame', async () => {
   await context.grantPermissions(['clipboard-read']);
   const page = await context.newPage(); await page.goto(`${origin}/Script-overlay`);
   const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
@@ -1819,8 +2031,11 @@ test('English script overlay copies from unified search inside the closed keyboa
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English script actions edit in place, preserve selection and caret, and confirm deletion', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English script actions edit in place, preserve selection and caret, and confirm deletion', async () => {
   await context.grantPermissions(['clipboard-read']);
   const code = 'const value = "中文";\n\n';
   await worker.evaluate(async code => chrome.storage.local.set({
@@ -1878,7 +2093,8 @@ test('English script actions edit in place, preserve selection and caret, and co
   await ui.reload(); await search.fill('Action');
   await expect(ui.locator('.result.script')).toHaveCount(1);
   await ui.keyboard.press('Meta+k');
-  await ui.locator('.palette').screenshot({ path: '/tmp/zing-script-actions.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-script-actions.png') });
+});
 });
 
 test('Chinese script actions protect built-in setup and return directly to search', async () => {
@@ -1894,7 +2110,9 @@ test('Chinese script actions protect built-in setup and return directly to searc
   await expect(search).toBeFocused(); await expect(search).toHaveValue('ctrl tab');
 });
 
-test('English script overlay actions edit and delete through the closed keyboard frame', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true } });
+  test('English script overlay actions edit and delete through the closed keyboard frame', async () => {
   await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:overlay-menu': { title: 'Overlay helper', code: '42;' } }));
   const page = await context.newPage(); await page.goto(`${origin}/Script-menu-overlay`);
   const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
@@ -1932,8 +2150,11 @@ test('English script overlay actions edit and delete through the closed keyboard
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English command discovery completes the script lifecycle entirely from search and keyboard', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English command discovery completes the script lifecycle entirely from search and keyboard', async () => {
   await context.grantPermissions(['clipboard-read']);
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('new script');
@@ -1968,6 +2189,7 @@ test('English command discovery completes the script lifecycle entirely from sea
   await ui.keyboard.type('Unsaved'); await ui.keyboard.press('Escape');
   await expect(search).toBeFocused();
   expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')))).toEqual([]);
+});
 });
 
 test('Chinese command discovery opens each preference at its keyboard control', async () => {
@@ -2015,7 +2237,9 @@ async function scriptExecutionFixture(code: string, enable = true) {
   return { page, surface, tabId };
 }
 
-test('English script execution storage overlay runs once, copies exact results and restores search', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English script execution storage overlay runs once, copies exact results and restores search', async () => {
   await context.grantPermissions(['clipboard-read']);
   const { page, surface } = await scriptExecutionFixture('localStorage.setItem("runs", String(Number(localStorage.getItem("runs") || 0) + 1)); localStorage.getItem("demo")');
   const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
@@ -2030,8 +2254,11 @@ test('English script execution storage overlay runs once, copies exact results a
   await page.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('Execution helper');
   expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => /result|execution/i.test(key)))).toEqual([]);
 });
+});
 
-test('English script execution storage searches the run command and handles async objects and errors', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English script execution storage searches the run command and handles async objects and errors', async () => {
   const { page, surface } = await scriptExecutionFixture('Promise.resolve({ answer: 42, markup: "<script>not HTML</script>" })');
   const search = surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('run script'); await page.keyboard.press('Enter');
@@ -2044,10 +2271,13 @@ test('English script execution storage searches the run command and handles asyn
   await search.fill('Execution helper'); await page.keyboard.press('Enter');
   await expect(surface.getByLabel('Result', { exact: true })).toHaveValue('Error: Expected failure');
   await expect(surface.getByRole('button', { name: 'Copy Result', exact: true })).toHaveCount(0);
-  await surface.locator('.palette').screenshot({ path: '/tmp/zing-script-run-error.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-script-run-error.png') });
+});
 });
 
-test('English script execution storage explains disabled permission and never runs before enabling', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English script execution storage explains disabled permission and never runs before enabling', async () => {
   const { page, surface } = await scriptExecutionFixture('localStorage.setItem("ran", "yes"); 42', false);
   await surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' }).fill('Execution helper'); await page.keyboard.press('Enter');
   await expect(surface.getByRole('alert')).toContainText('Enable user scripts');
@@ -2056,8 +2286,11 @@ test('English script execution storage explains disabled permission and never ru
   const created = context.waitForEvent('page'); await surface.getByRole('button', { name: 'Open Extension Details' }).click();
   const detail = await created; await expect(detail).toHaveURL(`chrome://extensions/?id=${new URL(worker.url()).hostname}`);
 });
+});
 
-test('English script execution storage leaves the clipboard alone after returning from a pending run', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English script execution storage leaves the clipboard alone after returning from a pending run', async () => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const { page, surface } = await scriptExecutionFixture('new Promise(resolve => setTimeout(() => { localStorage.setItem("done", "yes"); resolve("late result"); }, 700))');
   await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
@@ -2069,8 +2302,11 @@ test('English script execution storage leaves the clipboard alone after returnin
   await expect.poll(() => page.evaluate(() => localStorage.getItem('done'))).toBe('yes');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('unchanged');
 });
+});
 
-test('English script execution refuses a Chrome internal page and keeps built-in setup copy-only', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English script execution refuses a Chrome internal page and keeps built-in setup copy-only', async () => {
   await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:runner': { title: 'Execution helper', code: '42' } }));
   await ui.getByRole('combobox').fill('Execution helper'); await ui.keyboard.press('Enter');
   await expect(ui.getByRole('alert')).toContainText('ordinary HTTP or HTTPS');
@@ -2079,8 +2315,11 @@ test('English script execution refuses a Chrome internal page and keeps built-in
   await expect(ui.locator('.action-row')).toHaveCount(2);
   await expect(ui.locator('.action-row')).toContainText(['Copy Code', 'View Setup Instructions']);
 });
+});
 
-test('English script save stays visible without scrolling the editor', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English script save stays visible without scrolling the editor', async () => {
   await ui.setViewportSize({ width: 750, height: 516 });
   await ui.getByRole('combobox').fill('new script');
   await ui.keyboard.press('Enter');
@@ -2088,13 +2327,16 @@ test('English script save stays visible without scrolling the editor', async () 
   await ui.getByLabel('Name', { exact: true }).fill('Visible save regression');
   await ui.getByLabel('JavaScript code').fill('localStorage.getItem("demo")');
   await expect(ui.getByRole('button', { name: 'Save', exact: true })).toBeInViewport({ ratio: 1 });
-  await ui.screenshot({ path: '/tmp/zing-save-visible.png' });
+  await ui.screenshot({ path: test.info().outputPath('zing-save-visible.png') });
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(ui.getByRole('combobox')).toHaveValue('new script');
   expect(await worker.evaluate(async () => Object.values(await chrome.storage.local.get(null)).some((value: any) => value?.title === 'Visible save regression'))).toBe(true);
 });
+});
 
-test('Chinese script save storage overlay remains visible in a short viewport and enlarged editor', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, pageAccess: true, shadow: 'open' } });
+  test('Chinese script save storage overlay remains visible in a short viewport and enlarged editor', async () => {
   const page = await context.newPage();
   await page.setViewportSize({ width: 390, height: 400 });
   await page.goto(`${origin}/Script-save-short`);
@@ -2117,14 +2359,17 @@ test('Chinese script save storage overlay remains visible in a short viewport an
   await expect(save).toBeInViewport({ ratio: 1 });
   await surface.locator('.settings-body').evaluate(el => { el.scrollTop = el.scrollHeight; });
   await expect(save).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: '/tmp/zing-save-short.png' });
+  await page.screenshot({ path: test.info().outputPath('zing-save-short.png') });
   await save.click();
   await expect(surface.getByRole('combobox')).toHaveValue('新建脚本');
   expect(await worker.evaluate(async () => Object.values(await chrome.storage.local.get(null)).some((value: any) => value?.title === '短窗口验收' && value?.code === '42'))).toBe(true);
 });
+});
 
 
-test('English palette launch storage overlay opens centered on a fresh ordinary page', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette launch storage overlay opens centered on a fresh ordinary page', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Fresh-launch`);
   // The ordinary page already has the lightweight recent-key listener, but not the palette.
   const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
@@ -2157,8 +2402,11 @@ test('English palette launch storage overlay opens centered on a fresh ordinary 
   await expect(page.locator('#zing-command-palette')).toBeAttached();
   expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), id)).toBe('');
 });
+});
 
-test('English script editor shares the footer and action menu while preserving code editing', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English script editor shares the footer and action menu while preserving code editing', async () => {
   await context.grantPermissions(['clipboard-read']);
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await expect(ui.locator('.palette-footer .actions-button')).toBeVisible();
@@ -2197,11 +2445,14 @@ test('English script editor shares the footer and action menu while preserving c
   await expect(ui.getByRole('alertdialog').getByRole('button', { name: 'Cancel' })).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(name).toBeFocused();
   await expect(name).toHaveValue('Shared actions updated');
-  await ui.locator('.palette').screenshot({ path: '/tmp/zing-shared-editor.png' });
-  await ui.keyboard.press('Meta+k'); await ui.locator('.palette').screenshot({ path: '/tmp/zing-shared-editor-menu.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-shared-editor.png') });
+  await ui.keyboard.press('Meta+k'); await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-shared-editor-menu.png') });
+});
 });
 
-test('English palette launch overlay Escape returns one level from script management', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
+  test('English palette launch overlay Escape returns one level from script management', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Escape-management`);
   const open = () => worker.evaluate(async () => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
@@ -2246,8 +2497,11 @@ test('English palette launch overlay Escape returns one level from script manage
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English palette launch storage overlay Escape returns after clicking non-focusable content', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette launch storage overlay Escape returns after clicking non-focusable content', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Escape-content`);
   await worker.evaluate(async () => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
@@ -2287,8 +2541,11 @@ test('English palette launch storage overlay Escape returns after clicking non-f
   await search.fill('no-such-command'); await surface.getByText('No results found', { exact: true }).click();
   await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English Escape routing survives lost control focus through every script and settings layer', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English Escape routing survives lost control focus through every script and settings layer', async () => {
   await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:escape-fixture': { title: 'Escape fixture', code: 'return "fixture";' } }));
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   const escapeWithoutControlFocus = async () => {
@@ -2330,8 +2587,11 @@ test('English Escape routing survives lost control focus through every script an
   await escapeWithoutControlFocus(); await expect(scripts).toBeFocused();
   await escapeWithoutControlFocus(); await expect(search).toBeFocused();
 });
+});
 
-test('English palette launch storage overlay Escape routes from the document through storage layers', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette launch storage overlay Escape routes from the document through storage layers', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Escape-storage-layers`);
   await page.evaluate(() => { localStorage.setItem('fixture', '{"hello":"world"}'); sessionStorage.setItem('fixture', 'session'); });
   const open = () => worker.evaluate(async () => {
@@ -2375,8 +2635,11 @@ test('English palette launch storage overlay Escape routes from the document thr
   await escape(); await expect(search).toBeFocused();
   await escape(); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English Escape returns from pending and completed script results without stale updates', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English Escape returns from pending and completed script results without stale updates', async () => {
   await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:pending-fixture': { title: 'Pending fixture', code: '42' } }));
   // Defer only execution transport in this isolated popup to control completion
   // order. Navigation, selection and rendering use the production components.
@@ -2401,8 +2664,11 @@ test('English Escape returns from pending and completed script results without s
   await ui.keyboard.press('Escape'); await expect(picker).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
 });
+});
 
-test('English Backspace returns from empty searches while preserving text editing and the root', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English Backspace returns from empty searches while preserving text editing and the root', async () => {
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
   await search.fill('settings'); await search.press('Enter');
   await ui.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
@@ -2434,8 +2700,11 @@ test('English Backspace returns from empty searches while preserving text editin
   await search.press('Meta+k'); await ui.keyboard.press('Backspace');
   await expect(search).toBeFocused();
 });
+});
 
-test('English palette launch overlay Backspace respects fields inside the closed keyboard frame', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
+  test('English palette launch overlay Backspace respects fields inside the closed keyboard frame', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Backspace-navigation`);
   await page.evaluate(() => localStorage.setItem('fixture', '{"value":42}'));
   await worker.evaluate(async () => {
@@ -2478,8 +2747,11 @@ test('English palette launch overlay Backspace respects fields inside the closed
   await expect.poll(() => focused('Search commands, tabs, and bookmarks')).toBe(true);
   await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-for (const language of ['English', 'Chinese']) test(`${language} categorized candidates show real shortcuts and keep search matching and save binding`, async () => {
+for (const language of ['English', 'Chinese']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
+  test(`${language} categorized candidates show real shortcuts and keep search matching and save binding`, async () => {
   const en = language === 'English';
   const search = ui.locator('.search-bar input');
   await search.fill('script:new');
@@ -2512,11 +2784,14 @@ for (const language of ['English', 'Chinese']) test(`${language} categorized can
     const row = ui.locator('#zing-command\\:newTab');
     await expect(row.locator('.entry-shortcut')).toBeInViewport();
     expect(await ui.locator('.palette').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-    await ui.locator('.palette').screenshot({ path: `/tmp/zing-categories-${language}-${theme}.png` });
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`zing-categories-${language}-${theme}.png`) });
   }
 });
+});
 
-test('English palette launch storage overlay native favicons render cached website icons and fall back on errors', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette launch storage overlay native favicons render cached website icons and fall back on errors', async () => {
   const website = await context.newPage(); await website.goto(`${origin}/Favicon-site`);
   await expect.poll(() => worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)?.favIconUrl || '', website.url())).toContain('/fixture-icon.png');
   await worker.evaluate(url => chrome.bookmarks.create({ title: 'Favicon bookmark', url }), website.url());
@@ -2539,7 +2814,7 @@ test('English palette launch storage overlay native favicons render cached websi
   const search = surface.locator('.search-bar input'); await search.fill('Favicon site');
   const icon = surface.locator('.result.tab img.entry-favicon.loaded').first();
   await expect(icon).toBeVisible();
-  await surface.locator('.palette').screenshot({ path: '/tmp/zing-favicon-overlay.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-favicon-overlay.png') });
   // A real image failure must leave a type icon, never a broken-image glyph.
   await icon.evaluate((img: HTMLImageElement) => { img.src = img.src.replace('/_favicon/', '/missing-icon.png'); });
   await expect(surface.locator('.result.tab img')).toHaveCount(0);
@@ -2549,8 +2824,11 @@ test('English palette launch storage overlay native favicons render cached websi
   await search.fill('settings'); await search.press('Meta+,');
   await expect(surface.locator('.settings-header h1')).toHaveText('Settings');
 });
+});
 
-test('English performance repeated openings reuse bookmarks and observe bookmark edits', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English performance repeated openings reuse bookmarks and observe bookmark edits', async () => {
   await worker.evaluate(() => {
     const scope = globalThis as unknown as { __bookmarkReads: number };
     scope.__bookmarkReads = 0;
@@ -2576,8 +2854,11 @@ test('English performance repeated openings reuse bookmarks and observe bookmark
   await worker.evaluate(id => chrome.bookmarks.remove(id), bookmark.id);
   await expect(ui.locator('.result.bookmark')).toHaveCount(0);
 });
+});
 
-test('English performance switching acknowledges before slow usage persistence completes', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English performance switching acknowledges before slow usage persistence completes', async () => {
   const target = await context.newPage(); await target.goto(`${origin}/Switch-speed-fixture`);
   await ui.bringToFront();
   await ui.locator('.search-bar input').fill('Switch speed fixture');
@@ -2604,8 +2885,11 @@ test('English performance switching acknowledges before slow usage persistence c
   await worker.evaluate(() => (globalThis as unknown as { __releaseUsage: () => void }).__releaseUsage());
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('searchUsage')).searchUsage as { query: string }[] | undefined)?.some(record => record.query === 'switch speed fixture'))).toBe(true);
 });
+});
 
-test('English performance palette launch storage overlay opens and searches a large bookmark library', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English performance palette launch storage overlay opens and searches a large bookmark library', async () => {
   await worker.evaluate(async () => {
     const original = chrome.bookmarks.getTree.bind(chrome.bookmarks);
     chrome.bookmarks.getTree = (async () => [...await original(), ...Array.from({ length: 5000 }, (_, i) => ({
@@ -2640,8 +2924,11 @@ test('English performance palette launch storage overlay opens and searches a la
   expect(coldMs).toBeLessThan(1000); expect(warmMs).toBeLessThan(500);
   expect(Math.max(...searchMs)).toBeLessThan(500);
 });
+});
 
-test('English performance recent bridge reuses the prepared tabs instead of querying again', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English performance recent bridge reuses the prepared tabs instead of querying again', async () => {
   const code = await readFile(resolve('dist/switcher.js'), 'utf8');
   await context.route('**/switcher.js', route => route.fulfill({ contentType: 'text/javascript', body: `
     globalThis.__switchQueries = 0;
@@ -2668,9 +2955,12 @@ test('English performance recent bridge reuses the prepared tabs instead of quer
   await expect.poll(f.active).toBe(Number(selected!.replace('recent-', '')));
   await expect.poll(() => popup.isClosed()).toBe(true);
 });
+});
 
 for (const scenario of ['fast', 'slow', 'failure and retry']) {
-  test(`English delayed loading ${scenario}`, async () => {
+  test.describe(() => {
+    test.use({ environment: { ...defaults, locale: 'en-US' } });
+    test(`English delayed loading ${scenario}`, async () => {
     // Control time and the snapshot response separately: no wall-clock thresholds.
     await ui.clock.install();
     await ui.clock.pauseAt(new Date());
@@ -2738,9 +3028,12 @@ for (const scenario of ['fast', 'slow', 'failure and retry']) {
       await expect(ui.locator('.results .spinner')).toHaveCount(0);
     }
   });
+  });
 }
 
-test('English interaction polish script navigation scrolls and returns to the same selection and caret', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English interaction polish script navigation scrolls and returns to the same selection and caret', async () => {
   await worker.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 35 }, (_, i) => [
     `saved-script:polish-${i}`, { title: `Polish ${String(i).padStart(2, '0')}`, code: '42' },
   ]))));
@@ -2766,8 +3059,11 @@ test('English interaction polish script navigation scrolls and returns to the sa
   expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 4]);
   await expect(ui.locator('.script-item.selected')).toContainText('Polish 28');
 });
+});
 
-test('English interaction polish settings choices accept Control navigation without accidental confirmation', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English interaction polish settings choices accept Control navigation without accidental confirmation', async () => {
   await ui.locator('.search-bar input').fill('theme'); await ui.keyboard.press('Enter');
   const theme = ui.getByRole('combobox', { name: 'Theme', exact: true });
   await expect(theme).toBeFocused();
@@ -2780,8 +3076,11 @@ test('English interaction polish settings choices accept Control navigation with
   await theme.press('Enter'); await expect(theme).toHaveAttribute('aria-expanded', 'false');
   await expect(theme).toBeFocused();
 });
+});
 
-test('English interaction polish storage shares menu footer highlighting and focus restoration', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English interaction polish storage shares menu footer highlighting and focus restoration', async () => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const page = await context.newPage(); await page.goto(`${origin}/Interaction-polish`);
   await page.evaluate(() => localStorage.setItem('polish.key', 'value'));
@@ -2814,8 +3113,11 @@ test('English interaction polish storage shares menu footer highlighting and foc
   await page.setViewportSize({ width: 390, height: 600 });
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
 });
+});
 
-test('English interaction polish storage script picker ignores modified Enter before execution', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English interaction polish storage script picker ignores modified Enter before execution', async () => {
   const { page, surface } = await scriptExecutionFixture('42', false);
   await surface.locator('.search-bar input').fill('run script'); await page.keyboard.press('Enter');
   const search = surface.getByRole('textbox', { name: 'Search scripts' });
@@ -2827,8 +3129,11 @@ test('English interaction polish storage script picker ignores modified Enter be
   await search.press('Enter');
   await expect(surface.getByRole('alert')).toContainText('Enable user scripts');
 });
+});
 
-test('English result footer storage overlay copies reruns and restores output selection through the shared menu', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English result footer storage overlay copies reruns and restores output selection through the shared menu', async () => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const { page, surface } = await scriptExecutionFixture('localStorage.setItem("runs", String(Number(localStorage.getItem("runs") || 0) + 1)); "Exact result\\n\\n"');
   const search = surface.locator('.search-bar input');
@@ -2865,9 +3170,10 @@ test('English result footer storage overlay copies reruns and restores output se
   await expect(primary).toBeInViewport();
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   expect(await primary.locator('.primary-label').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await surface.locator('.palette').screenshot({ path: '/tmp/zing-result-footer-narrow.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-result-footer-narrow.png') });
   await primary.click(); expect(await page.evaluate(() => localStorage.getItem('runs'))).toBe('2');
   await page.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('Execution helper');
+});
 });
 
 test('Chinese result footer guards busy and failed runs and supports retry and menu back navigation', async () => {
@@ -2915,7 +3221,7 @@ test('Chinese result footer guards busy and failed runs and supports retry and m
   await ui.setViewportSize({ width: 750, height: 516 });
   await expect(primary).toBeInViewport();
   expect(await primary.locator('.primary-label').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await ui.locator('.palette').screenshot({ path: '/tmp/zing-result-footer-chinese.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-result-footer-chinese.png') });
   await primary.press('Meta+k'); await menu.press('Control+n'); await menu.press('Enter');
   await expect(primary).toBeDisabled();
   await ui.keyboard.press('Escape'); await expect(picker).toBeFocused(); await expect(picker).toHaveValue('Result fixture');
@@ -2923,7 +3229,9 @@ test('Chinese result footer guards busy and failed runs and supports retry and m
   await expect(picker).toBeFocused(); await expect(ui.locator('.script-output')).toHaveCount(0);
 });
 
-test('English recent bridge storage overlay shares palette geometry and focuses its capsule only after search activation', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay shares palette geometry and focuses its capsule only after search activation', async () => {
   const f = await bridgeFixture();
   await worker.evaluate(async () => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
@@ -2968,7 +3276,7 @@ test('English recent bridge storage overlay shares palette geometry and focuses 
   await expect(surface.locator('.secondary-action')).toHaveText('Cancelesc');
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
-  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-shared-footer.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-shared-footer.png') });
   const initial = await surface.locator('[aria-selected=true]').getAttribute('id');
   await f.a.keyboard.press('n');
   expect(await surface.locator('[aria-selected=true]').getAttribute('id')).not.toBe(initial);
@@ -2979,7 +3287,7 @@ test('English recent bridge storage overlay shares palette geometry and focuses 
   await expect(surface.getByRole('combobox')).toBeEnabled();
   await expect(surface.getByRole('combobox')).toBeFocused();
   await expect.poll(searchGeometry).toEqual(mainSearch);
-  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-activated.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-activated.png') });
   await f.a.keyboard.up('Control');
   await expect(surface.getByRole('combobox')).toBeFocused();
   expect(await f.active()).toBe(f.ids.source);
@@ -2987,8 +3295,11 @@ test('English recent bridge storage overlay shares palette geometry and focuses 
   await expect.poll(f.active).toBe(Number(initial!.replace('recent-', '')));
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English recent bridge storage overlay held search activation ignores release and confirms filtered results with Enter', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay held search activation ignores release and confirms filtered results with Enter', async () => {
   const f = await bridgeFixture();
   const extra = await context.newPage(); await extra.goto(`${origin}/Bridge-C`);
   await f.a.bringToFront();
@@ -3011,7 +3322,7 @@ test('English recent bridge storage overlay held search activation ignores relea
   await expect(surface.getByRole('option')).toHaveCount(1);
   await expect(surface.locator('.entry-title mark')).toHaveText(['Bridge', 'C']);
   await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
-  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-filtered.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-filtered.png') });
   const target = Number((await input.getAttribute('aria-activedescendant'))!.replace('recent-', ''));
   await f.a.keyboard.up('Control');
   await expect(input).toBeFocused(); await expect(input).toHaveValue('Bridge C');
@@ -3021,8 +3332,11 @@ test('English recent bridge storage overlay held search activation ignores relea
   await expect.poll(f.active).toBe(target);
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-for (const method of ['wrapper', 'icon', 'keyboard'] as const) test(`English recent bridge storage overlay search accepts typing after ${method} and release`, async () => {
+for (const method of ['wrapper', 'icon', 'keyboard'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test(`English recent bridge storage overlay search accepts typing after ${method} and release`, async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
   const surface = f.a.frameLocator('.zing-frame');
@@ -3044,13 +3358,16 @@ for (const method of ['wrapper', 'icon', 'keyboard'] as const) test(`English rec
   await expect(input).toBeFocused();
   await input.pressSequentially('Bridge-B');
   await expect(surface.getByRole('option')).toHaveCount(1);
-  await surface.locator('.palette').screenshot({ path: `/private/tmp/zing-switcher-search-${method}.png` });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`zing-switcher-search-${method}.png`) });
   await f.a.keyboard.press('Enter');
   await expect.poll(f.active).toBe(f.ids.previous);
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English recent bridge storage overlay search with no matches stays open until a visible choice', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay search with no matches stays open until a visible choice', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
   const surface = f.a.frameLocator('.zing-frame');
@@ -3074,8 +3391,11 @@ test('English recent bridge storage overlay search with no matches stays open un
   await surface.getByRole('option').click();
   await expect.poll(f.active).toBe(f.ids.previous);
 });
+});
 
-test('English recent bridge storage overlay quick taps alternate without creating a window', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay quick taps alternate without creating a window', async () => {
   const f = await bridgeFixture();
   for (let attempt = 0; attempt < 6; attempt++) {
     const page = attempt % 2 ? f.b : f.a;
@@ -3084,6 +3404,7 @@ test('English recent bridge storage overlay quick taps alternate without creatin
     expect(await f.windows()).toBe(0);
     await expect(page.locator('#zing-command-palette')).not.toBeAttached();
   }
+});
 });
 
 async function delayRecentOverlay() {
@@ -3103,7 +3424,9 @@ async function resumeRecentOverlay() {
   await worker.evaluate(() => (globalThis as unknown as { __resumeOverlay: () => void }).__resumeOverlay());
 }
 
-test('English recent bridge storage overlay buffers release and repeated shortcuts while opening', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay buffers release and repeated shortcuts while opening', async () => {
   const f = await bridgeFixture();
   await delayRecentOverlay();
   await f.a.keyboard.down('Control');
@@ -3118,9 +3441,12 @@ test('English recent bridge storage overlay buffers release and repeated shortcu
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
   expect(await f.windows()).toBe(0);
 });
+});
 
 for (const reason of ['Escape', 'outside click', 'another window', 'another tab', 'opening interrupted']) {
-  test(`English recent bridge storage overlay cancels on ${reason} without accepting a tab`, async () => {
+  test.describe(() => {
+    test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+    test(`English recent bridge storage overlay cancels on ${reason} without accepting a tab`, async () => {
     const f = await bridgeFixture();
     await f.a.getByRole('textbox').fill('keep my text'); await f.a.getByRole('textbox').focus();
     if (reason === 'opening interrupted') await delayRecentOverlay();
@@ -3150,9 +3476,12 @@ for (const reason of ['Escape', 'outside click', 'another window', 'another tab'
       expect(await f.active()).toBe(f.ids.source);
     }
   });
+  });
 }
 
-test('English recent bridge storage overlay keeps source selected when a candidate closes', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay keeps source selected when a candidate closes', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
   const surface = f.a.frameLocator('.zing-frame');
@@ -3163,8 +3492,11 @@ test('English recent bridge storage overlay keeps source selected when a candida
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
   expect(await f.active()).toBe(f.ids.source);
 });
+});
 
-test('English recent bridge storage overlay rejects unfocused pages and retains window fallback', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay rejects unfocused pages and retains window fallback', async () => {
   const f = await bridgeFixture();
   await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
     Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
@@ -3177,8 +3509,11 @@ test('English recent bridge storage overlay rejects unfocused pages and retains 
   await popup.keyboard.press('Escape').catch(error => { if (!popup.isClosed()) throw error; });
   await expect.poll(() => popup.isClosed()).toBe(true);
 });
+});
 
-for (const language of ['English', 'Chinese']) test(`${language} recent bridge storage overlay mouse selection and narrow geometry match palette`, async () => {
+for (const language of ['English', 'Chinese']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN', pageAccess: true, shadow: 'open', commands: true } });
+  test(`${language} recent bridge storage overlay mouse selection and narrow geometry match palette`, async () => {
   const f = await bridgeFixture(); await f.a.setViewportSize({ width: 390, height: 440 });
   await f.open();
   const surface = f.a.frameLocator('.zing-frame');
@@ -3204,35 +3539,33 @@ for (const language of ['English', 'Chinese']) test(`${language} recent bridge s
   await expect(surface.locator('.secondary-action')).toBeInViewport({ ratio: 1 });
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await expect.poll(() => surface.locator('.recent-overlay').evaluate(node => getComputedStyle(node).opacity)).toBe('1');
-  await surface.locator('.palette').screenshot({ path: `/private/tmp/zing-switcher-shared-footer-narrow-${language}.png` });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`zing-switcher-shared-footer-narrow-${language}.png`) });
   await surface.getByRole('option').filter({ hasText: 'Bridge B' }).click();
   await expect.poll(f.active).toBe(f.ids.previous);
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English recent bridge storage overlay closes safely when its worker stops', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay closes safely when its worker stops', async () => {
   const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
   await expect(f.a.frameLocator('.zing-frame').getByRole('listbox')).toBeFocused();
   const monitor = await context.newCDPSession(f.a);
   await monitor.send('ServiceWorker.enable'); await monitor.send('ServiceWorker.stopAllWorkers');
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-for (const action of ['header cancel', 'footer cancel', 'search', 'switch'] as const) test(`English recent bridge closed storage overlay Enter belongs to focused ${action} button`, async () => {
+for (const action of ['header cancel', 'footer cancel', 'search', 'switch'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
+  test(`English recent bridge closed storage overlay Enter belongs to focused ${action} button`, async () => {
   const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
   await expect(f.a.locator('#zing-command-palette')).toBeAttached();
   const cdp = await context.newCDPSession(f.a);
-  const { frameTree } = await cdp.send('Page.getFrameTree');
-  const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
   const name = action.includes('cancel') ? 'Cancel' : action === 'search' ? 'Search recent tabs…' : 'Switch';
-  const buttons = async () => (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes.filter(node => node.role?.value === 'button' && node.name?.value === name);
-  await expect.poll(async () => (await buttons()).length).toBe(action.includes('cancel') ? 2 : 1);
-  const node = (await buttons())[action === 'footer cancel' ? 1 : 0];
-  const { object } = await cdp.send('DOM.resolveNode', { backendNodeId: node.backendDOMNodeId });
-  // Focus through the accessibility node without opening either production shadow
-  // root. The window key listener receives a retargeted body, not this button.
-  await cdp.send('Runtime.callFunctionOn', { objectId: object.objectId, functionDeclaration: 'function() { this.focus(); }' });
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+  const frameId = await focusClosedButton(cdp, name, action === 'footer cancel' ? 1 : 0, action.includes('cancel') ? 2 : 1);
+  await pressNativeEnter(cdp, f.a);
   if (action === 'search') {
     await f.a.keyboard.up('Control');
     const focusedInput = async () => (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes.some(node =>
@@ -3244,8 +3577,11 @@ for (const action of ['header cancel', 'footer cancel', 'search', 'switch'] as c
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
   expect(await f.active()).toBe(action === 'switch' ? f.ids.previous : f.ids.source);
 });
+});
 
-test('English recent bridge closed storage overlay preserves Vimium navigation and release', async () => {
+for (const vimium of [false, true]) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true, vimium } });
+  test(`English recent bridge closed storage overlay preserves ${vimium ? 'Vimium' : 'production'} navigation and release`, async () => {
   const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
   await expect(f.a.locator('#zing-command-palette')).toBeAttached();
   const cdp = await context.newCDPSession(f.a);
@@ -3266,8 +3602,11 @@ test('English recent bridge closed storage overlay preserves Vimium navigation a
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
   expect(await f.windows()).toBe(0);
 });
+});
 
-for (const acceptDelay of [0, 250]) test(`English recent bridge storage overlay quick release never paints the scrim or panel (${acceptDelay}ms accept)`, async () => {
+for (const acceptDelay of [0, 250]) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test(`English recent bridge storage overlay quick release never paints the scrim or panel (${acceptDelay}ms accept)`, async () => {
   const f = await bridgeFixture();
   if (acceptDelay) await worker.evaluate(delay => {
     const update = chrome.tabs.update.bind(chrome.tabs);
@@ -3302,8 +3641,11 @@ for (const acceptDelay of [0, 250]) test(`English recent bridge storage overlay 
   expect(samples.length).toBeGreaterThan(0);
   expect(samples.every(opacity => opacity === 0)).toBe(true);
 });
+});
 
-test('English recent bridge storage overlay held shortcut reveals and navigates normally', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English recent bridge storage overlay held shortcut reveals and navigates normally', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
   const surface = f.a.frameLocator('.zing-frame');
@@ -3323,13 +3665,16 @@ test('English recent bridge storage overlay held shortcut reveals and navigates 
     const style = getComputedStyle(node, '::before');
     return { border: style.borderColor, shadow: style.boxShadow };
   })).toEqual({ border: 'rgba(0, 0, 0, 0)', shadow: 'none' });
-  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-switcher-disabled.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-disabled.png') });
   await f.a.keyboard.up('Control');
   await expect.poll(f.active).toBe(f.ids.previous);
   await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
-test('English human first recent switcher exposes clickable confirm and respects focused cancel', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English human first recent switcher exposes clickable confirm and respects focused cancel', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Mouse-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Mouse-B`);
   let popup = await recentPopup(a);
@@ -3341,8 +3686,11 @@ test('English human first recent switcher exposes clickable confirm and respects
   await cancel.press('Enter').catch(error => { if (!popup.page.isClosed()) throw error; });
   await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(popup.target.id);
 });
+});
 
-test('English human first recent switcher mouse hover preserves release selection and row click switches', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English human first recent switcher mouse hover preserves release selection and row click switches', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Mouse-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Mouse-B`);
   const c = await context.newPage(); await c.goto(`${origin}/Mouse-C`);
@@ -3357,8 +3705,11 @@ test('English human first recent switcher mouse hover preserves release selectio
   await row.click();
   await expect.poll(popup.closed).toBe(true); expect(await popup.active()).toBe(target);
 });
+});
 
-test('English pinned hostname result outranks bookmark prefixes and switches without opening a duplicate', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English pinned hostname result outranks bookmark prefixes and switches without opening a duplicate', async () => {
   const target = await context.newPage(); await target.goto(`${origin}/Service-Console`);
   const targetId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, target.url());
   await worker.evaluate(async ({ id, base }) => {
@@ -3378,8 +3729,11 @@ test('English pinned hostname result outranks bookmark prefixes and switches wit
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, targetId)).toBe(true);
   expect(await worker.evaluate(async url => (await chrome.tabs.query({})).filter(tab => tab.url === url).length, target.url())).toBe(1);
 });
+});
 
-test('English palette launch worker lifecycle repeatedly wakes and reloads without script load errors', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true } });
+  test('English palette launch worker lifecycle repeatedly wakes and reloads without script load errors', async () => {
   test.setTimeout(90_000);
   const monitor = await context.newPage(); await monitor.goto('chrome://extensions');
   await monitor.getByRole('button', { name: 'Developer mode', exact: true }).click();
@@ -3403,8 +3757,11 @@ test('English palette launch worker lifecycle repeatedly wakes and reloads witho
   }
   expect(errors).toEqual([]);
 });
+});
 
-test('English storage overlay refuses an unfocused page and opens after focus returns', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('English storage overlay refuses an unfocused page and opens after focus returns', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Focus-boundary`);
   const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
   await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }), id);
@@ -3428,6 +3785,7 @@ test('English storage overlay refuses an unfocused page and opens after focus re
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
 
 async function openNativePalette() {
   const source = await worker.evaluate(async () => {
@@ -3443,7 +3801,9 @@ async function openNativePalette() {
   return { source, palette };
 }
 
-test('English palette launch native page aligns a separate window with the content viewport and executes against the source', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test('English palette launch native page aligns a separate window with the content viewport and executes against the source', async () => {
   const { source, palette } = await openNativePalette();
   const bounds = await palette.evaluate(async sourceId => {
     const current = await chrome.windows.getCurrent();
@@ -3473,6 +3833,7 @@ test('English palette launch native page aligns a separate window with the conte
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).pinned, source.tabId)).toBe(true);
   await expect.poll(() => palette.isClosed()).toBe(true);
   expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
+});
 });
 
 // Chrome forbids tabs.setZoom on chrome:// pages. Exercise the real standalone
@@ -3512,7 +3873,9 @@ async function pointerViewport(page: Page, zoom: number) {
   return page.evaluate(() => (window as any).__contentOrigin as { left: number; top: number });
 }
 
-for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1, 1.25, .8]) test(`English palette launch native storage panel matches the overlay screen position with ${layout} at ${zoom * 100}% zoom`, async () => {
+for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1, 1.25, .8]) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true, verticalTabs: layout === 'vertical tabs' } });
+  test(`English palette launch native storage panel matches the overlay screen position with ${layout} at ${zoom * 100}% zoom`, async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Screen-alignment`); await page.bringToFront();
   const source = await worker.evaluate(async ({ url, zoom }) => {
     const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
@@ -3554,8 +3917,11 @@ for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1
   expect(await ui.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(1.5);
   expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
 });
+});
 
-test('English palette launch native window closes on Escape shortcut and focus loss', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test('English palette launch native window closes on Escape shortcut and focus loss', async () => {
   let opened = await openNativePalette();
   await opened.palette.keyboard.press('Escape').catch(error => { if (!opened.palette.isClosed()) throw error; });
   await expect.poll(() => opened.palette.isClosed()).toBe(true);
@@ -3569,8 +3935,11 @@ test('English palette launch native window closes on Escape shortcut and focus l
   await worker.evaluate(id => chrome.windows.update(id, { focused: true }), opened.source.windowId);
   await expect.poll(() => opened.palette.isClosed()).toBe(true);
 });
+});
 
-for (const zoom of [1, 1.25, .8]) test(`English palette launch native visual sizing matches the recent switcher at ${zoom * 100}% zoom and stays compact`, async () => {
+for (const zoom of [1, 1.25, .8]) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test(`English palette launch native visual sizing matches the recent switcher at ${zoom * 100}% zoom and stays compact`, async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Switcher-screen-alignment`); await page.bringToFront();
   const source = await worker.evaluate(async ({ url, zoom }) => {
     const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
@@ -3617,7 +3986,7 @@ for (const zoom of [1, 1.25, .8]) test(`English palette launch native visual siz
   const capture = await context.newCDPSession(switcher);
   const screenshot = await capture.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
     clip: { x: 0, y: 0, width: rendered.tabWidth, height: rendered.tabHeight, scale: 1 } });
-  await writeFile(`/private/tmp/zing-switcher-polish-${zoom * 100}.png`, Buffer.from(screenshot.data, 'base64'));
+  await writeFile(test.info().outputPath(`zing-switcher-polish-${zoom * 100}.png`), Buffer.from(screenshot.data, 'base64'));
   await capture.detach();
   await switcher.evaluate(async () => chrome.tabs.setZoom((await chrome.tabs.getCurrent())!.id!, 1));
   await switcher.setViewportSize({ width: 390, height: 440 });
@@ -3630,8 +3999,11 @@ for (const zoom of [1, 1.25, .8]) test(`English palette launch native visual siz
   await expect(switcher.locator('footer').getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
   expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, source.tabId)).toBe(true);
 });
+});
 
-test('English Tab Group search management and nested keyboard navigation', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English Tab Group search management and nested keyboard navigation', async () => {
   const setup = await worker.evaluate(async origin => {
     const a = await chrome.tabs.create({ url: `${origin}/Group-Alpha`, active: false });
     const b = await chrome.tabs.create({ url: `${origin}/Group-Beta`, active: false });
@@ -3671,7 +4043,7 @@ test('English Tab Group search management and nested keyboard navigation', async
   await ui.getByLabel('Change Group Color', { exact: true }).selectOption('purple');
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
   expect(await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).toMatchObject({ title: 'Reading', color: 'purple' });
-  await ui.locator('.palette').screenshot({ path: '/private/tmp/zing-tab-group-en.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-tab-group-en.png') });
   await action('Expand Group');
   expect((await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).collapsed).toBe(false);
   await search.fill('Beta');
@@ -3691,6 +4063,7 @@ test('English Tab Group search management and nested keyboard navigation', async
   await action('Close Tab');
   await expect(ui.getByText('This tab group is no longer in this window.')).toBeVisible();
   await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
+});
 });
 
 test('Chinese Tab Group labels and compact footer stay usable', async () => {
@@ -3724,7 +4097,7 @@ test('Chinese Tab Group labels and compact footer stay usable', async () => {
   await ui.getByLabel('标签组名称').fill('阅读资料');
   await ui.getByRole('button', { name: '保存', exact: true }).click();
   await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('标签组: 阅读资料');
-  await ui.locator('.palette').screenshot({ path: '/private/tmp/zing-tab-group-zh.png' });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-tab-group-zh.png') });
   await worker.evaluate(id => chrome.tabGroups.update(id, { title: '外部改名' }), group);
   // This headless Chrome does not reliably emit tabGroups.onUpdated for API edits.
   // Exercise the existing refresh-on-focus path used when returning to zing.
@@ -3733,7 +4106,9 @@ test('Chinese Tab Group labels and compact footer stay usable', async () => {
   await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
 });
 
-test('English palette launch storage overlay Tab Group fits a narrow viewport', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette launch storage overlay Tab Group fits a narrow viewport', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Group-host`);
   await page.setViewportSize({ width: 390, height: 440 });
   await worker.evaluate(async origin => {
@@ -3749,13 +4124,16 @@ test('English palette launch storage overlay Tab Group fits a narrow viewport', 
   const primary = surface.locator('.palette-footer .primary-action');
   await expect(primary).toBeInViewport();
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await surface.locator('.palette').screenshot({ path: '/private/tmp/zing-tab-group-narrow.png' });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-tab-group-narrow.png') });
   await page.keyboard.press('Meta+k'); await page.keyboard.press('Escape');
   await expect(surface.getByRole('combobox', { name: 'Search tabs in this group…' })).toBeFocused();
   await page.keyboard.press('Escape'); await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' })).toBeFocused();
 });
+});
 
-test('English Undo Tuck restores keyboard focus after a command keeps the palette open', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English Undo Tuck restores keyboard focus after a command keeps the palette open', async () => {
   const target = await worker.evaluate(async origin => {
     const tab = await chrome.tabs.create({ url: `${origin}/Undo-focus`, active: false });
     return { tabId: tab.id!, windowId: tab.windowId };
@@ -3771,8 +4149,11 @@ test('English Undo Tuck restores keyboard focus after a command keeps the palett
   await ui.keyboard.press('Meta+a'); await ui.keyboard.type('settings');
   await expect(input).toHaveValue('settings');
 });
+});
 
-test('English palette launch storage overlay Undo Tuck restores typing after footer and menu actions', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette launch storage overlay Undo Tuck restores typing after footer and menu actions', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Undo-overlay-host`);
   const target = await worker.evaluate(async origin => {
     const tab = await chrome.tabs.create({ url: `${origin}/Undo-overlay-target`, active: false });
@@ -3798,8 +4179,11 @@ test('English palette launch storage overlay Undo Tuck restores typing after foo
     await expect(input).toBeFocused();
   }
 });
+});
 
-test('English human first palette right click targets the clicked result and restores typing', async () => {
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English human first palette right click targets the clicked result and restores typing', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Mouse-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Mouse-B`);
   await ui.bringToFront(); await ui.reload();
@@ -3814,4 +4198,5 @@ test('English human first palette right click targets the clicked result and res
   await expect(row).toHaveAttribute('aria-selected', 'true');
   await input.press('Control+n');
   await expect(row).toHaveAttribute('aria-selected', 'false');
+});
 });
