@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatShortcut, matchesShortcut, shortcutKeys } from '../src/Shortcut';
+import { describeShortcut, formatShortcut, matchesShortcut, shortcutKeys } from '../src/Shortcut';
+
+test('shortcut explanations expand actual keys without assuming the default binding', () => {
+  for (const [binding, description] of [
+    ['⇧⌘P', 'Shift + Command + P'], ['⌃Tab', 'Control + Tab'],
+    ['Ctrl+Shift+Y', 'Control + Shift + Y'], ['⌥⌘↵', 'Option + Command + Enter'],
+    ['⌘,', 'Command + ,'], ['Alt+F2', 'Alt + F2'], ['Ctrl++', 'Control + +'],
+    ['↑', 'Arrow Up'], ['esc', 'Escape'], ['', ''],
+  ]) assert.equal(describeShortcut(binding), description);
+});
 
 test('binding hints and dispatch agree on platform and modifiers', () => {
   assert.deepEqual(shortcutKeys('Mod+Shift+T', true), ['⌘', '⇧', 'T']);

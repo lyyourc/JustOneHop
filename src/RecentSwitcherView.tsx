@@ -2,8 +2,10 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { ArrowLeftRight, Pin, Search } from 'lucide-react';
 import { HighlightedText } from './HighlightedText';
 import { Favicon } from './Favicon';
+import { CurrentTabBadge } from './CurrentTabBadge';
 import { PaletteFooter } from './PaletteFooter';
 import { NavigationHint } from './Shortcut';
+import { SearchDismissButton } from './SearchDismissButton';
 import { t } from './i18n';
 
 export function RecentSwitcherView({ tabs, index, query, onQueryChange, searching, onSearch, sourceId, loaded, closing, error, shortcut, releaseKey, theme, listRef, onSelect, onConfirm, onCancel }: {
@@ -34,7 +36,7 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
           aria-activedescendant={searching && tabs[index] ? `recent-${tabs[index].id}` : undefined} aria-describedby="recent-navigation"
           autoComplete="off" spellCheck={false} />
       </span>
-      <button className="icon-button close-button" onClick={onCancel} aria-label={t('recentCancel')} title={`${t('recentCancel')} (Esc)`}><kbd>esc</kbd></button>
+      <SearchDismissButton label={t('recentCancel')} />
     </header>
     <span className="sr-only" id="recent-navigation">{t('navigationHelp')}</span>
     <div className="results recent-list" id="recent-results" ref={listRef} tabIndex={searching ? -1 : 0} role="listbox" aria-label={t('recentSwitcher')}
@@ -42,7 +44,7 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
       {!loaded ? <p className="empty">{t('loading')}</p> : !tabs.length ? <p className="empty">{t('noResults')}</p> : tabs.map((tab, at) => <div className="result" role="option" id={`recent-${tab.id}`} key={tab.id} aria-selected={at === index}
         title={tab.title || tab.url} onClick={() => onSelect(at)}>
         <span className="entry-icon tab"><Favicon pageUrl={tab.url} fallback={<ArrowLeftRight size={18} />} /></span><span className="entry-copy"><span className="entry-title"><HighlightedText text={tab.title || tab.url || t('untitledTab')} query={query} allowTypos={false} /></span><span className="entry-subtitle"><HighlightedText text={tab.url || ''} query={query} allowTypos={false} /></span></span>
-        {tab.pinned ? <Pin size={13} /> : null}{tab.id === sourceId ? <span className="current-badge">{t('recentCurrent')}</span> : null}
+        {tab.pinned ? <Pin size={13} /> : null}<CurrentTabBadge current={tab.id === sourceId} />
       </div>)}
     </div>
     {error ? <p role="alert" className="recent-error">{error}</p> : null}

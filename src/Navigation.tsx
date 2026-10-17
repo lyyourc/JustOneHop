@@ -5,6 +5,21 @@ type Layer = { depth: number; back: () => void };
 const Layers = createContext<Map<symbol, Layer> | null>(null);
 const Depth = createContext(0);
 
+function topLayer(layers: Map<symbol, Layer>) {
+  return [...layers.values()].reduce<Layer | undefined>((selected, layer) =>
+    !selected || layer.depth > selected.depth ? layer : selected, undefined);
+}
+
+/** Mouse dismissal uses the same innermost layer as Escape. */
+export function useNavigateBack() {
+  const layers = useContext(Layers);
+  if (!layers) throw new Error('useNavigateBack requires NavigationRoot');
+  return () => {
+    const top = topLayer(layers);
+    if (top) flushSync(top.back);
+  };
+}
+
 /** One back-navigation owner per mounted palette. Escape is focus-independent. */
 export function NavigationRoot({ children }: { children: ReactNode }) {
   const surface = useRef<HTMLDivElement>(null);
@@ -28,8 +43,7 @@ export function NavigationRoot({ children }: { children: ReactNode }) {
           if (!focused.hasAttribute('data-back-on-empty') || (focused as HTMLInputElement).value !== '') return;
         } else if (focused?.tagName === 'TEXTAREA' || (focused?.isContentEditable && focused !== view.document.body)) return;
       }
-      const top = [...layers.values()].reduce<Layer | undefined>((selected, layer) =>
-        !selected || layer.depth > selected.depth ? layer : selected, undefined);
+      const top = topLayer(layers);
       if (!top || (backspace && top.depth === 1)) return;
       event.preventDefault();
       event.stopImmediatePropagation();

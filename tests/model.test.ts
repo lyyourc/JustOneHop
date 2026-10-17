@@ -25,6 +25,15 @@ test('one index contains tabs, bookmarks and commands; home prioritizes recent t
   assert.equal(homeEntries(many).filter(entry => entry.kind === 'tab').length, 6);
   assert.equal(search(many, 'Page 12')[0].tabId, 12);
 });
+test('home retains the source tab beyond the six-tab limit and marks only that tab current', () => {
+  const tabs = Array.from({ length: 10 }, (_, i) => tab(i + 1, i));
+  const items = entries({ ...data, tabs, currentTabId: 10 });
+  assert.deepEqual(items.filter(item => item.kind === 'tab' && item.active).map(item => item.tabId), [10]);
+  assert.deepEqual(homeEntries(items).filter(item => item.kind === 'tab').map(item => item.tabId), [1, 2, 3, 4, 5, 10]);
+  assert.deepEqual(homeEntries(entries({ ...data, tabs, currentTabId: 2 })).filter(item => item.kind === 'tab').map(item => item.tabId), [1, 2, 3, 4, 5, 6]);
+  assert.equal(homeEntries(entries({ ...data, tabs: [] })).filter(item => item.kind === 'tab').length, 0);
+});
+
 test('Chinese and English command terms are searchable', () => {
   assert.equal(search(entries(data), '刷新')[0].action, 'reload');
   assert.equal(search(entries(data), 'reload')[0].action, 'reload');

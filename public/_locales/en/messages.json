@@ -242,7 +242,8 @@
   "setUpShortcut": { "message": "Set Up" },
   "preferences": { "message": "Preferences" },
   "experimentalFeatures": { "message": "Experimental Features" },
-  "settingsNavigate": { "message": "Navigate" },
+  "nextControl": { "message": "Next" },
+  "previousControl": { "message": "Previous" },
   "settingsNavigationHelp": { "message": "Tab moves to the next control; Shift+Tab moves to the previous control." },
   "general": {
     "message": "General"
@@ -320,10 +321,10 @@
     "message": "Learned ranking cleared. Default ordering restored."
   },
   "navigate": {
-    "message": "Navigate"
+    "message": "Select"
   },
   "navigationHelp": {
-    "message": "Use ↑/↓, Ctrl+P/N, or click to select."
+    "message": "Up Arrow selects the previous item; Down Arrow selects the next. Alternatively, press Control + P (Ctrl+P) or Control + N (Ctrl+N), or click an item."
   },
   "localStorage": {
     "message": "View Local Storage"
@@ -470,7 +471,7 @@
     "message": "Set Up Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "Bind Chrome’s tab-switching shortcut via a one-time setup snippet."
+    "message": "Set up Ctrl+Tab to switch recent tabs with a one-time snippet."
   },
   "bindingEffect": {
     "message": "Uses Chrome’s internal settings API to bind Ctrl+Tab and Ctrl+Shift+Tab to zing’s recent tab switcher."

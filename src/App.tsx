@@ -4,8 +4,10 @@ import { useResultSelection } from './useResultSelection';
 import { TuckRecoveryView } from './TuckRecoveryView';
 import { entrySearchQuery, entryTitle } from './entryPresentation';
 import { Favicon } from './Favicon';
+import { CurrentTabBadge } from './CurrentTabBadge';
 import { NavigationHint, Shortcut } from './Shortcut';
 import { NavigationRoot, BackLayer } from './Navigation';
+import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { t, countMessage, errorMessage } from './i18n';
@@ -34,7 +36,6 @@ const icons = { extension: Puzzle, password: KeyRound, download: Download, histo
 function Glyph({ name, size = 18 }: { name: IconName; size?: number }) {
   const Icon = icons[name]; return <Icon size={size} strokeWidth={1.7} aria-hidden="true" />;
 }
-function Key({ children }: { children: React.ReactNode }) { return <kbd>{children}</kbd>; }
 
 export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState }) {
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
@@ -158,7 +159,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
 
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.id, settingsOpen]);
+  }, [selected?.id, settingsOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
   useLayoutEffect(() => {
     if (busy || settingsOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
     if (deleteTarget) { cancelDelete.current?.focus(); return; }
@@ -339,7 +340,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
             aria-describedby="zing-navigation"
             aria-activedescendant={selected ? `zing-${selected.id}` : undefined}
             autoComplete="off" autoCorrect="off" spellCheck={false} disabled={busy} />
-          <button className="icon-button close-button" aria-label={t('closePalette')} title={t('closeTooltip')} onClick={dismiss}><Key>esc</Key></button>
+          <SearchDismissButton label={t('closePalette')} />
         </header>
         <span className="sr-only result-status" role="status">{data ? countMessage('resultOne', 'resultMany', results.length) : loading && showLoading ? t('loading') : ''}</span>
         <div className="results" ref={list} id="zing-results" role="listbox" aria-label={t('resultsLabel')}>
@@ -368,7 +369,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
               {item.groupTitle ? <span className="tab-group-badge" data-color={item.groupColor}><HighlightedText text={item.groupTitle} query={query} /></span> : null}
               {item.pinned ? <Pin size={12} aria-label={t('pinned')} /> : null}
               {item.muted ? <VolumeX size={13} aria-label={t('muted')} /> : null}
-              {item.active ? <span className="current-badge">{t('current')}</span> : null}
+              <CurrentTabBadge current={!!item.active} />
               {item.tucked && !item.groupTitle ? <span className="tucked-badge">{t('tucked')}</span> : null}
               {!grouped && ['tab', 'bookmark'].includes(item.kind) ? <span className="kind-label">{t(item.kind === 'tab' ? 'tabKind' : 'bookmarkKind')}</span> : null}
             </span>

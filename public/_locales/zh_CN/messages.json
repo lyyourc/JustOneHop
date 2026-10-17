@@ -242,7 +242,8 @@
   "setUpShortcut": { "message": "前往配置" },
   "preferences": { "message": "偏好设置" },
   "experimentalFeatures": { "message": "实验性功能" },
-  "settingsNavigate": { "message": "切换控件" },
+  "nextControl": { "message": "下一个" },
+  "previousControl": { "message": "上一个" },
   "settingsNavigationHelp": { "message": "Tab 切换到下一个控件，Shift+Tab 切换到上一个控件。" },
   "general": {
     "message": "通用"
@@ -323,7 +324,7 @@
     "message": "选择"
   },
   "navigationHelp": {
-    "message": "上下方向键或 Ctrl+P / Ctrl+N 选择，也可直接点击。"
+    "message": "上方向键选择上一项，下方向键选择下一项。也可按 Control + P（Ctrl+P）选择上一项、Control + N（Ctrl+N）选择下一项，或直接点击。"
   },
   "localStorage": {
     "message": "查看 Local Storage"
@@ -470,7 +471,7 @@
     "message": "设置 Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "通过一次性配置代码，将切换快捷键绑定到此按键组合。"
+    "message": "通过一次性配置代码，设置 Ctrl+Tab 切换最近标签页。"
   },
   "bindingEffect": {
     "message": "借助 Chrome 内部设置接口，将 Ctrl+Tab 和 Ctrl+Shift+Tab 绑定到 zing 的最近标签页切换。"

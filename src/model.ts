@@ -45,7 +45,7 @@ export function entries(snapshot: Snapshot): Entry[] {
       id: `tab:${tab.id}`, kind: 'tab', title: tab.title, subtitle: labelUrl(tab.url),
       groupTitle: groups.get(tab.groupId!)?.title, groupColor: groups.get(tab.groupId!)?.color,
       keywords: `${tab.url}${tab.tucked ? ' tucked away 已收起' : ''}`, faviconPageUrl: tab.url, icon: 'tab', action: 'switch', tabId: tab.id,
-      active: tab.active, pinned: tab.pinned, muted: tab.muted, tucked: tab.tucked, canTuck: tab.canTuck,
+      active: tab.id === snapshot.currentTabId, pinned: tab.pinned, muted: tab.muted, tucked: tab.tucked, canTuck: tab.canTuck,
     })),
     ...snapshot.bookmarks.map((bookmark): Entry => ({
       id: `bookmark:${bookmark.id}`, kind: 'bookmark', title: bookmark.title,
@@ -99,8 +99,12 @@ export function entries(snapshot: Snapshot): Entry[] {
 }
 
 export function homeEntries(items: Entry[], usageScores: ReadonlyMap<string, number> = new Map()): Entry[] {
+  const tabs = items.filter(item => item.kind === 'tab');
+  const current = tabs.find(item => item.active);
+  const recent = tabs.slice(0, 6);
+  if (current && !recent.includes(current)) recent.splice(5, 1, current);
   return [
-    ...items.filter(item => item.kind === 'tab').slice(0, 6),
+    ...recent,
     ...items.filter(item => item.kind === 'command' && !item.danger && !item.searchOnly)
       .sort((a, b) => (usageScores.get(usageTarget(b)) || 0) - (usageScores.get(usageTarget(a)) || 0)),
   ];

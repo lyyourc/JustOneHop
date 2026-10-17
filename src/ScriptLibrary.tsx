@@ -1,4 +1,5 @@
 import { BackLayer } from './Navigation';
+import { SearchDismissButton } from './SearchDismissButton';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ArrowLeft, Copy, Plus, Save, Search, Trash2 } from 'lucide-react';
 import { t } from './i18n';
@@ -115,9 +116,20 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
       if (event.key.toLowerCase() === 'k') { event.preventDefault(); event.stopPropagation(); toggleMenu(); return; }
       if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if (!event.repeat && !deleting) void save(); return; }
     }
-    if (!draft && event.target === search.current && !event.shiftKey && !event.altKey && !event.metaKey && ((!event.ctrlKey && ['ArrowDown', 'ArrowUp'].includes(event.key)) || (event.ctrlKey && ['n', 'p'].includes(event.key.toLowerCase())))) {
+    const arrow = event.key === 'ArrowDown' || event.key === 'ArrowUp';
+    const emacs = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ['n', 'p'].includes(event.key.toLowerCase());
+    if (!draft && event.target === search.current && !event.shiftKey && (arrow || emacs || ['PageDown', 'PageUp'].includes(event.key))) {
       event.preventDefault(); event.stopPropagation();
-      setIndex((selected + (event.key === 'ArrowUp' || event.key.toLowerCase() === 'p' ? -1 : 1) + results.length) % (results.length || 1));
+      if (!results.length) return;
+      const down = event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'n';
+      let next = (selected + (down ? 1 : -1) + results.length) % results.length;
+      if (arrow && modifier) next = down ? results.length - 1 : 0;
+      else if (event.altKey || event.key.startsWith('Page')) {
+        const row = list.current?.querySelector<HTMLElement>('.script-item');
+        const page = Math.max(1, Math.floor((list.current?.clientHeight ?? 280) / (row?.offsetHeight || 40)) - 1);
+        next = Math.max(0, Math.min(results.length - 1, selected + (down ? page : -page)));
+      }
+      setIndex(next);
     }
     if (!draft && event.key === 'Enter' && event.target === search.current && results[selected]) {
       event.preventDefault(); event.stopPropagation();
@@ -131,7 +143,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
   }}>
     <div className={`script-surface ${menu || deleting ? 'subdued' : ''}`} inert={menu || deleting ? true : undefined}>
       <header className="settings-header"><button ref={back} className="settings-back" onClick={leave} aria-label={t('back')} disabled={busy}><ArrowLeft size={18} /></button>
-        <h1>{draft ? builtin ? t('bindCtrlTab') : t(scripts.some(script => script.id === draft.id) ? 'editScript' : 'newScript') : t('scriptLibrary')}</h1><kbd>esc</kbd></header>
+        <h1>{draft ? builtin ? t('bindCtrlTab') : t(scripts.some(script => script.id === draft.id) ? 'editScript' : 'newScript') : t('scriptLibrary')}</h1>{draft ? <kbd>esc</kbd> : null}</header>
       <div className="settings-body">
         <p className="script-description">{t('scriptLibraryHint')}</p>
         {draft ? <>
@@ -146,6 +158,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
           {!builtin ? <p className="script-description">{t('scriptExecutionHint')}</p> : null}
         </> : <>
           <div className="script-search"><Search size={16} /><input data-back-on-empty ref={search} aria-label={t('searchScripts')} placeholder={t('searchScripts')} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} />
+            <SearchDismissButton label={t('back')} />
             <button className="ranking-reset" disabled={!ready} onClick={() => edit({ id: crypto.randomUUID(), title: '', code: '' })}><Plus size={14} />{t('newScript')}</button></div>
           <div className="script-list" ref={list}>{results.map((script, at) => <button key={script.id} className={`script-item ${at === selected ? 'selected' : ''}`} onClick={() => { setIndex(at); edit(script); }}>
             <span><HighlightedText text={script.title} query={query} allowTypos={false} /></span><span>{t(script.id === 'builtin-ctrl-tab' ? 'builtInScript' : 'editScript')}</span></button>)}</div>
@@ -170,7 +183,8 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
     </BackLayer> : null}
     <PaletteFooter isMac={isMac} status={<span className="footer-note">{t('scriptLocalOnly')}</span>}
       primary={draft && !builtin ? { label: menu ? activeAction?.title || t('saveScript') : t('saveScript'), keys: menu ? ['↵'] : [mod, '↵'], disabled: busy || !ready || deleting || (menu && !activeAction), danger: !!(menu && activeAction?.danger), onAction: () => { if (menu) { if (activeAction) act(activeAction.id); } else void save(); } }
-        : { label: t('back'), keys: ['esc'], onAction: leave }}
+        : draft ? { label: t('back'), keys: ['esc'], onAction: leave }
+          : { label: t('editScript'), keys: ['↵'], disabled: !results[selected], onAction: () => { if (results[selected]) edit(results[selected]); } }}
       actions={draft && !builtin ? { open: menu, disabled: busy || !ready || deleting, onToggle: toggleMenu } : undefined} />
   </section></BackLayer></BackLayer>;
 }

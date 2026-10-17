@@ -2,9 +2,11 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { useResultSelection } from './useResultSelection';
 import { Layers, Palette, PanelTop, Pencil, Save, Search, X } from 'lucide-react';
 import { BackLayer } from './Navigation';
+import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { Favicon } from './Favicon';
+import { CurrentTabBadge } from './CurrentTabBadge';
 import { HighlightedText } from './HighlightedText';
 import { entries, search } from './model';
 import { errorMessage, t, countMessage, type MessageKey } from './i18n';
@@ -99,7 +101,8 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
           </select></label>}
       </div> : <>
         <div className="search-bar"><span className="search-icon"><Search size={20} /></span><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
-          placeholder={t('groupSearch')} aria-label={t('groupSearch')} role="combobox" aria-expanded="true" aria-controls="zing-group-tabs" aria-activedescendant={selected ? `group-${selected.id}` : undefined} disabled={busy} /></div>
+          placeholder={t('groupSearch')} aria-label={t('groupSearch')} role="combobox" aria-expanded="true" aria-controls="zing-group-tabs" aria-activedescendant={selected ? `group-${selected.id}` : undefined} disabled={busy} />
+          <SearchDismissButton label={t('back')} /></div>
         <div ref={list} className="results" id="zing-group-tabs" role="listbox" aria-label={t('resultsLabel')}>
           {results.map(entry => <div key={entry.id} id={`group-${entry.id}`} role="option" aria-selected={entry.id === selected?.id} className="result tab"
             onMouseMove={event => {
@@ -115,6 +118,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
             }}>
             <span className="entry-icon"><Favicon pageUrl={entry.faviconPageUrl} fallback={<PanelTop size={18} />} /></span>
             <span className="entry-copy"><span className="entry-title"><HighlightedText text={entry.title} query={query} /></span><span className="entry-subtitle"><HighlightedText text={entry.subtitle} query={query} /></span></span>
+            <CurrentTabBadge current={!!entry.active} />
           </div>)}
           {!results.length ? <div className="empty">{t('groupEmpty')}</div> : null}
         </div>

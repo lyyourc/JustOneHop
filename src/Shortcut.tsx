@@ -13,21 +13,27 @@ export function matchesShortcut(event: { key: string; metaKey: boolean; ctrlKey:
 export function formatShortcut(keys: string[]): string {
   return keys.every((key, index) => index === keys.length - 1 || /^[⌘⇧⌥⌃]$/.test(key)) ? keys.join('') : keys.join('+');
 }
-export function Shortcut({ binding, isMac }: { binding: string; isMac: boolean }) {
-  const keys = shortcutKeys(binding, isMac);
-  return <span className="key-chord entry-shortcut" aria-label={keys.join(' + ')}><kbd>{formatShortcut(keys)}</kbd></span>;
+const keyNames: Record<string, string> = {
+  '⌘': 'Command', '⇧': 'Shift', '⌃': 'Control', '⌥': 'Option', '↵': 'Enter', '⇥': 'Tab',
+  '↑': 'Arrow Up', '↓': 'Arrow Down', '←': 'Arrow Left', '→': 'Arrow Right',
+  '⌫': 'Backspace', '⌦': 'Delete', '⎋': 'Escape', Ctrl: 'Control', Cmd: 'Command', Esc: 'Escape', esc: 'Escape',
+};
+
+export function describeShortcut(shortcut: string): string {
+  return (shortcut.match(/[⌘⇧⌃⌥↵⇥↑↓←→⌫⌦⎋]|[^⌘⇧⌃⌥↵⇥↑↓←→⌫⌦⎋+]+|\+(?=$)/g) || [])
+    .map(key => key.trim()).filter(Boolean).map(key => keyNames[key] || key).join(' + ');
 }
 
-/** Control navigation works on every platform. Keep each chord semantic while
- *  the footer context renders the hint as quiet supporting text. */
-const navigationChords = [{ arrow: '↑', keys: ['Ctrl', 'P'] }, { arrow: '↓', keys: ['Ctrl', 'N'] }];
+export function Shortcut({ binding, isMac }: { binding: string; isMac: boolean }) {
+  const keys = shortcutKeys(binding, isMac);
+  const description = describeShortcut(formatShortcut(keys));
+  return <span className="key-chord entry-shortcut" title={description} aria-label={description}><kbd>{formatShortcut(keys)}</kbd></span>;
+}
 
 export function NavigationHint() {
-  return <span className="navigation-hint" title={t('navigationHelp')}>
-    <span className="navigation-label">{t('navigate')}</span>
-    {navigationChords.map(({ arrow, keys }) => <span className="navigation-key" key={arrow} aria-label={`${arrow} ${keys.join(' + ')}`}>
-      <span className="navigation-arrow" aria-hidden="true">{arrow}</span>
-      <span className="key-chord"><kbd>{formatShortcut(keys)}</kbd></span>
-    </span>)}
+  return <span className="navigation-hint" title={t('navigationHelp')} aria-label={t('navigationHelp')}>
+    <span className="navigation-key"><span className="key-chord"><kbd>Ctrl+P</kbd></span><span className="navigation-label">{t('previousControl')}</span></span>
+    <span aria-hidden="true">·</span>
+    <span className="navigation-key"><span className="key-chord"><kbd>Ctrl+N</kbd></span><span className="navigation-label">{t('nextControl')}</span></span>
   </span>;
 }

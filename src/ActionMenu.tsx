@@ -1,5 +1,6 @@
 import { matchesShortcut, Shortcut } from './Shortcut';
 import { BackLayer } from './Navigation';
+import { SearchDismissButton } from './SearchDismissButton';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Search } from 'lucide-react';
 import { t } from './i18n';
@@ -27,7 +28,11 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
       if (shortcutAction) { event.preventDefault(); if (!event.repeat) onAction(shortcutAction.id); return; }
       const mod = isMac ? event.metaKey : event.ctrlKey;
       if ((mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k')) { event.preventDefault(); onClose(); return; }
-      if (event.key === 'Tab') { event.preventDefault(); input.current?.focus(); return; }
+      if (event.key === 'Tab') {
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input, button:not(:disabled)'));
+        const at = controls.indexOf(event.target as HTMLElement);
+        event.preventDefault(); controls[(at + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus(); return;
+      }
       const emacs = event.ctrlKey && !event.metaKey && !event.altKey && ['p', 'n'].includes(event.key.toLowerCase());
       const arrow = ['ArrowDown', 'ArrowUp'].includes(event.key);
       if (!event.shiftKey && (arrow || emacs || ['PageDown', 'PageUp'].includes(event.key))) {
@@ -57,13 +62,14 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
             pointer.current = next;
           }}>
           {action.icon}<span><HighlightedText text={action.title} query={query} />{action.alias ? <span className="action-alias"><HighlightedText text={action.alias} query={query} allowTypos={false} /></span> : null}</span>
-          {action.shortcut ? <Shortcut binding={action.shortcut} isMac={isMac} /> : action.id === selected?.id ? <kbd>↵</kbd> : null}
+          {action.shortcut ? <Shortcut binding={action.shortcut} isMac={isMac} /> : action.id === selected?.id ? <kbd title={`Enter — ${action.title}`} aria-label={`Enter — ${action.title}`}>↵</kbd> : null}
         </div>)}
         {!actions.length ? <p className="action-empty">{t('noActions')}</p> : null}
       </div>
       <div className="action-search"><Search size={15} /><input data-back-on-empty ref={input} value={query} onChange={event => onQueryChange(event.target.value)}
         placeholder={t('searchActionsPlaceholder')} aria-label={t('searchActions')} role="combobox" aria-expanded="true" aria-controls={id}
-        aria-activedescendant={selected ? `${id}-${selected.id}` : undefined} autoComplete="off" spellCheck={false} /></div>
+        aria-activedescendant={selected ? `${id}-${selected.id}` : undefined} autoComplete="off" spellCheck={false} />
+        <SearchDismissButton label={t('back')} /></div>
     </div>
   </BackLayer>;
 }

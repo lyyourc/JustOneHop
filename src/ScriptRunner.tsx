@@ -1,4 +1,5 @@
 import { BackLayer } from './Navigation';
+import { SearchDismissButton } from './SearchDismissButton';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
 import { HighlightedText } from './HighlightedText';
@@ -31,6 +32,7 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
   const wasMenu = useRef(false);
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const search = useRef<HTMLInputElement>(null);
+  const searchCaret = useRef<[number, number]>([0, 0]);
   const list = useRef<HTMLDivElement>(null);
   const back = useRef<HTMLButtonElement>(null);
   const alive = useRef(true);
@@ -76,6 +78,10 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
   }
   async function run(id: string) {
     if (pending.current) return;
+    if (!selectedId) {
+      setIndex(Math.max(0, rows.findIndex(row => row.id === id)));
+      searchCaret.current = [search.current?.selectionStart ?? query.length, search.current?.selectionEnd ?? query.length];
+    }
     const revision = ++runRevision.current;
     pending.current = true; setMenu(false); setSelectedId(id); setBusy(true); setResult(null); setError(''); setNotice(''); setCopyFailed(false);
     try {
@@ -98,7 +104,7 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
     const restore = wasMenu.current && !menu;
     wasMenu.current = menu;
     if (menu) return;
-    if (!selectedId) search.current?.focus();
+    if (!selectedId) { search.current?.focus(); search.current?.setSelectionRange(...searchCaret.current); }
     else if (busy) back.current?.focus();
     else if (restore && returnFocus.current?.isConnected && !returnFocus.current.hasAttribute('disabled')) {
       const field = returnFocus.current;
@@ -106,7 +112,7 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
       if (field.tagName === 'TEXTAREA') (field as HTMLTextAreaElement).setSelectionRange(...outputCaret.current);
     } else (primaryButton() || back.current)?.focus();
   }, [selectedId, busy, result, menu]);
-  useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
+  useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id, !!selectedId]);
   function leave() {
     if (selectedId && !initialScriptId) {
       runRevision.current++; pending.current = false; setBusy(false);
@@ -131,8 +137,21 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
       return;
     }
     if (!selectedId && event.target === search.current) {
-      if (!event.shiftKey && !event.metaKey && !event.altKey && ((!event.ctrlKey && ['ArrowDown', 'ArrowUp'].includes(event.key)) || (event.ctrlKey && ['n', 'p'].includes(event.key.toLowerCase())))) {
-        event.preventDefault(); event.stopPropagation(); setIndex((Math.max(0, rows.indexOf(selected)) + (['arrowup', 'p'].includes(event.key.toLowerCase()) ? -1 : 1) + rows.length) % (rows.length || 1));
+      const arrow = event.key === 'ArrowDown' || event.key === 'ArrowUp';
+      const emacs = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ['n', 'p'].includes(event.key.toLowerCase());
+      if (!event.shiftKey && (arrow || emacs || ['PageDown', 'PageUp'].includes(event.key))) {
+        event.preventDefault(); event.stopPropagation();
+        if (!rows.length) return;
+        const at = rows.indexOf(selected);
+        const down = event.key === 'ArrowDown' || event.key === 'PageDown' || event.key.toLowerCase() === 'n';
+        let next = (at + (down ? 1 : -1) + rows.length) % rows.length;
+        if (arrow && modifier) next = down ? rows.length - 1 : 0;
+        else if (event.altKey || event.key.startsWith('Page')) {
+          const row = list.current?.querySelector<HTMLElement>('.script-item');
+          const page = Math.max(1, Math.floor((list.current?.clientHeight ?? 280) / (row?.offsetHeight || 40)) - 1);
+          next = Math.max(0, Math.min(rows.length - 1, at + (down ? page : -page)));
+        }
+        setIndex(next);
       } else if (event.key === 'Enter') {
         event.preventDefault(); event.stopPropagation();
         if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && selected) void run(selected.id);
@@ -141,11 +160,12 @@ export function ScriptRunner({ target, initialScriptId, autoCopy, onBack }: {
   }}>
     <div className={`script-surface ${menu ? 'subdued' : ''}`} inert={menu ? true : undefined}>
       <header className="settings-header"><button ref={back} className="settings-back" onClick={leave} aria-label={t('back')}><ArrowLeft size={18} /></button>
-        <h1>{selectedId ? script?.title || t('runScript') : t(autoCopy ? 'runCopyScript' : 'runScript')}</h1><kbd>esc</kbd></header>
+        <h1>{selectedId ? script?.title || t('runScript') : t(autoCopy ? 'runCopyScript' : 'runScript')}</h1>{selectedId ? <kbd>esc</kbd> : null}</header>
       <div className="settings-body">
         <p className="script-description script-run-target">{t('scriptRunTarget', (() => { try { return new URL(target.expectedUrl).host; } catch { return target.expectedUrl; } })())}</p>
         {!selectedId ? <>
-          <div className="script-search"><Search size={16} /><input data-back-on-empty ref={search} aria-label={t('searchScripts')} placeholder={t('searchScripts')} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} /></div>
+          <div className="script-search"><Search size={16} /><input data-back-on-empty ref={search} aria-label={t('searchScripts')} placeholder={t('searchScripts')} value={query} onChange={event => { setQuery(event.target.value); setIndex(0); }} />
+            <SearchDismissButton label={t('back')} /></div>
           <div ref={list} className="script-list" role="listbox" aria-label={t('scriptLibrary')}>{rows.map(row => <button key={row.id} role="option" aria-selected={row.id === selected?.id} className={`script-item ${row.id === selected?.id ? 'selected' : ''}`} onClick={() => void run(row.id)}>
             <span><HighlightedText text={row.title} query={query} allowTypos={false} /></span><Play size={14} /></button>)}</div>
           {!rows.length ? <p className="empty">{t(scripts.length ? 'noResults' : 'noRunnableScripts')}</p> : null}

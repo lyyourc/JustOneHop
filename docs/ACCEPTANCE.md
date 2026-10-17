@@ -4,6 +4,93 @@
 
 当前定位验收仍有未解决项：`tests/palette.spec.ts` 的屏幕位置对照现包含横向／垂直标签栏 × 80%／100%／125% 缩放，并通过可信 pointer 事件采样来源内容区屏幕原点。下文历史几何通过记录不覆盖这套新增矩阵；特别是垂直标签栏三档缩放尚不能标记通过。当前 `nativePanelBounds` 仍将浏览器外框与内容宽度之差平均分到左右，`alignPanelWindow` 只校准 popup 自身框架，未实现来源屏幕锚点采样或缓存；垂直标签栏的不对称偏移仍待解决。测试中的原点采样是验证手段，不是产品实现。
 
+## 2026-10-17 搜索 Esc、当前标签与跨视图一致性检查
+
+修复两个用户报告问题并检查全部主要视图：八处搜索界面复用 SearchDismissButton，点击与键盘 Esc 使用 Navigation 同一最深层路由；Settings 清空操作独立，ActionMenu Tab 可到达 Esc 并以 Enter 返回。CurrentTabBadge 统一主搜索、组成员和两种 Switcher，使用来源标签 ID；首页六项上限下保留来源标签，解决当前页排在尾部被截掉而没有标记的问题。
+
+审计还修复四处差异：主搜索从所有二级页返回时重新滚动选中项；脚本运行保存鼠标目标与搜索选区并在返回时恢复；脚本收藏列表底栏改为与行点击一致的编辑／Enter；两个脚本列表补齐翻页及首尾跳转。跨视图规则写入交互架构、评审标准与 ADR 0002。
+
+### 源码审阅覆盖
+
+| 视图／层 | 核对结果 |
+| --- | --- |
+| 主搜索（浮层、popup、原生窗口共用 App） | 搜索尾部 Esc、当前身份、列表／菜单／底栏、返回焦点与滚动；修复当前保留及返回滚动 |
+| 设置及语言／主题下拉 | 搜索、清空、逐层返回、Tab 遍历、光标与控件样式；接入共享 Esc |
+| Local／Session Storage、Cookies 列表与详情 | 点击复制、菜单、详情返回、搜索选区、加载／授权；搜索接入 Esc |
+| 标签组成员、改名、换色、菜单 | 执行目标、忙碌返回、列表导航；接入 Esc 与当前标记 |
+| 脚本收藏、新建／编辑、绑定指南、删除确认 | 编辑语义、主操作、分页、返回上下文；修复列表底栏与长列表导航 |
+| 脚本运行选择、执行中、成功／失败与结果菜单 | 鼠键交替、异步版本保护、返回恢复；修复选择／选区与分页 |
+| 收起恢复核对 | 候选、危险态、显式确认、返回；保留先选择再确认的用途差异 |
+| Tab Switcher 网页浮层与独立窗口 | 共享搜索、列表、底栏、松键、取消与加载缓冲；接入共享 Esc／当前标记 |
+| Cookie 授权页 | 站点目标、授权可用性、返回与错误；保留独立权限流程 |
+| PaletteFooter／ActionMenu／Navigation／样式 | 共用行为、图标／键帽、焦点、返回层、窄屏；移除逐页补丁思路 |
+
+此矩阵是源码审阅覆盖，不是全量浏览器通过声明。保留 Switcher hover 不改变松键目标、设置 Tab 遍历控件、编辑器普通 Enter 编辑文字等有明确用途的差异。按钮修饰 Enter 的进一步疑点未获独立原生事件证据，不列确认缺陷；暂停中的屏幕定位目标不在本轮修复范围。
+
+### 实际验证
+
+类型、diff 检查及 33 项 model／shortcut／i18n 单测通过，包含来源 ID 与 Chrome active 标志不同、当前页落在第六项之外等场景。浏览器共验证 8 个不同用例，分三轮：
+
+- 首轮 7 项：6 通过、1 失败。设置鼠键／窄屏、Storage／标签组几何与当前标记、脚本编辑底栏与分页、下拉 Esc 鼠标逐层返回及菜单 Tab／Enter、运行列表选择与选区恢复、独立 Switcher 取消均通过；网页 Switcher 新增鼠标取消段在保持 Control 时点击，未关闭。记录 `test-results/runs/2026-10-17T07-53-05-611Z-52520-eb3b5569/validation.json`，runner 38.452 秒，Playwright 37.0 秒。
+- 检查 trace 与事件路径后，取消段调整为先进入搜索再松开 Control，验证普通左键取消而非 macOS Control-click 路径；来源仍活动、松键不切页、点击后浮层移除均通过。仅复验此 1 项，记录 `test-results/runs/2026-10-17T07-55-29-462Z-57334-0c1a99fc/validation.json`，runner 7.228 秒，Playwright 5.8 秒。未独立记录 contextmenu 事件，不将 Control-click 解释当作已证实根因，也不声明支持按住 Control 的鼠标取消。
+- 补充闭合 Shadow DOM／iframe 纯键盘设置流程，更新新增 Esc 按钮后的 Tab 顺序，1 项通过。记录 `test-results/runs/2026-10-17T07-56-27-172Z-59527-93d7852d/validation.json`，runner 6.714 秒，Playwright 5.5 秒。
+
+含三次选例共约 55.3 秒，无跳过，不能写成一次全绿。未跑全量 E2E、Vimium、所有原生窗口或所有下游视图的浏览器矩阵；主列表返回可见性已修复并审阅，但无独立专门浏览器断言。构建已更新，日常 Chrome 未重载，改动未提交。本节于验证后追加。
+
+## 2026-10-17 共用底栏标题与说明统一留白
+
+修正此前仅在设置页隐藏标题圆点的局部处理：PaletteFooter 不再渲染标题分隔圆点，共用样式以留白区分 title 与 context／status，删除设置页的分隔特例。首页、设置、Tab Switcher 和其他共用底栏调用方统一；圆点只保留在提示内部的同级动作组中。
+
+类型与 diff 检查通过。1 项首页 quiet layout 定向 Playwright 一次通过，无失败／跳过／复验，覆盖标题无分隔符、补充信息间距、Ctrl+P／Ctrl+N 常驻、键盘与菜单流程和窄屏隐藏；已查看首页浅色截图。Playwright 6.3 秒，runner 含构建 7.721 秒，加选例 0.949 秒共约 8.7 秒。记录：`test-results/runs/2026-10-17T07-41-43-889Z-30149-9d4235df/validation.json`。未逐项运行其他调用方或完整 E2E，日常 Chrome 未重载；本节于验证后追加。
+
+## 2026-10-17 紧凑设置整体比例与设计规范
+
+按用户确认将正文按钮、选择框、菜单选项与开关点击区域统一适配为 32px，保留原控件语义、轨道尺寸与状态反馈；按钮横向内边距 12px。正文水平 16px、卡片内侧 12px、基础行高 48px、行上下 8px，模块标题上方 12px（首项 0）、下方 4px；说明换行自然增长，搜索与底栏几何保留。交互架构新增「紧凑面板的整体比例」，评审标准同步要求检查控件、容器、模块与留白的整页协调，不以照搬 Chromium 尺寸判定原生风格。
+
+类型检查、diff 检查及 1 项已有设置综合 Playwright 一次通过，无失败／跳过／复验。覆盖 32px 控件与菜单、鼠键及交替流程、中英文和窄屏；已查看 settings-light.png 和 settings-select-narrow.png，正文比例更紧凑，窄屏菜单完整且底栏保留。标准高度下末尾脚本收藏仍需正文滚动，不宣称全部设置一屏展示。Playwright 7.0 秒，runner 含构建 8.458 秒，加选例 0.942 秒共约 9.4 秒。记录：`test-results/runs/2026-10-17T07-37-02-577Z-20790-26edaedf/validation.json`。未运行全量测试或深色专项，日常 Chrome 未重载；本节于验证后追加。
+
+## 2026-10-17 选择框、菜单与设置间距适配
+
+选择框参考 Chromium md-select：36px 高、8px 圆角、透明底、内侧焦点轮廓；菜单间隔 4px、圆角 8px，选项最小 36px 高、13px 字号，选中项以勾选和 500 字重标识。菜单展开方向按实际 scrollHeight 判断，适配新增选项高度。设置正文上下留白 12px／16px、卡片水平内边距 16px（窄屏 12px）、行上下 8px 和最小 52px 高；窄屏控件换行后靠右。搜索和底栏几何保留。
+
+类型及 diff 检查通过，1 项既有设置综合 Playwright 一次通过，无失败、跳过或复验，覆盖选择框外观、菜单选项高度、鼠键流程和窄屏展开范围。已查看 settings-light.png 与 settings-select-narrow.png：菜单完整显示三项且处于正文范围内。Playwright 7.2 秒，runner 含构建 8.656 秒，选例 1.009 秒，共约 9.7 秒。记录：`test-results/runs/2026-10-17T07-30-13-490Z-7740-adb95894/validation.json`。未跑全量测试或深色专项；日常 Chrome 未重载。本节在验证结束后追加。
+
+## 2026-10-17 设置按钮 Chrome 风格适配与底栏留白
+
+按用户确认将设置正文操作按钮适配为 36px 高、100px 胶囊圆角、16px 横向内边距、透明底和主题色文字，修复 500 字重被通用 font 规则覆盖的问题。下拉框独立使用 36px 圆角矩形字段，开关以 36px 点击区域承载 26×16px 轨道和关闭／开启 8px／12px 滑块，并提供两种状态的 hover／active 反馈；返回与清空保留紧凑图标按钮。按钮覆盖限定在 settings-page，脚本库等共用 ranking-reset 样式不变。
+
+设置标题与导航提示之间隐藏原圆点，只用留白分开，不加竖线。提示恢复为 `Tab Next · Shift+Tab Previous`／`Tab 下一个 · Shift+Tab 上一个`。主搜索与 Tab Switcher 仍直接展示 Ctrl+P／Ctrl+N。
+
+类型检查及 diff 检查通过。1 项已有设置综合 Playwright 一次通过，无失败、跳过或复验；覆盖控件尺寸／字重、标题分隔隐藏、导航顺序、鼠键及交替流程、中英文和窄屏。已查看 settings-light.png 与 settings-narrow.png：胶囊按钮及标题留白符合本轮方案，底栏完整可见。Playwright 7.6 秒，runner 含构建 9.078 秒，加选例 0.943 秒共约 10 秒。记录：`test-results/runs/2026-10-17T07-23-11-405Z-93612-ec847d58/validation.json`。未运行全量测试、深色专项或开关所有交互状态专项；日常 Chrome 未重载。本节于验证后追加。
+
+## 2026-10-17 导航提示统一用词并恢复 Ctrl+P / Ctrl+N 常驻
+
+按用户反馈，主搜索与 Tab Switcher 提示改为 `Ctrl+P 上一个 · Ctrl+N 下一个`（英文 `Ctrl+P Previous · Ctrl+N Next`），移除可见方向键，Ctrl+P / Ctrl+N 不再只放在悬浮说明里。设置改为 `Shift+Tab 上一个 · Tab 下一个`（英文 `Shift+Tab Previous · Tab Next`）。两处统一按键在前、动作在后，先上一个再下一个，组间用圆点分隔；实际按键行为未改。
+
+本轮仅修改提示内容和排列，核对中英文、同步已有用例的显示断言并通过 diff 检查；为交付可加载扩展执行一次构建，通过。按用户要求未重跑类型检查或浏览器测试，上一节截图与浏览器通过记录不代表本轮展示已验收。
+
+## 2026-10-17 设置鼠标提示、键位解释与底栏导航分组
+
+修正所有设置名称误用手形指针的问题：无点击动作的名称保持普通指针，关联自动收起开关的标签保留手形。设置面板快捷键的悬浮／读屏说明展开 Chrome 实际绑定的按键名称及用途；`⌃Tab` 明确解释 Control + Tab 和配置用途，不声称已绑定。共享 Shortcut、菜单 Enter 和 PaletteFooter 操作按钮补充实际按键名称的原生 title 说明。
+
+设置底栏改为 `Tab 下一个 · Shift+Tab 上一个`／`Tab Next · Shift+Tab Previous`，每个按键与动作成组。主搜索及 Tab Switcher 共用 `↑ ↓ 选择`／`↑ ↓ Select`，Ctrl+P／Ctrl+N 的替代按法在悬浮说明中展开，绑定行为不变。
+
+类型检查、5 项 shortcut／i18n／settingsSearch 单测及 diff 检查通过。2 项已有定向 Playwright 一次通过（英文设置综合项、英文 quiet layout），无失败／跳过／重跑；覆盖普通名称与关联标签的 cursor、键帽说明属性、鼠键及交替流程、中英文设置提示、窄屏与列表导航。已查看设置常规／窄屏和主搜索截图，提示完整可见。Playwright 11.9 秒，runner 含构建 13.358 秒，加选例 0.945 秒共约 14.3 秒。记录：`test-results/runs/2026-10-17T07-07-57-447Z-64685-b508ded8/validation.json`。
+
+原生 title 的内容通过 DOM 断言，未独立捕获系统 tooltip 气泡；未运行完整 E2E、Tab Switcher 两种承载或 Windows/Linux 专项，日常 Chrome 未重载。Tab Switcher 使用相同 NavigationHint／PaletteFooter 的代码覆盖不等同于其独立浏览器验收。本节在验证结束后追加。
+
+## 2026-10-17 设置快捷键改为 ⌃Tab 并明确说明
+
+按用户反馈，macOS 设置键帽改为 `⌃Tab`，保留 Tab 文字。中文说明改为「通过一次性配置代码，设置 Ctrl+Tab 切换最近标签页。」，英文说明同步明确 `Ctrl+Tab`；悬浮与读屏提示保留。下节 `⌃⇥` 仅记录此前构建。
+
+类型检查、3 项 i18n／settingsSearch 单测与 diff 检查通过。更新既有设置综合用例的键帽与说明断言后，1 项定向 Playwright 一次通过，无失败、跳过或重跑，覆盖鼠标、键盘、交替流程和窄屏；Playwright 29.0 秒，runner 含构建 30.688 秒，加免构建选例 0.987 秒共约 31.7 秒。记录：`test-results/runs/2026-10-17T06-56-13-980Z-41847-280d2036/validation.json`。未运行全量测试或 Windows/Linux 浏览器验收，日常 Chrome 未重载；本节在验证后追加。
+
+## 2026-10-17 设置 Ctrl+Tab 符号显示统一
+
+设置页最近标签切换配置入口在 macOS 显示单键帽 `⌃⇥`，与面板快捷键 `⇧⌘P` 使用一致的符号风格和既有 `.hotkey-value` 样式；title 与 aria-label 保留 `Ctrl+Tab`。Windows/Linux 保留文字显示。仅调整展示，不修改绑定或配置脚本。
+
+类型检查与 diff 检查通过。1 项定向 Playwright（`English settings entries, narrow layout and Chrome hotkey settings`）一次通过，覆盖符号及提示属性、鼠标返回、Tab / Shift+Tab 控件遍历、搜索与鼠键交替、中英文和窄屏布局；已查看 `settings-light.png` 与 `settings-narrow.png`。无失败、跳过或重跑，Playwright 19.8 秒，runner 含构建 24.687 秒，加免构建选例 1.869 秒共约 26.6 秒。记录：`test-results/runs/2026-10-17T06-52-39-264Z-34836-8b9cfb6e/validation.json`。未运行全量测试或 Windows/Linux 浏览器验收，日常 Chrome 未重载；本节在验证后追加。
+
 ## 2026-10-17 重载命令统一分类前缀
 
 修正独立句式命名，重载入口使用共享 `category: 'zing'` 与动作名称，显示 `Zing: Reload`／`Zing: 重新加载`；复用分类标题、搜索词和冒号归一化机制。保留 reload zing／重新加载扩展等别名，单独 reload 仍指向标签页刷新。

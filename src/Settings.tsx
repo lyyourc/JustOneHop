@@ -1,9 +1,11 @@
 import { BackLayer } from './Navigation';
+import { SearchDismissButton } from './SearchDismissButton';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, Search, SlidersHorizontal, X } from 'lucide-react';
 import { HighlightedText } from './HighlightedText';
 import { matchingSettings, type SettingRow } from './settingsSearch';
 import { PaletteFooter } from './PaletteFooter';
+import { describeShortcut } from './Shortcut';
 import type { SettingsSection } from './types';
 import { ScriptLibrary } from './ScriptLibrary';
 import { systemLanguage, t } from './i18n';
@@ -27,7 +29,9 @@ function Choice<T extends string>({ label, value, options, onChange, query }: {
     const body = container.current.closest('.settings-body')!.getBoundingClientRect();
     const belowSpace = body.bottom - box.bottom;
     const aboveSpace = box.top - body.top;
-    const upwards = belowSpace < 120 && aboveSpace > belowSpace;
+    const menu = container.current.querySelector<HTMLElement>('.choice-menu');
+    const desiredHeight = (menu?.scrollHeight ?? 114) + 8;
+    const upwards = belowSpace < desiredHeight && aboveSpace > belowSpace;
     setAbove(upwards);
     setMenuHeight(Math.max(40, (upwards ? aboveSpace : belowSpace) - 8));
   }, [open]);
@@ -90,6 +94,8 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
   const scrollTop = useRef(0);
   const [query, setQuery] = useState('');
   const matches = matchingSettings(query);
+  const paletteHotkeyHelp = `${shortcut ? describeShortcut(shortcut) : t('notAssigned')} — ${t('paletteHotkey')}. ${t('hotkeyHint')}`;
+  const bindingHelp = `Control + Tab (Ctrl+Tab) — ${t('bindingHint')}`;
   const highlight = (text: string) => <HighlightedText text={text} query={query} allowTypos={false} />;
   function openLibrary(mode: 'all' | 'binding') {
     returnTo.current = mode === 'all' ? 'scripts' : 'binding';
@@ -131,6 +137,7 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
         onKeyDown={event => { if (event.key === 'Enter') event.stopPropagation(); }} autoComplete="off" spellCheck={false} />
       {query ? <button className="settings-clear" title={t('clearSettingsSearch')} aria-label={t('clearSettingsSearch')}
         onClick={clearSearch}><X size={16} /></button> : null}
+      <SearchDismissButton label={t('back')} />
     </header>
     <div className="settings-body" ref={body}>
       {matches.has('language') || matches.has('theme') ? <>
@@ -157,12 +164,12 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
         <div className="settings-group settings-keyboard">
           {matches.has('keyboard') ? <div className="setting-row hotkey-row" data-setting="keyboard">
             <div className="setting-copy"><label>{highlight(t('paletteHotkey'))}</label></div>
-            <div className="hotkey-controls"><kbd className="hotkey-value">{shortcut || t('notAssigned')}</kbd>
+            <div className="hotkey-controls"><kbd className="hotkey-value" title={paletteHotkeyHelp} aria-label={paletteHotkeyHelp}>{shortcut || t('notAssigned')}</kbd>
               <button className="hotkey-change" onClick={() => void changeHotkey()}>{highlight(t('changeHotkey'))}<ExternalLink size={12} /></button>
             </div>
           </div> : null}
           {matches.has('binding') ? <div className="setting-row" data-setting="binding"><div className="setting-copy"><label>{highlight(t('ctrlTabSetting'))}</label><p>{highlight(t('bindingHint'))}</p></div>
-            <div className="hotkey-controls"><kbd className="hotkey-value">{highlight('Ctrl+Tab')}</kbd>
+            <div className="hotkey-controls"><kbd className="hotkey-value" title={bindingHelp} aria-label={bindingHelp}>{highlight(isMac ? '⌃Tab' : 'Ctrl+Tab')}</kbd>
               <button className="ranking-reset" onClick={() => openLibrary('binding')}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
         </div>
       </> : null}
@@ -193,7 +200,9 @@ export function Settings({ preferences, shortcut, onBack, onClose, isMac, initia
     <PaletteFooter title={t('settings')}
       navigation={{ kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: onBack }}
       context={<span className="settings-navigation" title={t('settingsNavigationHelp')} aria-label={t('settingsNavigationHelp')}>
-        <span>{t('settingsNavigate')}</span><span className="key-chord"><kbd>Tab</kbd></span><span>/</span><span className="key-chord"><kbd>Shift+Tab</kbd></span>
+        <span className="navigation-key"><span className="key-chord"><kbd>Tab</kbd></span><span>{t('nextControl')}</span></span>
+        <span aria-hidden="true">·</span>
+        <span className="navigation-key"><span className="key-chord"><kbd>Shift+Tab</kbd></span><span>{t('previousControl')}</span></span>
       </span>} />
   </section>}</BackLayer>;
 }

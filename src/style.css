@@ -62,6 +62,8 @@
 .search-icon { color: var(--accent); width: 20px; display: flex; align-items: center; }
 .search-bar input, .storage-search input { flex: 1; font-size: 14.5px; font-weight: 400; height: 100%; caret-color: var(--accent); }
 .icon-button { display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+.search-dismiss { flex-shrink: 0; min-width: 30px; min-height: 28px; }
+.search-dismiss:hover { background: var(--hover); }
 
 .results, .storage-results { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 8px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .result-group.section-start { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
@@ -116,7 +118,7 @@
 .palette-footer-context { flex-shrink: 8; font-size: 11px; font-weight: 400; line-height: 16px; }
 /* Navigation hints are supporting text, matching origins and counts in other layers. */
 .palette-footer-context kbd { font: inherit; color: inherit; min-width: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; }
-.footer-divider { color: var(--faint); }
+.palette-footer-title + .palette-footer-context, .palette-footer-title + .palette-footer-status { margin-left: 16px; }
 @media (max-width: 520px) {
   .palette-footer-context { display: none; }
   .palette-footer-location { gap: 6px; }
@@ -138,7 +140,7 @@
 .action-heading > span:last-child { text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
 .action-target-icon { color: var(--accent); }
 .action-search { display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--faint); background: var(--bar); }
-.action-search input { width: 100%; font-size: 13px; height: 100%; caret-color: var(--accent); }
+.action-search input { flex: 1; font-size: 13px; height: 100%; caret-color: var(--accent); }
 .action-list { max-height: 280px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border) transparent; padding: 5px; }
 .action-row { position: relative; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
 .action-row:hover:not([aria-selected='true']) { background: var(--hover); }
@@ -177,7 +179,11 @@ body.zing-popup { margin: 0; width: 750px; height: 516px; overflow: hidden; back
 .settings-back { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border) !important; color: var(--muted) !important; background: var(--bg) !important; }
 .settings-back:hover { color: var(--text) !important; background: var(--hover) !important; }
 .settings-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 24px 24px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.settings-page > .settings-body { padding: 8px 24px 18px; }
+.settings-page > .settings-body { padding: 8px 16px 12px; }
+.settings-page .settings-body h2 { margin: 12px 0 4px; padding-left: 0; }
+.settings-page .settings-body h2:first-child { margin-top: 0; }
+.settings-page .settings-group { padding: 0 12px; }
+.settings-page .settings-group > div { min-height: 48px; padding: 8px 0; }
 .settings-body h2 { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; line-height: 1.4; color: var(--muted); margin: 16px 0 6px; padding-left: 2px; }
 .settings-body h2:first-child { margin-top: 0; }
 .settings-body h2 svg { color: var(--muted); }
@@ -187,13 +193,16 @@ body.zing-popup { margin: 0; width: 750px; height: 516px; overflow: hidden; back
 .settings-group > div { padding: 10px 0; }
 .settings-group > div + div { border-top: 1px solid var(--line); }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.setting-toggle { display: flex; align-items: center; flex: 0 0 36px; width: 36px; height: 20px; padding: 2px !important; border: 1px solid var(--border) !important; border-radius: 999px; background: light-dark(#f8f9fa, #202124) !important; transition: background-color .15s, border-color .15s; }
-.setting-toggle:hover:not(:disabled)[aria-checked="false"] { background: var(--hover) !important; }
-.setting-toggle span { width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s, background-color .15s; }
-.setting-toggle[aria-checked="true"] { background: var(--accent) !important; border-color: transparent !important; }
-.setting-toggle[aria-checked="true"] span { transform: translateX(16px); background: var(--bg); }
+.setting-toggle { position: relative; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; }
+.setting-toggle::before { content: ''; position: absolute; inset: 8px 3px; border: 1px solid var(--muted); border-radius: 50px; background: var(--bar); transition: background-color .15s, border-color .15s, box-shadow .15s; }
+.setting-toggle span { position: absolute; left: 7px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: left .15s, top .15s, width .15s, height .15s, background-color .15s; }
+.setting-toggle[aria-checked="true"]::before { background: var(--accent); border-color: var(--accent); }
+.setting-toggle[aria-checked="true"] span { left: 15px; top: 10px; width: 12px; height: 12px; background: var(--bg); }
+.setting-toggle:hover:not(:disabled)::before { box-shadow: 0 0 0 4px var(--key); }
+.setting-toggle:active:not(:disabled)::before { box-shadow: 0 0 0 4px var(--key-border); }
 .setting-copy { min-width: 120px; flex: 1; }
-.setting-copy label { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; cursor: pointer; }
+.setting-copy label { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; cursor: default; }
+.setting-copy label[for] { cursor: pointer; }
 .setting-copy p, .setting-note { color: var(--muted); font-size: 11.5px; margin: 2px 0 0; line-height: 1.45; }
 .setting-note { font-size: 11px; color: var(--faint); margin-top: 3px; }
 .setting-note[role="status"] { color: var(--accent); font-weight: 500; }
@@ -213,11 +222,27 @@ body.zing-popup { margin: 0; width: 750px; height: 516px; overflow: hidden; back
 .hotkey-value { height: 24px !important; padding: 0 7px !important; font-size: 11.5px !important; border-radius: 6px; background: var(--bar) !important; border-color: var(--border) !important; }
 .settings-navigation { display: inline-flex; align-items: center; gap: 8px; font: inherit; white-space: nowrap; }
 .settings-page .palette-footer-context { display: flex; }
+.settings-page .ranking-reset, .settings-page .hotkey-change { min-width: 5.14em; height: 32px; padding: 0 12px !important; border-radius: 100px; background: transparent !important; color: var(--accent); font-size: 13px !important; font-weight: 500; line-height: 20px; }
+.settings-page .ranking-reset:hover:not(:disabled):not([aria-disabled="true"]), .settings-page .hotkey-change:hover:not(:disabled) { background: var(--key) !important; }
+.settings-page .ranking-reset:active:not(:disabled):not([aria-disabled="true"]), .settings-page .hotkey-change:active:not(:disabled) { background: var(--key-border) !important; }
+.settings-page .hotkey-change svg { color: currentColor; }
+.settings-page .choice-trigger { height: 32px; background: transparent !important; font-size: 13px !important; font-weight: 400; line-height: 20px; }
+.settings-page .choice-trigger:hover { background: var(--key) !important; }
+.settings-page .choice-trigger:active { background: var(--key-border) !important; }
+.settings-page .choice-trigger:focus-visible { outline-offset: -1px; }
+.settings-page .choice-menu { top: calc(100% + 4px); padding: 4px; border-radius: 8px; }
+.settings-page .choice-menu.above { top: auto; bottom: calc(100% + 4px); }
+.settings-page .choice-option { min-height: 32px; padding: 6px; font-size: 13px; line-height: 20px; font-weight: 400; }
+.settings-page .choice-option[aria-selected="true"] { font-weight: 500; }
 @media (max-width: 520px) {
   .settings-body, .settings-page > .settings-body { padding: 8px 16px 14px; } .settings-header { padding: 0 14px; }
   .settings-group { padding: 2px 12px; }
   .setting-row { flex-wrap: wrap; gap: 8px 12px; }
   .hotkey-controls { flex-wrap: wrap; }
+  .settings-page > .settings-body { padding: 8px 16px 12px; }
+  .settings-page .settings-group { padding: 0 12px; }
+  .settings-page .setting-choice, .settings-page .hotkey-controls, .settings-page .setting-row > button { margin-left: auto; }
+  .settings-page .hotkey-controls { max-width: 100%; justify-content: flex-end; }
 }
 
 .zing-app.popup { min-height: 516px; background: var(--bg); }
