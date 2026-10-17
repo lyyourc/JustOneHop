@@ -61,7 +61,7 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
             if (pointer.current && (pointer.current.x !== next.x || pointer.current.y !== next.y)) onSelectionChange(action.id);
             pointer.current = next;
           }}>
-          {action.icon}<span><HighlightedText text={action.title} query={query} />{action.alias ? <span className="action-alias"><HighlightedText text={action.alias} query={query} allowTypos={false} /></span> : null}</span>
+          {action.icon}<span><HighlightedText text={action.title} query={query} />{action.alias ? <span className="action-alias"><HighlightedText text={action.alias} query={query} /></span> : null}</span>
           {action.shortcut ? <Shortcut binding={action.shortcut} isMac={isMac} /> : action.id === selected?.id ? <kbd title={`Enter — ${action.title}`} aria-label={`Enter — ${action.title}`}>↵</kbd> : null}
         </div>)}
         {!actions.length ? <p className="action-empty">{t('noActions')}</p> : null}

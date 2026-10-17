@@ -106,13 +106,51 @@ test('mixed ranking prefers exact titles and literal matches over fuzzy matches'
 
 test('close commands require explicit intent and never match through the active page title', () => {
   const items = entries({ ...data, tabs: [{ ...tab(2, 0), title: 'Claude' }] });
-  for (const query of ['Claude', 'clsoe', 'tab', 'guan', 'clos']) {
+  for (const query of ['Claude', 'clsoe', 'tab', 'cl', 'cloud', 'closed', 'disclose', 'clothes', 'guang', '关', 'close missing']) {
     assert.ok(!search(items, query).some(item => item.danger), query);
   }
   assert.equal(search(items, 'Claude')[0].kind, 'tab');
   assert.ok(!search(items, 'Claude').some(item => item.kind === 'command'));
   for (const query of ['close right', '关闭右侧', 'guanbi youce']) {
     assert.equal(search(items, query)[0].action, 'closeRight', query);
+  }
+});
+
+test('partial actions and reordered words stay discoverable in either language and tab menus', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      const items = entries(data);
+      const actions = actionsFor(items.find(item => item.id === 'tab:3')!, data);
+      for (const candidates of [items, actions]) {
+        for (const query of ['clo', 'clos', 'close', ' CLO ', 'clo tab', 'tab clo', 'Tab: clo', 'guan', 'guanb', 'guanbi', '关闭']) {
+          assert.equal(search(candidates, query)[0]?.action, 'close', `${locale}: ${query}`);
+          assert.ok(search(candidates, query).some(item => item.action === 'closeRight'), query);
+        }
+        for (const [query, action] of [['clo oth', 'closeOthers'], ['tab clo ri', 'closeRight'], ['关闭 右侧', 'closeRight'], ['guan you', 'closeRight']]) {
+          assert.equal(search(candidates, query)[0]?.action, action, `${locale}: ${query}`);
+        }
+      }
+      for (const query of ['reload ext', 'ext reload', 'restart exte']) {
+        assert.equal(search(items, query)[0]?.action, 'reloadExtension', `${locale}: ${query}`);
+      }
+      for (const query of ['reload ex', 'reload external', 'reload extract']) {
+        assert.ok(!search(items, query).some(item => item.action === 'reloadExtension'), query);
+      }
+      assert.ok(!homeEntries(items).some(item => item.danger));
+    }
+  } finally { globalThis.chrome = original; }
+});
+
+test('word prefixes in any order beat incidental substrings and metadata', () => {
+  const items = entries({ ...data, tabs: [
+    { ...tab(1, 0), title: 'Redesign Notebook' },
+    { ...tab(2, 1), title: 'Design Notes' },
+    { ...tab(3, 2), title: 'Workspace', url: 'https://example.com/des/not' },
+  ], bookmarks: [] });
+  for (const query of ['des not', 'not des']) {
+    assert.deepEqual(search(items, query).map(item => item.id), ['tab:2', 'tab:1', 'tab:3'], query);
   }
 });
 

@@ -1071,6 +1071,20 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
   await input.fill('reloda');
   await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:reload');
+  if (chinese) {
+    await expect(ui.locator('.result').first().locator('.entry-subtitle')).toHaveText('reload');
+    await expect(ui.locator('.result').first().locator('.entry-subtitle mark').first()).toBeVisible();
+  }
+  await input.fill('cl');
+  await expect(ui.locator('.result.danger')).toHaveCount(0);
+  await input.pressSequentially('o');
+  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:close');
+  await expect(ui.locator('.result.danger')).toHaveCount(3);
+  await expect(ui.locator('.result').first().locator('mark').first()).toHaveText(chinese ? 'clo' : 'Clo');
+  for (const [query, action] of [['tab clo', 'close'], ['clo oth', 'closeOthers'], ['tab clo ri', 'closeRight'], ['guan', 'close'], ['关闭', 'close'], ['reload ext', 'reloadExtension']]) {
+    await input.fill(query);
+    await expect(ui.locator('.result').first()).toHaveAttribute('id', `zing-command:${action}`);
+  }
   await input.fill('EchoTech IAM');
   await expect(ui.locator('.result[aria-selected="true"] .entry-title')).toHaveText('EchoTech IAM');
   await input.press('Meta+k');
@@ -1081,6 +1095,26 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   await expect(ui.locator('.action-row.danger')).toHaveCount(0);
   await action.fill('reloda');
   await expect(ui.locator('.action-row').first()).toContainText(chinese ? '刷新' : 'Reload');
+  if (chinese) await expect(ui.locator('.action-row').first().locator('.action-alias mark').first()).toBeVisible();
+  await action.fill('tab clo');
+  await expect(ui.locator('.action-row').first()).toContainText(chinese ? '关闭标签页' : 'Close Tab');
+  if (chinese) await expect(ui.locator('.action-row').first().locator('.action-alias mark')).toHaveText(['clo', 'tab']);
+  await action.press('Escape');
+  await expect(input).toHaveValue('EchoTech IAM');
+  await expect(input).toBeFocused();
+  await ui.locator('.result.tab').click({ button: 'right' });
+  await expect(action).toBeFocused();
+  await action.fill('clo');
+  await action.press('Control+n');
+  await expect(ui.locator('.action-row[aria-selected="true"]')).toContainText(chinese ? '关闭其他' : 'Close Other');
+  await action.press('Control+p');
+  if (chinese) await ui.locator('.action-row[aria-selected="true"]').click();
+  else await action.press('Enter');
+  await expect.poll(() => page.isClosed()).toBe(true);
+  await expect(input).toHaveValue('EchoTech IAM');
+  await expect(input).toBeFocused();
+  await expect(ui.locator('.result')).toHaveCount(0);
+  expect(noise.isClosed()).toBe(false);
 });
 });
 
@@ -1089,7 +1123,10 @@ test.describe(() => {
   test('English learned ranking follows successful selections, survives reopening tabs, and resets across palettes', async () => {
   const target = await context.newPage();
   await target.goto(`${origin}/EchoTech-IAM`);
-  await ui.evaluate(async base => { await chrome.bookmarks.create({ title: 'IAM Handbook', url: `${base}/Handbook` }); }, origin);
+  await ui.evaluate(async base => {
+    const bookmark = await chrome.bookmarks.create({ title: 'Team IAM Handbook', url: `${base}/Handbook` });
+    await chrome.storage.local.set({ searchUsage: [{ query: 'iam', target: `bookmark:${bookmark.id}`, weight: 0.5, lastUsed: Date.now() }] });
+  }, origin);
   const reopen = async () => {
     ui = await context.newPage(); await ui.goto(popupUrl);
     const input = ui.getByRole('combobox', { name: 'Search commands, tabs, and bookmarks' });
@@ -1125,7 +1162,7 @@ test.describe(() => {
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
   await ui.getByRole('button', { name: 'Reset Ranking', exact: true }).click();
   await expect(ui.getByRole('status')).toContainText('Default ordering restored');
-  await expect(observer.locator('.result').first()).toContainText('IAM Handbook');
+  await expect(observer.locator('.result').first()).toContainText('EchoTech IAM');
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage)).toBeUndefined();
   await ui.getByRole('button', { name: 'Reset Ranking', exact: true }).scrollIntoViewIfNeeded();
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('ranking-settings.png') });

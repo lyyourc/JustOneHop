@@ -84,18 +84,33 @@ test('history is bounded and repeated targets do not create duplicate records', 
   assert.equal(history[0].weight, 2);
 });
 
-test('learned choices move ahead for the same query while exact commands and strict filtering remain protected', () => {
+test('learning cannot promote metadata, substrings or typos above more relevant names', () => {
+  const items = entries({ currentTabId: 1, windowId: 1, shortcut: '', bookmarks: [],
+    tabs: ['Design', 'Design Notes', 'Team Design Notes', 'Redesign Notes', 'Workspace', 'Desgin Notes'].map((title, i) => ({
+      id: i + 1, windowId: 1, index: i, active: i === 0, pinned: false, muted: false, audible: false,
+      title, url: i === 4 ? 'https://example.com/design' : `https://example.com/${i}`,
+    })) });
+  for (const item of items.filter(item => item.kind === 'tab')) {
+    const scores = new Map([[usageTarget(item), 100]]);
+    assert.deepEqual(search(items, 'design', scores).map(item => item.tabId), [1, 2, 3, 4, 5, 6]);
+  }
+  const scores = new Map([['command:restore', 100], ['command:closeOthers', 100]]);
+  assert.equal(search(items, 'clo', scores)[0]?.action, 'closeOthers'); // Same prefix tier can learn.
+  assert.equal(search(items, 'close', scores)[0]?.action, 'close'); // Exact action stays first.
+});
+
+test('learned choices move ahead within the same relevance tier and query while strict filtering remains protected', () => {
   const items = entries({ currentTabId: 1, windowId: 1, shortcut: '', tabs: [{
     id: 1, windowId: 1, index: 0, active: true, pinned: false, muted: false, audible: false,
-    title: 'EchoTech IAM', url: 'https://auth.example/Guide',
+    title: 'IAM Console', url: 'https://auth.example/Guide',
   }, { id: 2, windowId: 1, index: 1, active: false, pinned: false, muted: false, audible: false,
     title: 'New Tab', url: 'chrome://newtab/' }],
   bookmarks: [{ id: 'iam', title: 'IAM Handbook', url: 'https://handbook.example', folder: '' }] });
-  assert.equal(search(items, 'iam')[0].bookmarkId, 'iam');
+  assert.equal(search(items, 'iam')[0].tabId, 1);
   const target = usageTarget(items[0]);
-  const history = addUsage(addUsage([], 'iam', target, now), 'iam', target, now);
-  assert.equal(search(items, 'iam', queryUsage(history, 'iam', now))[0].tabId, 1);
-  assert.equal(search(items, 'iam', queryUsage(history, 'other', now))[0].bookmarkId, 'iam');
+  const history = addUsage(addUsage([], 'iam', 'bookmark:iam', now), 'iam', 'bookmark:iam', now);
+  assert.equal(search(items, 'iam', queryUsage(history, 'iam', now))[0].bookmarkId, 'iam');
+  assert.equal(search(items, 'iam', queryUsage(history, 'other', now))[0].tabId, 1);
   const stale = new Map([['command:newTab', 100]]);
   assert.ok(!search(items, 'iam', stale).some(item => item.action === 'newTab'));
   assert.equal(search(items, 'new tab', new Map([['tab:chrome://newtab/', 100]]))[0].action, 'newTab');

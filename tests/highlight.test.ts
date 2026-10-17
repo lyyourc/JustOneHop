@@ -51,6 +51,20 @@ test('alias hint only explains a matching command when its display title does no
   assert.equal(matchingAlias({ ...item, kind: 'tab', title: 'Guide' }, 'new tab'), '');
 });
 
+test('translated commands explain partial, reordered and typo queries with visible aliases', () => {
+  const items = entries({ tabs: [], bookmarks: [], currentTabId: 0, windowId: 1, shortcut: '' });
+  const close = { ...items.find(item => item.action === 'close')!, title: '关闭当前标签页' };
+  assert.equal(matchingAlias(close, 'clo'), 'close');
+  assert.equal(matchingAlias(close, 'tab clo'), 'close tab');
+  assert.equal(matchingAlias(close, 'Tab: clo'), 'close');
+  assert.equal(matchingAlias(close, 'clo missing'), '');
+  const alias = matchingAlias(close, 'tab clo');
+  assert.deepEqual(highlightParts(alias, 'tab clo').filter(part => part.matched).map(part => part.text), ['clo', 'tab']);
+  const reload = { ...items.find(item => item.action === 'reload')!, title: '刷新当前标签页' };
+  assert.equal(matchingAlias(reload, 'reloda'), 'reload');
+  assert.ok(highlightParts(matchingAlias(reload, 'reloda'), 'reloda').some(part => part.matched));
+});
+
 test('highlights follow strict short-query and metadata matching', () => {
   for (const text of ['Example Domain', 'xinjian', 'Programming', 'WebSequenceDiagrams']) {
     assert.deepEqual(highlightParts(text, 'iam'), [{ text, matched: false }]);

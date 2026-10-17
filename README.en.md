@@ -57,7 +57,11 @@ npm run build
 
 ## Getting started
 
-Type to search, without a mode prefix. Try a tab title, a website domain, `new tab`, or `settings`. Corresponding Chinese keywords also work.
+Mute and pin search terms follow the target tab's state: on an unmuted tab, `unmute / 取消静音 / 恢复声音` will not suggest muting it; on an unpinned tab, `unpin / 取消固定` will not suggest pinning it. General terms such as `sound / jingyin / guding` still find the currently available toggle, consistently in main search and tab Actions.
+
+Find features using everyday terms: `refresh page / 刷新页面`, `reopen last tab / 恢复标签`, `open settings / 打开设置`, `dark mode / 深色`, `English / 英文`, or `打开书签`. Theme, language, and reset-ranking queries open the relevant settings without changing values or clearing records. Combine a title with a domain, tab group, or bookmark folder, such as `github pull`, `notion 路线`, or `前端 react`.
+
+Type to search, without a mode prefix. Try a tab title, a website domain, `new tab`, or `settings`. Corresponding Chinese keywords also work. You can stop partway through a command: `clo` finds Close Tab, `clo oth` finds Close Other Tabs, and `tab clo ri` finds Close Tabs to the Right. `关闭` and `guan` work too, with the same matching in main search and Actions. `cl`, `cloud`, and `tab` alone do not reveal close actions. Multiple words support word prefixes in either order: `des not` or `not des` finds `Design Notes`. Relevance comes first; learned choices only reorder results within the same tier, so a URL path match cannot outrank a name prefix. Matching aliases are shown and highlighted for queries in another language.
 
 In the main search, click a result to run it, or select it with the arrow keys and press Enter. The primary action and Actions buttons in the footer are clickable too. Every search field has a clickable `esc` control that leaves only the deepest active layer, just like Escape; clearing search remains separate. The home list retains the source tab within its six-tab limit and shares its Current badge with Tab Groups and Tab Switcher. Returning from a secondary page restores the selected result into view. In Script Library, a row click selects a read-only preview, Enter and the footer primary action copy code, and Actions provides editing. Returning from a script run restores the clicked selection and search caret. Both script lists support paging and first/last navigation.
 

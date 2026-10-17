@@ -19,12 +19,17 @@ export function commands(current?: TabItem): Entry[] {
     ['closeRight', t('closeRight'), 'close tabs to the right guanbi youce 关闭右侧标签页', 'right', true],
     ['restore', t('restore'), 'reopen restore undo closed tab huifu 恢复关闭的标签页', 'restore'],
     ['reload', t('reload'), 'reload refresh shuaxin 刷新标签页', 'reload'],
-    ['pin', current?.pinned ? t('unpin') : t('pin'), 'pin unpin toggle guding 固定 取消固定 标签页', 'pin'],
-    ['mute', current?.muted ? t('unmute') : t('mute'), 'mute unmute sound audio jingyin 静音 取消静音 标签页', 'volume'],
+    ['pin', current?.pinned ? t('unpin') : t('pin'), 'toggle guding 标签页', 'pin'],
+    ['mute', current?.muted ? t('unmute') : t('mute'), 'sound audio jingyin 标签页', 'volume'],
   ];
   if (current?.canTuck) definitions.push(['tuck', t('tuck'), 'tuck away tab 收起 标签页', 'tuck']);
   return definitions.map(([action, title, keywords, icon, danger]) => ({
     id: `command:${action}`, kind: 'command', category: 'tab', title, keywords, icon, action, danger,
+    aliases: action === 'pin' ? (current?.pinned
+      ? ['unpin', 'unpin tab', '取消固定', '取消固定标签页']
+      : ['pin', 'pin tab', '固定', '固定标签页']) : action === 'mute' ? (current?.muted
+      ? ['unmute', 'unmute tab', '取消静音', '恢复声音']
+      : ['mute', 'mute tab', '静音', '静音标签页', '关闭声音']) : undefined,
     shortcut: ({ newTab: 'Mod+T', close: 'Mod+W', restore: 'Mod+Shift+T', reload: 'Mod+R' } as Partial<Record<ActionId, string>>)[action],
     tabId: current?.id,
     searchOnly: action === 'tuck' || undefined,
@@ -78,10 +83,10 @@ export function entries(snapshot: Snapshot): Entry[] {
     { id: 'command:scriptLibrary', kind: 'command', category: 'script', action: 'scriptLibrary', icon: 'script', title: t('manageScripts'), subtitle: '',
       keywords: 'scripts snippets javascript js 收藏 脚本', aliases: ['scripts', 'script library', 'manage scripts', '脚本', '脚本收藏', '管理脚本'], searchOnly: true },
     ...([
-      ['language', 'changeLanguage', ['language', 'change language', '语言', '切换语言', '语言设置']],
-      ['theme', 'changeTheme', ['theme', 'appearance', 'change theme', '主题', '外观', '切换主题']],
+      ['language', 'changeLanguage', ['language', 'change language', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
+      ['theme', 'changeTheme', ['theme', 'appearance', 'change theme', 'dark mode', 'light mode', '深色模式', '浅色模式', '主题', '外观', '换主题', '切换主题']],
       ['keyboard', 'keyboardShortcuts', ['hotkey', 'shortcut', 'keyboard shortcuts', '快捷键', '快捷键设置']],
-      ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '使用习惯']],
+      ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '重置排序', '清除排序', '使用习惯']],
       ['tabs', 'autoTuck', ['auto tuck tabs', 'auto tuck', 'automatic tuck', '自动收起闲置标签页', '自动收起', '收起设置']],
     ] as const).map(([settingsSection, title, aliases]): Entry => ({
       id: `command:settings:${settingsSection}`, kind: 'command', category: 'settings', action: 'settings', settingsSection, icon: 'settings',
@@ -113,20 +118,18 @@ export function homeEntries(items: Entry[], usageScores: ReadonlyMap<string, num
 // Intent aliases are phrases, not the loose keyword bag. Keep them independent
 // of the display language so an English command works equally well in Chinese.
 const commandAliases: Partial<Record<Entry['action'], string[]>> = {
-  newTab: ['new tab', 'open new tab', 'create tab', '新建标签页', '新建', 'xinjian'],
-  close: ['close tab', 'close current tab', '关闭标签页', '关闭当前标签页', 'guanbi'],
+  newTab: ['new tab', 'open tab', 'open new tab', 'create tab', '新建标签页', '新标签页', '新建页面', '打开新标签页', '新建', 'xinjian'],
+  close: ['close', 'close tab', 'close current tab', '关闭', '关闭标签页', '关闭当前标签页', 'guanbi'],
   closeOthers: ['close others', 'close other tabs', '关闭其他标签页', 'guanbi qita'],
   closeRight: ['close right', 'close tabs to the right', '关闭右侧标签页', 'guanbi youce'],
-  restore: ['restore tab', 'reopen tab', 'reopen closed tab', 'restore', 'reopen', '恢复关闭的标签页', '恢复', 'huifu'],
-  reload: ['reload', 'refresh', 'reload tab', 'refresh tab', '刷新标签页', '刷新', 'shuaxin'],
-  pin: ['pin', 'unpin', 'pin tab', 'unpin tab', '固定标签页', '取消固定标签页', '固定', '取消固定', 'guding'],
-  mute: ['mute', 'unmute', 'mute tab', 'unmute tab', '静音标签页', '取消静音标签页', '静音', '取消静音', 'jingyin'],
+  restore: ['restore tab', 'reopen tab', 'reopen closed tab', 'reopen last tab', 'restore last closed tab', 'undo close tab', 'restore', 'reopen', '恢复关闭的标签页', '恢复标签页', '恢复上一个标签页', '重新打开', '重新打开关闭的标签页', '恢复', 'huifu'],
+  reload: ['reload', 'refresh', 'reload tab', 'refresh tab', 'reload page', 'refresh page', 'refresh this page', '刷新标签页', '刷新页面', '重新加载页面', '刷新', 'shuaxin'],
   tuck: ['tuck away tab', 'tuck tab', '收起标签页', '收起'],
   undoTuck: ['undo tuck away', 'undo tuck', '撤销收起'],
   localStorage: ['local storage', 'localstorage', '查看本地存储', '本地存储'],
   sessionStorage: ['session storage', 'sessionstorage', '查看会话存储', '会话存储'],
   cookies: ['cookies', 'cookie', '查看 cookie', '查看 cookies'],
-  settings: ['settings', 'preferences', '设置', '偏好设置', 'shezhi'],
+  settings: ['settings', 'open settings', 'preferences', '设置', '打开设置', '偏好设置', 'shezhi'],
 };
 
 const normalizeSearch = (value: string) => entrySearchQuery(value).trim().toLowerCase().replace(/\s+/g, ' ');
@@ -137,7 +140,17 @@ export function matchingAlias(item: Entry, query: string): string {
   const normalized = normalizeSearch(query);
   if (item.kind !== 'command' || !normalized || normalizeSearch(entryTitle(item)).includes(normalized)) return '';
   const intent = entrySearchQuery(query) === query ? normalized : normalizeSearch(query.replace(/^[^:：]*[:：]\s*/, ''));
-  return intent ? (item.aliases ?? commandAliases[item.action])?.find(alias => alias.includes(intent)) || '' : '';
+  if (!intent) return '';
+  const aliases = item.aliases ?? commandAliases[item.action] ?? [];
+  const terms = intent.split(/\s+/);
+  return aliases.find(alias => normalizeSearch(alias).includes(intent)) ||
+    aliases.find(alias => terms.every(term => normalizeSearch(alias).includes(term))) ||
+    aliases.find(alias => terms.every(term => termMatches(alias, term, !pinyinAliases.has(alias)).length > 0)) || '';
+}
+
+/** A partial action word is intent; a substring of an unrelated word is not. */
+function hasIntentPrefix(terms: string[], words: string[], minLength: number): boolean {
+  return terms.some(term => term.length >= minLength && words.some(word => word.startsWith(term)));
 }
 
 // Reuse the normalized documents and Fuse index while the candidate array is
@@ -148,7 +161,7 @@ function buildSearchIndex(items: Entry[]) {
   const index = items.map(item => {
     const title = normalizeSearch(item.title);
     const label = normalizeSearch(entryTitle(item));
-    const aliases = item.kind === 'command' ? item.aliases ?? commandAliases[item.action] ?? [] : [];
+    const aliases = item.kind === 'command' ? (item.aliases ?? commandAliases[item.action] ?? []).map(normalizeSearch) : [];
     // A service is often named by its domain while its page title is localized.
     // Rank that identity like a name; paths, query strings and folders remain
     // auxiliary metadata and still receive no typo tolerance.
@@ -185,7 +198,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
   const matches = fuse.search(terms.length === 1 ? terms[0] : {
     $and: terms.map((term): Expression => ({ $or: [{ title: term }, { label: term }, { categoryText: term }, { aliases: term }, { keywords: term }, { subtitle: term }] })),
   });
-  const explicitClose = /\b(?:close|guanbi)\b|关闭/i.test(normalized);
+  const explicitClose = hasIntentPrefix(terms, ['close'], 3) || hasIntentPrefix(terms, ['guanbi'], 4) || normalized.includes('关闭');
   const tier = (item: typeof index[number]) => {
     const names = item.names;
     // Exact command intent beats even a web page with the same title. A longer
@@ -193,14 +206,19 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     if (item.kind === 'command' && names.includes(normalized)) return 0;
     if (item.title === normalized) return 1;
     if (names.some(name => name.startsWith(normalized))) return 2;
-    // Prefer a contiguous phrase at a word boundary to scattered substrings.
-    if (item.wordNames.some(name => name.startsWith(normalized) || name.includes(` ${normalized}`))) return 3;
+    // Whole phrases lead; separate word prefixes work in either order too.
+    if (item.wordNames.some(name => terms.every(term => name.startsWith(term) || name.includes(` ${term}`)))) return 3;
     if (names.some(name => terms.every(term => name.includes(term)))) return 4;
     if (terms.every(term => [...names, item.categoryText, item.keywords, item.subtitle].some(field => field.includes(term)))) return 5;
-    return 6;
+    // A typo of a complete command name is clearer than the same word buried
+    // in a longer command ("setings": Settings before Chrome Settings).
+    if (item.kind === 'command' && terms.length === 1 && /^[a-z]{4,}$/.test(normalized) &&
+      [item.title, ...item.aliases].some(name => /^[a-z]+$/.test(name) && !pinyinAliases.has(name) &&
+        Math.abs(name.length - normalized.length) <= 1 && termMatches(name, normalized).length > 0)) return 6;
+    return 7;
   };
   const kindOrder = { tab: 0, bookmark: 1, command: 2, script: 3 };
-  const explicitExtensionReload = /\b(?:zing|extension|extention)\b|扩展/i.test(normalized);
+  const explicitExtensionReload = terms.includes('zing') || hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
   return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
     (!item.danger || item.action === 'deleteScript' || explicitClose) && terms.every(term =>
     // Metadata is searchable, but must not manufacture typo matches. Only
@@ -208,21 +226,21 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||
     item.title.includes(term) || termMatches(item.title, term).length > 0 || item.aliases.some(alias =>
       termMatches(alias, term, !pinyinAliases.has(alias)).length > 0)))
-    .map(result => ({ ...result, tier: tier(result.item), usage: usageScores.get(usageTarget(items[result.refIndex])) || 0 }))
-    // Explicit intent and learned choices stay protected. At equal relevance,
-    // prefer a pinned/open tab before incidental Fuse scores from URL length or
-    // duplicate title/URL hits. Preserve MRU order when those signals also tie.
-    .sort((a, b) => rankGroup(a.tier) - rankGroup(b.tier) || b.usage - a.usage ||
-      a.tier - b.tier || Number(b.item.kind === 'command') - Number(a.item.kind === 'command') ||
+    .map(result => ({ ...result, tier: tier(result.item), usage: usageScores.get(usageTarget(items[result.refIndex])) || 0,
+      // More aliases should improve discovery, not multiply a command's rank.
+      nameLength: result.item.kind === 'command'
+        ? Math.min(Infinity, ...result.item.names.filter(name => terms.every(term => name.includes(term))).map(name => name.length)) : Infinity,
+    }))
+    // Habits only reorder equally relevant results. Prefer a pinned/open tab
+    // before incidental Fuse scores from URL length or duplicate title/URL hits.
+    .sort((a, b) => a.tier - b.tier || b.usage - a.usage ||
+      Number(b.item.kind === 'command') - Number(a.item.kind === 'command') ||
       Number(b.item.pinned) - Number(a.item.pinned) ||
       kindOrder[a.item.kind] - kindOrder[b.item.kind] ||
+      (a.item.kind === 'command' && b.item.kind === 'command' ? a.nameLength - b.nameLength : 0) ||
       (a.tier > 1 ? (a.score ?? 1) - (b.score ?? 1) : 0) || a.refIndex - b.refIndex)
     .map(result => items[result.refIndex]);
 }
-
-// Keep exact command intent, complete titles and literal matches protected.
-// Within each group, learned choices can overtake ordinary textual ranking.
-function rankGroup(tier: number): number { return tier < 2 ? tier : tier === 6 ? 3 : 2; }
 
 export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
   if (entry.kind === 'script') {

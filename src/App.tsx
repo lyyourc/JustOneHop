@@ -359,7 +359,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
             <span className={`entry-icon ${item.kind}`} data-color={item.groupColor}><Favicon pageUrl={item.faviconPageUrl} fallback={<Glyph name={item.icon} />} /></span>
             <span className="entry-copy"><span className="entry-title"><HighlightedText text={entryTitle(item)} query={entrySearchQuery(query)} /></span><span className="entry-subtitle">
               {item.kind === 'command' ? (matchingAlias(item, query)
-                ? <><HighlightedText text={matchingAlias(item, query)} query={entrySearchQuery(query)} allowTypos={false} />{item.action === 'closeOthers' || item.action === 'closeRight' ? ` · ${t('keepPinned')}` : ''}</>
+                ? <><HighlightedText text={matchingAlias(item, query)} query={entrySearchQuery(query)} />{item.action === 'closeOthers' || item.action === 'closeRight' ? ` · ${t('keepPinned')}` : ''}</>
                 : (item.action === 'closeOthers' || item.action === 'closeRight' ? t('keepPinned') : ''))
                 : <HighlightedText text={item.subtitle} query={query} allowTypos={false} />}
             </span></span>

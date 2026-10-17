@@ -11,7 +11,7 @@ export const chromePages = {
   openHistory: { url: 'chrome://history/', title: 'chromeHistory', icon: 'history',
     aliases: ['history', 'browsing history', '历史', '历史记录', '浏览记录'] },
   openBookmarks: { url: 'chrome://bookmarks/', title: 'chromeBookmarks', icon: 'bookmark',
-    aliases: ['bookmark manager', 'manage bookmarks', '书签管理', '书签管理器', '管理书签'] },
+    aliases: ['bookmark manager', 'manage bookmarks', 'open bookmarks', '书签管理', '书签管理器', '管理书签', '打开书签'] },
   openChromeSettings: { url: 'chrome://settings/', title: 'chromeSettings', icon: 'settings',
     aliases: ['chrome settings', 'browser settings', 'chrome 设置', '浏览器设置'] },
   openExtensionShortcuts: { url: 'chrome://extensions/shortcuts', title: 'chromeExtensionShortcuts', icon: 'keyboard',
