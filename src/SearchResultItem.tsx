@@ -4,7 +4,7 @@ import { RankingButton } from './RankingButton';
 import {
   BookOpen, Copy, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
   Layers, Pin, Plus, RotateCcw, Puzzle, KeyRound, Download, History, Keyboard,
-  Settings2, Volume2, VolumeX, X, PanelTop,
+  Settings2, Volume2, VolumeX, X, PanelTop, Search,
 } from 'lucide-react';
 import { ResultContent } from './ResultContent';
 import { HistoryMetadata } from './HistoryMetadata';
@@ -16,7 +16,7 @@ import { matchingAlias } from './model';
 import { t, countMessage } from './i18n';
 import type { Entry, IconName } from './types';
 
-const icons = { copy: Copy, help: BookOpen, extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
+const icons = { search: Search, copy: Copy, help: BookOpen, extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
   others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, tuck: ArrowDownToLine };
 export function EntryGlyph({ name, size = 18 }: { name: IconName; size?: number }) {
   const Icon = icons[name]; return <Icon size={size} strokeWidth={1.7} aria-hidden="true" />;

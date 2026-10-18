@@ -97,12 +97,13 @@
     "message": "Open Bookmark"
   },
   "goToUrl": { "message": "Go to URL" },
+  "searchGoogleFor": { "message": "Search Google for “$1”" },
   "openCurrentTab": { "message": "Open in Current Tab" },
   "addressPinned": { "message": "Pinned tab: use a new tab" },
   "errorInvalidRequest": { "message": "This address cannot be opened. Check the URL and try again." },
   "errorTabChanged": { "message": "The source tab has changed. Reopen zing and try again." },
   "errorPinned": { "message": "The source tab is pinned. Open the address in a new tab." },
-  "helpAddressBody": { "message": "Type a URL, domain, or localhost address to show Go to URL first, unless a matching tab, bookmark, or history result already has that exact address. Paths, query strings, and fragments remain distinct. Enter or clicking the result navigates the source tab. Command+Enter on macOS or Alt+Enter on Windows/Linux opens and switches to a new tab in the same window. Both actions are also available in the footer and Actions menu. Bare domains use HTTPS; localhost and loopback addresses use HTTP. Pinned source tabs allow only opening a new tab. Only HTTP(S) destinations are supported; plain text stays a local search, with no web search or online suggestions." },
+  "helpAddressBody": { "message": "Type a URL, domain, or localhost address to show Go to URL first, unless a matching tab, bookmark, or history result already has that exact address. Paths, query strings, and fragments remain distinct. Enter or clicking the result navigates the source tab. Command+Enter on macOS or Alt+Enter on Windows/Linux opens and switches to a new tab in the same window. Both actions are also available in the footer and Actions menu. Bare domains use HTTPS; localhost and loopback addresses use HTTP. Pinned source tabs allow only opening a new tab. Only HTTP(S) destinations are supported. Nonempty searches also offer Search Google for “…” after local matches; with no local match it comes first. Type google React hooks or 谷歌搜索 React hooks to put Google first and search only the words after the prefix. URL navigation keeps priority for addresses. Google uses the same current-tab and new-tab actions, including pinned-tab protection. Typing stays local; only executing the Google result opens Google's search page. No online suggestions, additional permissions, or search-selection learning." },
   "runCommand": {
     "message": "Run Command"
   },

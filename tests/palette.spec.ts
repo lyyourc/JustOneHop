@@ -5918,6 +5918,101 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('Google search: local priority and mouse keyboard menu navigation preserve search terms', async () => {
+    // Chrome API-created tabs can navigate before Playwright installs routing.
+    // Capture the requested destination and use a local page to verify tab effects.
+    await worker.evaluate(base => {
+      const state = globalThis as unknown as { __googleRequests: string[] };
+      state.__googleRequests = [];
+      const redirect = (url: string | undefined) => {
+        if (!url?.startsWith('https://www.google.com/search?')) return url;
+        state.__googleRequests.push(url);
+        return `${base}/Google-destination${new URL(url).search}`;
+      };
+      const update = chrome.tabs.update.bind(chrome.tabs), create = chrome.tabs.create.bind(chrome.tabs);
+      chrome.tabs.update = (async (id: number, props: chrome.tabs.UpdateProperties) => update(id, { ...props, ...(props.url ? { url: redirect(props.url) } : {}) })) as typeof chrome.tabs.update;
+      chrome.tabs.create = (async (props: chrome.tabs.CreateProperties) => create({ ...props, ...(props.url ? { url: redirect(props.url) } : {}) })) as typeof chrome.tabs.create;
+    }, origin);
+    const requests = () => worker.evaluate(() => (globalThis as unknown as { __googleRequests: string[] }).__googleRequests);
+    const page = await context.newPage(); await page.goto(`${origin}/Google-source`);
+    const source = await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      await chrome.bookmarks.create({ title: 'LocalSearchMatch', url: 'https://example.test/local-result' });
+      return { id: tab.id!, windowId: tab.windowId };
+    }, page.url());
+    let surface = await openStorageOverlay(page);
+    let input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const rows = () => surface.locator('#zing-results .result');
+    await expect(rows().filter({ hasText: 'Search Google for' })).toHaveCount(0);
+    await input.fill('LocalSearchMatch');
+    await expect(rows().first()).toHaveClass(/bookmark/);
+    await expect(rows().last()).toContainText('Search Google for “LocalSearchMatch”');
+    await input.fill('example.test/new-path');
+    await expect(rows().first()).toContainText('Go to URL');
+    await expect(rows().last()).toContainText('Search Google for');
+    expect(await requests()).toEqual([]);
+    await input.press('Escape');
+    const shortcut = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter');
+    for (const method of ['click', 'enter', 'shortcut', 'footer', 'menu'] as const) {
+      await page.goto(`${origin}/Google-source`);
+      if (method === 'menu') await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), source.id);
+      surface = await openStorageOverlay(page);
+      input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+      const terms = `UnmatchedSearch ${method} 中文 C++ & #part`;
+      const prefix = method === 'shortcut' ? '谷歌搜索 ' : method === 'menu' ? 'google ' : '';
+      await input.fill(prefix + terms);
+      const row = rows().first();
+      await expect(row).toContainText(`Search Google for “${terms}”`);
+      await expect(row).toHaveAttribute('aria-selected', 'true');
+      const before = (await requests()).length;
+      for (const init of [{ key: 'Enter', isComposing: true }, { key: 'Enter', keyCode: 229 }, { key: 'Enter', repeat: true }, { key: 'Enter', metaKey: true, shiftKey: true }]) {
+        await input.dispatchEvent('keydown', init);
+      }
+      expect((await requests()).length).toBe(before);
+      if (method === 'click') await row.click();
+      else if (method === 'enter') await input.press('Enter');
+      else if (method === 'shortcut') await input.press(shortcut);
+      else if (method === 'footer') {
+        await page.setViewportSize({ width: 390, height: 640 });
+        const button = surface.getByRole('button', { name: 'Open in New Tab', exact: true });
+        const bounds = await button.boundingBox();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+        await button.click();
+      } else {
+        await expect(surface.getByRole('button', { name: 'Open in Current Tab', exact: true })).toBeDisabled();
+        // Only the primary action is disabled; a real right click must still open Actions.
+        const bounds = (await row.boundingBox())!;
+        await page.mouse.click(bounds.x + 30, bounds.y + bounds.height / 2, { button: 'right' });
+        let menuInput = surface.getByRole('combobox', { name: 'Search actions' });
+        await menuInput.press('Escape');
+        await expect(input).toHaveValue(prefix + terms); await expect(input).toBeFocused();
+        await input.press('Enter');
+        expect((await requests()).length).toBe(before);
+        await page.mouse.click(bounds.x + 30, bounds.y + bounds.height / 2, { button: 'right' });
+        menuInput = surface.getByRole('combobox', { name: 'Search actions' });
+        await menuInput.fill('新标签页');
+        await expect(surface.locator('.action-row')).toHaveCount(1);
+        await menuInput.press('Enter');
+      }
+      await expect(page.locator('.zing-frame')).toHaveCount(0);
+      await expect.poll(async () => (await requests()).length).toBe(before + 1);
+      const destination = new URL((await requests()).at(-1)!);
+      expect(destination.origin + destination.pathname).toBe('https://www.google.com/search');
+      expect([...destination.searchParams]).toEqual([['q', terms]]);
+      expect(destination.hash).toBe('');
+      await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toBe(`${origin}/Google-destination${destination.search}`);
+      const active = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0], source.windowId);
+      if (method === 'click' || method === 'enter') expect(active.id).toBe(source.id);
+      else {
+        expect(active.id).not.toBe(source.id);
+        expect((await worker.evaluate(id => chrome.tabs.get(id), source.id)).url).toBe(`${origin}/Google-source`);
+        await worker.evaluate(id => chrome.tabs.remove(id), active.id!);
+      }
+      await page.setViewportSize({ width: 1100, height: 760 });
+    }
+    expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage ?? [])).toEqual([]);
+  });
+
   test('Address navigation: exact existing results suppress the URL candidate but distinct destinations keep it', async () => {
     const page = await context.newPage(); await page.goto(`${origin}/Address-dedup-source`);
     const urls = { tab: `${origin}/Address-dedup-tab`, bookmark: `${origin}/Address-dedup-bookmark`, history: `${origin}/Address-dedup-history` };
@@ -6029,6 +6124,25 @@ async function openNativePalette() {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test('Google search: native panel opens current and new tabs in its source window', async () => {
+    await context.route('https://www.google.com/search?**', route => route.fulfill({ contentType: 'text/html', body: '<title>Search destination</title>' }));
+    for (const newTab of [false, true]) {
+      const { source, palette } = await openNativePalette();
+      const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+      const terms = `NativeSearch ${newTab} 中文 & C++`;
+      await input.fill(`google ${terms}`);
+      await expect(palette.locator('#zing-results .result').first()).toContainText(`Search Google for “${terms}”`);
+      const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
+      await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
+      await expect.poll(() => palette.isClosed()).toBe(true);
+      await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toMatch(/^https:\/\/www.google.com\/search\?/);
+      const active = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0], source.windowId);
+      expect(new URL(active.url!).searchParams.get('q')).toBe(terms);
+      expect(active.id === source.tabId).toBe(!newTab);
+      if (newTab) expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).url).toBe('chrome://version/');
+    }
+  });
+
   test('Address navigation: native panel navigates its source and opens new tabs in the source window', async () => {
     for (const newTab of [false, true]) {
       const { source, palette } = await openNativePalette();

@@ -13,6 +13,7 @@ import { Favicon } from './Favicon';
 import { NavigationHint, matchesShortcut, shortcutKeys } from './Shortcut';
 import { addressEntry, addressActions } from './addressPresentation';
 import { addressNewTabShortcut } from './address';
+import { googleSearchEntry, insertGoogleSearch } from './googleSearch';
 import { NavigationRoot, BackLayer } from './Navigation';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
@@ -92,7 +93,9 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const address = useMemo(() => data ? addressEntry(query, data, next.results) : undefined, [query, data, next.results, preferences.language]);
   const nextResults = useMemo(() => address ? [address, ...next.results] : next.results, [address, next.results]);
   const nextRanking = useMemo(() => rankingInfo(nextResults, address ? [address, ...next.baseline] : next.baseline, query.trim() ? liveScores : liveRecommendations.scores), [nextResults, address, next, liveScores, liveRecommendations, query]);
-  const nextVisible = !query.trim() ? nextResults.slice(0, 10) : data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults.slice(0, 100);
+  const google = useMemo(() => data ? googleSearchEntry(query, data) : undefined, [query, data, preferences.language]);
+  const nextVisible = !query.trim() ? nextResults.slice(0, 10) : insertGoogleSearch(
+    data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults, google);
   const results = history.pending ? committed.current.results : nextResults;
   const visible = history.pending ? committed.current.visible : nextVisible;
   const displayQuery = history.pending ? committed.current.query : query;
@@ -416,7 +419,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
               setSelection(item.id); setActionTarget(item); setActionQuery(''); setActionSelection(''); setError('');
             }} />
           </div>)}
-          {!grouped && results.length > visible.filter(item => item.action !== 'searchAllHistory').length ? <p className="more-hint">{t('moreResults')}</p> : null}
+          {!grouped && results.length > visible.filter(item => item.action !== 'searchAllHistory' && !item.id.startsWith('google:')).length ? <p className="more-hint">{t('moreResults')}</p> : null}
         </div>
       </div>
 

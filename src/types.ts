@@ -81,7 +81,7 @@ export type Request =
   | { source: 'zing'; type: 'forget-usage'; payload: { target: string | string[]; query?: string } }
   | { source: 'zing'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
-export type IconName = 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'tuck';
+export type IconName = 'search' | 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'tuck';
 export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'binding' | 'ranking' | 'tabs';
 export interface Entry {
   category?: 'tabGroup' | 'tab' | 'storage' | 'settings' | 'chromePages' | 'zing';
