@@ -187,7 +187,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         <div className="settings-group settings-experiments">
           {matches.has('tabs') ? <div data-setting="tabs">
             <div className="setting-row">
-              <div className="setting-copy"><label htmlFor={tuckToggle}>{highlight(t('autoTuck'))}</label><p id={tuckHint}>{highlight(t('autoTuckHint'))}</p></div>
+              <div className="setting-copy"><label htmlFor={tuckToggle}>{highlight(t('autoTuck'))}</label><p id={tuckHint}>{highlight(t('autoTuckHint'))} {highlight(t('autoTuckOffHint'))}</p></div>
               <button id={tuckToggle} className="setting-toggle" role="switch" aria-label={t('autoTuck')} aria-checked={preferences.autoTuck}
                 aria-describedby={tuckHint} disabled={tuckSaving} onClick={() => void toggleAutoTuck()}><span /></button>
             </div>

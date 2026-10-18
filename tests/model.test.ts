@@ -251,8 +251,15 @@ test('bookmark queries show the current state in both languages and menus withou
           for (const query of ['书签', 'close', '关闭', 'tab', 'remove', 'delete', 'boo', 'unboo', 'books', 'bookcase', 'book guide', 'unbookmrak', 'bookmrak', 'close bookmark']) {
             assert.ok(!search(candidates, query).some(item => item.action === 'unbookmarkTab'), `${locale}: ${query}`);
           }
-          for (const query of ['book', 'BOOKM', 'bookma', 'bookmar', 'Tab: book', 'bookmark', 'BOOKMARK', 'bookmark tab', 'add bookmark', 'save bookmark', '收藏', '收藏标签页', '添加书签', 'Tab: bookmark', '标签页：收藏标签页']) {
+          for (const query of ['book', 'BOOKM', 'bookma', 'bookmar', 'Tab: book', 'bookmark', 'BOOKMARK', 'bookmark tab', '收藏', '收藏标签页', 'Tab: bookmark', '标签页：收藏标签页']) {
             assert.equal(search(candidates, query)[0]?.action, action, `${locale}: ${query}, saved=${saved}`);
+          }
+          for (const query of ['add bookmark', 'save bookmark', '添加书签', 'Tab: add bookmark', '标签页：添加书签', 'bookmark add']) {
+            const found = search(candidates, query);
+            assert.ok(!found.some(item => item.danger), `${locale}: ${query}`);
+            assert.equal(found[0]?.action, 'bookmarkTab');
+            assert.equal(!!found[0]?.disabled, saved);
+            assert.equal(found[0]?.title, t(saved ? 'alreadyBookmarked' : 'bookmarkTab'));
           }
           if (!saved) assert.ok(search(candidates, '书签').some(item => item.action === 'bookmarkTab'));
           const command = candidates.find(item => item.action === action)!;

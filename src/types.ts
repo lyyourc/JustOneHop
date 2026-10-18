@@ -114,4 +114,5 @@ export interface Entry {
   tucked?: boolean;
   canTuck?: boolean;
   danger?: boolean;
+  disabled?: boolean;
 }

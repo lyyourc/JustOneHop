@@ -250,7 +250,7 @@
   "helpControlsBody": { "message": "Right-click a result, click Actions in the footer, or press Cmd/Ctrl+K to open actions for the selected item. Lists also support Ctrl+P and Ctrl+N alongside the arrow keys." },
   "helpBackBody": { "message": "Press Esc, click the back arrow, or press Backspace in an empty secondary search field to go back one level with your search and selection restored. At the main search, Esc closes zing." },
   "helpTabsTitle": { "message": "Manage and switch tabs" },
-  "helpTabsBody": { "message": "Pin, mute, and close actions apply directly to the selected result and keep the palette open for continuous cleanup; bulk close preserves pinned tabs. Search a tab group’s name to manage its tabs. Choose Zing: Tab Switcher to filter recent tabs inside the palette, then click a row or press Enter to switch; Cancel returns to your search. When launching the switcher with its shortcut, hold the modifier key to select and release to switch; click the search field or press Cmd/Ctrl+F to pause release-to-switch and filter by text instead." },
+  "helpTabsBody": { "message": "Pinning, muting, and closing other tabs keep the palette open for continued cleanup. Closing the tab you opened zing from ends the palette session, including when a bulk close removes it. Bulk close preserves pinned tabs. Search a tab group’s name to manage its tabs. Choose Zing: Tab Switcher to filter recent tabs inside the palette, then click a row or press Enter to switch; Cancel returns to your search. When launching the switcher with its shortcut, hold the modifier key to select and release to switch; click the search field or press Cmd/Ctrl+F to pause release-to-switch and filter by text instead." },
   "helpTuckBody": { "message": "“Tuck Away Tab” moves a tab into a collapsed group at the end of the window without closing or discarding it; switch to the tab from search anytime to bring it back. Enable “Auto Tuck Tabs” in Settings to automatically tuck tabs unused for 7 days. If a group needs confirmation after a browser restart, search for “recover tucked tabs”." },
   "helpStorageTitle": { "message": "View website storage" },
   "helpStorageBody": { "message": "Search for “local storage”, “session storage”, or “cookies” on a webpage. Select a key on the left to preview its value on the right; Enter or Copy Value copies the original string. JSON is formatted for reading; storage is read-only. Reading cookies requests permission only for the current site’s domains, which you can revoke anytime in Chrome’s extension settings." },
@@ -573,8 +573,9 @@
     "message": "Move tabs idle for 7 days into a collapsed Tucked Away group."
   },
   "autoTuckOffHint": {
-    "message": "Turning this off returns managed tabs to the tab strip. After restart, matching groups reconnect automatically; uncertain groups wait for your review."
+    "message": "Turning this off returns tabs still managed by zing to the tab strip, including manually tucked tabs."
   },
+  "alreadyBookmarked": { "message": "Already Bookmarked" },
   "tuck": {
     "message": "Tuck Away Tab"
   },

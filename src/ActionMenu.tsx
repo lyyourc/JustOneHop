@@ -6,7 +6,7 @@ import { Search } from 'lucide-react';
 import { t } from './i18n';
 import { HighlightedText } from './HighlightedText';
 
-export interface MenuAction { id: string; title: string; icon?: ReactNode; alias?: string; danger?: boolean; shortcut?: string }
+export interface MenuAction { id: string; title: string; icon?: ReactNode; alias?: string; danger?: boolean; disabled?: boolean; shortcut?: string }
 
 /** Pages own their actions; this component owns menu focus, navigation and rendering. */
 export function ActionMenu({ id, title, actions, query, onQueryChange, selectedId, onSelectionChange, onAction, onClose, isMac }: {
@@ -24,7 +24,7 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
     <div tabIndex={-1} className="action-menu" role="dialog" aria-label={t('actionMenu')} aria-modal="true" onKeyDown={event => {
       event.stopPropagation();
       if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-      const shortcutAction = actions.find(action => action.shortcut && matchesShortcut(event, action.shortcut, isMac));
+      const shortcutAction = actions.find(action => !action.disabled && action.shortcut && matchesShortcut(event, action.shortcut, isMac));
       if (shortcutAction) { event.preventDefault(); if (!event.repeat) onAction(shortcutAction.id); return; }
       const mod = isMac ? event.metaKey : event.ctrlKey;
       if ((mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k')) { event.preventDefault(); onClose(); return; }
@@ -50,19 +50,19 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
         onSelectionChange(actions[next].id);
       } else if (event.key === 'Enter') {
         event.preventDefault();
-        if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && selected) onAction(selected.id);
+        if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && selected && !selected.disabled) onAction(selected.id);
       }
     }}>
       <div className="action-heading">{title}</div>
       <div ref={list} className="action-list" id={id} role="listbox" aria-label={t('availableActions')}>
-        {actions.map(action => <div key={action.id} id={`${id}-${action.id}`} role="option" aria-selected={action.id === selected?.id}
-          className={`action-row ${action.danger ? 'danger' : ''}`} onClick={() => onAction(action.id)} onMouseMove={event => {
+        {actions.map(action => <div key={action.id} id={`${id}-${action.id}`} role="option" aria-selected={action.id === selected?.id} aria-disabled={action.disabled || undefined}
+          className={`action-row ${action.danger ? 'danger' : ''}`} onClick={() => { if (!action.disabled) onAction(action.id); }} onMouseMove={event => {
             const next = { x: event.screenX, y: event.screenY };
             if (pointer.current && (pointer.current.x !== next.x || pointer.current.y !== next.y)) onSelectionChange(action.id);
             pointer.current = next;
           }}>
           {action.icon}<span><HighlightedText text={action.title} query={query} />{action.alias ? <span className="action-alias"><HighlightedText text={action.alias} query={query} /></span> : null}</span>
-          {action.shortcut ? <Shortcut binding={action.shortcut} isMac={isMac} /> : action.id === selected?.id ? <kbd title={`Enter — ${action.title}`} aria-label={`Enter — ${action.title}`}>↵</kbd> : null}
+          {action.shortcut ? <Shortcut binding={action.shortcut} isMac={isMac} /> : !action.disabled && action.id === selected?.id ? <kbd title={`Enter — ${action.title}`} aria-label={`Enter — ${action.title}`}>↵</kbd> : null}
         </div>)}
         {!actions.length ? <p className="action-empty">{t('noActions')}</p> : null}
       </div>

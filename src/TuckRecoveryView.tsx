@@ -61,7 +61,8 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
         list.current?.focus();
       } else if (event.key === 'Enter' && (event.target as HTMLElement).tagName !== 'BUTTON') {
         event.preventDefault();
-        if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) void run(action?.id || 'back');
+        // Reviewing a candidate never confirms ownership. Tab to the footer or
+        // open its action menu to explicitly resume management.
       }
     }}>
     <div className="settings-body" inert={menu ? true : undefined}>

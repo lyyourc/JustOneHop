@@ -45,8 +45,8 @@ export function SearchResultItem({ entry, query, ranking, onForget, disabled = f
       if (dragged && selection && !selection.isCollapsed && selection.containsNode(event.currentTarget, true)) {
         event.stopPropagation(); return;
       }
-      onClick?.(event);
-    }} role="option" aria-selected={selected} className={`result ${entry.kind} ${entry.danger ? 'danger' : ''}`} title={`${entryTitle(entry)} — ${entry.subtitle}`}>
+      if (!entry.disabled) onClick?.(event);
+    }} role="option" aria-disabled={entry.disabled || undefined} aria-selected={selected} className={`result ${entry.kind} ${entry.danger ? 'danger' : ''}`} title={`${entryTitle(entry)} — ${entry.subtitle}`}>
     <ResultContent title={entryTitle(entry)} subtitle={subtitle} query={entrySearchQuery(query)} kind={entry.kind} color={entry.groupColor}
       pageUrl={entry.faviconPageUrl} icon={<EntryGlyph name={entry.icon} />}
       metadata={<>

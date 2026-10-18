@@ -67,11 +67,13 @@ export async function resumeTuck(windowId: number, recoveryId: string, groupId: 
     if (!record || !group || groupFingerprint(group) !== fingerprint ||
       state.groups.some(owned => owned.id === groupId || recordKey(owned) === recoveryId)) throw new Error(t('errorTuckRecoveryChanged'));
     invalidGroups.delete(groupId);
-    const owned: Group = { key: record.key, id: group.id, windowId, title: group.title, members: group.tabs.map(tab => tab.id) };
-    // Explicit confirmation authorizes this group, including a user-adjusted name/color.
+    // Explicit confirmation adopts the current metadata. A changed name (even
+    // an empty one) is custom; unchanged generated names can still track counts.
+    const owned: Group = { key: record.key, id: group.id, windowId, title: group.title,
+      color: group.color as chrome.tabGroups.TabGroup['color'], customTitle: record.customTitle || group.title !== record.title,
+      members: group.tabs.map(tab => tab.id) };
     state.groups.push(owned);
-    owned.title = `${t('tuckGroupTitle')} · ${owned.members.length}`;
-    try { await chrome.tabGroups.update(group.id, { title: owned.title, color: 'grey',
+    try { await chrome.tabGroups.update(group.id, {
       collapsed: !(await chrome.tabs.query({ groupId })).some(tab => tab.active) }); }
     catch (error) { state.groups = state.groups.filter(item => item !== owned); throw error; }
     for (const tab of await chrome.tabs.query({ groupId })) if (tab.active) await releaseTab(tab);

@@ -187,10 +187,8 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   }, []);
 
   useEffect(() => {
-    if (frozenRanking && (frozenRanking.query !== query || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || storage || bindingOpen || recoveryId || groupId !== undefined)) {
-      setFrozenRanking(null);
-    }
-  }, [frozenRanking, query, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, bindingOpen, recoveryId, groupId]);
+    if (frozenRanking && frozenRanking.query !== query) setFrozenRanking(null);
+  }, [frozenRanking, query]);
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [selected?.id, nextResults, actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, bindingOpen, recoveryId, groupId]);
@@ -211,7 +209,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   function toggleActions() {
     if (resultBusy) return;
     if (actionTarget) closeActions();
-    else if (selected) {
+    else if (selected && !selected.disabled) {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       setActionTarget(selected); setActionQuery(''); setActionSelection(''); setError(''); }
   }
@@ -229,7 +227,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     finally { executing.current = false; setBusy(false); }
   }
   async function run(entry?: Entry, confirmed = false) {
-    if (!entry || !data || resultBusy || (bookmarkRemoval && !confirmed)) return;
+    if (!entry || entry.disabled || !data || resultBusy || (bookmarkRemoval && !confirmed)) return;
     if (entry.action === 'unbookmarkTab' && !confirmed) {
       const bookmarks = data.bookmarks.filter(bookmark => entry.bookmarkIds?.includes(bookmark.id));
       if (bookmarks.some(bookmark => bookmark.unmodifiable)) { setError(t('errorBookmarkManaged')); return; }
@@ -403,7 +401,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
-              if (resultBusy) return;
+              if (resultBusy || item.disabled) return;
               savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
               setSelection(item.id); setActionTarget(item); setActionQuery(''); setActionSelection(''); setError('');
             }} />
@@ -414,7 +412,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
 
       {bookmarkRemoval ? <BookmarkConfirmation target={bookmarkRemoval} onCancel={() => setBookmarkRemoval(null)} onConfirm={() => void run(bookmarkRemoval.entry, true)} /> : actionTarget ? <ActionMenu id="zing-actions" isMac={isMac}
         title={<><span className="action-target-icon"><Favicon pageUrl={actionTarget.faviconPageUrl} fallback={<Glyph name={actionTarget.icon} size={15} />} /></span><span>{liveTarget?.title}</span></>}
-        actions={actions.map(action => ({ id: action.id, title: action.title, shortcut: visibleShortcut(action), icon: <Favicon pageUrl={action.faviconPageUrl} fallback={<Glyph name={action.icon} size={16} />} />, danger: action.danger || action.action === 'close', alias: matchingAlias(action, actionQuery) }))}
+        actions={actions.map(action => ({ id: action.id, title: action.title, shortcut: visibleShortcut(action), icon: <Favicon pageUrl={action.faviconPageUrl} fallback={<Glyph name={action.icon} size={16} />} />, danger: action.danger || action.action === 'close', disabled: action.disabled, alias: matchingAlias(action, actionQuery) }))}
         query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }} selectedId={selectedAction?.id} onSelectionChange={setActionSelection}
         onAction={id => void run(actions.find(action => action.id === id))} onClose={closeActions} /> : null}
 
@@ -428,8 +426,8 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
-        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || resultBusy || !!bookmarkRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        actions={{ open: !!actionTarget, disabled: !selected || resultBusy || !!bookmarkRemoval, onToggle: toggleActions }} />
+        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
+        actions={{ open: !!actionTarget, disabled: !selected || selected.disabled || resultBusy || !!bookmarkRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}
   </div></BackLayer></NavigationRoot>;

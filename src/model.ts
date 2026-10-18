@@ -39,7 +39,8 @@ export function commands(current?: TabItem): Entry[] {
   }));
 }
 
-const bookmarkStateAliases = ['bookmark', 'bookmark tab', 'add bookmark', 'save bookmark', '收藏', '收藏标签页', '添加书签'];
+const bookmarkStateAliases = ['bookmark', 'bookmark tab', '收藏', '收藏标签页'];
+const bookmarkAddAliases = ['add bookmark', 'save bookmark', '添加书签'];
 
 export function bookmarkTabAction(tab: TabItem | undefined, bookmarks: BookmarkItem[]): Entry | undefined {
   if (!tab || !safeBookmarkUrl(tab.url)) return undefined;
@@ -53,7 +54,7 @@ export function bookmarkTabAction(tab: TabItem | undefined, bookmarks: BookmarkI
     keywords: 'bookmark tab 书签 标签页',
     aliases: action === 'unbookmarkTab'
       ? [...bookmarkStateAliases, 'unbookmark', 'unbookmark tab', 'remove bookmark', 'remove bookmarks', 'delete bookmark', 'delete bookmarks', '取消收藏', '取消收藏标签页', '删除书签']
-      : bookmarkStateAliases,
+      : [...bookmarkStateAliases, ...bookmarkAddAliases],
   };
 }
 
@@ -258,6 +259,13 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
   const normalized = normalizeSearch(query);
   if (!normalized) return items;
   const terms = normalized.split(/\s+/);
+  const bookmarkIntent = normalizeSearch(query.replace(/^\s*(?:tab|标签页)\s*[:：]\s*/i, ''));
+  const explicitBookmarkAdd = bookmarkAddAliases.includes(bookmarkIntent) ||
+    /^(?:add|save)\s+(?:a\s+)?bookmark(?:\s+tab)?$/.test(bookmarkIntent) || bookmarkIntent === 'bookmark add' || bookmarkIntent === 'bookmark save';
+  if (explicitBookmarkAdd) items = items.map(item => item.action === 'unbookmarkTab' ? {
+    ...item, title: t('alreadyBookmarked'), action: 'bookmarkTab', danger: false, disabled: true, shortcut: undefined,
+    aliases: [...bookmarkAddAliases, bookmarkIntent],
+  } : item);
   let prepared = searchIndexes.get(items);
   if (!prepared || prepared.language !== t('languageTag')) {
     prepared = buildSearchIndex(items);
@@ -268,7 +276,6 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     $and: terms.map((term): Expression => ({ $or: [{ title: term }, { label: term }, { categoryText: term }, { aliases: term }, { keywords: term }, { subtitle: term }] })),
   });
   const explicitClose = hasIntentPrefix(terms, ['close'], 3) || hasIntentPrefix(terms, ['guanbi'], 4) || normalized.includes('关闭');
-  const bookmarkIntent = normalizeSearch(query.replace(/^\s*(?:tab|标签页)\s*[:：]\s*/i, ''));
   const bookmarkPrefix = /^book[a-z]*$/.test(bookmarkIntent) && 'bookmark'.startsWith(bookmarkIntent);
   const unbookmarkPrefix = /^unbook[a-z]*$/.test(bookmarkIntent) && 'unbookmark'.startsWith(bookmarkIntent);
   const explicitBookmarkState = bookmarkStateAliases.includes(bookmarkIntent) || bookmarkPrefix;

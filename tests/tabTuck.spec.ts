@@ -416,6 +416,16 @@ test('English actual Chrome restart retains records and safely resumes a group w
     await ui.screenshot({ path: test.info().outputPath('zing-tuck-recovery-zh.png') });
     await ui.keyboard.press('Control+n');
     await ui.keyboard.press('Control+p');
+    await expect(ui.getByRole('listbox')).toBeFocused();
+    await ui.getByRole('listbox').getByRole('option', { selected: true }).click();
+    await ui.keyboard.press('Enter');
+    await expect(ui.locator('.tuck-recovery')).toBeVisible();
+    expect((await recoverySnapshot()).tuckRecoveries).toHaveLength(1);
+    expect((await recoverySnapshot()).tabs.filter((tab: { tucked?: boolean }) => tab.tucked)).toHaveLength(0);
+    await ui.keyboard.press('Tab');
+    await expect(ui.locator('.tuck-recovery .footer-back')).toBeFocused();
+    await ui.keyboard.press('Tab');
+    await expect(ui.getByRole('button', { name: '继续管理这组', exact: true })).toBeFocused();
     await ui.keyboard.press('Enter');
   }
   await expect.poll(async () => (await recoverySnapshot()).tabs.filter((tab: { tucked?: boolean }) => tab.tucked).length).toBe(2);
@@ -424,6 +434,60 @@ test('English actual Chrome restart retains records and safely resumes a group w
   await expect.poll(() => groupId(alpha.id)).toBe(-1);
   expect(await groupId(beta.id)).not.toBe(-1);
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabGroups.get((await chrome.tabs.get(id)).groupId)).collapsed, beta.id)).toBe(true);
+});
+
+test('English recovery requires explicit keyboard confirmation and keeps the candidate name and color managed', async () => {
+  const [a, b] = await seed('Confirm-Alpha', 'Confirm-Beta');
+  await execute('tuck', a); await execute('tuck', b);
+  // Require review independently of whether this Chrome version restores names.
+  await worker.evaluate(async () => {
+    const { zingTabTuckRecovery } = await chrome.storage.local.get('zingTabTuckRecovery');
+    const saved = zingTabTuckRecovery as { records: { requiresConfirmation?: boolean }[] };
+    saved.records.forEach(record => { record.requiresConfirmation = true; });
+    await chrome.storage.local.set({ zingTabTuckRecovery: saved });
+  });
+  await restartChrome();
+  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(1);
+  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries[0].candidates.length).toBe(1);
+  const candidate = (await recoverySnapshot()).tuckRecoveries[0].candidates[0];
+  await worker.evaluate(id => chrome.tabGroups.update(id, { title: 'Read when ready', color: 'purple' }), candidate.id);
+  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries[0].candidates[0].title).toBe('Read when ready');
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+  await search.fill('recover tucked tabs');
+  await expect(ui.getByRole('option').filter({ hasText: 'Review Tucked Away Groups' }).first()).toHaveAttribute('aria-selected', 'true');
+  await search.press('Enter');
+  const list = ui.getByRole('listbox');
+  await expect(list).toBeFocused();
+  await expect(list.getByRole('option', { selected: true })).toContainText('Read when ready');
+  await ui.keyboard.press('Enter');
+  await expect(ui.locator('.tuck-recovery')).toBeVisible();
+  let snapshot = await recoverySnapshot();
+  expect(snapshot.tuckRecoveries).toHaveLength(1);
+  expect(snapshot.tabs.filter((tab: { tucked?: boolean }) => tab.tucked)).toHaveLength(0);
+  expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
+  await ui.keyboard.press('Control+n');
+  await ui.keyboard.press('Control+p');
+  await ui.keyboard.press('Tab');
+  await expect(ui.locator('.tuck-recovery .footer-back')).toBeFocused();
+  await ui.keyboard.press('Tab');
+  await expect(ui.getByRole('button', { name: 'Continue Managing This Group', exact: true })).toBeFocused();
+  await ui.keyboard.press('Enter');
+  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(0);
+  snapshot = await recoverySnapshot();
+  expect(snapshot.tabs.filter((tab: { tucked?: boolean }) => tab.tucked)).toHaveLength(2);
+  expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
+  const [extra] = await seed('Confirm-Extra');
+  await execute('tuck', extra);
+  expect(await groupId(extra)).toBe(candidate.id);
+  const alpha = snapshot.tabs.find((tab: { url: string }) => tab.url === `${origin}/Confirm-Alpha`);
+  await worker.evaluate(id => chrome.tabs.update(id, { active: true }), alpha.id);
+  await expect.poll(() => groupId(alpha.id)).toBe(-1);
+  expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
+  await expect.poll(() => worker.evaluate(async () => {
+    const { zingTabTuckRecovery } = await chrome.storage.local.get('zingTabTuckRecovery');
+    return (zingTabTuckRecovery as { records: { title: string; color: string; customTitle: boolean; urls: string[] }[] }).records;
+  })).toEqual([expect.objectContaining({ title: 'Read when ready', color: 'purple', customTitle: true,
+    urls: expect.arrayContaining([`${origin}/Confirm-Beta`, `${origin}/Confirm-Extra`]) })]);
 });
 
 test('English late restored group metadata reconnects automatically without creating a new group', async () => {

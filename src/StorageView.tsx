@@ -111,11 +111,13 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
     if (modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') { event.preventDefault(); openMenu(); return; }
     if (event.key === 'Tab') {
       const scope = event.currentTarget;
-      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, textarea, button:not(:disabled), [tabindex="0"]')).filter(node => node.offsetParent !== null);
+      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, textarea, button:not(:disabled), [tabindex="0"]'))
+        .filter(node => node.offsetParent !== null && !node.closest('[inert]') && !node.hasAttribute('disabled') && node.tabIndex >= 0 && (!menu || node.closest('.action-menu')));
       const index = nodes.indexOf(event.target as HTMLElement);
-      event.preventDefault(); nodes[(index + (event.shiftKey ? -1 : 1) + nodes.length) % nodes.length]?.focus(); return;
+      const next = index < 0 ? (event.shiftKey ? nodes.length - 1 : 0) : (index + (event.shiftKey ? -1 : 1) + nodes.length) % nodes.length;
+      event.preventDefault(); nodes[next]?.focus(); return;
     }
-    if (busy || (event.target as HTMLElement).closest('.storage-preview')) return;
+    if (menu || busy || (event.target as HTMLElement).closest('.storage-preview')) return;
     const emacs = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ['p', 'n'].includes(event.key.toLowerCase());
     const arrow = ['ArrowDown', 'ArrowUp'].includes(event.key);
     if (detail && !event.shiftKey && (arrow || emacs || ['PageDown', 'PageUp'].includes(event.key))) {

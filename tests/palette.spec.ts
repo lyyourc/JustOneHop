@@ -1758,6 +1758,7 @@ test.describe(() => {
   await expect(input).toBeFocused();
   await input.fill('设置');
   await expect(ui.locator('.result').first()).toContainText('Settings');
+  await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
   await input.press('Enter');
   await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await expect(ui.locator('[data-setting="keyboard"] .hotkey-value')).toHaveText(await worker.evaluate(async () => (await chrome.commands.getAll()).find(c => c.name === 'toggle-palette')!.shortcut!));
@@ -1796,6 +1797,7 @@ test.describe(() => {
   expect(themeBox!.x).toBe(languageBox!.x);
   expect(themeBox!.width).toBe(languageBox!.width);
   const experiments = ui.locator('.settings-experiments');
+  await expect(ui.locator('[data-setting="tabs"] p')).toContainText('including manually tucked tabs');
   await expect(experiments.getByRole('switch')).toHaveCount(1);
   await expect(experiments.getByRole('button')).toHaveText(['Reset Ranking']);
   const changeButton = ui.getByRole('button', { name: 'Change in Chrome' });
@@ -2512,6 +2514,16 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await expect(page.locator('#zing-command-palette')).toBeAttached();
     expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(expect.arrayContaining(preserved));
     expect(await worker.evaluate(async () => ((await chrome.storage.local.get('searchUsage')).searchUsage as UsageRecord[]).length)).toBe(preserved.length);
+
+    await surface.locator('.settings-button').click();
+    await expect(surface.locator('.settings-page')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(searchInput).toBeFocused();
+    await expect(searchInput).toHaveValue('rankfixture');
+    expect(await searchInput.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 5]);
+    expect(await surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
+    await expect(surface.locator(`[id="${chosenId}"]`)).toHaveAttribute('aria-selected', 'true');
+    await expect(surface.locator(`[id="${chosenId}"]`)).toBeInViewport();
 
     await searchInput.fill('rankfixture no match');
     await expect(surface.locator('.result.bookmark')).toHaveCount(0);
@@ -4516,10 +4528,24 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     const remove = surface.locator('[id="zing-command:unbookmarkTab"]');
     await expect(remove).toBeVisible();
     await expect(remove.locator('.entry-shortcut')).toHaveCount(0);
+    for (const query of ['add bookmark', 'save bookmark', '添加书签']) {
+      await input.fill(query);
+      const remembered = surface.locator('#zing-results [aria-disabled="true"]');
+      await expect(remembered).toContainText(language === 'English' ? 'Already Bookmarked' : '已收藏');
+      await expect(surface.locator('.primary-action')).toBeDisabled();
+      await expect(surface.locator('.actions-button')).toBeDisabled();
+      await input.press('Enter');
+      const bounds = (await remembered.boundingBox())!;
+      await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+      expect((await bookmarks()).length).toBe(1);
+    }
+    await input.fill('book');
+    await expect(remove).not.toHaveAttribute('aria-disabled', 'true');
     await remove.click();
     await expect.poll(async () => (await bookmarks()).length).toBe(0);
     await expect(add.locator('.entry-shortcut kbd')).toHaveText('⌘D');
-    await input.press('ArrowDown');
+    await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await input.press('Meta+ArrowUp');
     await expect(add).toHaveAttribute('aria-selected', 'true');
     await input.press('Enter');
     await expect.poll(async () => (await bookmarks()).length).toBe(1);
@@ -4901,11 +4927,34 @@ test.describe(() => {
   const actions = surface.getByRole('combobox', { name: 'Search actions' });
   await expect(actions).toBeFocused(); await actions.fill('copy');
   await expect(surface.locator('.action-row mark')).toHaveCount(2);
+  await surface.locator('.palette-footer-title').click();
+  await expect(surface.locator('.storage-view')).toBeFocused();
+  for (const key of ['ArrowDown', 'Control+n', 'PageDown', 'Meta+ArrowDown']) await page.keyboard.press(key);
+  await expect(surface.locator('.storage-row[aria-selected="true"]')).toHaveText('polish.key');
+  await expect(surface.locator('.action-heading')).toHaveText('polish.key');
+  await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
+  await surface.locator('.palette-footer-title').click();
+  await page.keyboard.press('Shift+Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
   await actions.press('Control+n');
   await expect(surface.locator('.palette-footer .primary-action')).toHaveText(/Copy Name/);
   await actions.press('Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
   await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
-  await actions.press('Escape'); await expect(search).toBeFocused();
+  const primary = surface.locator('.palette-footer .primary-action');
+  await primary.focus();
+  for (const key of ['Shift+Enter', 'Control+Enter', 'Alt+Enter', 'Meta+Enter', 'Shift+Space']) {
+    await primary.press(key);
+    await expect(surface.locator('.action-menu')).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('value');
+  }
+  const prevented = await primary.evaluate(node => [
+    { key: 'Enter', repeat: true }, { key: 'Enter', isComposing: true }, { key: 'Enter', keyCode: 229 },
+  ].map(init => !node.dispatchEvent(new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true }))));
+  expect(prevented).toEqual([true, true, true]);
+  await primary.press('Enter');
+  await expect(surface.locator('.action-menu')).toHaveCount(0);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('polish.key');
+  await expect(search).toBeFocused();
   expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 3]);
   await search.fill('');
   const preview = surface.locator('.storage-preview');
@@ -4950,7 +4999,16 @@ test.describe(() => {
     await expect.poll(() => value.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
     await expect(longRow).toHaveAttribute('aria-selected', 'true');
     expect(await list.evaluate(node => node.scrollTop)).toBe(listScroll);
-    const previewScroll = await value.evaluate(node => node.scrollTop);
+    // Native PageDown scrolls over several frames; compare independent scrolling
+    // only after the preview has stopped, rather than sampling its animation.
+    let previewScroll = -1;
+    let stableSamples = 0;
+    await expect.poll(async () => {
+      const current = await value.evaluate(node => node.scrollTop);
+      stableSamples = current === previewScroll ? stableSamples + 1 : 0;
+      previewScroll = current;
+      return stableSamples;
+    }, { intervals: [100], timeout: 3000 }).toBeGreaterThanOrEqual(3);
     await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
     expect(await list.evaluate(node => node.scrollTop)).toBeGreaterThan(listScroll);
     expect(await value.evaluate(node => node.scrollTop)).toBe(previewScroll);
