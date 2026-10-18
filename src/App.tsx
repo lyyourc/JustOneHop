@@ -10,7 +10,9 @@ import { keepsPaletteOpen } from './paletteActions';
 import { useResultSelection } from './useResultSelection';
 import { TuckRecoveryView } from './TuckRecoveryView';
 import { Favicon } from './Favicon';
-import { NavigationHint } from './Shortcut';
+import { NavigationHint, matchesShortcut, shortcutKeys } from './Shortcut';
+import { addressEntry, addressActions } from './addressPresentation';
+import { addressNewTabShortcut } from './address';
 import { NavigationRoot, BackLayer } from './Navigation';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
@@ -18,7 +20,7 @@ import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
-import { LoaderCircle, Search, AlertCircle } from 'lucide-react';
+import { LoaderCircle, Search, AlertCircle, ExternalLink } from 'lucide-react';
 import { getPreferences, subscribePreferences } from './preferences';
 import { getUsage, subscribeUsage, usageReady } from './usageState';
 import { homeUsage, queryUsage, rankingInfo, usageTarget, type RankingInfo } from './usage';
@@ -87,8 +89,9 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     const results = scores.size ? search(candidates, query, scores) : baseline;
     return { results, baseline };
   }, [items, query, scores, history.outcome, recommendations]);
-  const nextResults = next.results;
-  const nextRanking = useMemo(() => rankingInfo(nextResults, next.baseline, query.trim() ? liveScores : liveRecommendations.scores), [next, liveScores, liveRecommendations, query]);
+  const address = useMemo(() => data ? addressEntry(query, data, next.results) : undefined, [query, data, next.results, preferences.language]);
+  const nextResults = useMemo(() => address ? [address, ...next.results] : next.results, [address, next.results]);
+  const nextRanking = useMemo(() => rankingInfo(nextResults, address ? [address, ...next.baseline] : next.baseline, query.trim() ? liveScores : liveRecommendations.scores), [nextResults, address, next, liveScores, liveRecommendations, query]);
   const nextVisible = !query.trim() ? nextResults.slice(0, 10) : data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults.slice(0, 100);
   const results = history.pending ? committed.current.results : nextResults;
   const visible = history.pending ? committed.current.visible : nextVisible;
@@ -101,7 +104,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const liveTarget = actionTarget && [...items, ...visible].find(item => item.id === actionTarget.id);
   const actionItems = useMemo(() => {
     if (!data || !liveTarget) return [];
-    const actions = actionsFor(liveTarget, data)
+    const actions = (liveTarget.action === 'navigateAddress' ? addressActions(liveTarget, isMac) : actionsFor(liveTarget, data))
       .sort((a, b) => Number(a.action.startsWith('close')) - Number(b.action.startsWith('close')));
     return actions;
   }, [data, liveTarget, preferences.language]);
@@ -210,7 +213,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   function toggleActions() {
     if (resultBusy) return;
     if (actionTarget) closeActions();
-    else if (selected && !selected.disabled) {
+    else if (selected && (!selected.disabled || selected.action === 'navigateAddress')) {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       setActionTarget(selected); setActionQuery(''); setActionSelection(''); setError(''); }
   }
@@ -347,6 +350,12 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       setter(pool[next].id);
       if ((event.target as HTMLElement).closest('.ranking-forget')) input.current?.focus();
     } else if (event.key === 'Enter') {
+      if (!storage && !actionTarget && current?.action === 'navigateAddress' && (event.target as HTMLElement).tagName !== 'BUTTON'
+        && matchesShortcut(event, addressNewTabShortcut(isMac), isMac)) {
+        event.preventDefault();
+        if (!event.repeat) void run(addressActions(current, isMac)[1]);
+        return;
+      }
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.repeat) { event.preventDefault(); return; }
       if ((event.target as HTMLElement).tagName === 'BUTTON') return;
       event.preventDefault(); void run(current);
@@ -369,7 +378,8 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const visibleShortcut = (entry: Entry) => entry.action === 'tabSwitcher' || (mode === 'popup' && ['close', 'reload'].includes(entry.action)) ? undefined : entry.shortcut;
   const current = actionTarget ? selectedAction : selected;
   const count = affected(current);
-  const primaryLabel = current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
+  const newAddressAction = !actionTarget && selected?.action === 'navigateAddress' ? addressActions(selected, isMac)[1] : undefined;
+  const primaryLabel = current?.action === 'navigateAddress' ? t('openCurrentTab') : current?.action === 'openAddressNewTab' ? t('openNewTab') : current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
     : current?.kind === 'history' ? t('openHistoryPage') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
   return <NavigationRoot><BackLayer onBack={dismiss}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
@@ -401,7 +411,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
-              if (resultBusy || item.disabled) return;
+              if (resultBusy || (item.disabled && item.action !== 'navigateAddress')) return;
               savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
               setSelection(item.id); setActionTarget(item); setActionQuery(''); setActionSelection(''); setError('');
             }} />
@@ -423,11 +433,13 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
         title="zing" context={<NavigationHint />}
         status={busy ? <span className="footer-status"><LoaderCircle className="spinner" size={13} />{t('running')}</span>
           : notice ? <span role="status">{notice}</span>
+          : newAddressAction && selected?.disabled ? <span role="status">{t('addressPinned')}</span>
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
         primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        actions={{ open: !!actionTarget, disabled: !selected || selected.disabled || resultBusy || !!bookmarkRemoval, onToggle: toggleActions }} />
+        secondary={newAddressAction ? { label: t('openNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval, onAction: () => void run(newAddressAction) } : undefined}
+        actions={{ open: !!actionTarget, disabled: !selected || (selected.disabled && selected.action !== 'navigateAddress') || resultBusy || !!bookmarkRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}
   </div></BackLayer></NavigationRoot>;

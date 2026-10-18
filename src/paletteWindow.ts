@@ -81,12 +81,16 @@ export async function getPaletteWindowState(sender: chrome.runtime.MessageSender
 /** Legacy paletteState is accepted but can never create or rebind a host. */
 export async function performPaletteAction(payload: Execution, sender: chrome.runtime.MessageSender, onPerformed: () => void) {
   if (!payload || !Number.isInteger(payload.windowId)) throw new Error(t('errorWindow'));
-  if (['close', 'closeOthers', 'closeRight'].includes(payload.action)) {
+  const addressAction = payload.action === 'navigateAddress' || payload.action === 'openAddressNewTab';
+  if (addressAction || ['close', 'closeOthers', 'closeRight'].includes(payload.action)) {
     // Validate the source independently of optional state from older clients.
     const source = sender.tab?.id !== undefined ? await chrome.tabs.get(sender.tab.id)
       : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     if (!source?.id || !source.active || source.windowId !== payload.windowId ||
         (sender.tab && source.windowId !== sender.tab.windowId)) throw new Error(t('errorMovedTab'));
+    if (addressAction && (payload.tabId !== source.id || (sender.tab && source.id !== sender.tab.id))) {
+      throw new Error(t('errorTabChanged'));
+    }
   }
   await perform(payload, onPerformed);
 }

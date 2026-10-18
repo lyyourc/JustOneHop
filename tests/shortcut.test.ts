@@ -22,4 +22,11 @@ test('binding hints and dispatch agree on platform and modifiers', () => {
   assert.ok(!matchesShortcut(event, 'Mod+Enter', false));
   assert.ok(!matchesShortcut({ ...event, altKey: true }, 'Mod+Enter', true));
   assert.ok(!matchesShortcut({ ...event, shiftKey: true }, 'Mod+Enter', true));
+  const alt = { ...event, metaKey: false, altKey: true };
+  assert.ok(matchesShortcut(alt, 'Alt+Enter', false));
+  assert.ok(!matchesShortcut({ ...alt, ctrlKey: true }, 'Alt+Enter', false));
+  assert.ok(!matchesShortcut({ ...alt, shiftKey: true }, 'Alt+Enter', false));
+  assert.ok(!matchesShortcut({ ...alt, metaKey: true }, 'Alt+Enter', false));
+  assert.equal(formatShortcut(shortcutKeys('Alt+Enter', false)), 'Alt+↵');
+  assert.equal(formatShortcut(shortcutKeys('Alt+Enter', true)), '⌥↵');
 });

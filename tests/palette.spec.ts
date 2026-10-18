@@ -947,6 +947,35 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
+  test('Address navigation: closed-shadow overlay accepts native new-tab shortcut', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Address-closed-source`);
+    await page.getByRole('textbox', { name: 'Page input' }).click();
+    const source = await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+      return { id: tab.id!, windowId: tab.windowId };
+    }, page.url());
+    await expect(page.locator('#zing-command-palette')).toBeAttached();
+    expect(await page.locator('#zing-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
+    const session = await context.newCDPSession(page);
+    const ax = async () => {
+      const { frameTree } = await session.send('Page.getFrameTree');
+      const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+      return (await session.send('Accessibility.getFullAXTree', { frameId })).nodes;
+    };
+    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.properties?.some(property => property.name === 'focused' && property.value.value === true))).toBe(true);
+    const target = `${origin}/Address-closed-target?Q=A%2Bb#Part`;
+    await page.keyboard.type(target);
+    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value.includes('Go to URL') && node.properties?.some(property => property.name === 'selected' && property.value.value === true))).toBe(true);
+    const shortcut = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter');
+    await page.keyboard.press(shortcut);
+    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toBe(target);
+    expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).url, source.id)).toBe(`${origin}/Address-closed-source`);
+    await session.detach();
+  });
+
   test('Chrome Pages: closed-shadow overlay Enter opens native Downloads and dismisses the palette', async () => {
     const page = await context.newPage();
     await page.goto(`${origin}/Chrome-Pages-overlay`);
@@ -5887,6 +5916,103 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
   });
 });
 
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('Address navigation: exact existing results suppress the URL candidate but distinct destinations keep it', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Address-dedup-source`);
+    const urls = { tab: `${origin}/Address-dedup-tab`, bookmark: `${origin}/Address-dedup-bookmark`, history: `${origin}/Address-dedup-history` };
+    await worker.evaluate(async urls => {
+      await chrome.tabs.create({ url: urls.tab, active: false });
+      await chrome.bookmarks.create({ title: 'Saved address', url: urls.bookmark });
+      await chrome.history.addUrl({ url: urls.history });
+    }, urls);
+    const surface = await openStorageOverlay(page);
+    const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const address = surface.locator('#zing-results .result').filter({ hasText: 'Go to URL' });
+    for (const kind of ['tab', 'bookmark', 'history'] as const) {
+      await input.fill(urls[kind]);
+      await expect(surface.locator(`#zing-results .result.${kind}`)).toHaveCount(1);
+      await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+      await expect(address).toHaveCount(0);
+    }
+    for (const suffix of ['/different', '?q=1', '#part']) {
+      const target = `${urls.tab}${suffix}`;
+      await input.fill(target);
+      await expect(address).toHaveCount(1);
+      await expect(address).toContainText(target);
+    }
+    await input.fill(`${origin}/Address-dedup-unseen`);
+    await expect(address).toHaveCount(1);
+    await expect(address).toHaveAttribute('aria-selected', 'true');
+    await input.fill(urls.tab);
+    await expect(surface.locator('#zing-results .result.tab')).toHaveAttribute('aria-selected', 'true');
+    await expect(address).toHaveCount(0);
+    await input.press('Enter');
+    await expect(page.locator('.zing-frame')).toHaveCount(0);
+    await expect.poll(async () => worker.evaluate(async url => (await chrome.tabs.query({ active: true })).some(tab => tab.url === url), urls.tab)).toBe(true);
+    await expect(page).toHaveURL(`${origin}/Address-dedup-source`);
+  });
+
+  test('Address navigation: overlay mouse keyboard and menu open the selected address in the intended tab', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Address-source`);
+    const source = await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      return { id: tab.id!, windowId: tab.windowId };
+    }, page.url());
+    const initialCount = await worker.evaluate(async () => (await chrome.tabs.query({})).length);
+    const shortcut = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter');
+    for (const method of ['click', 'enter', 'shortcut', 'footer', 'menu'] as const) {
+      const surface = await openStorageOverlay(page);
+      const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+      const target = `${origin}/Address-${method}?Q=A%2Bb#Part`;
+      await input.fill(target.replace('http://', ''));
+      const row = surface.locator('#zing-results .result').first();
+      await expect(row).toHaveText(/Go to URL/);
+      await expect(row).toContainText(target);
+      await expect(row).toHaveAttribute('aria-selected', 'true');
+      for (const init of [{ key: 'Enter', isComposing: true }, { key: 'Enter', keyCode: 229 }, { key: 'Enter', repeat: true, metaKey: true }, { key: 'Enter', metaKey: true, shiftKey: true }]) {
+        await input.dispatchEvent('keydown', init);
+      }
+      expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).url, source.id)).toBe(page.url());
+      expect(await worker.evaluate(async () => (await chrome.tabs.query({})).length)).toBe(initialCount);
+      if (method === 'click') await row.click();
+      else if (method === 'enter') await input.press('Enter');
+      else if (method === 'shortcut') await input.press(shortcut);
+      else if (method === 'footer') {
+        await page.setViewportSize({ width: 390, height: 640 });
+        const button = surface.getByRole('button', { name: 'Open in New Tab', exact: true });
+        await expect(button).toBeVisible();
+        const bounds = await button.boundingBox();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+        await button.click();
+      } else {
+        await row.click({ button: 'right' });
+        const menuInput = surface.getByRole('combobox', { name: 'Search actions' });
+        await menuInput.fill('新标签页');
+        await expect(surface.locator('.action-row')).toHaveCount(1);
+        await menuInput.press('Enter');
+      }
+      await expect(page.locator('.zing-frame')).toHaveCount(0);
+      if (method === 'click' || method === 'enter') {
+        await expect(page).toHaveURL(target);
+        expect(await worker.evaluate(async () => (await chrome.tabs.query({})).length)).toBe(initialCount);
+      } else {
+        await expect.poll(async () => worker.evaluate(async ({ windowId, target }) => {
+          const tab = (await chrome.tabs.query({ windowId, active: true }))[0];
+          return tab?.url === target ? tab.id : undefined;
+        }, { windowId: source.windowId, target })).not.toBeUndefined();
+        const created = await worker.evaluate(async ({ windowId, target }) => (await chrome.tabs.query({ windowId })).find(tab => tab.url === target)!, { windowId: source.windowId, target });
+        expect(created.id).not.toBe(source.id);
+        expect(await worker.evaluate(async () => (await chrome.tabs.query({})).length)).toBe(initialCount + 1);
+        expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).url, source.id)).toBe(`${origin}/Address-enter?Q=A%2Bb#Part`);
+        await worker.evaluate(id => chrome.tabs.remove(id), created.id!);
+      }
+      await page.setViewportSize({ width: 1100, height: 760 });
+    }
+    expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage ?? [])).toEqual([]);
+  });
+});
+
 async function openNativePalette() {
   const source = await worker.evaluate(async () => {
     const tab = await chrome.tabs.create({ url: 'chrome://version/', active: true });
@@ -5903,6 +6029,25 @@ async function openNativePalette() {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test('Address navigation: native panel navigates its source and opens new tabs in the source window', async () => {
+    for (const newTab of [false, true]) {
+      const { source, palette } = await openNativePalette();
+      const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+      const target = `${origin}/Address-native-${newTab ? 'new' : 'current'}?Q=A%2Bb#Part`;
+      const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), source.windowId);
+      await input.fill(target);
+      await expect(palette.locator('#zing-results .result').first()).toHaveAttribute('aria-selected', 'true');
+      const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
+      await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
+      await expect.poll(() => palette.isClosed()).toBe(true);
+      await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toBe(target);
+      const tabs = await worker.evaluate(windowId => chrome.tabs.query({ windowId }), source.windowId);
+      expect(tabs).toHaveLength(before.length + Number(newTab));
+      expect(tabs.find(tab => tab.id === source.tabId)?.url).toBe(newTab ? 'chrome://version/' : target);
+      expect(tabs.find(tab => tab.url === target)?.id === source.tabId).toBe(!newTab);
+    }
+  });
+
   test('Embedded Tab Switcher native palette returns to parent and confirms only in its source window', async () => {
     const target = await worker.evaluate(async base => {
       const tab = await chrome.tabs.create({ url: `${base}/Embedded-native-target`, active: false });

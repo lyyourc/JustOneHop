@@ -8,7 +8,10 @@ test('help searches bilingual titles and body, retaining whole matching sections
   assert.deepEqual(matchingHelp('Alt+Z', 'Alt+Z').map(section => section.title), ['helpStartTitle']);
   assert.deepEqual(matchingHelp('未绑定', '未绑定').map(section => section.title), ['helpStartTitle']);
   assert.deepEqual(matchingHelp('$1'), []);
-  for (const query of ['COOKIE', '查看网站存储', 'cookies 权限', '不修改数据', '撤销']) {
+  for (const query of ['Go to URL', 'localhost', 'Command+Enter', '访问网址']) {
+    assert.ok(matchingHelp(query).some(section => section.title === 'helpStartTitle' && section.paragraphs.includes('helpAddressBody')), query);
+  }
+  for (const query of ['COOKIE', '查看网站存储', 'cookies 权限', '不修改数据', 'Cookie 撤销']) {
     assert.deepEqual(matchingHelp(query).map(section => section.title), ['helpStorageTitle'], query);
   }
   assert.deepEqual(matchingHelp('网站存储').map(section => section.title), ['helpStorageTitle', 'helpQuestionsTitle']);

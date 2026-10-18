@@ -29,7 +29,7 @@ export function SearchResultItem({ entry, query, ranking, onForget, disabled = f
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const alias = entry.kind === 'command' ? matchingAlias(entry, query) : '';
   const protectPinned = entry.action === 'closeOthers' || entry.action === 'closeRight';
-  const subtitle = entry.kind !== 'command' || entry.action === 'searchAllHistory' || entry.action === 'tabSwitcher' ? entry.subtitle
+  const subtitle = entry.kind !== 'command' || entry.action === 'navigateAddress' || entry.action === 'searchAllHistory' || entry.action === 'tabSwitcher' ? entry.subtitle
     : alias ? <><HighlightedText text={alias} query={entrySearchQuery(query)} />{protectPinned ? ` · ${t('keepPinned')}` : ''}</>
       : protectPinned ? t('keepPinned') : '';
   const shortcut = suppressTabShortcuts && ['close', 'reload'].includes(entry.action) ? undefined : entry.shortcut;

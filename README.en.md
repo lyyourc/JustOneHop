@@ -16,6 +16,10 @@ Closing non-source tabs, pinning, muting, and other organizing actions keep zing
 
 When focus is lost to the panel background, the search bar shows “Press Tab to focus search.” Press Tab or click the magnifying glass to restore input without changing your query or text selection; the hint then disappears. Tab and Shift+Tab keep their normal order when a control already has focus. An open Actions menu restores its own search field. Cmd/Ctrl+F is not used for focus recovery. If the address bar or another app holds focus, click the search field or magnifying glass.
 
+### Go to URL
+
+Type `example.com/docs`, a complete HTTP(S) URL, or `localhost:3000` in the main search to put Go to URL first, with the normalized address shown. The candidate is omitted when a matching tab, bookmark, or history result already has that exact URL; different paths, queries, and fragments remain distinct. Click or Enter navigates the source tab; **⌘Enter** on macOS or **Alt+Enter** on Windows/Linux opens and switches to a new tab in the same window. Both actions are available in the footer and right-click/Actions menu; the new-tab footer button uses an icon with a tooltip on narrow screens. Pinned sources allow only opening a new tab. Bare domains use HTTPS, while localhost and loopback addresses use HTTP; paths, queries, and fragments are preserved. Only HTTP(S) is supported. Plain text remains a local search, with no new permission, web search, online suggestions, or address-selection learning.
+
 ### Bookmark tabs
 
 Search `bookmark tab` or `收藏标签页` to bookmark the source page. The result shows Chrome's bookmark shortcut, `⌘D` on macOS or `Ctrl+D` on Windows/Linux; Unbookmark does not show this keycap. In the main list or a tab group's member list, right-click, Actions, or Cmd/Ctrl+K targets the selected tab; a normal click or Enter still switches to it. Bookmarks use Chrome's native store and default to Other bookmarks. An existing identical full URL prevents duplicate creation; query strings and fragments remain distinct.

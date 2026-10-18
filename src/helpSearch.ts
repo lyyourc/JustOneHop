@@ -4,7 +4,7 @@ import type { MessageKey } from './i18n';
 import { termMatches } from './searchMatch';
 
 const sections: { title: MessageKey; paragraphs: MessageKey[] }[] = [
-  { title: 'helpStartTitle', paragraphs: ['helpStartBody', 'helpSearchBody'] },
+  { title: 'helpStartTitle', paragraphs: ['helpStartBody', 'helpSearchBody', 'helpAddressBody'] },
   { title: 'helpControlsTitle', paragraphs: ['helpControlsBody', 'helpBackBody'] },
   { title: 'helpTabsTitle', paragraphs: ['helpTabsBody', 'helpTuckBody'] },
   { title: 'helpStorageTitle', paragraphs: ['helpStorageBody'] },

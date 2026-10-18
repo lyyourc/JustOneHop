@@ -1,5 +1,6 @@
 import { tuckFlags, canUndoTuck, tabTuckingReady, tuckTab, undoTuck, tuckRecoveries, resumeTuck, forgetTuckRecovery, updateManagedGroup } from './tabTuck';
 import { t } from './i18n';
+import { addressUrl } from './address';
 import { reloadExtension } from './reloadExtension';
 import { isChromePageAction, openChromePage } from './chromePages';
 import { closeTargets } from './model';
@@ -95,6 +96,22 @@ async function performAction(payload: Execution): Promise<string> {
   // Validate the original window even when the command does not target a tab.
   const window = await chrome.windows.get(windowId);
   const target = (key: string) => window.incognito ? '' : key;
+  if (action === 'navigateAddress' || action === 'openAddressNewTab') {
+    if (!Number.isInteger(tabId) || typeof payload.url !== 'string' || !/^https?:\/\//i.test(payload.url) ||
+        addressUrl(payload.url) !== payload.url || typeof payload.expectedUrl !== 'string' || !payload.expectedUrl) {
+      throw new Error(t('errorInvalidRequest'));
+    }
+    const source = await chrome.tabs.get(tabId!);
+    if (source.id !== tabId || !source.active || source.windowId !== windowId || source.url !== payload.expectedUrl ||
+        (source.pendingUrl && source.pendingUrl !== source.url)) throw new Error(t('errorTabChanged'));
+    if (action === 'navigateAddress') {
+      if (source.pinned) throw new Error(t('errorPinned'));
+      await chrome.tabs.update(source.id!, { url: payload.url });
+    } else {
+      await chrome.tabs.create({ windowId: source.windowId, url: payload.url, active: true });
+    }
+    return '';
+  }
   if (action === 'updateGroup') {
     if (!Number.isInteger(payload.groupId) || !payload.groupChanges) throw new Error(t('errorGroup'));
     const changes = payload.groupChanges;

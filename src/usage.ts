@@ -12,7 +12,7 @@ export const usageQuery = (query: string) => query.trim().toLowerCase().replace(
 export const settingsUsageTarget = (section?: SettingsSection): string => section ? `command:settings:${section}` : 'command:settings';
 
 export function usageTarget(entry: Entry): string {
-  if (entry.action === 'copyUrl') return '';
+  if (['copyUrl', 'navigateAddress', 'openAddressNewTab'].includes(entry.action)) return '';
   // History becomes an open tab after selection; keep its preference across that transition.
   if (entry.kind === 'tab' || entry.kind === 'history') return entry.url ? `tab:${entry.url}` : '';
   if (entry.kind === 'bookmark') return entry.bookmarkId ? `bookmark:${entry.bookmarkId}` : '';

@@ -96,6 +96,13 @@
   "openBookmark": {
     "message": "打开书签"
   },
+  "goToUrl": { "message": "访问网址" },
+  "openCurrentTab": { "message": "当前页打开" },
+  "addressPinned": { "message": "当前页已固定，请在新标签页打开" },
+  "errorInvalidRequest": { "message": "无法打开此地址，请检查 URL 后重试。" },
+  "errorTabChanged": { "message": "来源标签页已变化，请重新打开 zing 后重试。" },
+  "errorPinned": { "message": "来源标签页已固定，请在新标签页打开此地址。" },
+  "helpAddressBody": { "message": "输入网址、域名或 localhost 地址，首项显示「访问网址」；如果匹配的标签页、书签或历史结果已包含相同完整地址，则不再显示该候选。路径、参数和片段不同仍视为不同地址。Enter 或点击结果在唤起 zing 的来源页跳转；macOS 按 Command+Enter，Windows/Linux 按 Alt+Enter，在同一窗口新开标签页并切换过去。底栏和操作菜单也提供这两个动作。未带协议的域名使用 HTTPS，localhost 与回环地址使用 HTTP。固定的来源页只允许新标签页打开。仅支持 HTTP(S) 目标；普通文字继续本地搜索，不提供网页搜索或在线联想。" },
   "runCommand": {
     "message": "执行命令"
   },

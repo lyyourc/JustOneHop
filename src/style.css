@@ -113,7 +113,8 @@
 .footer-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .footer-actions button { display: flex; align-items: center; gap: 7px; font-size: 11.5px; border-radius: 8px; padding: 4px 8px; transition: background-color 70ms ease; }
 .footer-actions button:hover, .footer-actions button.pressed { background: var(--selected); color: var(--text); }
-.primary-action { min-width: 0; font-weight: 600 !important; color: var(--accent); }
+.primary-action, .secondary-action { font-weight: 500; }
+.primary-action { min-width: 0; color: var(--accent); }
 .primary-action.danger { color: var(--danger); }
 .footer-separator { height: 14px; width: 1px; background: var(--border); }
 .secondary-compact-icon { display: none; }

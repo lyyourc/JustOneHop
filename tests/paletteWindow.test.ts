@@ -111,6 +111,8 @@ globalThis.chrome = {
       return overlayReply;
     },
     remove: removeTabs,
+    update: async (id: number, options: chrome.tabs.UpdateProperties) => { calls.push(['update-tab', id, options]); return tabs.find(tab => tab.id === id); },
+    create: async (options: chrome.tabs.CreateProperties) => { calls.push(['create-tab', options]); return { id: 99, ...options }; },
   },
 } as unknown as typeof chrome;
 const { togglePaletteWindow, paletteSender, getPaletteWindowState, performPaletteAction, closePaletteWindowForShortcut, cancelPaletteContinuation } = await import('../src/paletteWindow.ts');
@@ -123,6 +125,75 @@ beforeEach(async () => {
   await closePaletteWindowForShortcut({ windowId: 10 } as chrome.tabs.Tab);
   await tick();
   reset();
+});
+
+for (const host of ['page', 'legacy action popup', 'native'] as const) {
+  for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
+    test(`${host}: ${action} binds navigation to the source without focusing a window or learning`, async () => {
+      if (host === 'native') {
+        tabs[1].url = 'chrome://version/';
+        await togglePaletteWindow(tabs[1]);
+      }
+      const sender = host === 'native' ? await paletteSender(nativeSender())
+        : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+      const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: tabs[1].url, url: 'https://destination.example/', query: 'destination.example' };
+      calls = [];
+      let acknowledged = 0;
+      await performPaletteAction(payload, sender, () => { acknowledged++; });
+      assert.deepEqual(calls, action === 'navigateAddress'
+        ? [['update-tab', 2, { url: 'https://destination.example/' }]]
+        : [['create-tab', { windowId: 10, url: 'https://destination.example/', active: true }]]);
+      assert.equal(acknowledged, 1);
+      assert.deepEqual(usage, []);
+    });
+
+    test(`${host}: ${action} refuses a payload targeting another tab even if it is active`, async () => {
+      if (host === 'native') await togglePaletteWindow(tabs[1]);
+      const sender = host === 'native' ? await paletteSender(nativeSender())
+        : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+      // An independently valid target cannot replace the host's own source.
+      Object.assign(tabs[2], { active: true, url: 'https://source.example' });
+      calls = [];
+      let acknowledged = 0;
+      await assert.rejects(performPaletteAction({ action, windowId: 10, tabId: 3, expectedUrl: tabs[2].url,
+        url: 'https://destination.example/', query: 'destination.example' }, sender, () => { acknowledged++; }));
+      assert.deepEqual(calls, []);
+      assert.equal(acknowledged, 0);
+      assert.deepEqual(usage, []);
+    });
+
+    test(`${host}: ${action} rejects stale source state before acknowledging`, async () => {
+      if (host === 'native') await togglePaletteWindow(tabs[1]);
+      const sender = host === 'native' ? await paletteSender(nativeSender())
+        : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+      const original = { ...tabs[1] };
+      const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: original.url, url: 'https://destination.example/', query: 'destination.example' };
+      if (host === 'native') focused = 30;
+      calls = [];
+      let acknowledged = 0;
+      for (const patch of [{ active: false }, { windowId: 20 }, { url: 'https://changed.example/' }, { pendingUrl: 'https://pending.example/' }]) {
+        tabs[1] = { ...original, ...patch };
+        await assert.rejects(performPaletteAction(payload, sender, () => { acknowledged++; }));
+      }
+      tabs = tabs.filter(tab => tab.id !== 2);
+      await assert.rejects(performPaletteAction(payload, sender, () => { acknowledged++; }));
+      assert.deepEqual(calls, []);
+      assert.equal(acknowledged, 0);
+      assert.deepEqual(usage, []);
+    });
+  }
+}
+
+test('toolbar navigation follows the current active tab and rejects the old payload after activation changes', async () => {
+  const sender = { url: 'chrome-extension://zing/popup.html' };
+  tabs[1].active = false;
+  Object.assign(tabs[2], { active: true, url: 'https://source.example' });
+  for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
+    await assert.rejects(performPaletteAction({ action, windowId: 10, tabId: 2, expectedUrl: tabs[1].url,
+      url: 'https://destination.example/' }, sender, () => assert.fail('stale toolbar request acknowledged')));
+  }
+  assert.deepEqual(calls, []);
+  assert.deepEqual(usage, []);
 });
 
 test('startup clears default and per-tab toolbar popup overrides', async () => {

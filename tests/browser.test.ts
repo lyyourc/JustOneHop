@@ -82,6 +82,81 @@ function gate() {
   return { promise, release };
 }
 
+const addressExecution = (action: 'navigateAddress' | 'openAddressNewTab'): Execution => ({
+  action, tabId: 2, windowId: 10, expectedUrl: 'https://source.example/', url: 'https://destination.example/path?q=one#two', query: 'destination.example',
+});
+
+for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
+  test(`${action} uses the exact source and destination without learning`, async () => {
+    tabs[1].url = 'https://source.example/';
+    tabs[1].pendingUrl = tabs[1].url;
+    let acknowledged = 0;
+    await perform(addressExecution(action), () => { acknowledged++; });
+    assert.deepEqual(calls, action === 'navigateAddress'
+      ? [['update', 2, { url: 'https://destination.example/path?q=one#two' }]]
+      : [['create', { windowId: 10, url: 'https://destination.example/path?q=one#two', active: true }]]);
+    assert.equal(acknowledged, 1);
+    assert.deepEqual(usage, []);
+  });
+
+  test(`${action} rejects malformed requests without acknowledgement or learning`, async () => {
+    tabs[1].url = 'https://source.example/';
+    const patches: Partial<Execution>[] = [
+      ...[undefined, '', 'destination.example', 'https://destination.example', 'HTTPS://destination.example/',
+        ' https://destination.example/', 'https://destination.example/ ', 'https://user:secret@destination.example/',
+        'https://destination.example/a\nb', 'https://destination.example/\\\\bad', 'http://', 'https://bad_host/',
+        'javascript:alert(1)', 'data:text/html,hello', 'chrome://settings/', 'file:///tmp/a', 'ftp://example.com/']
+        .map(url => ({ url })),
+      ...[undefined, NaN, 2.5, '2' as unknown as number].map(tabId => ({ tabId })),
+      ...[undefined, '', 42 as unknown as string].map(expectedUrl => ({ expectedUrl })),
+    ];
+    let acknowledged = 0;
+    for (const patch of patches) {
+      await assert.rejects(perform({ ...addressExecution(action), ...patch }, () => { acknowledged++; }), { message: t('errorInvalidRequest') });
+    }
+    assert.deepEqual(calls, []);
+    assert.equal(acknowledged, 0);
+    assert.deepEqual(usage, []);
+  });
+
+  test(`${action} rejects stale, inactive, moved, missing and mismatched sources`, async () => {
+    const original = { ...tabs[1], url: 'https://source.example/' };
+    let acknowledged = 0;
+    for (const patch of [{ active: false }, { windowId: 20 }, { url: 'https://changed.example/' },
+      { url: undefined }, { pendingUrl: 'https://pending.example/' }]) {
+      tabs[1] = { ...original, ...patch };
+      await assert.rejects(perform(addressExecution(action), () => { acknowledged++; }), { message: t('errorTabChanged') });
+    }
+    tabs[1] = original;
+    await assert.rejects(perform({ ...addressExecution(action), tabId: 999 }, () => { acknowledged++; }), /No tab/);
+    chrome.tabs.get = async () => ({ ...original, id: 99 });
+    await assert.rejects(perform(addressExecution(action), () => { acknowledged++; }), { message: t('errorTabChanged') });
+    assert.deepEqual(calls, []);
+    assert.equal(acknowledged, 0);
+    assert.deepEqual(usage, []);
+  });
+
+  test(`${action} does not acknowledge or learn when Chrome navigation fails`, async () => {
+    tabs[1].url = 'https://source.example/';
+    const failure = async () => { throw new Error('Navigation failed'); };
+    chrome.tabs.update = failure;
+    chrome.tabs.create = failure;
+    let acknowledged = 0;
+    await assert.rejects(perform(addressExecution(action), () => { acknowledged++; }), /Navigation failed/);
+    assert.equal(acknowledged, 0);
+    assert.deepEqual(usage, []);
+  });
+}
+
+test('address navigation protects pinned sources while allowing an active new tab', async () => {
+  Object.assign(tabs[1], { url: 'https://source.example/', pinned: true });
+  await assert.rejects(perform(addressExecution('navigateAddress')), { message: t('errorPinned') });
+  assert.deepEqual(calls, []);
+  await perform({ ...addressExecution('openAddressNewTab'), url: 'http://localhost:3000/' });
+  assert.deepEqual(calls, [['create', { windowId: 10, url: 'http://localhost:3000/', active: true }]]);
+  assert.deepEqual(usage, []);
+});
+
 test('bookmark item removal deletes only the selected ID without requiring an open tab', async () => {
   bookmarkStore([
     { id: 'selected', title: 'Selected', url: 'https://example.com' },

@@ -1,5 +1,5 @@
 export type ChromePageAction = 'openExtensions' | 'openPasswords' | 'openDownloads' | 'openHistory' | 'openBookmarks' | 'openChromeSettings' | 'openExtensionShortcuts';
-export type ActionId = ChromePageAction | 'switch' | 'bookmarkTab' | 'unbookmarkTab' | 'removeBookmark' | 'openBookmark' | 'openHistoryPage' | 'newTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
+export type ActionId = ChromePageAction | 'switch' | 'bookmarkTab' | 'unbookmarkTab' | 'removeBookmark' | 'openBookmark' | 'openHistoryPage' | 'newTab' | 'navigateAddress' | 'openAddressNewTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
 
 export interface TabItem {
   id: number;

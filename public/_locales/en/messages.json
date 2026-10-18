@@ -96,6 +96,13 @@
   "openBookmark": {
     "message": "Open Bookmark"
   },
+  "goToUrl": { "message": "Go to URL" },
+  "openCurrentTab": { "message": "Open in Current Tab" },
+  "addressPinned": { "message": "Pinned tab: use a new tab" },
+  "errorInvalidRequest": { "message": "This address cannot be opened. Check the URL and try again." },
+  "errorTabChanged": { "message": "The source tab has changed. Reopen zing and try again." },
+  "errorPinned": { "message": "The source tab is pinned. Open the address in a new tab." },
+  "helpAddressBody": { "message": "Type a URL, domain, or localhost address to show Go to URL first, unless a matching tab, bookmark, or history result already has that exact address. Paths, query strings, and fragments remain distinct. Enter or clicking the result navigates the source tab. Command+Enter on macOS or Alt+Enter on Windows/Linux opens and switches to a new tab in the same window. Both actions are also available in the footer and Actions menu. Bare domains use HTTPS; localhost and loopback addresses use HTTP. Pinned source tabs allow only opening a new tab. Only HTTP(S) destinations are supported; plain text stays a local search, with no web search or online suggestions." },
   "runCommand": {
     "message": "Run Command"
   },
