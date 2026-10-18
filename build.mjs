@@ -6,8 +6,13 @@ await mkdir('dist', { recursive: true });
 await cp('public', 'dist', { recursive: true });
 // Both Chinese browser locales use our current Simplified Chinese translation.
 await cp('public/_locales/zh_CN', 'dist/_locales/zh_TW', { recursive: true });
-for (const size of [16, 32, 128]) {
-  await sharp('public/icon.svg').resize(size).png().toFile(`dist/icon${size}.png`);
+// Logo sources live in docs/brand (see docs/brand/LOGO.md). The toolbar sizes use the simplified
+// light mark, trimmed so the wide glyph fills the square; larger sizes use the full mark on its plate.
+for (const size of [16, 32, 48, 128]) {
+  const small = size <= 32;
+  const icon = sharp(small ? 'docs/brand/logo-small-light.svg' : 'docs/brand/logo-app.svg', { density: 576 });
+  if (small) icon.trim({ threshold: 0 });
+  await icon.resize(size, size, { fit: 'contain', background: '#00000000' }).png().toFile(`dist/icon${size}.png`);
 }
 const shared = {
   bundle: true, target: 'chrome127', sourcemap: true,
