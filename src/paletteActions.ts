@@ -2,9 +2,9 @@ import type { ActionId } from './types';
 
 export function keepsPaletteOpen(action: ActionId, targetId: number | undefined, sourceId: number) {
   switch (action) {
-    case 'close': case 'closeOthers': case 'closeRight': case 'pin': case 'mute':
-    case 'undoTuck': case 'ungroupTab': case 'updateGroup': return true;
-    case 'tuck': case 'reload': return targetId !== sourceId;
+    case 'closeOthers': case 'closeRight': case 'pin': case 'mute':
+    case 'undoTuck': case 'ungroupTab': case 'updateGroup': case 'bookmarkTab': case 'unbookmarkTab': case 'removeBookmark': return true;
+    case 'close': case 'tuck': case 'reload': return targetId !== sourceId;
     default: return false;
   }
 }

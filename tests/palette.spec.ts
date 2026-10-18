@@ -1036,6 +1036,269 @@ test('search isolates windows, merges bookmarks, and target actions mute the sel
   await expect(input).toBeFocused();
 });
 
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true } });
+  test('bookmark tab closed-shadow keyboard preserves source URL and search caret', async () => {
+    const page = await context.newPage();
+    const url = `${origin}/Bookmark-keyboard-source?mode=full&value=a%2Bb#saved-fragment`;
+    await page.goto(url);
+    const source = await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      await chrome.bookmarks.create({ title: tab.title!, url });
+      return tab;
+    }, url);
+    await page.bringToFront();
+    await worker.evaluate(async tabId => {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+    }, source.id!);
+    await expect(page.locator('#zing-command-palette')).toBeAttached();
+    expect(await page.locator('#zing-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
+    const cdp = await context.newCDPSession(page);
+    const ax = async () => {
+      const { frameTree } = await cdp.send('Page.getFrameTree');
+      const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+      return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
+    };
+    const combo = async () => (await ax()).find(node => node.role?.value === 'combobox' && node.name?.value === 'Search commands, tabs, bookmarks, and history');
+    const focused = async () => (await combo())?.properties?.some(property => property.name === 'focused' && property.value.value === true);
+    const bookmarks = () => worker.evaluate(url => chrome.bookmarks.search({ url }), url);
+    // Read the real closed-root input through AX; every user interaction remains keyboard input.
+    const caret = async () => {
+      const node = await combo();
+      const { object } = await cdp.send('DOM.resolveNode', { backendNodeId: node!.backendDOMNodeId });
+      try {
+        const { result } = await cdp.send('Runtime.callFunctionOn', {
+          objectId: object.objectId, returnByValue: true,
+          functionDeclaration: 'function() { return [this.selectionStart, this.selectionEnd]; }',
+        });
+        return result.value;
+      } finally { if (object.objectId) await cdp.send('Runtime.releaseObject', { objectId: object.objectId }); }
+    };
+    await expect.poll(focused).toBe(true);
+    for (const [query, adding] of [['book', false], ['book', true], ['book', false], ['收藏标签页', true], ['收藏标签页', false]] as const) {
+      await page.keyboard.press('Meta+a');
+      await page.keyboard.insertText(query);
+      const title = adding ? 'Bookmark Tab' : 'Unbookmark Tab';
+      await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value?.includes(title)
+        && node.properties?.some(property => property.name === 'selected' && property.value.value === true))).toBe(true);
+      await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('Shift+ArrowLeft');
+      const selection = [query.length - 3, query.length - 2];
+      expect(await caret()).toEqual(selection);
+      await page.keyboard.press('Enter');
+      await expect.poll(async () => (await bookmarks()).length).toBe(adding ? 1 : 0);
+      if (adding) {
+        const [saved] = await bookmarks();
+        expect(saved).toMatchObject({ title: source.title, url });
+        const [folder] = await worker.evaluate(id => chrome.bookmarks.get(id), saved.parentId!);
+        expect(folder.title).toMatch(/^Other bookmarks$/i);
+      }
+      await expect.poll(async () => (await ax()).some(node => node.name?.value === (adding ? 'Tab bookmarked' : 'Bookmark removed'))).toBe(true);
+      await expect.poll(async () => (await ax()).some(node => node.role?.value === 'alertdialog')).toBe(false);
+      await expect.poll(focused).toBe(true);
+      expect((await combo())?.value?.value).toBe(query);
+      expect(await caret()).toEqual(selection);
+      expect((await ax()).some(node => node.role?.value === 'option' && node.name?.value?.includes(`Tab: ${title}`))).toBe(false);
+      if (adding) {
+        const removal = async () => (await ax()).find(node => node.role?.value === 'option' && node.name?.value?.includes('Unbookmark Tab'));
+        await expect.poll(async () => !!(await removal())).toBe(true);
+        expect((await removal())?.properties?.some(property => property.name === 'selected' && property.value.value === true)).toBe(false);
+        // Keeping the bookmark query reveals the reverse action without inheriting its selection.
+        await page.keyboard.press('Enter');
+        await expect.poll(focused).toBe(true);
+        expect(await bookmarks()).toHaveLength(1);
+        expect((await combo())?.value?.value).toBe(query);
+        await page.keyboard.press('ArrowDown');
+        await expect.poll(async () => (await removal())?.properties?.some(property => property.name === 'selected' && property.value.value === true)).toBe(true);
+      }
+      await expect(page.locator('#zing-command-palette')).toBeAttached();
+      expect(await worker.evaluate(id => chrome.tabs.get(id), source.id!)).toMatchObject({ active: true, url });
+      await page.keyboard.insertText('X');
+      await expect.poll(async () => (await combo())?.value?.value).toBe(`${query.slice(0, selection[0])}X${query.slice(selection[1])}`);
+    }
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await cdp.detach();
+  });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('bookmark tab menus confirm exact duplicate sets and retry changed scope', async () => {
+    const page = await context.newPage();
+    await page.setViewportSize({ width: 500, height: 760 });
+    await page.goto(`${origin}/Bookmark-menu-source`);
+    const url = `${origin}/Bookmark-menu-target?mode=full&value=a%2Bb#saved-fragment`;
+    const seed = await worker.evaluate(async ({ sourceUrl, url }) => {
+      const source = (await chrome.tabs.query({})).find(tab => tab.url === sourceUrl)!;
+      const target = await chrome.tabs.create({ windowId: source.windowId, url, active: false });
+      const groupId = await chrome.tabs.group({ tabIds: [target.id!] });
+      await chrome.tabGroups.update(groupId, { title: 'Bookmark collection', color: 'blue' });
+      const folder = await chrome.bookmarks.create({ parentId: '2', title: 'Duplicate folder' });
+      const otherUrl = await chrome.bookmarks.create({ parentId: folder.id, title: 'Different fragment', url: url.replace('#saved-fragment', '#keep-fragment') });
+      return { source: source.id!, target: target.id!, folder: folder.id, otherUrl: otherUrl.id };
+    }, { sourceUrl: page.url(), url });
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).status, seed.target)).toBe('complete');
+    const surface = await openStorageOverlay(page);
+    const root = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const actions = surface.getByRole('combobox', { name: 'Search actions' });
+    const bookmarks = () => worker.evaluate(url => chrome.bookmarks.search({ url }), url);
+    const ids = async () => (await bookmarks()).map(bookmark => bookmark.id).sort();
+    await root.fill('Bookmark menu');
+    await root.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+    const target = surface.locator(`[id="zing-tab:${seed.target}"]`);
+    await target.click({ button: 'right' });
+    await expect(surface.locator('.action-heading')).toContainText('Bookmark menu target');
+    await actions.fill('bookmark tab');
+    await surface.locator('.action-row').filter({ hasText: 'Bookmark Tab' }).click();
+    await expect.poll(async () => (await bookmarks()).length).toBe(1);
+    expect((await bookmarks())[0]).toMatchObject({ title: 'Bookmark menu target', url, parentId: '2' });
+    expect(await worker.evaluate(url => chrome.bookmarks.search({ url }), page.url())).toEqual([]);
+    await expect(surface.locator('.palette-footer')).toContainText('Tab bookmarked');
+    await expect(root).toBeFocused(); await expect(root).toHaveValue('Bookmark menu');
+    expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    await expect(target).toHaveAttribute('aria-selected', 'true');
+    await worker.evaluate(({ parentId, url }) => chrome.bookmarks.create({ parentId, title: 'Second copy', url }), { parentId: seed.folder, url });
+    const originalIds = await ids();
+    expect(originalIds).toHaveLength(2);
+    await root.fill('Bookmark collection');
+    await surface.getByRole('option').filter({ hasText: 'Tab Group: Bookmark collection' }).click();
+    const group = surface.getByRole('combobox', { name: 'Search tabs in this group…' });
+    await group.fill('target');
+    await group.press('ArrowLeft'); await group.press('Shift+ArrowLeft');
+    const groupCaret = [4, 5];
+    const member = surface.locator(`[id="group-tab:${seed.target}"]`);
+    const confirmation = surface.getByRole('alertdialog', { name: 'Remove bookmarks?' });
+    const cancel = confirmation.getByRole('button', { name: 'Cancel', exact: true });
+    async function confirmMenu(count: number, mouse = false) {
+      if (mouse) await member.click({ button: 'right' });
+      else await group.press('Meta+k');
+      await actions.fill('unbookmark tab');
+      await actions.press('Enter');
+      await expect(confirmation).toBeVisible();
+      await expect(confirmation).toContainText(`Remove all ${count} bookmarks for this URL from the folders below?`);
+      await expect(confirmation).toContainText(/Other bookmarks/i);
+      await expect(confirmation).toContainText('Duplicate folder');
+      await expect(confirmation.getByRole('button', { name: `Remove ${count} bookmarks`, exact: true })).toBeInViewport();
+      await expect(cancel).toBeFocused();
+    }
+    async function returnToGroup() {
+      await expect(confirmation).toHaveCount(0);
+      await expect(actions).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(group).toBeFocused(); await expect(group).toHaveValue('target');
+      expect(await group.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual(groupCaret);
+      await expect(member).toHaveAttribute('aria-selected', 'true');
+    }
+    await confirmMenu(2, true);
+    await cancel.click();
+    expect(await ids()).toEqual(originalIds);
+    await returnToGroup();
+    await confirmMenu(2);
+    await page.keyboard.press('Escape');
+    expect(await ids()).toEqual(originalIds);
+    await returnToGroup();
+    await confirmMenu(2, true);
+    const added = await worker.evaluate(({ parentId, url }) => chrome.bookmarks.create({ parentId, title: 'Added after confirmation', url }), { parentId: seed.folder, url });
+    const changedIds = [...originalIds, added.id].sort();
+    await confirmation.getByRole('button', { name: 'Remove 2 bookmarks', exact: true }).click();
+    await expect(surface.getByRole('alert')).toContainText('The page or its bookmarks changed. Check the updated list and try again.');
+    expect(await ids()).toEqual(changedIds);
+    await expect(confirmation).toHaveCount(0);
+    await expect(actions).toBeFocused();
+    await returnToGroup();
+    await confirmMenu(3);
+    // Cancel is the default; Tab explicitly chooses the destructive confirmation.
+    await page.keyboard.press('Tab');
+    await expect(confirmation.getByRole('button', { name: 'Remove 3 bookmarks', exact: true })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect.poll(ids).toEqual([]);
+    await expect(confirmation).toHaveCount(0);
+    await expect(surface.locator('.action-menu')).toHaveCount(0);
+    await expect(surface.locator('.palette-footer')).toContainText('Bookmark removed');
+    await expect(group).toBeFocused(); await expect(group).toHaveValue('target');
+    expect(await group.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual(groupCaret);
+    await expect(member).toHaveAttribute('aria-selected', 'true');
+    expect(await worker.evaluate(async id => (await chrome.bookmarks.get(id))[0].url, seed.otherUrl)).toBe(url.replace('#saved-fragment', '#keep-fragment'));
+    expect(await worker.evaluate(id => chrome.tabs.get(id), seed.source)).toMatchObject({ active: true, url: page.url() });
+    await page.keyboard.insertText('X');
+    await expect(group).toHaveValue('targXt');
+    await page.keyboard.press('Escape');
+    await expect(root).toHaveValue('Bookmark collection');
+    await expect(root).toBeFocused();
+  });
+});
+
+for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale } });
+  test(`bookmark result item ${locale} removes only the selected ID through mouse and keyboard menus`, async () => {
+    const english = locale === 'en-US';
+    const url = `${origin}/Bookmark-item-unopened?value=a%2Bb#saved-fragment`;
+    const seed = await worker.evaluate(async ({ origin, url }) => {
+      const first = await chrome.bookmarks.create({ title: 'Bookmark item Alpha', url });
+      const second = await chrome.bookmarks.create({ title: 'Bookmark item Beta', url });
+      const neighbor = await chrome.bookmarks.create({ title: 'Bookmark item Neighbor', url: `${origin}/Bookmark-item-neighbor` });
+      return { first, second, neighbor };
+    }, { origin, url });
+    const input = ui.getByRole('combobox', { name: english ? 'Search commands, tabs, bookmarks, and history' : '搜索命令、标签页、书签和历史' });
+    const actions = ui.getByRole('combobox', { name: english ? 'Search actions' : '搜索操作' });
+    const rows = ui.locator('#zing-results .result.bookmark');
+    const tabs = () => worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => ({ id: tab.id, url: tab.url })));
+    const beforeTabs = await tabs();
+    expect(beforeTabs.some(tab => tab.url === url)).toBe(false);
+    await input.fill('Bookmark item');
+    await expect(rows).toHaveCount(3);
+    await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 7));
+    const label = english ? 'Unbookmark' : '取消收藏';
+    for (const [index, bookmark] of [seed.first, seed.second].entries()) {
+      const row = ui.locator(`[id="zing-bookmark:${bookmark.id}"]`);
+      const remove = ui.locator(`[id="zing-actions-bookmark:${bookmark.id}:removeBookmark"]`);
+      const order = await rows.evaluateAll(nodes => nodes.map(node => node.id));
+      const at = order.indexOf(`zing-bookmark:${bookmark.id}`);
+      const next = order[at + 1] ?? order[at - 1];
+      if (index === 0) {
+        // Right-click and footer Actions must expose the same item-specific action.
+        await row.click({ button: 'right' });
+        await expect(remove.locator(':scope > span')).toHaveText(label);
+        await ui.getByRole('button', { name: english ? 'Back' : '返回', exact: true }).click();
+        await expect(input).toBeFocused();
+        await expect(row).toHaveAttribute('aria-selected', 'true');
+        await ui.getByRole('button', { name: english ? 'Open action menu' : '打开操作菜单' }).click();
+        await expect(remove.locator(':scope > span')).toHaveText(label);
+        await expect(ui.locator('[id="zing-actions-action:unbookmarkTab"]')).toHaveCount(0);
+        await remove.click();
+      } else {
+        // Select the remaining duplicate using only the keyboard, then Cmd+K/Enter.
+        await input.press('Meta+ArrowUp');
+        const remaining = await rows.evaluateAll(nodes => nodes.map(node => node.id));
+        for (let step = 0; step < remaining.indexOf(`zing-bookmark:${bookmark.id}`); step++) await input.press('ArrowDown');
+        await expect(row).toHaveAttribute('aria-selected', 'true');
+        await input.press('Meta+k');
+        await expect(actions).toBeFocused();
+        await ui.keyboard.type(english ? '取消收藏' : 'unbookmark');
+        await expect(remove.locator(':scope > span')).toContainText(label);
+        await expect(remove).toHaveAttribute('aria-selected', 'true');
+        await ui.keyboard.press('Enter');
+      }
+      await expect.poll(() => worker.evaluate(async url => (await chrome.bookmarks.search({ url })).map(item => item.id), url))
+        .toEqual(index === 0 ? [seed.second.id] : []);
+      await expect(ui.getByRole('alertdialog')).toHaveCount(0);
+      await expect(ui.locator('.action-menu')).toHaveCount(0);
+      await expect(ui.locator('.palette-footer')).toContainText(english ? 'Bookmark removed' : '已取消收藏');
+      await expect(row).toHaveCount(0);
+      await expect(rows).toHaveCount(2 - index);
+      await expect(ui.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', next);
+      await expect(input).toHaveValue('Bookmark item'); await expect(input).toBeFocused();
+      expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);
+      expect(await tabs()).toEqual(beforeTabs);
+      expect(await worker.evaluate(async id => (await chrome.bookmarks.get(id))[0], seed.neighbor.id)).toMatchObject({ id: seed.neighbor.id, title: seed.neighbor.title, url: seed.neighbor.url });
+    }
+    await ui.keyboard.type('X');
+    await expect(input).toHaveValue('BoXk item');
+  });
+});
+
 test('bookmark opens a new tab in the same window', async () => {
   const sourceWindow = await ui.evaluate(async base => {
     await chrome.bookmarks.create({ title: 'BookmarkAcceptance', url: `${base}/Bookmarked` });
@@ -6312,18 +6575,17 @@ test.describe(() => {
 
 for (const layer of ['root', 'group'] as const) test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true } });
-  test(`English keep-open overlay source close continues ${layer} search in a native window with explicit reselection`, async () => {
+  test(`English source close overlay ${layer} keeps other-tab management open then closes without a new window`, async () => {
     const sourcePage = await context.newPage();
-    await sourcePage.goto(`${origin}/Continuation-member-source`);
+    await sourcePage.goto(`${origin}/SourceClose-member-source`);
     const seeded = await worker.evaluate(async ({ origin, grouped }) => {
-      const source = (await chrome.tabs.query({})).find(tab => tab.url === `${origin}/Continuation-member-source`)!;
-      // Put a non-injectable native page immediately to the right of the source.
-      // The fixture grants loopback access only; the handoff must use a window.
+      const source = (await chrome.tabs.query({})).find(tab => tab.url === `${origin}/SourceClose-member-source`)!;
+      // A native successor must not trigger an automatic standalone panel.
       const successor = await chrome.tabs.create({ windowId: source.windowId, index: source.index + 1, url: 'chrome://version/', active: false });
-      const another = await chrome.tabs.create({ windowId: source.windowId, index: source.index + 2, url: `${origin}/Continuation-member-another`, active: false });
-      const last = await chrome.tabs.create({ windowId: source.windowId, index: source.index + 3, url: `${origin}/Continuation-member-last`, active: false });
+      const another = await chrome.tabs.create({ windowId: source.windowId, index: source.index + 2, url: `${origin}/SourceClose-member-another`, active: false });
+      const last = await chrome.tabs.create({ windowId: source.windowId, index: source.index + 3, url: `${origin}/SourceClose-member-last`, active: false });
       const groupId = grouped ? await chrome.tabs.group({ tabIds: [source.id!, successor.id!, another.id!, last.id!] }) : undefined;
-      if (groupId !== undefined) await chrome.tabGroups.update(groupId, { title: 'Continuation Research', color: 'blue', collapsed: false });
+      if (groupId !== undefined) await chrome.tabGroups.update(groupId, { title: 'SourceClose Research', color: 'blue', collapsed: false });
       return { source: source.id!, windowId: source.windowId, successor: successor.id!, another: another.id!, last: last.id!, groupId };
     }, { origin, grouped: layer === 'group' });
     for (const id of [seeded.successor, seeded.another, seeded.last]) {
@@ -6338,61 +6600,48 @@ for (const layer of ['root', 'group'] as const) test.describe(() => {
     const surface = sourcePage.frameLocator('.zing-frame');
     const root = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(root).toBeFocused();
+    await worker.evaluate(() => {
+      const created: number[] = [];
+      (globalThis as unknown as { __sourceCloseWindows: number[] }).__sourceCloseWindows = created;
+      chrome.windows.onCreated.addListener(window => created.push(window.id!));
+    });
+    if (layer === 'group') {
+      await root.fill('SourceClose Research');
+      await surface.getByRole('option').filter({ hasText: 'Tab Group: SourceClose Research' }).click();
+    }
+    const input = layer === 'root' ? root : surface.getByRole('combobox', { name: 'Search tabs in this group…' });
+    const query = layer === 'root' ? 'SourceClose member' : 'member';
+    await input.fill(query);
+    await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+    await surface.locator(`[id="${layer === 'root' ? 'zing' : 'group'}-tab:${seeded.another}"]`).click({ button: 'right' });
+    await surface.locator(layer === 'root' ? '[id="zing-actions-action:close"]' : '#group-actions-close').click();
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), seeded.another)).toBe(false);
+    await expect(input).toHaveValue(query); await expect(input).toBeFocused();
+    expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    await expect(surface.locator('.action-menu')).toHaveCount(0);
+    await expect(sourcePage.locator('#zing-command-palette')).toBeAttached();
+    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.source)).toMatchObject({ active: true });
     if (layer === 'root') {
-      await root.fill('close tab');
+      await input.fill('close tab');
       await expect(surface.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', 'zing-command:close');
       await surface.locator('.palette-footer .primary-action').click().catch(error => { if (!sourcePage.isClosed()) throw error; });
     } else {
-      await root.fill('Continuation Research');
-      await surface.getByRole('option').filter({ hasText: 'Tab Group: Continuation Research' }).click();
-      await surface.getByRole('combobox', { name: 'Search tabs in this group…' }).fill('member');
       await surface.locator(`[id="group-tab:${seeded.source}"]`).click({ button: 'right' });
       await surface.locator('#group-actions-close').click().catch(error => { if (!sourcePage.isClosed()) throw error; });
     }
     await expect.poll(() => sourcePage.isClosed()).toBe(true);
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), seeded.source)).toBe(false);
-    await expect.poll(() => context.pages().filter(page => page.url().includes('popup.html#window=')).length).toBe(1);
-    const palette = context.pages().find(page => page.url().includes('popup.html#window='))!;
-    const input = palette.getByRole('combobox', { name: layer === 'root' ? 'Search commands, tabs, bookmarks, and history' : 'Search tabs in this group…' });
-    await expect(input).toHaveValue(layer === 'root' ? 'close tab' : 'member');
-    await expect(input).toBeFocused();
-    const ownWindow = await palette.evaluate(() => chrome.windows.getCurrent());
-    expect(ownWindow.type).toBe('popup');
-    expect(ownWindow.id).not.toBe(seeded.windowId);
     await expect.poll(() => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.id, seeded.windowId)).toBe(seeded.successor);
-    const list = palette.locator(layer === 'root' ? '#zing-results' : '#zing-group-tabs');
-    await expect(list.locator('[aria-selected="true"]')).toHaveCount(0);
-    if (layer === 'root') await expect(palette.locator('.palette-footer .primary-action')).toBeDisabled();
-    else await expect(palette.locator('.palette-footer .primary-action:enabled')).toHaveCount(0);
-    const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), seeded.windowId);
-    await input.press('Enter');
-    await input.press('Enter');
-    await expect(input).toBeFocused();
-    await expect(list.locator('[aria-selected="true"]')).toHaveCount(0);
-    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), seeded.windowId)).toEqual(before);
-    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.successor)).toMatchObject({ active: true, url: 'chrome://version/' });
-    if (layer === 'root') await input.fill('Continuation member');
-    await palette.locator(`[id="${layer === 'root' ? 'zing' : 'group'}-tab:${seeded.another}"]`).click({ button: 'right' });
-    await palette.locator(layer === 'root' ? '[id="zing-actions-action:close"]' : '#group-actions-close').click();
-    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), seeded.another)).toBe(false);
-    await expect(input).toHaveValue(layer === 'root' ? 'Continuation member' : 'member');
-    await expect(input).toBeFocused();
-    await expect(palette.getByRole('dialog')).toHaveCount(0);
-    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.successor)).toMatchObject({ active: true, windowId: seeded.windowId });
     expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.last)).toMatchObject({ windowId: seeded.windowId });
-    if (layer === 'group') {
-      await expect(palette.locator('.palette-footer .footer-title-label')).toHaveText('Tab Group: Continuation Research');
-      await palette.keyboard.press('Escape');
-      const restored = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-      await expect(restored).toHaveValue('Continuation Research');
-      await expect(restored).toBeFocused();
-    }
+    expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toHaveLength(0);
+    expect(await worker.evaluate(() => (globalThis as unknown as { __sourceCloseWindows: number[] }).__sourceCloseWindows)).toEqual([]);
+    expect(await worker.evaluate(() => chrome.storage.session.get('zingPaletteWindow'))).toEqual({});
   });
 });
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
-  test('English keep-open native source close preserves query and requires keyboard reselection', async () => {
+  test('English source close native bound tab closes its panel without rebinding or creating a window', async () => {
     const successor = await worker.evaluate(async () => {
       const tab = await chrome.tabs.create({ url: 'chrome://downloads/', active: false });
       return tab.id!;
@@ -6400,53 +6649,51 @@ test.describe(() => {
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).status, successor)).toBe('complete');
     const { source, palette } = await openNativePalette();
     const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const bound = await palette.evaluate(async () => {
+      const reply = await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' });
+      return { currentTabId: reply.data.currentTabId, panelTabId: (await chrome.tabs.getCurrent())!.id };
+    });
+    expect(bound.currentTabId).toBe(source.tabId);
+    expect(bound.panelTabId).not.toBe(source.tabId);
+    await worker.evaluate(() => {
+      const created: number[] = [];
+      (globalThis as unknown as { __sourceCloseWindows: number[] }).__sourceCloseWindows = created;
+      chrome.windows.onCreated.addListener(window => created.push(window.id!));
+    });
     await input.fill('close tab');
     await expect(palette.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', 'zing-command:close');
     await input.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), source.tabId)).toBe(false);
-    await expect.poll(() => context.pages().filter(page => page.url().includes('popup.html#window=')).length).toBe(1);
-    const continued = context.pages().find(page => page.url().includes('popup.html#window='))!;
-    const search = continued.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    await expect(search).toHaveValue('close tab');
-    await expect(search).toBeFocused();
-    await expect(continued.locator('#zing-results [aria-selected="true"]')).toHaveCount(0);
-    await expect(continued.locator('.palette-footer .primary-action')).toBeDisabled();
+    await expect.poll(() => palette.isClosed()).toBe(true);
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, successor)).toBe(true);
-    const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), source.windowId);
-    await search.press('Enter');
-    await expect(search).toBeFocused();
-    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), source.windowId)).toEqual(before);
-    await search.press('ArrowDown');
-    await expect(continued.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', 'zing-command:close');
-    await expect(continued.locator('.palette-footer .primary-action')).toBeEnabled();
-    // Changing the query also explicitly selects a result and allows normal navigation.
-    await continued.keyboard.press('Meta+a'); await continued.keyboard.type('settings');
-    await expect(search).toHaveValue('settings');
-    await continued.keyboard.press('Enter');
-    await expect(continued.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+    await expect.poll(() => worker.evaluate(() => chrome.storage.session.get('zingPaletteWindow'))).toEqual({});
+    expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toHaveLength(0);
+    expect(await worker.evaluate(() => (globalThis as unknown as { __sourceCloseWindows: number[] }).__sourceCloseWindows)).toEqual([]);
+    expect(ui.isClosed()).toBe(false);
   });
 
-  test('English keep-open neutral native handoff accepts mouse Pin and Mute selection for subsequent Enter', async () => {
-    const successor = await worker.evaluate(async () => (await chrome.tabs.create({ url: 'chrome://downloads/', active: false })).id!);
-    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).status, successor)).toBe('complete');
+  test('English keep-open native other-tab close retains its binding and mouse Pin and Mute accept subsequent Enter', async () => {
+    const other = await worker.evaluate(async () => (await chrome.tabs.create({ url: 'chrome://downloads/', active: false })).id!);
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).status, other)).toBe('complete');
     const { source, palette } = await openNativePalette();
-    await palette.getByRole('combobox').fill('chrome://version');
-    await palette.locator(`[id="zing-tab:${source.tabId}"]`).click({ button: 'right' });
-    await palette.locator('[id="zing-actions-action:close"]').click();
-    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), source.tabId)).toBe(false);
     const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    await expect(input).toHaveValue('chrome://version'); await expect(input).toBeFocused();
-    await expect(palette.locator('#zing-results [aria-selected="true"]')).toHaveCount(0);
-    await expect(palette.locator('.palette-footer .primary-action')).toBeDisabled();
-    await input.press('Enter');
-    expect(await worker.evaluate(id => chrome.tabs.get(id), successor)).toMatchObject({ active: true, pinned: false });
+    await input.fill('chrome://downloads');
+    await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 7));
+    await palette.locator(`[id="zing-tab:${other}"]`).click({ button: 'right' });
+    await palette.locator('[id="zing-actions-action:close"]').click();
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), other)).toBe(false);
+    await expect(input).toHaveValue('chrome://downloads'); await expect(input).toBeFocused();
+    expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);
+    expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toEqual([palette]);
+    expect(await palette.evaluate(async () => (await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' })).data.currentTabId)).toBe(source.tabId);
+    expect(await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).toMatchObject({ active: true, pinned: false });
     for (const action of ['pin', 'mute'] as const) {
       await input.fill(action);
       const row = palette.locator(`[id="zing-command:${action}"]`);
       await row.click();
       const state = () => worker.evaluate(async ({ id, action }) => {
         const tab = await chrome.tabs.get(id); return action === 'pin' ? tab.pinned : tab.mutedInfo?.muted;
-      }, { id: successor, action });
+      }, { id: source.tabId, action });
       await expect.poll(state).toBe(true);
       await expect(row).toHaveAttribute('aria-selected', 'true');
       await expect(row.locator('.entry-title')).toContainText(action === 'pin' ? 'Unpin Tab' : 'Unmute Tab');
@@ -6478,7 +6725,7 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true } });
-  test('English keep-open explicit Escape cancels a pending source-close continuation', async () => {
+  test('English source close delayed removal still completes after Escape without reopening a panel', async () => {
     const page = await context.newPage(); await page.goto(`${origin}/Cancelled-continuation-source`);
     const seeded = await worker.evaluate(async origin => {
       const source = (await chrome.tabs.query({})).find(tab => tab.url === `${origin}/Cancelled-continuation-source`)!;
@@ -6489,25 +6736,16 @@ test.describe(() => {
     await page.bringToFront();
     await worker.evaluate(async sourceId => {
       const original = chrome.tabs.remove.bind(chrome.tabs);
-      const state = { release: undefined as (() => void) | undefined, cancelled: false, settled: false, popups: [] as number[] };
+      const state = { release: undefined as (() => void) | undefined, settled: false, popups: [] as number[] };
       (globalThis as unknown as { __cancelledClose: typeof state }).__cancelledClose = state;
       chrome.windows.onCreated.addListener(window => { if (window.type === 'popup') state.popups.push(window.id!); });
-      chrome.runtime.onMessage.addListener(message => { if (message.type === 'cancel-palette-continuation') state.cancelled = true; });
       chrome.tabs.remove = (async (ids: number | number[]) => {
-        if ((Array.isArray(ids) ? ids : [ids]).includes(sourceId)) {
-          await new Promise<void>(resolve => { state.release = resolve; });
-        }
-        return original(Array.isArray(ids) ? ids : [ids]);
-      }) as typeof chrome.tabs.remove;
-      // A cancelled handoff clears its session before releasing pending.done.
-      // Observe that real cleanup so reopening cannot race the held operation.
-      const removeSession = chrome.storage.session.remove.bind(chrome.storage.session);
-      chrome.storage.session.remove = (async (keys: string | string[]) => {
-        const result = await removeSession(keys);
-        if ((Array.isArray(keys) ? keys : [keys]).includes('zingPaletteWindow') && state.release &&
-            !(await chrome.tabs.query({})).some(tab => tab.id === sourceId)) state.settled = true;
+        const removesSource = (Array.isArray(ids) ? ids : [ids]).includes(sourceId);
+        if (removesSource) await new Promise<void>(resolve => { state.release = resolve; });
+        const result = await original(Array.isArray(ids) ? ids : [ids]);
+        if (removesSource) state.settled = true;
         return result;
-      }) as typeof chrome.storage.session.remove;
+      }) as typeof chrome.tabs.remove;
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
     }, seeded.source);
@@ -6516,14 +6754,15 @@ test.describe(() => {
     await expect.poll(() => worker.evaluate(() => typeof (globalThis as unknown as { __cancelledClose: { release?: () => void } }).__cancelledClose.release)).toBe('function');
     await page.keyboard.press('Escape');
     await expect(page.locator('#zing-command-palette')).not.toBeAttached();
-    await expect.poll(() => worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { cancelled: boolean } }).__cancelledClose.cancelled)).toBe(true);
     expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, seeded.source)).toBe(true);
     await worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { release: () => void } }).__cancelledClose.release());
     await expect.poll(() => page.isClosed()).toBe(true);
     await expect.poll(() => worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { settled: boolean } }).__cancelledClose.settled)).toBe(true);
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, seeded.successor)).toBe(true);
-    // A fresh real command proves the pending close has drained. The only
-    // popup ever created must belong to this explicit new launch.
+    expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toHaveLength(0);
+    expect(await worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { popups: number[] } }).__cancelledClose.popups)).toEqual([]);
+    expect(await worker.evaluate(() => chrome.storage.session.get('zingPaletteWindow'))).toEqual({});
+    // Only an explicit new command may open a panel on the successor.
     await worker.evaluate(async () => {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));

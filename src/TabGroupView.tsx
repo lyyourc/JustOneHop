@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useResultSelection } from './useResultSelection';
+import { keepsPaletteOpen } from './paletteActions';
 import { Layers, Palette, PanelTop, Pencil, Save, Search, X } from 'lucide-react';
 import { BackLayer } from './Navigation';
 import { SearchDismissButton } from './SearchDismissButton';
@@ -8,7 +9,9 @@ import { ActionMenu } from './ActionMenu';
 import { Favicon } from './Favicon';
 import { CurrentTabBadge } from './CurrentTabBadge';
 import { HighlightedText } from './HighlightedText';
-import { entries, search } from './model';
+import { bookmarkTabAction, entries, search } from './model';
+import { BookmarkConfirmation, type BookmarkRemoval } from './BookmarkConfirmation';
+import { EntryGlyph } from './SearchResultItem';
 import { errorMessage, t, countMessage, type MessageKey } from './i18n';
 import type { Snapshot, Entry, Execution, PaletteState } from './types';
 
@@ -28,6 +31,8 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   const [localBusy, setBusy] = useState(false);
   const busy = localBusy || executionBusy;
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [bookmarkRemoval, setBookmarkRemoval] = useState<BookmarkRemoval | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const caret = useRef<[number, number]>(initialState?.id === groupId ? initialState.caret : [0, 0]);
   const pointer = useRef<{ x: number; y: number } | null>(null);
@@ -38,9 +43,11 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   const results = search(members, query);
   const { selected, selection, setSelection } = useResultSelection(results, query, data.currentTabId,
     initialState?.id === groupId ? initialState.selection : '');
+  const bookmarkAction = bookmarkTabAction(data.tabs.find(tab => tab.id === selected?.tabId), data.bookmarks);
   const allActions: { id: string; title: string; keywords: string; icon: React.ReactNode; danger?: boolean }[] = editor ? [{ id: 'save', title: t('groupSave'), keywords: 'save 保存', icon: <Save size={16} /> }] : [
     ...(selected ? [
       { id: 'switch', title: t('switchTabPrimary'), keywords: 'switch tab 切换标签页', icon: <PanelTop size={16} /> },
+      ...(bookmarkAction ? [{ id: bookmarkAction.action, title: bookmarkAction.title, keywords: [bookmarkAction.keywords, ...(bookmarkAction.aliases || [])].join(' '), icon: <EntryGlyph name="bookmark" size={16} />, danger: bookmarkAction.danger }] : []),
       { id: 'ungroupTab', title: t('groupRemoveTab'), keywords: 'remove ungroup tab 移出 取消分组', icon: <Layers size={16} /> },
       { id: 'close', title: t('closeTab'), keywords: 'close tab 关闭标签页', icon: <X size={16} />, danger: true },
     ] : []),
@@ -52,12 +59,17 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   ];
   const actions = allActions.filter(action => `${action.title} ${action.keywords}`.toLocaleLowerCase().includes(actionQuery.trim().toLocaleLowerCase()));
   const chosen = actions.find(action => action.id === actionId) || actions[0];
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 2500);
+    return () => clearTimeout(timer);
+  }, [notice]);
   useLayoutEffect(() => {
-    if (menu || busy) return;
+    if (menu || busy || bookmarkRemoval) return;
     if (editor === 'name') { nameInput.current?.focus(); nameInput.current?.select(); }
     else if (editor === 'color') colorInput.current?.focus();
     else { input.current?.focus(); input.current?.setSelectionRange(...caret.current); }
-  }, [menu, editor, busy]);
+  }, [menu, editor, busy, bookmarkRemoval]);
   useLayoutEffect(() => {
     if (!editor && !menu) list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [selected?.id, editor, menu]);
@@ -69,23 +81,40 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   }
   /** The footer breadcrumb mirrors Escape: it leaves exactly the deepest layer. */
   function back() {
+    if (bookmarkRemoval) { setBookmarkRemoval(null); return; }
     if (menu) { setMenu(false); return; }
     if (editor) { setEditor(undefined); return; }
     onBack();
   }
-  async function run(id: string, target: Entry | undefined = selected) {
-    if (busy || !group) return;
+  async function run(id: string, target: Entry | undefined = selected, confirmed?: Entry) {
+    if (busy || !group || (bookmarkRemoval && !confirmed)) return;
+    const bookmark = confirmed || (bookmarkAction?.action === id ? bookmarkAction : undefined);
+    if (bookmark && !confirmed && id === 'unbookmarkTab') {
+      const bookmarks = data.bookmarks.filter(item => bookmark.bookmarkIds?.includes(item.id));
+      if (bookmarks.some(item => item.unmodifiable)) { setError(t('errorBookmarkManaged')); return; }
+      if (bookmarks.length > 1) {
+        rememberCaret(); setError(''); setNotice('');
+        setBookmarkRemoval({ entry: { ...bookmark, bookmarkIds: [...bookmark.bookmarkIds!] }, bookmarks });
+        return;
+      }
+    }
+    if (confirmed) setBookmarkRemoval(null);
     if (id === 'name' || id === 'color') { rememberCaret(); setName(group.title); setColor(group.color); setEditor(id); setMenu(false); setError(''); return; }
-    rememberCaret(); setBusy(true); setError('');
+    rememberCaret(); setBusy(true); setError(''); setNotice('');
     try {
-      if (id === 'save') {
+      if (bookmark && (id === 'bookmarkTab' || id === 'unbookmarkTab')) {
+        await onExecute({ action: id, windowId: data.windowId, groupId, tabId: bookmark.tabId,
+          expectedUrl: bookmark.expectedUrl, bookmarkIds: bookmark.bookmarkIds });
+        setNotice(t(id === 'bookmarkTab' ? 'tabBookmarked' : 'tabUnbookmarked'));
+      } else if (id === 'save') {
         await onExecute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: editor === 'name' ? { title: name.trim() } : { color } });
       } else if (id === 'collapse') {
         await onExecute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: { collapsed: !group.collapsed } });
       } else if (target && (id === 'switch' || id === 'close' || id === 'ungroupTab')) {
+        const keep = keepsPaletteOpen(id, target.tabId, data.currentTabId);
         await onExecute({ action: id, windowId: data.windowId, groupId, tabId: target.tabId,
-          ...(id === 'close' ? { paletteState: { ...paletteState, group: { id: groupId, query, selection, caret: caret.current } } } : {}) });
-        if (id === 'switch') { onClose(); return; }
+          ...(keep && id === 'close' ? { paletteState: { ...paletteState, group: { id: groupId, query, selection, caret: caret.current } } } : {}) });
+        if (!keep) { onClose(); return; }
       } else return;
       setMenu(false); setEditor(undefined);
     } catch (reason) { setError(errorMessage(reason)); }
@@ -131,14 +160,15 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
       navigation={{ kind: 'back', label: `${t('back')} · ${groupLabel}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={groupLabel}
       context={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
-      status={selection === null && !editor ? <span role="status">{t('chooseNextTab')}</span> : undefined}
-      primary={primary ? { label: primary.title, keys: ['↵'], disabled: busy || !group, danger: !!primary.danger, onAction: () => void run(primary.id) } : undefined}
-      actions={{ open: menu, disabled: busy || !group, onToggle: toggleMenu }} />
-    {menu ? <ActionMenu id="group-actions" title={editor ? t(editor === 'name' ? 'groupRename' : 'groupColor') : group?.title} actions={actions} query={actionQuery} onQueryChange={setActionQuery}
+      status={notice ? <span role="status">{notice}</span> : selection === null && !editor ? <span role="status">{t('chooseNextTab')}</span> : undefined}
+      primary={primary ? { label: primary.title, keys: ['↵'], disabled: busy || !group || !!bookmarkRemoval, danger: !!primary.danger, onAction: () => void run(primary.id) } : undefined}
+      actions={{ open: menu, disabled: busy || !group || !!bookmarkRemoval, onToggle: toggleMenu }} />
+    {bookmarkRemoval ? <BookmarkConfirmation target={bookmarkRemoval} onCancel={() => setBookmarkRemoval(null)}
+      onConfirm={() => void run('unbookmarkTab', undefined, bookmarkRemoval.entry)} /> : menu ? <ActionMenu id="group-actions" title={editor ? t(editor === 'name' ? 'groupRename' : 'groupColor') : group?.title} actions={actions} query={actionQuery} onQueryChange={setActionQuery}
       selectedId={chosen?.id} onSelectionChange={setActionId} onAction={id => void run(id)} onClose={() => setMenu(false)} isMac={isMac} /> : null}
   </>;
   return <BackLayer onBack={onBack}><section className="palette group-view" aria-label={groupLabel} aria-busy={busy} onKeyDown={event => {
-    if (event.nativeEvent.isComposing || event.keyCode === 229 || menu) return;
+    if (event.nativeEvent.isComposing || event.keyCode === 229 || menu || bookmarkRemoval) return;
     const mod = isMac ? event.metaKey : event.ctrlKey;
     if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') { event.preventDefault(); toggleMenu(); return; }
     if (busy) return;

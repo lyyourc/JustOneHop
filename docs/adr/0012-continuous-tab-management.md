@@ -1,6 +1,8 @@
 # 0012 · 整理操作保留面板与关闭来源页后接续
 
-状态：已采纳。记录日期：2026-10-17。更新 [ADR 0007](0007-refresh-and-loading.md) 的成功后一律关闭策略，以及 [ADR 0001](0001-local-extension-and-overlay.md) 的来源关闭边界。
+状态：部分被 [ADR 0016](0016-source-close-ends-palette.md) 替代（2026-10-18）。记录日期：2026-10-17。原决策更新 [ADR 0007](0007-refresh-and-loading.md) 的成功后一律关闭策略，以及 [ADR 0001](0001-local-extension-and-overlay.md) 的来源关闭边界。
+
+以下保留原决策及取舍作为历史记录，不代表会话接续仍可用。0016 替代本 ADR 的来源关闭后接续、独立面板新建／重绑、跨承载状态传递及接续后清空选择规则：任何 source 实际被删除（含批量连带与外部关闭）都结束 zing。非来源页整理保留面板、导航成功关闭及共享选择／焦点规则继续适用；窗口承载与定位不变。
 
 ## 背景
 
@@ -30,4 +32,4 @@
 
 ## 相关实现
 
-[交互契约](../INTERACTION-ARCHITECTURE.md#整理操作与会话接续) · [paletteActions.ts](../../src/paletteActions.ts) · [useResultSelection.ts](../../src/useResultSelection.ts) · [paletteWindow.ts](../../src/paletteWindow.ts) · [使用指南](../USAGE.md)
+[当前交互契约](../INTERACTION-ARCHITECTURE.md#整理操作与来源删除) · [paletteActions.ts](../../src/paletteActions.ts) · [useResultSelection.ts](../../src/useResultSelection.ts) · [paletteWindow.ts](../../src/paletteWindow.ts) · [使用指南](../USAGE.md)

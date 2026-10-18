@@ -44,6 +44,19 @@
   "reloadTab": {
     "message": "Reload Tab"
   },
+  "bookmarkTab": { "message": "Bookmark Tab" },
+  "unbookmarkTab": { "message": "Unbookmark Tab" },
+  "removeBookmark": { "message": "Unbookmark" },
+  "errorBookmarkItemManaged": { "message": "This bookmark is managed by your organization and cannot be removed." },
+  "tabBookmarked": { "message": "Tab bookmarked" },
+  "tabUnbookmarked": { "message": "Bookmark removed" },
+  "confirmUnbookmark": { "message": "Remove bookmarks?" },
+  "unbookmarkPrompt": { "message": "Remove all $1 bookmarks for this URL from the folders below?" },
+  "unbookmarkCount": { "message": "Remove $1 bookmarks" },
+  "errorBookmarkChanged": { "message": "The page or its bookmarks changed. Check the updated list and try again." },
+  "errorBookmarkManaged": { "message": "This URL has a bookmark managed by your organization. No bookmarks were removed." },
+  "errorBookmarkWrite": { "message": "Could not update bookmarks. Please try again." },
+  "errorBookmarkPartial": { "message": "Some bookmarks were removed, but the operation could not finish. Check the remaining bookmarks before trying again." },
   "pin": {
     "message": "Pin Tab"
   },

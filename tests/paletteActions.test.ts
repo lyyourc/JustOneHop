@@ -3,15 +3,21 @@ import assert from 'node:assert/strict';
 import { keepsPaletteOpen, nearbySelection } from '../src/paletteActions.ts';
 
 test('list mutations keep the palette open while navigation and host reload hand off to the page', () => {
-  for (const action of ['close', 'closeOthers', 'closeRight', 'pin', 'mute', 'undoTuck', 'ungroupTab', 'updateGroup'] as const) {
+  for (const action of ['closeOthers', 'closeRight', 'pin', 'mute', 'undoTuck', 'ungroupTab', 'updateGroup'] as const) {
     assert.equal(keepsPaletteOpen(action, 1, 1), true, action);
   }
   for (const action of ['switch', 'newTab', 'openBookmark', 'restore', 'openExtensions', 'openPasswords'] as const) {
     assert.equal(keepsPaletteOpen(action, 2, 1), false, action);
   }
-  for (const action of ['reload', 'tuck'] as const) {
+  for (const action of ['close', 'reload', 'tuck'] as const) {
     assert.equal(keepsPaletteOpen(action, 1, 1), false);
     assert.equal(keepsPaletteOpen(action, 2, 1), true);
+  }
+});
+
+test('bookmark mutations keep the palette open for both source and selected tabs', () => {
+  for (const action of ['bookmarkTab', 'unbookmarkTab', 'removeBookmark'] as const) {
+    for (const target of [1, 2]) assert.equal(keepsPaletteOpen(action, target, 1), true, `${action}: ${target}`);
   }
 });
 

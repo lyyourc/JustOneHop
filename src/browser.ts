@@ -5,7 +5,8 @@ import { isChromePageAction, openChromePage } from './chromePages';
 import { closeTargets } from './model';
 import { recordUsage } from './usageStorage';
 import { settingsUsageTarget } from './usage';
-import type { BookmarkItem, Execution, HistorySearchResult, Snapshot, TabItem } from './types';
+import { getBookmarks, performBookmarkAction, safeBookmarkUrl } from './bookmarks';
+import type { Execution, HistorySearchResult, Snapshot, TabItem } from './types';
 
 function safeHistoryUrl(value: unknown): value is string {
   if (typeof value !== 'string' || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) return false;
@@ -53,39 +54,6 @@ export function toTab(tab: chrome.tabs.Tab): TabItem {
   };
 }
 
-function flattenBookmarks(nodes: chrome.bookmarks.BookmarkTreeNode[], folder = ''): BookmarkItem[] {
-  return nodes.flatMap(node => node.url
-    ? [{ id: node.id, title: node.title || node.url, url: node.url, folder }]
-    : flattenBookmarks(node.children || [], [folder, node.title].filter(Boolean).join(' / ')));
-}
-
-// The bookmark tree is shared by every window. Reuse it until Chrome reports a
-// change; tabs and command bindings are always read live for each snapshot.
-const bookmarkCaches = new WeakMap<typeof chrome.bookmarks, { pending?: Promise<BookmarkItem[]> }>();
-function getBookmarks(): Promise<BookmarkItem[]> {
-  const source = chrome.bookmarks;
-  let cache = bookmarkCaches.get(source);
-  if (!cache) {
-    cache = {};
-    bookmarkCaches.set(source, cache);
-    const invalidate = () => { cache!.pending = undefined; };
-    for (const event of [source.onCreated, source.onRemoved, source.onChanged, source.onMoved, source.onChildrenReordered, source.onImportEnded]) {
-      event?.addListener(invalidate);
-    }
-  }
-  if (!cache.pending) {
-    const pending: Promise<BookmarkItem[]> = source.getTree().then(nodes => {
-      // A change during the read must not publish the superseded tree.
-      return cache!.pending === pending ? flattenBookmarks(nodes) : getBookmarks();
-    }).catch(error => {
-      if (cache!.pending === pending) cache!.pending = undefined;
-      throw error;
-    });
-    cache.pending = pending;
-  }
-  return cache.pending;
-}
-
 export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
   const active = senderTab?.id !== undefined ? await chrome.tabs.get(senderTab.id)
     : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
@@ -123,6 +91,7 @@ export async function perform(payload: Execution, onPerformed?: () => void): Pro
 async function performAction(payload: Execution): Promise<string> {
   if (!payload || !Number.isInteger(payload.windowId)) throw new Error(t('errorWindow'));
   const { action, windowId, tabId, bookmarkId } = payload;
+  if (action === 'bookmarkTab' || action === 'unbookmarkTab' || action === 'removeBookmark') return performBookmarkAction(payload);
   // Validate the original window even when the command does not target a tab.
   const window = await chrome.windows.get(windowId);
   const target = (key: string) => window.incognito ? '' : key;
@@ -163,7 +132,7 @@ async function performAction(payload: Execution): Promise<string> {
   if (action === 'openBookmark') {
     if (typeof bookmarkId !== 'string') throw new Error(t('errorBookmark'));
     const [bookmark] = await chrome.bookmarks.get(bookmarkId);
-    if (!bookmark?.url || !['http:', 'https:', 'file:', 'ftp:', 'chrome:'].includes(new URL(bookmark.url).protocol)) {
+    if (!bookmark?.url || !safeBookmarkUrl(bookmark.url)) {
       throw new Error(t('errorBookmarkUrl'));
     }
     await chrome.tabs.create({ windowId, url: bookmark.url }); return target(`bookmark:${bookmarkId}`);

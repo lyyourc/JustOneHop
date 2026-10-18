@@ -1,5 +1,5 @@
 export type ChromePageAction = 'openExtensions' | 'openPasswords' | 'openDownloads' | 'openHistory' | 'openBookmarks' | 'openChromeSettings' | 'openExtensionShortcuts';
-export type ActionId = ChromePageAction | 'switch' | 'openBookmark' | 'openHistoryPage' | 'newTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
+export type ActionId = ChromePageAction | 'switch' | 'bookmarkTab' | 'unbookmarkTab' | 'removeBookmark' | 'openBookmark' | 'openHistoryPage' | 'newTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
 
 export interface TabItem {
   id: number;
@@ -15,7 +15,7 @@ export interface TabItem {
   canTuck?: boolean;
   groupId?: number;
 }
-export interface BookmarkItem { id: string; title: string; url: string; folder: string }
+export interface BookmarkItem { id: string; title: string; url: string; folder: string; unmodifiable?: 'managed' }
 export interface HistoryPage { id: string; url: string; title: string; lastVisitTime: number }
 export interface HistorySearchResult { items: HistoryPage[]; limited: boolean }
 export interface TuckRecoveryItem {
@@ -49,6 +49,8 @@ export interface Execution {
   windowId: number;
   tabId?: number;
   bookmarkId?: string;
+  expectedUrl?: string;
+  bookmarkIds?: string[];
   url?: string;
   query?: string;
   recoveryId?: string;
@@ -109,6 +111,8 @@ export interface Entry {
   scriptId?: string;
   tabId?: number;
   bookmarkId?: string;
+  expectedUrl?: string;
+  bookmarkIds?: string[];
   pinned?: boolean;
   muted?: boolean;
   active?: boolean;

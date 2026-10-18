@@ -4,7 +4,8 @@ import { chromePages } from './chromePages';
 import Fuse, { type Expression } from 'fuse.js';
 import { termMatches } from './searchMatch';
 import { usageTarget } from './usage';
-import type { ActionId, ChromePageAction, Entry, Snapshot, TabItem } from './types';
+import { safeBookmarkUrl } from './bookmarks';
+import type { ActionId, BookmarkItem, ChromePageAction, Entry, Snapshot, TabItem } from './types';
 
 export function labelUrl(raw: string): string {
   try { const url = new URL(raw); return (url.hostname || url.protocol.replace(':', '')) + (url.pathname === '/' ? '' : url.pathname); }
@@ -38,8 +39,27 @@ export function commands(current?: TabItem): Entry[] {
   }));
 }
 
+const bookmarkStateAliases = ['bookmark', 'bookmark tab', 'add bookmark', 'save bookmark', '收藏', '收藏标签页', '添加书签'];
+
+export function bookmarkTabAction(tab: TabItem | undefined, bookmarks: BookmarkItem[]): Entry | undefined {
+  if (!tab || !safeBookmarkUrl(tab.url)) return undefined;
+  const bookmarkIds = bookmarks.filter(bookmark => bookmark.url === tab.url).map(bookmark => bookmark.id);
+  const action = bookmarkIds.length ? 'unbookmarkTab' : 'bookmarkTab';
+  return {
+    id: `command:${action}`, kind: 'command', category: 'tab', action, icon: 'bookmark',
+    title: t(action), subtitle: tab.title, tabId: tab.id, expectedUrl: tab.url, bookmarkIds,
+    searchOnly: true, danger: action === 'unbookmarkTab' || undefined,
+    keywords: 'bookmark tab 书签 标签页',
+    aliases: action === 'unbookmarkTab'
+      ? [...bookmarkStateAliases, 'unbookmark', 'unbookmark tab', 'remove bookmark', 'remove bookmarks', 'delete bookmark', 'delete bookmarks', '取消收藏', '取消收藏标签页', '删除书签']
+      : bookmarkStateAliases,
+  };
+}
+
 export function entries(snapshot: Snapshot): Entry[] {
   const groups = new Map((snapshot.groups || []).map(group => [group.id, group]));
+  const current = snapshot.tabs.find(tab => tab.id === snapshot.currentTabId);
+  const bookmark = bookmarkTabAction(current, snapshot.bookmarks);
   return [
     ...(snapshot.groups || []).map((group): Entry => ({
       id: `group:${group.id}`, kind: 'command', category: 'tabGroup', title: group.title, groupCount: snapshot.tabs.filter(tab => tab.groupId === group.id).length,
@@ -62,7 +82,8 @@ export function entries(snapshot: Snapshot): Entry[] {
       title: t('reviewTuck'), subtitle: `${item.title} — ${item.urls.length}`, recoveryId: item.id,
       keywords: '恢复 收起 继续管理 检查 分组 recover resume tuck group', aliases: ['recover tucked tabs', 'resume tuck', '继续管理', '恢复收起组'],
     })),
-    ...commands(snapshot.tabs.find(tab => tab.id === snapshot.currentTabId)),
+    ...commands(current),
+    ...(bookmark ? [bookmark] : []),
     { id: 'command:help', kind: 'command', category: 'zing', action: 'help', icon: 'help',
       title: t('help'), subtitle: t('helpHint'), keywords: 'help guide 帮助 使用说明 使用指南',
       aliases: ['help', 'user guide', '帮助', '使用帮助', '使用说明', '使用指南'] },
@@ -253,11 +274,19 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     $and: terms.map((term): Expression => ({ $or: [{ title: term }, { label: term }, { categoryText: term }, { aliases: term }, { keywords: term }, { subtitle: term }] })),
   });
   const explicitClose = hasIntentPrefix(terms, ['close'], 3) || hasIntentPrefix(terms, ['guanbi'], 4) || normalized.includes('关闭');
+  const bookmarkIntent = normalizeSearch(query.replace(/^\s*(?:tab|标签页)\s*[:：]\s*/i, ''));
+  const bookmarkPrefix = /^book[a-z]*$/.test(bookmarkIntent) && 'bookmark'.startsWith(bookmarkIntent);
+  const unbookmarkPrefix = /^unbook[a-z]*$/.test(bookmarkIntent) && 'unbookmark'.startsWith(bookmarkIntent);
+  const explicitBookmarkState = bookmarkStateAliases.includes(bookmarkIntent) || bookmarkPrefix;
+  const explicitUnbookmark = unbookmarkPrefix || terms.includes('unbookmark') ||
+    (terms.some(term => term === 'remove' || term === 'delete') && terms.some(term => term === 'bookmark' || term === 'bookmarks')) ||
+    /取消\s*收藏|删除\s*书签/.test(normalized);
   const tier = (item: typeof index[number]) => {
     const names = item.names;
     // Exact command intent beats even a web page with the same title. A longer
     // page query stops receiving this boost: "new tab guide" still finds its page.
-    if (item.kind === 'command' && names.includes(normalized)) return 0;
+    if (item.kind === 'command' && (names.includes(normalized) ||
+        ((bookmarkPrefix || unbookmarkPrefix) && ['bookmarkTab', 'unbookmarkTab', 'removeBookmark'].includes(item.action)))) return 0;
     if (item.title === normalized) return 1;
     if (names.some(name => name.startsWith(normalized))) return 2;
     // Whole phrases lead; separate word prefixes work in either order too.
@@ -274,7 +303,9 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
   const kindOrder = { tab: 0, bookmark: 1, history: 2, command: 3, script: 4 };
   const explicitExtensionReload = terms.includes('zing') || hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
   return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
-    (!item.danger || item.action === 'deleteScript' || explicitClose) && terms.every(term =>
+    (item.action !== 'bookmarkTab' || !explicitUnbookmark) &&
+    (!item.danger || item.action === 'deleteScript' || (['unbookmarkTab', 'removeBookmark'].includes(item.action) ? explicitUnbookmark || explicitBookmarkState :
+      ['close', 'closeOthers', 'closeRight'].includes(item.action) && explicitClose)) && terms.every(term =>
     // Metadata is searchable, but must not manufacture typo matches. Only
     // visible names and natural-language command aliases receive typo tolerance.
     item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||
@@ -323,9 +354,18 @@ export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
   const copy = copyUrlAction(entry);
   const copyActions = copy ? [copy] : [];
   if (entry.kind === 'history') return [{ ...entry, title: t('openHistoryPage'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }, ...copyActions];
-  if (entry.kind === 'bookmark') return [{ ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }, ...copyActions];
+  if (entry.kind === 'bookmark') return [
+    { ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` },
+    ...copyActions,
+    { id: `${entry.id}:removeBookmark`, kind: 'command', action: 'removeBookmark', icon: 'bookmark',
+      title: t('removeBookmark'), subtitle: entry.title, keywords: 'bookmark remove delete 书签 删除 取消 收藏',
+      aliases: [...bookmarkStateAliases, 'unbookmark', 'remove bookmark', 'delete bookmark', '取消收藏', '删除书签'],
+      bookmarkId: entry.bookmarkId, expectedUrl: entry.url, danger: true },
+  ];
   const tab = snapshot.tabs.find(item => item.id === entry.tabId);
   const available = commands(tab).filter(command => ['close', 'pin', 'mute', 'reload', 'closeOthers', 'closeRight', 'tuck'].includes(command.action));
+  const bookmark = bookmarkTabAction(tab, snapshot.bookmarks);
+  if (bookmark) available.push(bookmark);
   return [{ ...entry, title: t('switchTab'), subtitle: entry.title, keywords: `${entry.keywords} switch tab 切换标签页` }, ...copyActions, ...available.map(command => ({
     ...command, shortcut: tab?.id === snapshot.currentTabId ? command.shortcut : undefined, title: command.title.replace(t('current'), ''), id: `action:${command.action}`, tabId: entry.tabId,
   }))];

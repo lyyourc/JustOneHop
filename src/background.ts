@@ -1,4 +1,4 @@
-import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut, getPaletteWindowState, performWithPaletteContinuation, registerPaletteContinuation, releasePaletteContinuation, cancelPaletteContinuation } from './paletteWindow';
+import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut, getPaletteWindowState, performPaletteAction, cancelPaletteContinuation } from './paletteWindow';
 import { startTabTucking } from './tabTuck';
 import { runSavedScript } from './scriptExecution';
 import { openRecentSwitcher } from './recentTabs';
@@ -49,10 +49,6 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'zing') return;
   if (!['run-saved-script', 'open-script-settings', 'snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
-  // Register before any await so a dismissal arriving during preflight also
-  // cancels this caller's continuation, without cancelling its browser action.
-  const ticket = request.type === 'execute' && request.payload?.paletteState && ['close', 'closeOthers', 'closeRight'].includes(request.payload.action)
-    ? registerPaletteContinuation(sender) : undefined;
   let responded = false;
   const success = (data?: void | Snapshot | PageStorage | ScriptResult | PaletteState | HistorySearchResult) => {
     if (responded) return;
@@ -75,7 +71,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
         if (!Number.isInteger(request.payload.windowId)) throw new Error(t('errorWindow'));
         await historyWindow(sender, request.payload.windowId);
       }
-      return performWithPaletteContinuation(request.payload, sender, () => success(), ticket);
+      return performPaletteAction(request.payload, sender, () => success());
     }
     if (request.type === 'reset-usage') return resetUsage();
     if (request.type === 'forget-usage') return forgetUsage(request.payload?.target, request.payload?.query);
@@ -88,7 +84,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     }
     return openChromePage('openExtensionShortcuts', windowId);
   });
-  void result.finally(() => releasePaletteContinuation(ticket)).then(success).catch(error => {
+  void result.then(success).catch(error => {
     if (!responded) respond({ ok: false, error: errorMessage(error) });
   });
   return true;

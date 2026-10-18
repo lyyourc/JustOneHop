@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { historyWindow, perform, searchHistory, snapshot } from '../src/browser.ts';
 import { queryUsage, rankingInfo, type UsageRecord, USAGE_STORAGE_KEY } from '../src/usage.ts';
 import { entries, search } from '../src/model.ts';
+import { safeBookmarkUrl } from '../src/bookmarks.ts';
+import { t } from '../src/i18n.ts';
+import type { Execution } from '../src/types.ts';
 
 let calls: [string, ...unknown[]][];
 let tabs: chrome.tabs.Tab[];
@@ -31,12 +34,284 @@ beforeEach(() => {
       update: record('update'), remove: record('remove'), create: record('create'), reload: record('reload'),
     },
     bookmarks: { get: async () => [{ id: 'b', title: 'Bookmark', url: bookmarkUrl }], getTree: async () => [{ title: 'Folder', children: [{ id: 'b', title: 'Bookmark', url: bookmarkUrl }] }] },
-    tabGroups: { query: async () => [] },
+    tabGroups: { query: async () => [], get: async (id: number) => ({ id, windowId: 10 }) },
     commands: { getAll: async () => [{ name: 'toggle-palette', shortcut: '⌘⇧P' }] },
     sessions: { getRecentlyClosed: async () => [{ tab: { sessionId: 'session' } }], restore: record('restore') },
   } as unknown as typeof chrome;
 });
 const historySender = (): chrome.runtime.MessageSender => ({ id: 'zing', url: 'chrome-extension://zing/popup.html' });
+
+function bookmarkStore(initial: Partial<chrome.bookmarks.BookmarkTreeNode>[] = []) {
+  const nodes = structuredClone(initial) as chrome.bookmarks.BookmarkTreeNode[];
+  const find = (items: chrome.bookmarks.BookmarkTreeNode[], id: string): chrome.bookmarks.BookmarkTreeNode | undefined => {
+    for (const item of items) {
+      if (item.id === id) return item;
+      const child = find(item.children || [], id);
+      if (child) return child;
+    }
+  };
+  chrome.bookmarks.getTree = async () => structuredClone(nodes);
+  chrome.bookmarks.get = (async (id: string) => {
+    const node = find(nodes, id);
+    return node ? [structuredClone(node)] : [];
+  }) as typeof chrome.bookmarks.get;
+  chrome.bookmarks.create = async details => {
+    calls.push(['bookmarkCreate', details]);
+    const node = { ...details, id: `new-${nodes.length}`, syncing: false } as chrome.bookmarks.BookmarkTreeNode;
+    nodes.push(node);
+    return structuredClone(node);
+  };
+  chrome.bookmarks.remove = async id => {
+    calls.push(['bookmarkRemove', id]);
+    const remove = (items: chrome.bookmarks.BookmarkTreeNode[]) => {
+      const index = items.findIndex(item => item.id === id);
+      if (index >= 0) items.splice(index, 1);
+      else for (const item of items) remove(item.children || []);
+    };
+    remove(nodes);
+  };
+  tabs[1].url = 'https://example.com';
+  return nodes;
+}
+const bookmarkExecution = (action: 'bookmarkTab' | 'unbookmarkTab', bookmarkIds?: string[]): Execution => ({
+  action, tabId: 2, windowId: 10, expectedUrl: 'https://example.com', ...(bookmarkIds ? { bookmarkIds } : {}),
+});
+function gate() {
+  let release!: () => void;
+  const promise = new Promise<void>(resolve => { release = resolve; });
+  return { promise, release };
+}
+
+test('bookmark item removal deletes only the selected ID without requiring an open tab', async () => {
+  bookmarkStore([
+    { id: 'selected', title: 'Selected', url: 'https://example.com' },
+    { id: 'duplicate', title: 'Managed duplicate', url: 'https://example.com', unmodifiable: 'managed' },
+  ]);
+  await snapshot(tabs[1]);
+  chrome.tabs.get = async () => { throw new Error('No open tab required'); };
+  await perform({ action: 'removeBookmark', windowId: 10, bookmarkId: 'selected', expectedUrl: 'https://example.com' });
+  assert.deepEqual(calls, [['bookmarkRemove', 'selected']]);
+  assert.deepEqual((await chrome.bookmarks.getTree()).map(item => item.id), ['duplicate']);
+  assert.ok(usage.some(item => item.target === 'command:removeBookmark'));
+  assert.ok(!usage.some(item => item.target === 'bookmark:selected'));
+});
+
+test('bookmark item removal refuses stale IDs, changed URLs and managed ancestors', async () => {
+  const nodes = bookmarkStore([
+    { id: 'selected', title: 'Selected', url: 'https://changed.example' },
+    { id: 'managed', unmodifiable: 'managed', children: [{ id: 'child', title: 'Managed child', url: 'https://example.com' } as chrome.bookmarks.BookmarkTreeNode] },
+  ]);
+  for (const bookmarkId of ['selected', 'missing', 'managed', '']) {
+    await assert.rejects(perform({ action: 'removeBookmark', windowId: 10, bookmarkId, expectedUrl: 'https://example.com' }), { message: t('errorBookmarkChanged') });
+  }
+  await assert.rejects(perform({ action: 'removeBookmark', windowId: 10, bookmarkId: 'child', expectedUrl: 'https://example.com' }), { message: t('errorBookmarkItemManaged') });
+  assert.equal(nodes.length, 2);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(usage, []);
+});
+
+test('bookmark item removal failures do not learn and private removal leaves duplicates intact', async () => {
+  bookmarkStore([{ id: 'selected', title: 'Selected', url: 'https://example.com' }, { id: 'other', title: 'Other', url: 'https://example.com' }]);
+  const remove = chrome.bookmarks.remove;
+  chrome.bookmarks.remove = async () => { throw new Error('Write failed'); };
+  const request: Execution = { action: 'removeBookmark', windowId: 10, bookmarkId: 'selected', expectedUrl: 'https://example.com' };
+  await assert.rejects(perform(request), { message: t('errorBookmarkWrite') });
+  assert.deepEqual(usage, []);
+  chrome.bookmarks.remove = remove;
+  chrome.windows.get = (async () => ({ id: 10, incognito: true, focused: true, alwaysOnTop: false })) as typeof chrome.windows.get;
+  await perform(request);
+  assert.deepEqual((await chrome.bookmarks.getTree()).map(item => item.id), ['other']);
+  assert.deepEqual(usage, []);
+});
+
+test('bookmark URL validation shares the opening protocol policy and rejects malformed input', async () => {
+  for (const url of ['https://example.com', 'http://example.com', 'file:///tmp/a', 'ftp://example.com', 'chrome://settings/']) assert.equal(safeBookmarkUrl(url), true);
+  for (const url of [undefined, '', 'invalid', 'javascript:alert(1)', 'data:text/html,a', ' https://example.com', 'https://exa\nmple.com']) {
+    assert.equal(safeBookmarkUrl(url), false);
+    bookmarkUrl = url as string;
+    await assert.rejects(perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b' }), { message: t('errorBookmarkUrl') });
+  }
+});
+
+test('bookmark creation uses live title, native destination and exact live URL deduplication', async () => {
+  bookmarkStore([{ id: 'different', title: 'Other', url: 'https://example.com/' }]);
+  await snapshot(tabs[1]);
+  tabs[1].title = 'Live title';
+  await perform(bookmarkExecution('bookmarkTab'));
+  assert.deepEqual(calls, [['bookmarkCreate', { title: 'Live title', url: 'https://example.com' }]]);
+  assert.equal((await snapshot(tabs[1])).bookmarks.length, 2);
+  await perform(bookmarkExecution('bookmarkTab'));
+  assert.equal(calls.length, 1);
+  assert.ok(usage.some(item => item.target === 'command:bookmarkTab'));
+});
+
+test('concurrent bookmark requests serialize before live reads and cannot create duplicates', async () => {
+  bookmarkStore();
+  const started = gate(); const blocked = gate();
+  const create = chrome.bookmarks.create;
+  chrome.bookmarks.create = async details => { started.release(); await blocked.promise; return create(details); };
+  const first = perform(bookmarkExecution('bookmarkTab'));
+  await started.promise;
+  const second = perform(bookmarkExecution('bookmarkTab'));
+  blocked.release();
+  await Promise.all([first, second]);
+  assert.equal(calls.filter(([name]) => name === 'bookmarkCreate').length, 1);
+});
+
+test('queued bookmark writes reread navigation, window and group context after the preceding write', async () => {
+  for (const patch of [{ url: 'https://changed.example' }, { pendingUrl: 'https://changed.example' }, { windowId: 20 }, { groupId: 9 }]) {
+    bookmarkStore(); Object.assign(tabs[1], { url: 'https://example.com', pendingUrl: undefined, windowId: 10, groupId: 7 });
+    const started = gate(); const blocked = gate();
+    const create = chrome.bookmarks.create;
+    chrome.bookmarks.create = async details => { started.release(); await blocked.promise; return create(details); };
+    const first = perform(bookmarkExecution('bookmarkTab'));
+    await started.promise;
+    const second = assert.rejects(perform({ ...bookmarkExecution('bookmarkTab'), groupId: 7 }));
+    Object.assign(tabs[1], patch);
+    blocked.release(); await Promise.all([first, second]);
+  }
+  assert.equal(calls.filter(([name]) => name === 'bookmarkCreate').length, 4);
+});
+
+test('bookmark queue is isolated by API instance and a failed write does not poison it', async () => {
+  bookmarkStore();
+  const started = gate(); const blocked = gate();
+  chrome.bookmarks.create = async () => { started.release(); await blocked.promise; throw new Error('sensitive backend detail'); };
+  const first = assert.rejects(perform(bookmarkExecution('bookmarkTab')), { message: t('errorBookmarkWrite') });
+  await started.promise;
+  chrome.bookmarks = {} as typeof chrome.bookmarks;
+  bookmarkStore();
+  await perform(bookmarkExecution('bookmarkTab'));
+  blocked.release(); await first;
+  const nodes = bookmarkStore();
+  const create = chrome.bookmarks.create;
+  chrome.bookmarks.create = async () => { throw new Error('backend detail'); };
+  await assert.rejects(perform(bookmarkExecution('bookmarkTab')), { message: t('errorBookmarkWrite') });
+  chrome.bookmarks.create = create;
+  await perform(bookmarkExecution('bookmarkTab'));
+  assert.equal(nodes.length, 1);
+});
+
+test('bookmark cancellation removes the complete observed set and repeated cancellation is idempotent', async () => {
+  bookmarkStore([{ id: 'a', url: 'https://example.com' }, { id: 'b', url: 'https://example.com' }, { id: 'other', url: 'https://example.com/' }]);
+  await snapshot(tabs[1]);
+  await perform(bookmarkExecution('unbookmarkTab', ['b', 'a']));
+  assert.deepEqual(calls, [['bookmarkRemove', 'b'], ['bookmarkRemove', 'a']]);
+  assert.deepEqual((await snapshot(tabs[1])).bookmarks.map(item => item.id), ['other']);
+  await perform(bookmarkExecution('unbookmarkTab', ['b', 'a']));
+  assert.equal(calls.length, 2);
+  assert.ok(usage.some(item => item.target === 'command:unbookmarkTab'));
+});
+
+test('bookmark cancellation refuses added, missing, retargeted or malformed observed IDs', async () => {
+  for (const nodes of [
+    [{ id: 'a', url: 'https://example.com' }, { id: 'b', url: 'https://example.com' }, { id: 'new', url: 'https://example.com' }],
+    [{ id: 'a', url: 'https://example.com' }],
+    [{ id: 'a', url: 'https://other.example' }],
+    [{ id: 'a', children: [] }],
+  ]) {
+    bookmarkStore(nodes);
+    await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a', 'b'])), { message: t('errorBookmarkChanged') });
+  }
+  bookmarkStore([{ id: 'a', url: 'https://example.com' }]);
+  for (const bookmarkIds of [undefined, [], ['a', 'a'], [''], [42]]) {
+    await assert.rejects(perform({ ...bookmarkExecution('unbookmarkTab'), bookmarkIds } as Execution), { message: t('errorBookmarkChanged') });
+  }
+  assert.deepEqual(calls, []); assert.deepEqual(usage, []);
+});
+
+test('managed bookmarks and managed ancestors reject the entire cancellation and propagate to snapshots', async () => {
+  for (const managed of [
+    { id: 'managed', url: 'https://example.com', unmodifiable: 'managed' as const },
+    { id: 'folder', title: 'Policy', unmodifiable: 'managed' as const, children: [{ id: 'managed', title: 'Managed', url: 'https://example.com', syncing: false }] },
+  ]) {
+    bookmarkStore([{ id: 'editable', url: 'https://example.com' }, managed]);
+    await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['editable', 'managed'])), { message: t('errorBookmarkManaged') });
+    assert.equal((await snapshot(tabs[1])).bookmarks.find(item => item.id === 'managed')?.unmodifiable, 'managed');
+  }
+  assert.deepEqual(calls, []);
+});
+
+test('bookmark cancellation rereads individual URLs before remove and stops on partial failure', async () => {
+  bookmarkStore([{ id: 'a', url: 'https://example.com' }]);
+  chrome.bookmarks.get = async () => [{ id: 'a', title: 'Changed', url: 'https://elsewhere.example', syncing: false }];
+  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a'])), { message: t('errorBookmarkChanged') });
+  assert.deepEqual(calls, []);
+  bookmarkStore([{ id: 'a', url: 'https://example.com' }, { id: 'b', url: 'https://example.com' }, { id: 'c', url: 'https://example.com' }]);
+  const remove = chrome.bookmarks.remove;
+  chrome.bookmarks.remove = async id => {
+    if (id === 'b') throw new Error('private failure detail');
+    await remove(id);
+  };
+  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a', 'b', 'c'])), { message: t('errorBookmarkPartial') });
+  assert.deepEqual(calls, [['bookmarkRemove', 'a']]);
+  assert.deepEqual(usage, []);
+});
+
+test('bookmark cancellation stops when a new duplicate appears between removals', async () => {
+  const nodes = bookmarkStore([{ id: 'a', url: 'https://example.com' }, { id: 'b', url: 'https://example.com' }]);
+  const remove = chrome.bookmarks.remove;
+  chrome.bookmarks.remove = async id => {
+    await remove(id);
+    nodes.push({ id: 'new', title: 'New duplicate', url: 'https://example.com', syncing: false });
+  };
+  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a', 'b'])), { message: t('errorBookmarkPartial') });
+  assert.deepEqual(calls, [['bookmarkRemove', 'a']]);
+});
+
+test('bookmark writes revalidate optional group and navigation after live tree reads', async () => {
+  bookmarkStore(); tabs[1].groupId = 7;
+  chrome.tabGroups.get = async () => ({ id: 7, windowId: 20 }) as chrome.tabGroups.TabGroup;
+  await assert.rejects(perform({ ...bookmarkExecution('bookmarkTab'), groupId: 7 }), { message: t('errorGroup') });
+  chrome.tabGroups.get = async () => ({ id: 7, windowId: 10 }) as chrome.tabGroups.TabGroup;
+  chrome.bookmarks.getTree = async () => { tabs[1].pendingUrl = 'https://away.example'; return []; };
+  await assert.rejects(perform({ ...bookmarkExecution('bookmarkTab'), groupId: 7 }), { message: t('errorBookmarkChanged') });
+  assert.deepEqual(calls, []);
+});
+
+test('bookmark cancellation reports a final concurrent duplicate as partial and invalidates cached snapshots', async () => {
+  const nodes = bookmarkStore([{ id: 'a', url: 'https://example.com' }]);
+  await snapshot(tabs[1]);
+  const remove = chrome.bookmarks.remove;
+  chrome.bookmarks.remove = async id => {
+    await remove(id);
+    nodes.push({ id: 'new', title: 'New duplicate', url: 'https://example.com', syncing: false });
+  };
+  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a'])), { message: t('errorBookmarkPartial') });
+  assert.deepEqual((await snapshot(tabs[1])).bookmarks.map(item => item.id), ['new']);
+  assert.deepEqual(usage, []);
+});
+
+test('queued bookmark writes reread the originating window and preserve fixed errors', async () => {
+  bookmarkStore();
+  const started = gate(); const blocked = gate();
+  const create = chrome.bookmarks.create;
+  chrome.bookmarks.create = async details => { started.release(); await blocked.promise; return create(details); };
+  const first = perform(bookmarkExecution('bookmarkTab'));
+  await started.promise;
+  const second = assert.rejects(perform(bookmarkExecution('bookmarkTab')), { message: t('errorWindow') });
+  chrome.windows.get = async () => { throw new Error('private window detail'); };
+  blocked.release(); await Promise.all([first, second]);
+  assert.equal(calls.length, 1);
+});
+
+test('bookmark writes reject stale or unsafe URLs and never learn failed or private actions', async () => {
+  bookmarkStore();
+  for (const expectedUrl of [undefined, 'javascript:alert(1)', 'https://stale.example']) {
+    await assert.rejects(perform({ ...bookmarkExecution('bookmarkTab'), expectedUrl }));
+  }
+  tabs[1].pendingUrl = 'https://away.example';
+  await assert.rejects(perform(bookmarkExecution('bookmarkTab')), { message: t('errorBookmarkChanged') });
+  assert.deepEqual(calls, []); assert.deepEqual(usage, []);
+  tabs[1].pendingUrl = tabs[1].url;
+  tabs[1].incognito = true;
+  await perform(bookmarkExecution('bookmarkTab'));
+  assert.equal(calls.length, 1); assert.deepEqual(usage, []);
+  tabs[1].incognito = false;
+  chrome.windows.get = async () => ({ id: 10, incognito: true }) as chrome.windows.Window;
+  await perform(bookmarkExecution('unbookmarkTab', ['new-0']));
+  assert.deepEqual(usage, []);
+});
 
 test('history reads are uncached, bounded to 100 and use explicit week/all start times', async () => {
   const searches: chrome.history.HistoryQuery[] = [];

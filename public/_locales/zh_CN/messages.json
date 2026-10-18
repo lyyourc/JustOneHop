@@ -44,6 +44,19 @@
   "reloadTab": {
     "message": "刷新标签页"
   },
+  "bookmarkTab": { "message": "收藏标签页" },
+  "unbookmarkTab": { "message": "取消收藏" },
+  "removeBookmark": { "message": "取消收藏" },
+  "errorBookmarkItemManaged": { "message": "此书签由组织管理，无法删除。" },
+  "tabBookmarked": { "message": "已收藏标签页" },
+  "tabUnbookmarked": { "message": "已取消收藏" },
+  "confirmUnbookmark": { "message": "取消收藏？" },
+  "unbookmarkPrompt": { "message": "将从以下目录删除此网址的全部 $1 个书签，是否继续？" },
+  "unbookmarkCount": { "message": "删除 $1 个书签" },
+  "errorBookmarkChanged": { "message": "页面或书签已变化，请核对更新后的列表再试。" },
+  "errorBookmarkManaged": { "message": "此网址包含组织管理的书签，无法取消收藏，未删除任何书签。" },
+  "errorBookmarkWrite": { "message": "无法更新书签，请重试。" },
+  "errorBookmarkPartial": { "message": "已删除部分书签，但操作未能完成。请核对剩余书签后重试。" },
   "pin": {
     "message": "固定标签页"
   },

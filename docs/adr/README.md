@@ -19,10 +19,11 @@ ADR 解释“为什么这样做”，保留背景、决策、备选方案和接�
 | 0009 | [列表型二级页取消标题栏，层名与返回移到底栏左侧](0009-list-page-footer-breadcrumb.md) | 已采纳 |
 | 0010 | [内容区锚定与原生窗口边框校准](0010-content-anchor-panel-geometry.md) | 已采纳；更新 0001 的独立窗口几何策略 |
 | 0011 | [Chrome 内置页面与当前窗口复用](0011-chrome-pages.md) | 已采纳 |
-| 0012 | [整理操作保留面板与关闭来源页后接续](0012-continuous-tab-management.md) | 已采纳；更新 0001、0007 |
+| 0012 | [整理操作保留面板与关闭来源页后接续](0012-continuous-tab-management.md) | 部分被 0016 替代；保留非来源页整理规则与历史接续理由 |
 | 0013 | [扩展图标菜单、实际快捷键与独立帮助页](0013-toolbar-help-and-shortcuts.md) | 已采纳 |
-
 | 0014 | [最近一周历史混搜与显式全部时间搜索](0014-history-search.md) | 已采纳 |
+| 0015 | [原生标签页收藏与明确取消范围](0015-native-tab-bookmarks.md) | 已采纳；补充书签结果仅删除所选 ID |
+| 0016 | [来源页删除即结束面板](0016-source-close-ends-palette.md) | 已采纳；部分替代 0012，承载与定位不变 |
 
 ## 维护方式
 

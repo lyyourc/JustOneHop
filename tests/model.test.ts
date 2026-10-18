@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, closeTargets, entries, homeEntries, homeRecommendations, search } from '../src/model.ts';
-import type { Snapshot, TabItem } from '../src/types.ts';
+import { actionsFor, bookmarkTabAction, closeTargets, entries, homeEntries, homeRecommendations, matchingAlias, search } from '../src/model.ts';
+import type { BookmarkItem, Snapshot, TabItem } from '../src/types.ts';
+import { t } from '../src/i18n.ts';
 import { entryTitle } from '../src/entryPresentation.ts';
 import { usageTarget } from '../src/usage.ts';
 
@@ -16,8 +17,8 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one search index contains every source while cold home contains only nine safe defaults', () => {
   const items = entries(data);
-  assert.equal(items.length, 35);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 31);
+  assert.equal(items.length, 36);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 32);
   const home = homeEntries(items);
   assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
   assert.ok(home.every(entry => entry.kind === 'command' && !entry.danger && !entry.searchOnly));
@@ -156,8 +157,149 @@ test('search finds bookmark folders and URLs', () => {
 test('actions target the selected tab, not the active tab', () => {
   const selected = entries(data).find(entry => entry.tabId === 3)!;
   assert.ok(actionsFor(selected, data).every(action => action.tabId === 3));
-  assert.equal(actionsFor(selected, data).length, 8);
+  assert.equal(actionsFor(selected, data).length, 9);
 });
+test('bookmark actions use exact complete URLs and include every duplicate, including managed bookmarks', () => {
+  const current = { ...tab(2, 1), url: 'https://example.com/docs?q=one#section' };
+  const bookmarks: BookmarkItem[] = [
+    { id: 'first', title: 'First', url: current.url, folder: '' },
+    { id: 'managed', title: 'Managed', url: current.url, folder: '', unmodifiable: 'managed' },
+    { id: 'query', title: 'Query', url: 'https://example.com/docs?q=two#section', folder: '' },
+    { id: 'hash', title: 'Hash', url: 'https://example.com/docs?q=one#other', folder: '' },
+  ];
+  const remove = bookmarkTabAction(current, bookmarks)!;
+  assert.equal(remove.action, 'unbookmarkTab');
+  assert.equal(remove.title, t('unbookmarkTab'));
+  assert.equal(remove.tabId, current.id);
+  assert.equal(remove.expectedUrl, current.url);
+  assert.equal(remove.subtitle, current.title);
+  assert.equal(remove.icon, 'bookmark');
+  assert.equal(remove.category, 'tab');
+  assert.equal(remove.searchOnly, true);
+  assert.equal(remove.danger, true);
+  assert.deepEqual(remove.bookmarkIds, ['first', 'managed']);
+  const add = bookmarkTabAction(current, bookmarks.slice(2))!;
+  assert.equal(add.action, 'bookmarkTab');
+  assert.equal(add.title, t('bookmarkTab'));
+  assert.equal(add.expectedUrl, current.url);
+  assert.deepEqual(add.bookmarkIds, []);
+  assert.ok(!add.danger);
+});
+
+test('bookmark discovery targets the source while menus target the selected tab and keep switching as default', () => {
+  const snapshot = { ...data, bookmarks: [{ id: 'selected', title: 'Selected', url: data.tabs[2].url, folder: '' }] };
+  const items = entries(snapshot);
+  const source = items.find(item => item.action === 'bookmarkTab')!;
+  assert.equal(source.tabId, 2);
+  assert.equal(source.expectedUrl, data.tabs[1].url);
+  assert.ok(!items.some(item => item.action === 'unbookmarkTab'));
+  const selected = items.find(item => item.id === 'tab:3')!;
+  assert.equal(selected.action, 'switch');
+  const menu = actionsFor(selected, snapshot);
+  assert.equal(menu[0].action, 'switch');
+  const remove = menu.find(item => item.action === 'unbookmarkTab')!;
+  assert.equal(remove.tabId, 3);
+  assert.equal(remove.expectedUrl, data.tabs[2].url);
+  assert.deepEqual(remove.bookmarkIds, ['selected']);
+  assert.ok(!menu.some(item => item.action === 'bookmarkTab'));
+  assert.ok(search(menu, '').includes(remove));
+  assert.ok(search(menu, '  ').includes(remove));
+  assert.equal(new Set(menu.map(item => item.id)).size, menu.length);
+  assert.ok(actionsFor(items.find(item => item.id === 'tab:2')!, snapshot).some(item => item.action === 'bookmarkTab'));
+  const refreshed = { ...snapshot, bookmarks: [] };
+  assert.ok(actionsFor(selected, refreshed).some(item => item.action === 'bookmarkTab'));
+  assert.ok(!entries({ ...snapshot, currentTabId: 999 }).some(item => ['bookmarkTab', 'unbookmarkTab'].includes(item.action)));
+});
+
+test('unsupported or missing tab URLs never offer bookmark mutations', () => {
+  assert.equal(bookmarkTabAction(undefined, []), undefined);
+  for (const url of ['', 'invalid URL', 'javascript:alert(1)', 'data:text/html,hello', 'about:blank', 'chrome-extension://test/popup.html']) {
+    const current = { ...tab(2, 0), url };
+    assert.equal(bookmarkTabAction(current, [{ id: 'unsafe', title: 'Unsafe', url, folder: '' }]), undefined, url);
+    const snapshot = { ...data, tabs: [current] };
+    const items = entries(snapshot);
+    const menu = actionsFor(items.find(item => item.kind === 'tab')!, snapshot);
+    for (const candidates of [items, menu]) {
+      assert.ok(!candidates.some(item => ['bookmarkTab', 'unbookmarkTab'].includes(item.action)), url);
+    }
+  }
+  for (const url of ['http://example.com/', 'https://example.com/', 'file:///tmp/page.html', 'ftp://example.com/page', 'chrome://settings/']) {
+    assert.equal(bookmarkTabAction({ ...tab(2, 0), url }, [])?.expectedUrl, url);
+  }
+});
+
+test('bookmark queries show the current state in both languages and menus without exposing removal for unrelated queries', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      for (const saved of [false, true]) {
+        const snapshot = { ...data, bookmarks: saved ? [{ id: 'source', title: 'Source', url: data.tabs[1].url, folder: '' }] : [] };
+        const items = entries(snapshot);
+        const menu = actionsFor(items.find(item => item.id === 'tab:2')!, snapshot);
+        const action = saved ? 'unbookmarkTab' : 'bookmarkTab';
+        assert.equal(items.find(item => item.action === action)?.title, t(action));
+        assert.ok(!homeEntries(items, new Map([[`command:${action}`, 1e9]])).some(item => item.action === action));
+        for (const candidates of [items, menu]) {
+          for (const query of ['unbook', 'UNBOOKM', 'Tab: unbook', 'unbookmark', 'UNBOOKMARK', 'unbookmark tab', 'remove bookmark', 'bookmark remove', 'delete bookmarks', '取消收藏', '取消 收藏', '删除书签', '删除 书签', 'Tab: unbookmark', '标签页：取消收藏']) {
+            const found = search(candidates, query);
+            assert.ok(!found.some(item => item.action === 'bookmarkTab'), `${locale}: ${query}`);
+            if (saved) assert.equal(found[0]?.action, 'unbookmarkTab', `${locale}: ${query}`);
+          }
+          for (const query of ['书签', 'close', '关闭', 'tab', 'remove', 'delete', 'boo', 'unboo', 'books', 'bookcase', 'book guide', 'unbookmrak', 'bookmrak', 'close bookmark']) {
+            assert.ok(!search(candidates, query).some(item => item.action === 'unbookmarkTab'), `${locale}: ${query}`);
+          }
+          for (const query of ['book', 'BOOKM', 'bookma', 'bookmar', 'Tab: book', 'bookmark', 'BOOKMARK', 'bookmark tab', 'add bookmark', 'save bookmark', '收藏', '收藏标签页', '添加书签', 'Tab: bookmark', '标签页：收藏标签页']) {
+            assert.equal(search(candidates, query)[0]?.action, action, `${locale}: ${query}, saved=${saved}`);
+          }
+          if (!saved) assert.ok(search(candidates, '书签').some(item => item.action === 'bookmarkTab'));
+          const command = candidates.find(item => item.action === action)!;
+          const alias = matchingAlias(command, locale === 'en-US' ? (saved ? '取消收藏' : '收藏') : (saved ? 'unbookmark' : 'bookmark'));
+          assert.ok(alias, `${locale}: ${action}`);
+        }
+      }
+    }
+  } finally { globalThis.chrome = original; }
+});
+
+test('bookmark prefixes rank the current state above page names and learned page matches', () => {
+  for (const saved of [false, true]) {
+    const snapshot = { ...data, bookmarks: [
+      ...(saved ? [{ id: 'source', title: 'Source', url: data.tabs[1].url, folder: '' }] : []),
+      { id: 'book', title: 'Book', url: 'https://example.com/books', folder: '' },
+      { id: 'guide', title: 'Book guide', url: 'https://example.com/book-guide', folder: '' },
+    ] };
+    const items = entries(snapshot);
+    const scores = new Map([['bookmark:book', 1e9], ['bookmark:guide', 1e9]]);
+    assert.equal(search(items, 'book', scores)[0]?.action, saved ? 'unbookmarkTab' : 'bookmarkTab');
+    assert.equal(search(items, 'book guide', scores)[0]?.id, 'bookmark:guide');
+    assert.ok(!search(items, 'book guide', scores).some(item => item.action === 'unbookmarkTab'));
+  }
+});
+
+test('bookmark result menus offer removal of that bookmark, preserving open as the default action', () => {
+  const snapshot = { ...data, bookmarks: [
+    { id: 'one', title: 'First', url: 'https://example.com/path?q=1#two', folder: 'Folder' },
+    { id: 'two', title: 'Second', url: 'https://example.com/path?q=1#two', folder: 'Other' },
+  ] };
+  const bookmark = entries(snapshot).find(entry => entry.id === 'bookmark:one')!;
+  const menu = actionsFor(bookmark, snapshot);
+  assert.equal(menu[0].action, 'openBookmark');
+  const remove = menu.find(entry => entry.action === 'removeBookmark')!;
+  assert.equal(remove.kind, 'command');
+  assert.equal(remove.bookmarkId, 'one');
+  assert.equal(remove.expectedUrl, snapshot.bookmarks[0].url);
+  assert.equal(remove.tabId, undefined);
+  assert.equal(remove.bookmarkIds, undefined);
+  assert.equal(remove.danger, true);
+  assert.equal(usageTarget(remove), 'command:removeBookmark');
+  for (const query of ['', 'book', 'bookm', 'unbook', 'bookmark', 'unbookmark', 'remove bookmark', '取消收藏', '收藏', '删除书签']) {
+    assert.ok(search(menu, query).some(entry => entry.action === 'removeBookmark'), query);
+  }
+  for (const query of ['close', 'tab', 'bookmrak']) assert.ok(!search(menu, query).some(entry => entry.action === 'removeBookmark'), query);
+  assert.ok(!entries(snapshot).some(entry => entry.action === 'removeBookmark'));
+});
+
 test('URL actions preserve the selected URL and never inherit shortcuts or learning identity', () => {
   const snapshot = { ...data, tabs: [{ ...tab(3, 0), url: 'chrome://settings/content?search=test#cookies' }],
     bookmarks: [{ id: 'url', title: 'Docs', url: 'https://example.com/docs?q=one%20two#section', folder: 'Folder' }] };
