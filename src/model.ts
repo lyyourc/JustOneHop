@@ -107,9 +107,9 @@ export function entries(snapshot: Snapshot): Entry[] {
       ['language', 'language', ['language', 'change language', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
       ['theme', 'theme', ['theme', 'appearance', 'change theme', 'dark mode', 'light mode', '深色模式', '浅色模式', '主题', '外观', '换主题', '切换主题']],
       ['keyboard', 'keyboardShortcuts', ['hotkey', 'shortcut', 'keyboard shortcuts', '快捷键', '快捷键设置']],
-      ['binding', 'bindCtrlTab', ['ctrl tab', 'Ctrl+Tab', 'bind Ctrl+Tab', 'set up Ctrl+Tab', '设置 Ctrl+Tab', '绑定 Ctrl+Tab']],
+      ['binding', 'bindCtrlTab', ['ctrl tab', 'Ctrl+Tab', 'bind Ctrl+Tab', 'set up Ctrl+Tab', '设置 Ctrl+Tab', '配置 Ctrl+Tab', '绑定 Ctrl+Tab']],
       ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '重置排序', '清除排序', '使用习惯']],
-      ['tabs', 'autoTuck', ['auto tuck tabs', 'auto tuck', 'automatic tuck', '自动收起闲置标签页', '自动收起', '收起设置']],
+      ['tabs', 'autoTuck', ['auto tuck tabs', 'auto tuck', 'automatic tuck', '自动收起闲置标签页', '自动收起标签页', '自动收起', '收起设置']],
     ] as const).map(([settingsSection, title, aliases]): Entry => ({
       id: `command:settings:${settingsSection}`, kind: 'command', category: 'settings', action: 'settings', settingsSection, icon: 'settings',
       title: t(title), subtitle: '', keywords: '', aliases: [...aliases], searchOnly: true,

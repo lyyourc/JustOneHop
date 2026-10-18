@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useResultSelection } from './useResultSelection';
 import { keepsPaletteOpen } from './paletteActions';
-import { Layers, Palette, PanelTop, Pencil, Save, Search, X } from 'lucide-react';
+import { Layers, Palette, PanelTop, Pencil, Save, X } from 'lucide-react';
 import { BackLayer } from './Navigation';
+import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
@@ -131,7 +132,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
             {colors.map(value => <option key={value} value={value}>{t(`color${value[0].toUpperCase()}${value.slice(1)}` as MessageKey)}</option>)}
           </select></label>}
       </div> : <>
-        <div className="search-bar"><span className="search-icon"><Search size={20} /></span><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
+        <div className="search-bar"><SearchFocusButton input={input} disabled={busy} /><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('groupSearch')} aria-label={t('groupSearch')} role="combobox" aria-expanded="true" aria-controls="zing-group-tabs" aria-activedescendant={selected ? `group-${selected.id}` : undefined} disabled={busy} />
           <SearchDismissButton label={t('back')} /></div>
         <div ref={list} className="results" id="zing-group-tabs" role="listbox" aria-label={t('resultsLabel')}>

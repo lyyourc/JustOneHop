@@ -106,11 +106,9 @@ if (!scope[marker]) {
       void Promise.all([preferencesReady, usageReady]).then(() => {
         try {
           if (host) { close(); respond(true); return; }
-          // DOM focus inside the frame cannot take keyboard focus from Chrome's
-          // address bar. Let the existing native popup fallback handle this case
-          // instead of opening an overlay that cannot receive typing.
+          // Try to focus the page, but keep the overlay available for a real
+          // click when Chrome retains keyboard focus in its address bar.
           if (!document.hidden && !document.hasFocus()) window.focus();
-          if (!document.hasFocus()) { respond(false); return; }
           open();
           respond(true);
         } catch { close(); respond(false); }

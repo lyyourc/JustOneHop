@@ -12,6 +12,7 @@ import { TuckRecoveryView } from './TuckRecoveryView';
 import { Favicon } from './Favicon';
 import { NavigationHint } from './Shortcut';
 import { NavigationRoot, BackLayer } from './Navigation';
+import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
@@ -381,7 +382,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       <span className="sr-only" id="zing-navigation">{t('navigationHelp')}</span>
       <div className={`main-surface ${actionTarget || bookmarkRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval ? true : undefined}>
         <header className="search-bar">
-          <span className="search-icon"><Search size={20} /></span>
+          <SearchFocusButton input={input} disabled={busy} />
           <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError(''); setNotice(''); }}
             placeholder={t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
             aria-autocomplete="list" aria-expanded="true" aria-controls="zing-results"

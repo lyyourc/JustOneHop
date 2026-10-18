@@ -1,4 +1,5 @@
-import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut, getPaletteWindowState, performPaletteAction, cancelPaletteContinuation } from './paletteWindow';
+import { paletteSender, getPaletteWindowState, performPaletteAction, cancelPaletteContinuation } from './paletteWindow';
+import { launchPalette } from './paletteLaunch';
 import { startTabTucking } from './tabTuck';
 import { openRecentSwitcher } from './recentTabs';
 import { readPageStorage, openCookieAccess } from './pageStorage';
@@ -10,37 +11,12 @@ import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
 import { forgetUsage, resetUsage } from './usageStorage';
 import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult } from './types';
 
-const opening = new Set<number>();
-async function launch(tab: chrome.tabs.Tab) {
-  if (tab.id === undefined || opening.has(tab.id)) return;
-  if (await closePaletteWindowForShortcut(tab)) return;
-  if (isNativePage(tab)) {
-    await chrome.action.setPopup({ tabId: tab.id, popup: '' });
-    await togglePaletteWindow(tab); return;
-  }
-  opening.add(tab.id);
-  try {
-    // Other content listeners can accept a message without answering it. Only
-    // the palette's explicit acknowledgement proves its handler is installed.
-    const ready = await chrome.tabs.sendMessage(tab.id, { source: 'zing', type: 'ping' }, { frameId: 0 }).catch(() => false);
-    if (ready !== true) await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-    const shown = await chrome.tabs.sendMessage(tab.id, { source: 'zing', type: 'toggle' }, { frameId: 0 });
-    if (!shown) throw new Error('Unable to show page overlay');
-    await chrome.action.setPopup({ tabId: tab.id, popup: '' });
-  } catch {
-    // Restricted pages and overlays that cannot receive browser keyboard focus.
-    await chrome.action.setPopup({ tabId: tab.id, popup: 'popup.html' });
-    try { await chrome.action.openPopup({ windowId: tab.windowId }); }
-    catch (error) { console.warn('zing: click the toolbar icon to open the fallback.', error); }
-  } finally { opening.delete(tab.id); }
-}
-
-chrome.action.onClicked.addListener(tab => { void launch(tab); });
+chrome.action.onClicked.addListener(tab => launchPalette(tab).catch(error => console.warn('zing: unable to open palette.', error)));
 chrome.commands.onCommand.addListener(async command => {
   if (command === 'switch-recent' || command === 'switch-recent-back') { await openRecentSwitcher(command); return; }
   if (command !== 'toggle-palette') return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) await launch(tab);
+  if (tab) await launchPalette(tab).catch(error => console.warn('zing: unable to open palette.', error));
 });
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.status === 'loading') void chrome.action.setPopup({ tabId, popup: '' }).catch(() => {});

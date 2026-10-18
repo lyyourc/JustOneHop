@@ -1,4 +1,5 @@
 import { BackLayer, useNavigateBack } from './Navigation';
+import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, Search, SlidersHorizontal, X } from 'lucide-react';
@@ -134,7 +135,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   }
   return <BackLayer onBack={onBack}>{helpOpen ? <HelpView shortcut={shortcut} onBack={() => setHelpOpen(false)} /> : bindingOpen ? <BindingGuide onBack={() => setBindingOpen(false)} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
     <header className="search-bar settings-search">
-      <span className="search-icon"><Search size={20} /></span>
+      <SearchFocusButton input={input} />
       <input ref={input} data-back-on-empty aria-label={t('searchSettings')} placeholder={t('searchSettingsPlaceholder')}
         value={query} onChange={event => { setQuery(event.target.value); if (body.current) body.current.scrollTop = 0; }}
         onKeyDown={event => { if (event.key === 'Enter') event.stopPropagation(); }} autoComplete="off" spellCheck={false} />

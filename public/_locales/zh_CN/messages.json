@@ -168,6 +168,15 @@
   "searchActions": {
     "message": "搜索操作"
   },
+  "focusSearch": {
+    "message": "聚焦搜索框"
+  },
+  "focusSearchHint": {
+    "message": "按 Tab 聚焦搜索框"
+  },
+  "focusSearchClickHint": {
+    "message": "点击搜索框开始输入"
+  },
   "retry": {
     "message": "重试"
   },
@@ -256,7 +265,7 @@
   "helpStorageBody": { "message": "在网页中搜索「local storage」「session storage」或「cookies」，左侧选择 key，右侧预览 value；Enter 或「复制值」复制原始字符串。JSON 自动格式化预览，不修改数据。首次读取 Cookie 时只按需申请当前网站域名的访问权限，可随时在 Chrome 扩展设置中撤销。" },
   "helpQuestionsTitle": { "message": "常见问题" },
   "helpShortcutBody": { "message": "若快捷键未生效或存在冲突，可在「设置 → 键盘」中前往 Chrome 扩展快捷键页修改。由于浏览器限制，Ctrl+Tab 需手动配置，搜索「ctrl tab」即可查看配置代码与步骤。" },
-  "helpWindowBody": { "message": "zing 在普通网页中以页面浮层打开；在 Chrome 内置页、扩展商店等受限页面或地址栏聚焦时，会自动切换为独立面板或工具栏弹窗。" },
+  "helpWindowBody": { "message": "zing 在普通网页中始终使用页面浮层，即使地址栏仍持有焦点。无法输入时，请点击搜索框。Chrome 内置页、扩展商店等无法承载浮层的页面使用独立窗口。" },
   "helpPrivacyBody": { "message": "zing 无账号、服务端或遥测。设置偏好与搜索习惯仅保存在本机；网站存储值仅保留在当前面板内存中。浏览历史权限在安装时申请；zing 不持久复制历史库，仅记住你显式选择并成功打开的搜索词与网站地址。读取历史本身和打开失败均不记录。无痕窗口不读取普通历史，也不记录选择。" },
   "settings": {
     "message": "设置"
@@ -511,7 +520,7 @@
     "message": "方向键、Ctrl+N / Ctrl+P 或点击选择 · Esc 取消"
   },
   "bindCtrlTab": {
-    "message": "设置 Ctrl+Tab"
+    "message": "配置 Ctrl+Tab"
   },
   "bindingHint": {
     "message": "使用右侧快捷键，像在 VS Code 中一样切换标签页。也可通过一次配置改用 Ctrl+Tab。"
@@ -561,7 +570,10 @@
     "message": "存储"
   },
   "categorySettings": {
-    "message": "设置"
+    "message": "zing 设置"
+  },
+  "settingsCommandTitle": {
+    "message": "$1：$2"
   },
   "tabManagement": {
     "message": "标签页"

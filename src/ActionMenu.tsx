@@ -2,7 +2,7 @@ import { matchesShortcut, Shortcut } from './Shortcut';
 import { BackLayer } from './Navigation';
 import { SearchDismissButton } from './SearchDismissButton';
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { Search } from 'lucide-react';
+import { SearchFocusButton } from './SearchFocusButton';
 import { t } from './i18n';
 import { HighlightedText } from './HighlightedText';
 
@@ -66,7 +66,7 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
         </div>)}
         {!actions.length ? <p className="action-empty">{t('noActions')}</p> : null}
       </div>
-      <div className="action-search"><Search size={15} /><input data-back-on-empty ref={input} value={query} onChange={event => onQueryChange(event.target.value)}
+      <div className="action-search"><SearchFocusButton input={input} size={15} /><input data-back-on-empty ref={input} value={query} onChange={event => onQueryChange(event.target.value)}
         placeholder={t('searchActionsPlaceholder')} aria-label={t('searchActions')} role="combobox" aria-expanded="true" aria-controls={id}
         aria-activedescendant={selected ? `${id}-${selected.id}` : undefined} autoComplete="off" spellCheck={false} />
         <SearchDismissButton label={t('back')} /></div>

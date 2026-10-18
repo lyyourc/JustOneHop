@@ -3,8 +3,9 @@ import { copyText } from './clipboard';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getUsage, subscribeUsage } from './usageState';
 import { queryUsage, rankingInfo, usageTarget } from './usage';
-import { History, LoaderCircle, Search } from 'lucide-react';
+import { History, LoaderCircle } from 'lucide-react';
 import { BackLayer } from './Navigation';
+import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
@@ -135,7 +136,7 @@ export function HistoryView({ initialQuery, windowId, isMac, onBack, onClose }: 
     }
   }}>
     <div className="main-surface" inert={menu ? true : undefined}>
-      <header className="search-bar"><span className="search-icon"><Search size={20} /></span>
+      <header className="search-bar"><SearchFocusButton input={input} disabled={busy} />
         <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError(''); setNotice(''); }}
           placeholder={t('historySearchLabel')} aria-label={t('historySearchLabel')} role="combobox" aria-autocomplete="list" aria-expanded="true"
           aria-controls="zing-history-results" aria-activedescendant={selected ? `zing-${selected.id}` : undefined} autoComplete="off" spellCheck={false} disabled={busy} />

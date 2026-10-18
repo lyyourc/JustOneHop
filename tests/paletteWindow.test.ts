@@ -20,6 +20,9 @@ let calls: [string, ...unknown[]][];
 let focused: number;
 let removeFailure = false;
 let creationFocus = false;
+let overlayReply: unknown = true;
+let injectionFailure = false;
+let beforeToggle: (() => Promise<void>) | undefined;
 let beforeRemove: (() => Promise<void>) | undefined;
 let afterRemove: (() => Promise<void>) | undefined;
 let usageWrite: (() => Promise<void>) | undefined;
@@ -35,6 +38,7 @@ function reset() {
   windows = [{ id: 10, type: 'normal', focused: true }, { id: 20, type: 'normal', focused: false }] as chrome.windows.Window[];
   stored = {}; usage = []; calls = []; focused = 10;
   removeFailure = false; creationFocus = false;
+  overlayReply = true; injectionFailure = false; beforeToggle = undefined;
   beforeRemove = afterRemove = usageWrite = undefined;
 }
 function focus(id: number) {
@@ -64,6 +68,8 @@ async function removeTabs(ids: number | number[]) {
 reset();
 globalThis.chrome = {
   runtime: { getURL: (path: string) => `chrome-extension://zing/${path}` },
+  action: { setPopup: async (options: chrome.action.PopupDetails) => { calls.push(['set-popup', options]); } },
+  scripting: { executeScript: async () => { calls.push(['inject']); if (injectionFailure) throw new Error('Cannot access this page'); } },
   storage: {
     onChanged: event<[Record<string, chrome.storage.StorageChange>, string]>(),
     session: {
@@ -96,11 +102,19 @@ globalThis.chrome = {
     onRemoved: removed,
     get: async (id: number) => { const tab = tabs.find(tab => tab.id === id); if (!tab) throw new Error('No tab'); return { ...tab }; },
     getZoom: async () => 1,
-    query: async (query: chrome.tabs.QueryInfo) => tabs.filter(tab => (query.active === undefined || tab.active === query.active) && tab.windowId === (query.currentWindow ? focused : query.windowId)).map(tab => ({ ...tab })),
+    query: async (query: chrome.tabs.QueryInfo) => tabs.filter(tab => (query.active === undefined || tab.active === query.active) &&
+      (query.currentWindow ? tab.windowId === focused : query.windowId === undefined || tab.windowId === query.windowId)).map(tab => ({ ...tab })),
+    sendMessage: async (_id: number, message: { type: string }) => {
+      calls.push(['message', message.type]);
+      if (message.type === 'ping') return undefined;
+      await beforeToggle?.();
+      return overlayReply;
+    },
     remove: removeTabs,
   },
 } as unknown as typeof chrome;
 const { togglePaletteWindow, paletteSender, getPaletteWindowState, performPaletteAction, closePaletteWindowForShortcut, cancelPaletteContinuation } = await import('../src/paletteWindow.ts');
+const { launchPalette, clearToolbarPopups } = await import('../src/paletteLaunch.ts');
 const nativeSender = () => ({ url: tabs.find(tab => tab.id === 30)!.url, tab: tabs.find(tab => tab.id === 30)! });
 const execute = (action: Execution['action'] = 'close', tabId = 2, sender: chrome.runtime.MessageSender = sourceSender(), acknowledged = () => {}) =>
   performPaletteAction({ action, windowId: 10, tabId, query: 'close', paletteState: state }, sender, acknowledged);
@@ -111,14 +125,69 @@ beforeEach(async () => {
   reset();
 });
 
-for (const host of ['page', 'action popup', 'native'] as const) {
+test('startup clears default and per-tab toolbar popup overrides', async () => {
+  await clearToolbarPopups();
+  assert.deepEqual(calls, [['set-popup', { popup: '' }], ...tabs.map(tab => ['set-popup', { tabId: tab.id, popup: '' }])]);
+});
+
+test('ordinary pages open an acknowledged overlay without creating a window', async () => {
+  await launchPalette(tabs[1]);
+  assert.deepEqual(calls.map(([name]) => name), ['set-popup', 'message', 'inject', 'message']);
+  assert.equal(stored.zingPaletteWindow, undefined);
+});
+
+for (const reason of ['native', 'restricted', 'overlay unavailable', 'missing acknowledgement'] as const) {
+  test(`${reason} launch uses a source-bound window and repeated launch closes it`, async () => {
+    if (reason === 'native') tabs[1].url = 'chrome://version/';
+    if (reason === 'restricted') injectionFailure = true;
+    if (reason === 'overlay unavailable') overlayReply = false;
+    if (reason === 'missing acknowledgement') overlayReply = undefined;
+    await launchPalette(tabs[1]);
+    assert.equal((await paletteSender(nativeSender())).tab?.id, 2);
+    assert.equal(calls.filter(([name]) => name === 'create').length, 1);
+    assert.ok(calls.filter(([name]) => name === 'set-popup').every(([, options]) => (options as { popup: string }).popup === ''));
+    if (reason === 'native') assert.equal(calls.some(([name]) => name === 'inject'), false);
+    await launchPalette(tabs.find(tab => tab.id === 30)!);
+    assert.equal(stored.zingPaletteWindow, undefined);
+  });
+}
+
+for (const change of ['deactivated', 'moved', 'navigated', 'closed', 'window focus'] as const) {
+  test(`fallback does not open after source is ${change}`, async () => {
+    const source = { ...tabs[1] };
+    overlayReply = false;
+    beforeToggle = async () => {
+      if (change === 'deactivated') tabs[1].active = false;
+      if (change === 'moved') tabs[1].windowId = 20;
+      if (change === 'navigated') tabs[1].url = 'https://other.example';
+      if (change === 'closed') tabs = tabs.filter(tab => tab.id !== source.id);
+      if (change === 'window focus') focus(20);
+    };
+    if (change === 'closed') await assert.rejects(launchPalette(source), /No tab/);
+    else await launchPalette(source);
+    assert.equal(calls.some(([name]) => name === 'create'), false);
+  });
+}
+
+test('concurrent launches do not create duplicate fallback windows', async () => {
+  const gate = deferred();
+  overlayReply = false;
+  beforeToggle = () => gate.promise;
+  const first = launchPalette(tabs[1]);
+  await tick();
+  await launchPalette(tabs[1]);
+  gate.resolve(); await first;
+  assert.equal(calls.filter(([name]) => name === 'create').length, 1);
+});
+
+for (const host of ['page', 'legacy action popup', 'native'] as const) {
   for (const [action, target, removedIds] of [
     ['close', 2, 2], ['closeOthers', 3, [2]], ['closeRight', 1, [2, 3]],
   ] as const) {
     test(`${host}: ${action} removing the source ends the session even with legacy paletteState`, async () => {
       if (host === 'native') await togglePaletteWindow(tabs[1]);
       const native = host === 'native' ? nativeSender() : undefined;
-      const sender = native ? await paletteSender(native) : host === 'action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+      const sender = native ? await paletteSender(native) : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
       calls = [];
       await execute(action, target, sender);
       await tick();

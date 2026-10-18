@@ -64,6 +64,12 @@
   box-shadow: 0 1px 6px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .search-icon { color: var(--accent); width: 20px; display: flex; align-items: center; }
+.search-focus { justify-content: center; flex-shrink: 0; height: 28px; border-radius: 6px; }
+.search-focus:hover { background: var(--hover); }
+.search-focus:disabled { opacity: .5; cursor: default; }
+.search-focus-hint { position: absolute; right: 58px; bottom: 5px; max-width: calc(100% - 104px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 12px; color: var(--muted); background: var(--bar); pointer-events: none; }
+.action-search { position: relative; }
+.action-search .search-focus-hint { bottom: 1px; }
 .search-bar input, .storage-search input { flex: 1; font-size: 14.5px; font-weight: 400; height: 100%; caret-color: var(--accent); }
 .icon-button { display: flex; align-items: center; justify-content: center; border-radius: 6px; }
 .search-dismiss { flex-shrink: 0; min-width: 30px; min-height: 28px; }

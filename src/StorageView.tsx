@@ -1,10 +1,11 @@
 import { BackLayer } from './Navigation';
+import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
 import { ReadOnlyPreview } from './ReadOnlyPreview';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Copy, Database, Cookie, Search, RotateCcw, FileText, LoaderCircle } from 'lucide-react';
+import { Copy, Database, Cookie, RotateCcw, FileText, LoaderCircle } from 'lucide-react';
 import { readPageStorage, openCookieAccess } from './api';
 import { copyText } from './clipboard';
 import { t, errorMessage } from './i18n';
@@ -148,7 +149,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       {detail ? <div className="storage-detail" ref={detailBody} tabIndex={0} aria-label={t('viewDetails')}>
         <StorageValue entry={detail} />
       </div> : <>
-        <div className="storage-search"><span className="search-icon"><Search size={20} /></span><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setNotice(''); }}
+        <div className="storage-search"><SearchFocusButton input={input} /><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setNotice(''); }}
           placeholder={t('storageSearch')} aria-label={t('storageSearchLabel')} role="combobox" aria-expanded="true" aria-controls="storage-results" aria-autocomplete="list"
           aria-activedescendant={selected ? `storage-row-${rows.indexOf(selected)}` : undefined} aria-describedby="storage-navigation" autoComplete="off" spellCheck={false} />
           <SearchDismissButton label={t('back')} /></div>

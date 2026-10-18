@@ -1,5 +1,6 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
+import { availableSearchButton, hasControlFocus } from './searchFocus';
 import { useWheelBack } from './useWheelBack';
 import { t } from './i18n';
 
@@ -41,6 +42,15 @@ export function NavigationRoot({ children }: { children: ReactNode }) {
     const parentView = view.frameElement?.ownerDocument.defaultView;
     const views = new Set([view, ...(parentView ? [parentView] : [])]);
     const navigateBack = (event: KeyboardEvent) => {
+      if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+        const root = surface.current!;
+        const button = availableSearchButton(root);
+        if (button && !hasControlFocus(root)) {
+          event.preventDefault(); event.stopImmediatePropagation();
+          if (!event.repeat) button.click();
+          return;
+        }
+      }
       const backspace = event.key === 'Backspace';
       if ((!backspace && event.key !== 'Escape') || event.isComposing || event.keyCode === 229) return;
       if (backspace) {

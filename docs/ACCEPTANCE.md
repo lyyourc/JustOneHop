@@ -4,6 +4,71 @@
 
 当前定位验收仍有未解决项：`tests/palette.spec.ts` 的屏幕位置对照现包含横向／垂直标签栏 × 80%／100%／125% 缩放，并通过可信 pointer 事件采样来源内容区屏幕原点。下文历史几何通过记录不覆盖这套新增矩阵；特别是垂直标签栏三档缩放尚不能标记通过。当前 `nativePanelBounds` 仍将浏览器外框与内容宽度之差平均分到左右，`alignPanelWindow` 只校准 popup 自身框架，未实现来源屏幕锚点采样或缓存；垂直标签栏的不对称偏移仍待解决。测试中的原点采样是验证手段，不是产品实现。
 
+## 2026-10-18 一次性点击聚焦尝试（用户实测无效，已撤回）
+
+用户反馈「还是不行」，按要求删除新增的一次性 click() + focus() 尝试，恢复此前实现。保留普通网页浮层、原有自动聚焦、失焦提示与手动聚焦入口。以下记录保留试用时的验证边界。
+
+按用户要求在实际 Command Palette 浮层创建并渲染后，若页面仍无焦点或搜索输入不是 activeElement，则对搜索输入执行一次 click() 和 focus({ preventScroll: true })。仅可见网页的命令面板使用，不循环、不延迟重试、不改变 Tab Switcher。失焦提示与手动恢复入口保留；是否改善地址栏持有焦点的实际场景待用户验证，无效果可撤掉此块。
+
+类型检查、构建与 diff 检查通过，主工作区 dist 已更新。本轮按用户要求交付直接试用，未新增浏览器实验，未重载日常 Chrome，不将构建成功记为聚焦修复通过。
+
+## 2026-10-18 搜索框脚本模拟点击实验
+
+按用户要求，在独立 Chrome for Testing 145.0.7632.6 profile 中加载当前 dist 的临时副本，仅副本增加 loopback 权限并打开两个 ShadowRoot。通过扩展 service worker 的 chrome.scripting.executeScript 在内容脚本隔离世界对实际搜索输入执行操作，未修改产品源码。确定焦点在 iframe body、输入框未聚焦后：input.click() 与合成 mousedown／mouseup／click 均未使输入框获得焦点；click() 后调用 input.focus()、window／iframe focus 配合 click／input focus 则使输入框成为 activeElement。捕获到的合成 click 均为 isTrusted=false。本对照只验证页面内焦点，不证明从地址栏恢复或真实键盘输入成功。
+
+原计划先通过系统 Cmd+L 将焦点移到地址栏，再读取原生 AX 焦点及输入测试文字；System Events 读取测试 Chrome 窗口持续返回 AppleEvent handler failed (-10000)，网页 hasFocus 仍为 true，因此未建立地址栏焦点前提，未发送测试文字，不能将结果表述为地址栏场景已通过或失败。实验中还遇到默认 Playwright 浏览器路径不存在，以及一次复用 profile 的启动等待，已停止该运行并使用现有测试 Chrome 和新 profile。脚本与页面内对照证据：`/tmp/zing-click-focus.TFf9dy/experiment.mjs`、`/tmp/zing-click-focus.TFf9dy/body-report.json`。独立测试浏览器已关闭，未重载日常 Chrome。
+
+## 2026-10-18 无法自动聚焦时保留网页浮层
+
+按用户最新选择，Command Palette 不再因普通网页 `document.hasFocus()` 为 false 拒绝创建浮层；保留尽力自动聚焦，无法注入或创建浮层时才使用独立窗口。共享搜索按钮从实际承载父文档判断页面焦点：页面无焦点时显示「点击搜索框开始输入」，页面有焦点但面板无有效控件焦点时沿用 Tab 提示。即使 DOM activeElement 仍为输入框，也不能隐藏页面失焦提示。Tab Switcher 的焦点和松键语义未修改。同步 ADR 0019、交互契约、双语 README、使用指南与内置帮助。
+
+类型检查及 paletteWindow／i18n 单测 40/40 通过。定向浏览器首轮 3/4 通过，runner 28.496 秒：失焦仍打开浮层、点击恢复及输入／退出通过，两种承载原有 Tab／菜单／鼠标恢复通过；受限页独立窗口用例失败，生命周期记录显示窗口创建后立即关闭，结束时来源窗口 focused=false。未改源码，复用同一构建仅复验失败项一次，1/1 通过，runner 8.429 秒；复验通过不证明首次焦点丢失的原因已解决。两轮共约 37 秒，无跳过，源码／dist 校验通过。
+
+报告：`test-results/runs/2026-10-18T09-31-21-940Z-55635-51d0efa2/validation.json` 与 `test-results/runs/2026-10-18T09-32-22-778Z-57792-dfe8a227/validation.json`。失焦分支通过隔离世界覆盖 hasFocus 模拟，开放 Shadow DOM 夹具验证提示和恢复，不等同于日常 Chrome 地址栏实测；未运行全量 E2E或重载日常 Chrome。主工作区 dist 已更新，未提交。
+
+## 2026-10-18 主工作区集成与日常 Chrome 加载检查
+
+将两种承载、Tab 恢复和失焦提示合入主工作区，保留已有横滑返回与未提交的 zing 设置命名调整。两种承载 ADR 顺延为 0019，原 worktree 保留。类型检查及 paletteWindow／wheelBack／i18n 单测 45/45 通过，diff 检查通过。
+
+浏览器 runner 首次在构建前因未跟踪的嵌套 worktree 目录触发 EISDIR，未执行用例（0.097 秒）；在本地 `.git/info/exclude` 排除 `/.claude/worktrees/` 后执行选定 3 项，3/3 通过，无跳过，runner 19.575 秒。覆盖浮层／独立窗口的 Tab、鼠标与菜单搜索恢复，以及生产闭合 iframe 的横滑返回和根关闭。报告：`test-results/runs/2026-10-18T09-16-33-981Z-27122-4c59bb73/validation.json`，构建及源码／dist 前后校验通过。焦点恢复用例仍为开放 Shadow DOM 夹具；未运行全量 E2E。
+
+日常 Chrome 的原扩展 `cggmdlihedmedfbgihbgmlhmolokkbad` 注册路径为主工作区 `dist`。直接打开该扩展的 `popup.html`，辅助功能树可见新增的 Focus search 按钮，证实日常 Chrome 可以读取新版 UI 资源；该诊断页已关闭。扩展详情 Reload 的辅助功能点击与键盘激活未产生可独立确认的后台重载证据，实际快捷键也未打开面板，不能据此标记后台已重载或两种承载已完成日常 Chrome 验收。浏览器留在该扩展详情页，需用户手动点击扩展 Reload 后测试。未提交。
+
+以下三节的报告路径和未合并状态描述保留当时 worktree 的历史证据，对应产物位于保留的 `.claude/worktrees/palette-two-hosts/` 下。
+
+## 2026-10-18 Tab 恢复与失焦提示（替代下一节新增的 Cmd/Ctrl+F 绑定）
+
+按用户确认撤掉本次新增的 Cmd/Ctrl+F 聚焦绑定及按钮快捷键提示。面板内无有效控件焦点时，搜索栏显示「按 Tab 聚焦搜索框 / Press Tab to focus search」；普通 Tab 或点击放大镜恢复当前搜索并保留输入选区，提示隐藏。有控件焦点时保留 Tab／Shift+Tab 顺序，不显示提示；菜单只恢复自身搜索，无搜索的 modal 不越层。共享 `searchFocus` 判断控制恢复与提示，使用 owner window 与实际 ShadowRoot 的焦点事件，无轮询。Tab Switcher 原有进入筛选快捷键未在此轮修改。
+
+类型检查与语言包 2/2 通过。复用浮层／独立窗口两项浏览器用例，首轮独立窗口通过，浮层因 Shadow DOM 到承载 body 的焦点事件在 window 层被裁剪而没有显示提示，失败。补充实际 root 的 focusin／focusout 监听后，第二轮 2/2 通过；共享监听改动使独立窗口也重新验证。两轮 runner 为 18.358、15.352 秒，累计约 34 秒。覆盖失焦提示出现／恢复隐藏、Tab 保留选区、按钮点击与菜单 Enter、菜单 body 恢复、设置内 Shift+Tab／Tab 顺序；合成可取消键盘事件确认新增逻辑不拦截 Cmd/Ctrl+F，不据此声称已验证浏览器原生查找 UI。
+
+最终报告：`test-results/runs/2026-10-18T08-43-38-021Z-62701-13f5aebd/validation.json`，构建与源码／dist 校验通过。使用隔离有界面 Chrome 和开放 Shadow DOM 夹具，尚未实测生产闭合根、中文或所有子页。未运行全量 E2E、未重载日常 Chrome，worktree 产物已更新，未提交或合并。下一节保留原迭代证据，其 Cmd/Ctrl+F 新增绑定已被本节替代。
+
+## 2026-10-18 手动恢复搜索焦点
+
+在同一 `worktree-palette-two-hosts` 增加共享 `SearchFocusButton`：主搜索、设置、历史、Storage、标签组、帮助和 ActionMenu 的放大镜可点击聚焦，包含本地化说明、快捷键提示、可见焦点及 Enter／Space 激活保护；Tab Switcher 沿用已有入口。NavigationRoot 在实际承载 window 和浮层父 window 捕获 Cmd/Ctrl+F，恢复可见活动层的搜索，保留 query 与 caret／选区；modal 限制和 inert 检查避免返回背景搜索。
+
+类型检查、语言包单测 2/2 和 diff 检查通过。页面浮层与独立窗口两个定向浏览器用例共两轮：首轮均已通过 body 失焦后的 Cmd+F、点击放大镜、输入选区保留、菜单按钮 Enter 不执行结果、菜单内 Ctrl+F；最后因测试误将设置搜索 textbox 定位为 combobox 失败。只修正测试角色后第二轮 2/2 通过，包括设置控件到搜索框的恢复与返回主搜索上下文。两轮 runner 为 24.156 与 15.542 秒，合计约 40 秒；最终报告 `test-results/runs/2026-10-18T08-32-18-745Z-40161-6e543001/validation.json`，源码／dist 前后校验通过。
+
+验证使用隔离有界面 Chrome、开放 Shadow DOM／iframe 与命令回调，主动将 DOM 焦点移到 body／控件模拟自动聚焦丢失。未验证所有二级页或闭合 Shadow DOM 的新快捷键，未宣称能从浏览器地址栏或其他应用截获按键。鼠标按钮提供显式恢复路径；地址栏持有焦点时需点击搜索框或放大镜。未重载日常 Chrome、未运行全量 E2E，产物仍仅在 worktree，未提交或合并。
+
+## 2026-10-18 命令面板仅保留两种承载
+
+在 `worktree-palette-two-hosts`（基于 `725242a`）将命令面板启动提取为共享 `paletteLaunch`，图标与快捷键共用页面浮层／来源绑定独立窗口两条路径。移除 `action.openPopup` 与非空 popup 配置；后台启动清理旧默认和每标签页覆盖，保留导航清理。注入失败或页面拒绝焦点时重新核对来源，再使用现有独立窗口生命周期。同步 ADR 0019、双语 README、使用指南和交互契约；几何算法不变。
+
+类型检查通过，paletteWindow 定向单测 38/38 通过：包含默认／单页旧配置清理、普通页明确握手、原生页／注入失败／无焦点／缺少确认的兜底、来源切换／导航／移窗／关闭、窗口焦点与并发启动，及原有来源删除生命周期。diff 检查通过。
+
+浏览器选中 4 项，分两轮验证：首轮普通网页新启动与原生窗口 Esc／重复快捷键／失焦关闭通过；两个新兜底场景已经通过窗口创建、来源身份、无 toolbar popup、鼠标进入设置及 Esc 返回，但随后测试在搜索结果未就绪时发送 Enter，固定标签页断言失败。trace 显示当时主操作禁用，补充结果选中与主操作可用断言后，仅复验这两项，2/2 通过。两轮 runner 耗时 37.368、14.794 秒，共约 52 秒，无跳过。报告分别为 `test-results/runs/2026-10-18T08-15-52-481Z-4984-cfa2e9be/validation.json` 与 `test-results/runs/2026-10-18T08-17-06-309Z-7853-5249c4a5/validation.json`；构建与源码／dist 前后校验通过。
+
+新场景使用有界面的隔离 Chrome，命令回调夹具启动；无焦点场景在隔离世界固定 `document.hasFocus()` 为 false，受限注入场景使用 data URL，验证真实独立窗口、来源页 Pin 操作与键盘返回，不等于实体地址栏、扩展图标点击、Web Store 或文件授权的逐项实机验收。普通页用开放 Shadow DOM 夹具；未重验屏幕定位、全量 E2E 或日常 Chrome。产物仅在此 worktree 的 `dist/`，未覆盖主工作区、未提交或合并。
+
+
+## 2026-10-18 设置命令明确 zing 归属
+
+根入口统一为 `zing Settings / zing 设置`，六个设置子项统一使用 `zing Settings: … / zing 设置：…`；中文 Ctrl+Tab 标题为「配置 Ctrl+Tab」。保留原有检索词，补齐配置与自动收起的中文别名，支持带品牌前缀及中英文冒号的查询。同步双语 README、使用指南、交互契约及浏览器用例的名称预期。
+
+语言包与 model 单测共执行三轮：前两轮各 46/47，分别发现新增测试对跨语言排序要求超出既有契约，以及自动收起的完整中文名称缺少别名；调整为验证当前语言首项与跨语言可发现性、补齐别名后，第三轮 47/47 通过（约 0.77 秒）。类型检查、构建及 diff 检查通过，`dist/` 已更新。此次仅涉及命名及相关检索文本，未运行浏览器用例、未重载日常 Chrome；历史验收中的旧名称保留当时记录。
+
 ## 2026-10-18 横滑静默间隔调整为 140ms
 
 经用户确认，将 `WHEEL_BACK_IDLE_MS` 从 240 改为 140，与 `@use-gesture/core@10.3.1` 的默认 wheel 结束间隔一致。子页仍同步返回；140ms 用于惯性锁解锁和根层关闭等待。此前对 wheel-gestures 提交 `4c0592be090cf4e24370e9f3bde6080230791827` 的 20 份公开录制样本回放中，140ms 与 240ms 的返回次数一致；100ms 会拆开一份 Windows 触控板尾流，但尾流位移不足以再次返回。双次右滑样本在三档固定间隔下均只能识别一次，尚未实现惯性中断检测。录制来自较旧浏览器，结论不等于当前设备最佳手感。

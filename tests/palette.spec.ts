@@ -1744,7 +1744,7 @@ test.describe(() => {
   const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const mainFooter = await ui.locator('.palette-footer').boundingBox();
   const mainHeader = await ui.locator('.search-bar').boundingBox();
-  await expect(ui.locator('.result.command .entry-title').nth(0)).toHaveText('Zing: Settings');
+  await expect(ui.locator('.result.command .entry-title').nth(0)).toHaveText('zing Settings');
   await expect(ui.locator('.result.command .entry-title').nth(1)).toHaveText('Zing: Help');
   await ui.locator('[id="zing-command:help"]').click();
   await expect(ui.locator('.help-view')).toBeVisible();
@@ -3963,7 +3963,7 @@ test.describe(() => {
 });
 
 
-for (const host of ['overlay', 'native', 'toolbar'] as const) test.describe(() => {
+for (const host of ['overlay', 'native'] as const) test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true } });
   test(`English Settings Keyboard binding guide survives real ${host} navigation`, async () => {
     const source = await context.newPage();
@@ -3972,24 +3972,13 @@ for (const host of ['overlay', 'native', 'toolbar'] as const) test.describe(() =
     const visibilitySession = await context.newCDPSession(source);
     await visibilitySession.send('Emulation.setFocusEmulationEnabled', { enabled: false });
     await expect.poll(() => source.evaluate(() => document.hasFocus())).toBe(true);
-    let toolbar: Page | undefined;
-    if (host === 'toolbar') {
-      const created = context.waitForEvent('page');
-      await worker.evaluate(async () => {
-        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-        await chrome.action.setPopup({ tabId: tab.id!, popup: 'popup.html' });
-        await chrome.action.openPopup({ windowId: tab.windowId });
-      });
-      toolbar = await created;
-    } else {
-      await worker.evaluate(async () => {
-        const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
-        await Promise.all(callbacks.map(callback => callback('toggle-palette')));
-      });
-    }
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
     if (host === 'native') await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
     const native = host === 'native' ? context.pages().find(page => page.url().includes('popup.html#window='))! : undefined;
-    const surface = toolbar || native || source.frameLocator('.zing-frame');
+    const surface = native || source.frameLocator('.zing-frame');
     await surface.locator('.settings-button').click();
     await surface.getByRole('button', { name: 'Set Up', exact: true }).click();
     const code = await surface.getByRole('textbox', { name: 'JavaScript code' }).inputValue();
@@ -4155,7 +4144,7 @@ test.describe(() => {
     const { frameTree } = await cdp.send('Page.getFrameTree');
     const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
     const nodes = (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
-    return nodes.some(node => node.role?.value === 'option' && node.name?.value?.includes('Settings: Set Up Ctrl+Tab') && node.properties?.some(prop => prop.name === 'selected' && prop.value.value === true)) &&
+    return nodes.some(node => node.role?.value === 'option' && node.name?.value?.includes('zing Settings: Set Up Ctrl+Tab') && node.properties?.some(prop => prop.name === 'selected' && prop.value.value === true)) &&
       nodes.some(node => node.role?.value === 'button' && node.name?.value === 'Set Up Ctrl+Tab' && !node.properties?.some(prop => prop.name === 'disabled' && prop.value.value === true));
   }).toBe(true);
   await page.keyboard.press('Enter');
@@ -4178,7 +4167,7 @@ test('Chinese binding guide returns to settings and retains its standalone hando
   await search.fill('ctrl tab'); await search.press('Enter');
   const setup = ui.locator('[data-setting=binding] button');
   await expect(setup).toBeFocused(); await setup.press('Enter');
-  await expect(ui.getByRole('region', { name: '设置 Ctrl+Tab', exact: true })).toBeVisible();
+  await expect(ui.getByRole('region', { name: '配置 Ctrl+Tab', exact: true })).toBeVisible();
   await expect(ui.getByLabel('JavaScript 代码')).toHaveAttribute('readonly', '');
   await ui.keyboard.press('Meta+k');
   await expect(ui.locator('.action-row')).toContainText(['复制代码', '打开 Chrome 快捷键页']);
@@ -4713,7 +4702,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await search.fill('ctrl tab'); await search.press('Enter');
   const setup = ui.locator('[data-setting=binding] button');
   await expect(setup).toBeFocused(); await setup.press('Enter');
-  await expect(ui.locator('.binding-view')).toHaveAccessibleName(en ? 'Set Up Ctrl+Tab' : '设置 Ctrl+Tab');
+  await expect(ui.locator('.binding-view')).toHaveAccessibleName(en ? 'Set Up Ctrl+Tab' : '配置 Ctrl+Tab');
   await expect(ui.locator('.binding-code-field textarea')).toHaveAttribute('readonly', '');
   await ui.keyboard.press('Escape'); await expect(setup).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
@@ -5753,8 +5742,8 @@ test.describe(() => {
 });
 
 test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
-  test('English storage overlay refuses an unfocused page and opens after focus returns', async () => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette keeps an unfocused overlay and offers click recovery', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Focus-boundary`);
   const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
   await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }), id);
@@ -5763,21 +5752,138 @@ test.describe(() => {
   await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
     Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false });
   } }), id);
-  expect(await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' }, { frameId: 0 }), id)).toBe(false);
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await worker.evaluate(async () => {
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+  });
+  const surface = page.frameLocator('.zing-frame');
+  await expect(page.locator('#zing-command-palette')).toBeAttached();
+  await expect(surface.locator('.search-focus-hint')).toHaveText('Click the search field to type');
+  expect(context.pages().some(candidate => candidate.url().includes('popup.html#window='))).toBe(false);
+  expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), id)).toBe('');
+  const search = surface.getByRole('combobox');
+  await search.evaluate(node => { node.ownerDocument.body.tabIndex = -1; node.ownerDocument.body.focus(); });
   await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
     Reflect.deleteProperty(document, 'hasFocus');
-    window.focus();
   } }), id);
-  await expect.poll(() => page.evaluate(() => document.hasFocus())).toBe(true);
-  expect(await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' }, { frameId: 0 }), id)).toBe(true);
-  const search = page.frameLocator('.zing-frame').getByRole('combobox');
+  await surface.getByRole('button', { name: 'Focus search', exact: true }).click();
   await expect(search).toBeFocused();
+  await expect(surface.locator('.search-focus-hint')).toHaveCount(0);
   await page.keyboard.type('settings');
   await expect(search).toHaveValue('settings');
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true, pageAccess: true } });
+  test('English palette restricted fallback opens a source-bound window without toolbar popup', async () => {
+    const page = await context.newPage();
+    await page.goto('data:text/html,<title>Restricted source</title>');
+    await page.bringToFront();
+    const source = await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      await chrome.windows.update(tab.windowId, { focused: true });
+      return { id: tab.id!, windowId: tab.windowId };
+    }, page.url());
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
+    await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
+    const palette = context.pages().find(page => page.url().includes('popup.html#window='))!;
+    const search = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await expect(search).toBeFocused();
+    expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), source.id)).toBe('');
+    const bound = await palette.evaluate(async () => {
+      const reply = await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' });
+      return { source: reply.data.currentTabId, window: reply.data.windowId, host: (await chrome.tabs.getCurrent())!.windowId };
+    });
+    expect(bound).toMatchObject({ source: source.id, window: source.windowId });
+    expect(bound.host).not.toBe(source.windowId);
+    await palette.locator('.settings-button').click();
+    await expect(palette.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+    await palette.keyboard.press('Escape');
+    await expect(search).toBeFocused();
+    await search.fill('pin');
+    await expect(palette.locator('[id="zing-command:pin"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(palette.locator('.palette-footer .primary-action')).toBeEnabled();
+    await search.press('Enter');
+    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).pinned, source.id)).toBe(true);
+    await expect(search).toHaveValue('pin');
+    await palette.keyboard.press('Escape').catch(error => { if (!palette.isClosed()) throw error; });
+    await expect.poll(() => palette.isClosed()).toBe(true);
+    expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), source.id)).toBe('');
+  });
+});
+
+for (const host of ['overlay', 'native'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true, pageAccess: true, shadow: 'open' } });
+  test(`English manual search focus recovers from body and controls in ${host}`, async () => {
+    const source = await context.newPage();
+    await source.goto(host === 'overlay' ? `${origin}/Manual-focus-source` : 'chrome://version/');
+    await source.bringToFront();
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
+    if (host === 'native') await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
+    const page = host === 'native' ? context.pages().find(page => page.url().includes('popup.html#window='))! : source;
+    const surface = host === 'native' ? page : page.frameLocator('.zing-frame');
+    const input = surface.locator('.search-bar input');
+    await expect(input).toBeFocused();
+    await input.fill('new tab');
+    await expect(surface.locator('[id="zing-command:newTab"]')).toHaveAttribute('aria-selected', 'true');
+    await input.evaluate((node: HTMLInputElement) => {
+      node.setSelectionRange(1, 4);
+      node.ownerDocument.body.tabIndex = -1; node.ownerDocument.body.focus();
+    });
+    await expect(input).not.toBeFocused();
+    await expect(surface.locator('.search-focus-hint')).toHaveText('Press Tab to focus search');
+    expect(await input.evaluate(node => ['Meta', 'Control'].map(modifier => {
+      const view = node.ownerDocument.defaultView!;
+      const event = new view.KeyboardEvent('keydown', { key: 'f', metaKey: modifier === 'Meta', ctrlKey: modifier === 'Control', bubbles: true, cancelable: true });
+      node.ownerDocument.body.dispatchEvent(event);
+      return event.defaultPrevented;
+    }))).toEqual([false, false]);
+    await page.keyboard.press('Tab');
+    await expect(surface.locator('.search-focus-hint')).toHaveCount(0);
+    await expect(input).toBeFocused();
+    expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    await surface.locator('.settings-button').focus();
+    await surface.getByRole('button', { name: 'Focus search', exact: true }).click();
+    await expect(input).toBeFocused(); await expect(input).toHaveValue('new tab');
+    expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    await input.press('Meta+k');
+    const menu = surface.getByRole('combobox', { name: 'Search actions', exact: true });
+    await expect(menu).toBeFocused();
+    const menuButton = surface.locator('.action-menu [data-focus-search]');
+    await menuButton.focus(); await page.keyboard.press('Enter');
+    await expect(menu).toBeFocused();
+    await menu.evaluate(node => node.ownerDocument.body.focus());
+    await expect(surface.locator('.action-menu .search-focus-hint')).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(menu).toBeFocused();
+    await expect(surface.locator('.action-menu')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(input).toHaveValue('new tab');
+    await surface.locator('.settings-button').click();
+    const settingsInput = surface.getByRole('textbox', { name: 'Search settings', exact: true });
+    await expect(settingsInput).toBeVisible();
+    await settingsInput.fill('theme');
+    await settingsInput.evaluate(node => node.ownerDocument.body.focus());
+    await expect(surface.locator('.search-focus-hint')).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(settingsInput).toBeFocused(); await expect(settingsInput).toHaveValue('theme');
+    await page.keyboard.press('Shift+Tab');
+    await expect(surface.getByRole('button', { name: 'Focus search', exact: true })).toBeFocused();
+    await expect(surface.locator('.search-focus-hint')).toHaveCount(0);
+    await page.keyboard.press('Tab'); await expect(settingsInput).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(input).toHaveValue('new tab');
+    await page.keyboard.press('Escape').catch(error => { if (!page.isClosed()) throw error; });
+  });
 });
 
 async function openNativePalette() {

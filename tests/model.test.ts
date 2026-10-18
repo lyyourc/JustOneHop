@@ -22,7 +22,7 @@ test('one search index contains every source while cold home contains only eight
   const home = homeEntries(items);
   assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
   assert.ok(home.every(entry => entry.kind === 'command' && !entry.danger && !entry.searchOnly));
-  assert.deepEqual(home.slice(0, 2).map(entryTitle), ['Zing: Settings', 'Zing: Help']);
+  assert.deepEqual(home.slice(0, 2).map(entryTitle), ['zing Settings', 'Zing: Help']);
   const learned = homeEntries(items, new Map([['command:pin', 10]]));
   assert.deepEqual(learned.slice(0, 3).map(entry => entry.id), ['command:pin', 'command:settings', 'command:help']);
   const many = entries({ ...data, tabs: Array.from({ length: 12 }, (_, i) => tab(i + 1, i)) });
@@ -507,6 +507,30 @@ test('Tab Switcher describes VSCode style switching and displays only the actual
       }
       for (const tabSwitcherShortcut of ['', undefined]) {
         assert.equal(entries({ ...data, tabSwitcherShortcut }).find(item => item.action === 'tabSwitcher')?.shortcut, undefined);
+      }
+    }
+  } finally { globalThis.chrome = original; }
+});
+
+test('settings command titles identify zing in both languages and remain searchable', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      const items = entries(data);
+      for (const [section, english, chinese] of [
+        ['', 'zing Settings', 'zing 设置'],
+        ['theme', 'zing Settings: Theme', 'zing 设置：主题'],
+        ['language', 'zing Settings: Language', 'zing 设置：语言'],
+        ['keyboard', 'zing Settings: Keyboard Shortcuts', 'zing 设置：快捷键'],
+        ['ranking', 'zing Settings: Search Ranking', 'zing 设置：搜索排序'],
+        ['tabs', 'zing Settings: Auto Tuck Tabs', 'zing 设置：自动收起标签页'],
+        ['binding', 'zing Settings: Set Up Ctrl+Tab', 'zing 设置：配置 Ctrl+Tab'],
+      ]) {
+        const id = `command:settings${section ? `:${section}` : ''}`;
+        assert.equal(entryTitle(items.find(item => item.id === id)!), locale === 'en-US' ? english : chinese);
+        assert.equal(search(items, locale === 'en-US' ? english : chinese)[0]?.id, id);
+        for (const query of [english, chinese]) assert.ok(search(items, query).some(item => item.id === id), `${locale}: ${query}`);
       }
     }
   } finally { globalThis.chrome = original; }

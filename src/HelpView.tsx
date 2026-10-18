@@ -3,6 +3,7 @@ import { Search, X } from 'lucide-react';
 import { t } from './i18n';
 import { BackLayer, useNavigateBack } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
+import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { HighlightedText } from './HighlightedText';
 import { matchingHelp } from './helpSearch';
@@ -28,7 +29,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
     controls[(at + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
   }}>
     <header className="search-bar help-search">
-      <span className="search-icon"><Search size={20} /></span>
+      <SearchFocusButton input={input} />
       <input ref={input} data-back-on-empty value={query} onChange={event => setQuery(event.target.value)}
         aria-label={t('searchHelp')} placeholder={t('searchHelpPlaceholder')} aria-controls="zing-help-content"
         autoComplete="off" spellCheck={false} />
