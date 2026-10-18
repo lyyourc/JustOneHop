@@ -1409,7 +1409,7 @@ test('Raycast navigation pages, jumps to home endpoints and restores caret when 
   const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('');
   await expect(ui.locator('.section-start')).toHaveCount(0);
-  await expect(ui.locator('.suggested-label')).toHaveCount(1);
+  await expect(ui.locator('.suggested-label')).toHaveCount(0);
   await input.press('Meta+ArrowUp');
   await expect(ui.locator('.result').first()).toHaveAttribute('aria-selected', 'true');
   await input.press('Meta+ArrowDown');
@@ -1462,7 +1462,7 @@ test('light and dark surfaces, compact rows and bottom action search fit without
     await input.fill('');
     expect((await ui.locator('.result').first().boundingBox())!.height).toBe(40);
     await expect(ui.locator('.section-start')).toHaveCount(0);
-    await expect(ui.locator('.suggested-label')).toHaveCount(1);
+    await expect(ui.locator('.suggested-label')).toHaveCount(0);
     await ui.locator('.palette').screenshot({ path: test.info().outputPath(`palette-${theme}.png`) });
     await input.fill('Design System');
     await expect(ui.locator('.result')).toHaveCount(1);
@@ -2738,7 +2738,8 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     const defaults = ['settings', 'help', 'tabSwitcher', 'searchAllHistory', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']
       .map(action => action === 'searchAllHistory' ? 'zing-search-all-history' : `zing-command:${action}`);
     await expect.poll(ids).toEqual(defaults);
-    await expect(surface.locator('.suggested-label')).toHaveText(chinese ? '推荐' : 'Suggested');
+    await expect(surface.locator('.suggested-label')).toHaveCount(0);
+    await expect(surface.locator('#zing-results')).toHaveAccessibleName(chinese ? '推荐' : 'Suggested');
     await expect(surface.locator('.section-start')).toHaveCount(0);
     await worker.evaluate(async ({ seed, base }) => {
       const lastUsed = Date.now();
@@ -2841,9 +2842,10 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   const input = ui.getByRole('combobox');
   await expect(ui.locator('.result.tab')).toHaveCount(0);
   await expect(ui.locator('.list-heading, .section-heading, .context-hint')).toHaveCount(0);
-  await expect(ui.locator('.suggested-label')).toHaveText(chinese ? '推荐' : 'Suggested');
+  await expect(ui.locator('#zing-results')).toHaveAccessibleName(chinese ? '推荐' : 'Suggested');
+  await expect(ui.getByText(chinese ? '推荐' : 'Suggested', { exact: true })).toHaveCount(0);
   await expect(ui.locator('.section-start')).toHaveCount(0);
-  await expect(ui.locator('.suggested-label')).toHaveCount(1);
+  await expect(ui.locator('.suggested-label')).toHaveCount(0);
   await expect(ui.locator('.palette-footer .footer-divider')).toHaveCount(0);
   await expect(ui.locator('.palette-footer-context')).toHaveCSS('margin-left', '16px');
   const hintChords = ui.locator('.navigation-hint .key-chord');
@@ -2873,10 +2875,9 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   await expect(rows.first()).toHaveAttribute('aria-selected', 'true');
   await expect(input).toBeFocused();
   const header = await ui.locator('.search-bar').boundingBox();
-  const suggested = await ui.locator('.suggested-label').boundingBox();
   const first = await rows.first().boundingBox();
-  expect(suggested!.y - header!.y - header!.height).toBeLessThanOrEqual(9);
-  expect(first!.y - suggested!.y - suggested!.height).toBeLessThanOrEqual(9);
+  expect(first!.y - header!.y - header!.height).toBeGreaterThanOrEqual(0);
+  expect(first!.y - header!.y - header!.height).toBeLessThanOrEqual(9);
   await input.fill('Navigation fixture');
   await expect(ui.locator('.kind-label')).toHaveCount(1);
   await input.press('Meta+k');

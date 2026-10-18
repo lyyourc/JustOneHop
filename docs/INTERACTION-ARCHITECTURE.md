@@ -80,7 +80,7 @@ Command Palette 只保留页面浮层和独立窗口。普通网页即使地址�
 
 ### 首页推荐（2026-10-18）
 
-空查询只呈现一组「推荐 / Suggested」，页面与命令混排且最多 10 项。无学习时默认顺序为 Settings、Help、Tab Switcher、Search All History、New Tab、Reload Tab、Pin/Unpin、Local Storage、Cookies；有状态时可加入安全的撤销收起／恢复收起组入口，仍受总数上限约束。关闭等危险命令与 `searchOnly` 项不进入首页。页面候选来自当前窗口标签页及书签，必须有 zing 显式成功选择的有效记录，不以 MRU 或历史预加载补位；完整 URL 去重、排除当前 URL，并优先用当前窗口已打开标签页代表。
+空查询直接呈现一组推荐列表，不渲染可见「推荐 / Suggested」标题或为其留白；列表保留本地化的「推荐 / Suggested」无障碍名称。页面与命令混排且最多 10 项。无学习时默认顺序为 Settings、Help、Tab Switcher、Search All History、New Tab、Reload Tab、Pin/Unpin、Local Storage、Cookies；有状态时可加入安全的撤销收起／恢复收起组入口，仍受总数上限约束。关闭等危险命令与 `searchOnly` 项不进入首页。页面候选来自当前窗口标签页及书签，必须有 zing 显式成功选择的有效记录，不以 MRU 或历史预加载补位；完整 URL 去重、排除当前 URL，并优先用当前窗口已打开标签页代表。
 
 首页跨查询汇总频次与衰减权重，含显式空查询；沿用 14 天半衰期、90 天未使用失效、最多 500 条记录。仅首页聚合同 URL 的 `tab:<URL>` 与对应已学习 `bookmark:<id>`，有词搜索的身份及同词同级排序不变。推荐分数在打开面板／来源会话开始时捕获，查询往返、子页返回、新增学习或忘记均不重排当次首页，下次打开再取新分数；关闭／移走页面等真实数据变化仍更新候选。本面板 Settings 全量 Reset 是例外，立即恢复默认首页与排序。无痕首页仅默认入口，隐藏 Search All History，不使用普通窗口习惯，不新增权限，也不增加独立收藏页、隐藏或推荐管理页；收藏动作从搜索或标签页菜单进入。Search All History 在首页仅提供导航，打开空历史搜索页，不预加载历史；有查询时仍沿用原来的独立插入规则，避免重复入口。
 

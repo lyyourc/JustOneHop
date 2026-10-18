@@ -396,7 +396,6 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
           {loading && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={25} /><p>{t('preparing')}</p></div> : null}
           {data && !history.pending && !visible.length ? <div className="empty"><Search size={30} /><strong>{t('noResults')}</strong>
             <p>{t('noResultsHint')}</p></div> : null}
-          {data && grouped ? <div className="suggested-label" role="presentation">{t('suggested')}</div> : null}
           {visible.map(item => <div className="result-group" key={item.id}>
             <SearchResultItem entry={item} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} suppressTabShortcuts={mode === 'popup'} id={`zing-${item.id}`} selected={!history.pending && selected?.id === item.id}
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}

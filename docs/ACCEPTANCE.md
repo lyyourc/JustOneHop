@@ -1261,3 +1261,13 @@ Computer Use 已在日常 Chrome 点击 Reload 并观察到 Reloaded。实测原
 - 布局、交互逻辑、快捷键绑定、组件接口、权限和存储均未改动。
 
 `npm run typecheck`、87 项单元测试、生产构建通过；浏览器用例断言改为核对 `Ctrl` `P` 与 `Ctrl` `N` 两个独立键帽，并保留 390px 底栏无溢出、提示不压住 Actions 的几何约束。中英文浅色 / 深色 / 窄屏截图已复核。
+
+## 移除首页可见推荐标题（2026-10-18）
+
+首页移除「推荐 / Suggested」可见标题及专用样式；推荐行为不变，listbox 保留本地化无障碍名称。已有标题断言改为不存在，布局断言直接测量首行与搜索栏的间距。
+
+- `npm run typecheck` 与 `git diff --check` 通过。
+- 先通过 `--list` 选中中英文 `quiet layout exposes Ctrl P N navigation in results and actions at narrow widths` 两项，发现耗时 1.046 秒；执行前预算为构建与执行约 1–2 分钟。
+- 单轮 runner 构建并执行：2 passed，0 failed；Playwright 报告 11.0 秒，runner 总耗时 12.929 秒（构建 1.283 秒、测试阶段 11.427 秒），含发现累计 13.975 秒。前后源码及 dist 一致性校验通过，当前 worktree 的 `dist/` 已更新。
+- 覆盖中英文可见标题缺失、无障碍列表名称、首行间距、Ctrl+P/N 与菜单键盘导航及 390px 底栏无溢出，生成浅色／深色／窄屏截图。本轮未运行全套，未验证日常 Chrome 重载或独立鼠标操作流程。
+- 执行证据：`test-results/runs/2026-10-18T09-47-24-657Z-87104-a74cf7eb/validation.json`。上述结果仅适用于该构建与所选两项用例。
