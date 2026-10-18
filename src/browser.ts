@@ -115,7 +115,7 @@ async function performAction(payload: Execution): Promise<string> {
     await chrome.tabs.create({ windowId, url: payload.url }); return target(`tab:${payload.url}`);
   }
   if (action === 'settings') {
-    if (payload.settingsSection !== undefined && !['language', 'theme', 'keyboard', 'ranking', 'tabs'].includes(payload.settingsSection)) throw new Error(t('errorCommand'));
+    if (payload.settingsSection !== undefined && !['language', 'theme', 'keyboard', 'binding', 'ranking', 'tabs'].includes(payload.settingsSection)) throw new Error(t('errorCommand'));
     return target(settingsUsageTarget(payload.settingsSection));
   }
   if (action === 'reloadExtension') return '';

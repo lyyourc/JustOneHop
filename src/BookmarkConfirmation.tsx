@@ -13,7 +13,7 @@ export function BookmarkConfirmation({ target, onCancel, onConfirm }: {
   useLayoutEffect(() => { cancel.current?.focus(); }, []);
   return <BackLayer onBack={onCancel}>
     <button className="action-scrim" aria-label={t('backToResults')} tabIndex={-1} onClick={onCancel} />
-    <div className="action-menu script-confirm bookmark-confirm" role="alertdialog" aria-modal="true"
+    <div className="action-menu bookmark-confirm" role="alertdialog" aria-modal="true"
       aria-labelledby="bookmark-delete-title" aria-describedby="bookmark-delete-detail" onKeyDown={event => {
         event.stopPropagation();
         if (event.nativeEvent.isComposing || event.keyCode === 229) {
@@ -34,9 +34,9 @@ export function BookmarkConfirmation({ target, onCancel, onConfirm }: {
         <p>{target.entry.expectedUrl}</p>
         <ul>{target.bookmarks.map(bookmark => <li key={bookmark.id}>{bookmark.folder || bookmark.title}</li>)}</ul>
       </div>
-      <div className="script-controls">
-        <button ref={cancel} className="surface-button" onClick={onCancel}>{t('cancelScriptDelete')}</button>
-        <button ref={confirm} className="surface-button delete-script-button" onClick={onConfirm}>{t('unbookmarkCount', String(target.bookmarks.length))}</button>
+      <div className="confirm-controls">
+        <button ref={cancel} className="surface-button" onClick={onCancel}>{t('cancel')}</button>
+        <button ref={confirm} className="surface-button delete-button" onClick={onConfirm}>{t('unbookmarkCount', String(target.bookmarks.length))}</button>
       </div>
     </div>
   </BackLayer>;

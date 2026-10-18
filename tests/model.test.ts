@@ -15,12 +15,12 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
   bookmarks: [{ id: 'b', title: 'GitHub Docs', url: 'https://docs.github.com', folder: '开发' }],
 };
 
-test('one search index contains every source while cold home contains only nine safe defaults', () => {
+test('one search index contains every source while cold home contains only eight safe defaults', () => {
   const items = entries(data);
-  assert.equal(items.length, 36);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 32);
+  assert.equal(items.length, 33);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 29);
   const home = homeEntries(items);
-  assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
+  assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
   assert.ok(home.every(entry => entry.kind === 'command' && !entry.danger && !entry.searchOnly));
   assert.deepEqual(home.slice(0, 2).map(entryTitle), ['Zing: Settings', 'Zing: Help']);
   const learned = homeEntries(items, new Map([['command:pin', 10]]));
@@ -49,9 +49,9 @@ test('home mixes learned pages and commands in a single list capped at ten witho
   const result = homeEntries(items, scores);
   assert.equal(result.length, 10);
   assert.deepEqual(result.slice(0, 3).map(item => item.id), ['bookmark:b', 'command:pin', 'tab:1']);
-  assert.equal(homeEntries(items, new Map([['bookmark:b', 1]])).length, 10);
+  assert.equal(homeEntries(items, new Map([['bookmark:b', 1]])).length, 9);
   assert.ok(!result.some(item => item.active));
-  assert.equal(homeRecommendations(items, scores).results.length, 21);
+  assert.equal(homeRecommendations(items, scores).results.length, 20);
 });
 
 test('home deduplicates exact full URLs, preferring open tabs and counting each learned identity once', () => {
@@ -97,7 +97,7 @@ test('less-used commands stay searchable and out of home even with learned prefe
     const snapshot = { ...data, tabs: data.tabs.map(tab => ({ ...tab, muted })) };
     const items = entries(snapshot);
     assert.deepEqual(homeEntries(items, scores).filter(item => item.kind === 'command').map(item => item.action),
-      ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
+      ['settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
     for (const [action, queries] of [
       ['mute', muted ? ['unmute', '取消静音'] : ['mute', '静音']],
       ['restore', ['reopen closed tab', '恢复关闭的标签页']],
@@ -485,16 +485,6 @@ test('long English names tolerate limited typos while URLs and auxiliary keyword
   assert.deepEqual(search(items, 'zzzzzz'), []);
 });
 
-test('script actions retain the target and allow searching delete in both languages', () => {
-  const entry = { id: 'script:one', scriptId: 'one', kind: 'script' as const, action: 'copyScript' as const, icon: 'script' as const, title: 'Helper', subtitle: '', keywords: '' };
-  const actions = actionsFor(entry, data);
-  assert.deepEqual(actions.map(action => action.action), ['runScript', 'runCopyScript', 'copyScript', 'editScript', 'deleteScript']);
-  assert.ok(actions.every(action => action.scriptId === 'one'));
-  assert.equal(new Set(actions.map(action => action.id)).size, 5);
-  for (const query of ['delete', '删除']) assert.deepEqual(search(actions, query).map(action => action.action), ['deleteScript']);
-  assert.deepEqual(actionsFor({ ...entry, scriptId: 'builtin-ctrl-tab' }, data).map(action => action.action), ['copyScript', 'editScript']);
-});
-
 test('Tab Switcher describes VSCode style switching and displays only the actual binding', () => {
   const original = globalThis.chrome;
   try {
@@ -523,15 +513,14 @@ test('feature commands are discoverable by intent and help is available on home'
     ['Zing: Help', 'command:help'], ['Zing: Settings', 'command:settings'],
     ['Settings: Theme', 'command:settings:theme'], ['change theme', 'command:settings:theme'],
     ['Settings: Language', 'command:settings:language'], ['change language', 'command:settings:language'],
-    ['new script', 'command:newScript'], ['新建脚本', 'command:newScript'],
-    ['scripts', 'command:scriptLibrary'], ['脚本', 'command:scriptLibrary'], ['管理脚本', 'command:scriptLibrary'],
+    ['ctrl tab', 'command:settings:binding'], ['设置 Ctrl+Tab', 'command:settings:binding'],
     ['language', 'command:settings:language'], ['语言', 'command:settings:language'],
     ['theme', 'command:settings:theme'], ['主题', 'command:settings:theme'],
     ['hotkey', 'command:settings:keyboard'], ['快捷键', 'command:settings:keyboard'],
     ['reset search ranking', 'command:settings:ranking'], ['重置搜索排序', 'command:settings:ranking'],
     ['auto tuck', 'command:settings:tabs'], ['自动收起', 'command:settings:tabs'],
   ]) assert.equal(search(items, query)[0]?.id, id, query);
-  assert.equal(homeEntries(items).filter(item => item.kind === 'command').length, 9);
+  assert.equal(homeEntries(items).filter(item => item.kind === 'command').length, 8);
 });
 
 test('Chrome Pages have bilingual intent, independent identities and search-only discovery', () => {
@@ -567,7 +556,7 @@ test('Chrome Pages have bilingual intent, independent identities and search-only
       for (const query of ['shortcut', '快捷键']) assert.equal(search(items, query)[0]?.id, 'command:settings:keyboard');
       const scores = new Map(items.filter(item => item.category === 'chromePages').map(item => [item.id, 100]));
       assert.ok(homeEntries(items, scores).every(item => item.category !== 'chromePages'));
-      assert.equal(homeEntries(items, scores).filter(item => item.kind === 'command').length, 9);
+      assert.equal(homeEntries(items, scores).filter(item => item.kind === 'command').length, 8);
     }
   } finally { globalThis.chrome = original; }
 });
@@ -579,7 +568,7 @@ test('tucking appears only for eligible targets and stays out of the empty-searc
     assert.equal(search(items, query)[0]?.action, 'tuck', query);
   }
   assert.equal(items.find(item => item.action === 'tuck')?.tabId, snapshot.currentTabId);
-  assert.equal(homeEntries(items).filter(item => item.kind === 'command').length, 9);
+  assert.equal(homeEntries(items).filter(item => item.kind === 'command').length, 8);
   assert.ok(!homeEntries(items).some(item => item.action === 'tuck'));
   const pinned = items.find(item => item.id === 'tab:1')!;
   const eligible = items.find(item => item.id === 'tab:3')!;
@@ -603,16 +592,16 @@ test('tucked pages keep their titles, favicons and switch action; undo exists on
 });
 
 test('category prefixes are searchable without changing titles, IDs or exact command intent', () => {
-  const items = entries({ ...data, tabs: [{ ...tab(1, 0), title: 'New Tab' }, { ...tab(2, 1), title: 'Script: New Script' }] });
+  const items = entries({ ...data, tabs: [{ ...tab(1, 0), title: 'New Tab' }, { ...tab(2, 1), title: 'Website storage documentation' }] });
   assert.equal(search(items, 'new tab')[0].id, 'command:newTab');
-  assert.equal(search(items, 'Script: New Script')[0].id, 'command:newScript');
-  assert.equal(search(items, 'Script:new')[0].id, 'command:newScript');
-  assert.equal(search(items, '脚本：new')[0].id, 'command:newScript');
+  assert.equal(search(items, 'Storage: Local Storage')[0].id, 'command:localStorage');
+  assert.equal(search(items, 'Storage:local')[0].id, 'command:localStorage');
+  assert.equal(search(items, '存储：local')[0].id, 'command:localStorage');
   assert.ok(search(items, 'Storage: cookie').some(item => item.action === 'cookies'));
   assert.ok(search(items, 'Settings: theme').some(item => item.settingsSection === 'theme'));
   assert.ok(search(items, 'iam').every(item => item.action !== 'newTab'));
-  assert.equal(items.find(item => item.id === 'command:newScript')?.title, 'New Script');
-  assert.equal(items.find(item => item.id === 'command:newScript')?.category, 'script');
+  assert.equal(items.find(item => item.id === 'command:localStorage')?.title, 'View Local Storage');
+  assert.equal(items.find(item => item.id === 'command:localStorage')?.category, 'storage');
   const site = items.find(item => item.id === 'tab:1')!;
   assert.equal(site.title, 'New Tab'); assert.equal(site.category, undefined);
   assert.equal(site.faviconPageUrl, data.tabs[0].url);
@@ -675,4 +664,15 @@ test('hostname ranking handles www and inner domain labels without promoting pat
     { ...tab(3, 2, true), title: 'Console', url: 'https://console.sls.example' },
   ], bookmarks: [] });
   assert.deepEqual(search(items, 'sls').map(item => item.id), ['tab:2', 'tab:3', 'tab:1']);
+});
+
+test('retired script commands are absent from search while Ctrl+Tab setup remains discoverable', () => {
+  const items = entries(data);
+  for (const query of ['scripts', 'script library', 'new script', 'run script', 'userscript', '脚本', '管理脚本', '新建脚本']) {
+    assert.deepEqual(search(items, query), [], query);
+  }
+  const binding = search(items, 'Ctrl+Tab')[0];
+  assert.equal(binding.id, 'command:settings:binding');
+  assert.equal(binding.settingsSection, 'binding');
+  assert.equal(binding.searchOnly, true);
 });

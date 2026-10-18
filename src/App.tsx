@@ -22,34 +22,27 @@ import { getPreferences, subscribePreferences } from './preferences';
 import { getUsage, subscribeUsage, usageReady } from './usageState';
 import { homeUsage, queryUsage, rankingInfo, usageTarget, type RankingInfo } from './usage';
 import { StorageView } from './StorageView';
-import { bindingScript, deleteScript, type SavedScript, getScripts, scriptEntries, scriptsReady, subscribeScripts } from './scripts';
+import { BindingGuide } from './BindingGuide';
 import { copyText } from './clipboard';
-import { ScriptRunner } from './ScriptRunner';
-import { ScriptLibrary } from './ScriptLibrary';
 import { Settings } from './Settings';
 import { HelpView } from './HelpView';
 import { cancelPaletteContinuation, execute, forgetSearchRanking, getSnapshot } from './api';
 import { actionsFor, closeTargets, entries, homeRecommendations, matchingAlias, search } from './model';
-import type { Entry, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteState, Execution } from './types';
+import type { Entry, Snapshot, StorageRead, SettingsSection, PaletteState, Execution } from './types';
 
 const emptyScores: ReadonlyMap<string, number> = new Map();
 
 export function App({ mode, onClose, initialState, initialBinding = false }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState; initialBinding?: boolean }) {
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
-  const scripts = useSyncExternalStore(subscribeScripts, getScripts);
   const [notice, setNotice] = useState('');
   const [frozenRanking, setFrozenRanking] = useState<{ query: string; scores: ReadonlyMap<string, number> } | null>(null);
   const [groupId, setGroupId] = useState<number | undefined>(initialState?.group?.id);
   const [recoveryId, setRecoveryId] = useState<string>();
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
   const [homeSession, setHomeSession] = useState<{ sourceId: number; scores: ReadonlyMap<string, number> } | null>(null);
-  const [scriptRun, setScriptRun] = useState<{ target: Omit<ScriptRun, 'scriptId'>; initialScriptId?: string; autoCopy: boolean } | null>(null);
   const [storage, setStorage] = useState<StorageRead | null>(null);
-  const [scriptLibraryOpen, setScriptLibraryOpen] = useState(false);
+  const [bindingOpen, setBindingOpen] = useState(initialBinding);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>();
-  const [scriptEditor, setScriptEditor] = useState<SavedScript | null>(() => initialBinding ? bindingScript() : null);
-  const [deleteTarget, setDeleteTarget] = useState<SavedScript | null>(null);
-  const cancelDelete = useRef<HTMLButtonElement>(null);
   const [bookmarkRemoval, setBookmarkRemoval] = useState<BookmarkRemoval | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -74,7 +67,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const list = useRef<HTMLDivElement>(null);
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const mod = isMac ? '⌘' : 'Ctrl';
-  const items = useMemo(() => data ? [...entries(data), ...scriptEntries(scripts)] : [], [data, preferences.language, scripts]);
+  const items = useMemo(() => data ? entries(data) : [], [data, preferences.language]);
   const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
   const committed = useRef<{ query: string; results: Entry[]; visible: Entry[]; ranking: Map<string, RankingInfo> }>({ query: '', results: [], visible: [], ranking: new Map() });
   const liveHomeScores = useMemo(() => data?.incognito ? emptyScores : homeUsage(usage), [usage, data?.incognito]);
@@ -180,7 +173,6 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     };
     const changed = () => { clearTimeout(timer); timer = setTimeout(refresh, 100); };
     refresh();
-    void scriptsReady.catch(() => { if (mounted.current) setError(t('errorGeneric')); });
     const focusWindow = () => refresh();
     window.addEventListener('focus', focusWindow);
     input.current?.focus();
@@ -195,22 +187,21 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   }, []);
 
   useEffect(() => {
-    if (frozenRanking && (frozenRanking.query !== query || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || storage || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined)) {
+    if (frozenRanking && (frozenRanking.query !== query || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || storage || bindingOpen || recoveryId || groupId !== undefined)) {
       setFrozenRanking(null);
     }
-  }, [frozenRanking, query, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  }, [frozenRanking, query, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, bindingOpen, recoveryId, groupId]);
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.id, nextResults, actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, scriptEditor, scriptLibraryOpen, scriptRun, recoveryId, groupId]);
+  }, [selected?.id, nextResults, actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, bindingOpen, recoveryId, groupId]);
   useLayoutEffect(() => {
-    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || scriptEditor || scriptLibraryOpen || scriptRun || recoveryId || groupId !== undefined) return;
+    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || bindingOpen || recoveryId || groupId !== undefined) return;
     if (bookmarkRemoval) return;
-    if (deleteTarget) { cancelDelete.current?.focus(); return; }
     if (!actionTarget) { input.current?.focus(); input.current?.setSelectionRange(...savedCaret.current); }
-  }, [actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, scriptEditor, scriptLibraryOpen, deleteTarget, bookmarkRemoval, scriptRun, recoveryId, groupId, busy]);
+  }, [actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, bindingOpen, bookmarkRemoval, recoveryId, groupId, busy]);
 
   function openSettings(section?: SettingsSection) {
-    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun) return;
+    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || bindingOpen) return;
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     closeActions(); setSettingsSection(section); setSettingsOpen(true); setError('');
   }
@@ -281,32 +272,6 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       closeActions(); setRecoveryId(entry.recoveryId); return;
     }
-    if (entry.action === 'runScript' || entry.action === 'runCopyScript') {
-      const tab = data.tabs.find(tab => tab.id === data.currentTabId);
-      if (!tab) return;
-      if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setNotice(''); setError('');
-      setScriptRun({ target: { tabId: tab.id, windowId: data.windowId, expectedUrl: tab.url }, initialScriptId: entry.scriptId, autoCopy: entry.action === 'runCopyScript' });
-      return;
-    }
-    if (entry.action === 'newScript' || entry.action === 'scriptLibrary') {
-      if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setError(''); setNotice('');
-      if (entry.action === 'newScript') setScriptEditor({ id: crypto.randomUUID(), title: '', code: '' });
-      else setScriptLibraryOpen(true);
-      return;
-    }
-    if (entry.action === 'copyScript' || entry.action === 'editScript' || entry.action === 'deleteScript') {
-      const script = [bindingScript(), ...scripts].find(script => script.id === entry.scriptId);
-      if (!script) { closeActions(); return; }
-      if (entry.action === 'editScript') { closeActions(); setNotice(''); setScriptEditor(script); return; }
-      if (entry.action === 'deleteScript') { if (script.id !== 'builtin-ctrl-tab') setDeleteTarget(script); return; }
-      const anchor = input.current;
-      if (!script || !anchor) return;
-      try { await copyText(script.code, anchor); closeActions(); setNotice(t('scriptCopied')); setError(''); }
-      catch { setError(t('scriptCopyError')); }
-      return;
-    }
     // A secondary tab operation (for example closing an IAM page) is not evidence
     // that the user prefers opening that page for the original root query.
     const learningQuery = !actionTarget || entry.action === actionTarget.action ? query : undefined;
@@ -335,13 +300,6 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       setError(errorMessage(reason));
     } finally { setBusy(false); }
   }
-  async function confirmDelete() {
-    if (!deleteTarget || busy) return;
-    setBusy(true); setError('');
-    try { await deleteScript(deleteTarget.id); setDeleteTarget(null); closeActions(); setNotice(t('scriptDeleted')); }
-    catch { setError(t('errorGeneric')); }
-    finally { setBusy(false); }
-  }
   function hover(event: React.MouseEvent, id: string) {
     // Scrolling under a stationary pointer must not undo keyboard selection.
     const position = { x: event.screenX, y: event.screenY };
@@ -352,7 +310,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   }
   function keyboard(event: KeyboardEvent) {
     if (event.nativeEvent.isComposing || event.keyCode === 229 || bookmarkRemoval) return;
-    if ((helpOpen || historyOpen || tabSwitcherOpen || scriptEditor || scriptLibraryOpen || deleteTarget || scriptRun || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
+    if ((helpOpen || historyOpen || tabSwitcherOpen || bindingOpen || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
     const modifier = isMac ? event.metaKey : event.ctrlKey;
     if (modifier && !event.altKey && !event.shiftKey && event.key === ',') {
       event.preventDefault(); openSettings(); return;
@@ -413,15 +371,14 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const current = actionTarget ? selectedAction : selected;
   const count = affected(current);
   const primaryLabel = current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
-    : current?.kind === 'history' ? t('openHistoryPage') : current?.kind === 'script' && current.action === 'runScript' ? t('runScript') : current?.action === 'copyScript' ? t('copyScript') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
+    : current?.kind === 'history' ? t('openHistoryPage') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
   return <NavigationRoot><BackLayer onBack={dismiss}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
-    if (event.target === event.currentTarget) { if (bookmarkRemoval) setBookmarkRemoval(null); else if (deleteTarget) { if (!busy) setDeleteTarget(null); } else if (actionTarget) closeActions(); else dismiss(); }
+    if (event.target === event.currentTarget) { if (bookmarkRemoval) setBookmarkRemoval(null); else if (actionTarget) closeActions(); else dismiss(); }
   }}>
     {tabSwitcherOpen && data ? <PaletteTabSwitcher data={data} theme={preferences.theme} onBack={() => setTabSwitcherOpen(false)} onClose={onClose} /> : historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} windowId={data.windowId} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
       initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
-      onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : scriptRun ? <ScriptRunner {...scriptRun} onBack={() => setScriptRun(null)} /> : scriptLibraryOpen ? <ScriptLibrary isMac={isMac} onBack={() => setScriptLibraryOpen(false)} onClose={onClose} /> : scriptEditor ? <ScriptLibrary initialScript={scriptEditor} isMac={isMac} onBack={() => setScriptEditor(null)} onClose={onClose}
-      onComplete={message => { setScriptEditor(null); setNotice(message); }} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} tabSwitcherShortcut={data?.tabSwitcherShortcut || ''} isMac={isMac}
+      onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : bindingOpen ? <BindingGuide isMac={isMac} onBack={() => setBindingOpen(false)} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} tabSwitcherShortcut={data?.tabSwitcherShortcut || ''} isMac={isMac}
       onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label="zing" aria-busy={busy}>
       <span className="sr-only" id="zing-navigation">{t('navigationHelp')}</span>
       <div className={`main-surface ${actionTarget || bookmarkRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval ? true : undefined}>
@@ -455,15 +412,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
         </div>
       </div>
 
-      {bookmarkRemoval ? <BookmarkConfirmation target={bookmarkRemoval} onCancel={() => setBookmarkRemoval(null)} onConfirm={() => void run(bookmarkRemoval.entry, true)} /> : actionTarget ? deleteTarget ? <BackLayer onBack={() => { if (!busy) setDeleteTarget(null); }}>
-        <button className="action-scrim" aria-label={t('backToResults')} tabIndex={-1} onClick={() => { if (!busy) setDeleteTarget(null); }} />
-        <div className="action-menu script-confirm" role="alertdialog" aria-modal="true" aria-labelledby="script-delete-title" aria-describedby="script-delete-detail">
-          <h2 id="script-delete-title">{t('confirmDeleteScript')}</h2>
-          <p id="script-delete-detail">{t('scriptDeletePrompt', deleteTarget.title)}</p>
-          <div className="script-controls"><button ref={cancelDelete} className="surface-button" disabled={busy} onClick={() => setDeleteTarget(null)}>{t('cancelScriptDelete')}</button>
-            <button className="surface-button delete-script-button" disabled={busy} onClick={() => void confirmDelete()}>{t('deleteScript')}</button></div>
-        </div>
-      </BackLayer> : <ActionMenu id="zing-actions" isMac={isMac}
+      {bookmarkRemoval ? <BookmarkConfirmation target={bookmarkRemoval} onCancel={() => setBookmarkRemoval(null)} onConfirm={() => void run(bookmarkRemoval.entry, true)} /> : actionTarget ? <ActionMenu id="zing-actions" isMac={isMac}
         title={<><span className="action-target-icon"><Favicon pageUrl={actionTarget.faviconPageUrl} fallback={<Glyph name={actionTarget.icon} size={15} />} /></span><span>{liveTarget?.title}</span></>}
         actions={actions.map(action => ({ id: action.id, title: action.title, shortcut: visibleShortcut(action), icon: <Favicon pageUrl={action.faviconPageUrl} fallback={<Glyph name={action.icon} size={16} />} />, danger: action.danger || action.action === 'close', alias: matchingAlias(action, actionQuery) }))}
         query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }} selectedId={selectedAction?.id} onSelectionChange={setActionSelection}
@@ -479,8 +428,8 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
-        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || resultBusy || !!deleteTarget || !!bookmarkRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        actions={{ open: !!actionTarget, disabled: !selected || resultBusy || !!deleteTarget || !!bookmarkRemoval, onToggle: toggleActions }} />
+        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || resultBusy || !!bookmarkRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
+        actions={{ open: !!actionTarget, disabled: !selected || resultBusy || !!bookmarkRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}
   </div></BackLayer></NavigationRoot>;

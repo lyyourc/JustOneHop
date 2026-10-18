@@ -245,22 +245,19 @@
   "helpStartTitle": { "message": "打开与搜索" },
   "toolbarShortcut": { "message": "打开 zing：$1 · 修改快捷键" },
   "helpStartBody": { "message": "点击工具栏的 zing 图标，或按启动快捷键打开面板（当前：$1）。可在「设置 → 键盘」中修改快捷键，或右键工具栏图标修改绑定、在新标签页打开本帮助。" },
-  "helpSearchBody": { "message": "首页最多推荐 10 个页面与命令，依据在 zing 中成功使用的习惯，记录不足时展示精选命令；推荐顺序下次打开时更新。直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「脚本」「主题」「下载」。最近一周的浏览历史也参与搜索。「搜索全部历史」位于第 7 条，结果较少时放末尾，可继续搜索全部时间；历史查询较慢时先显示其他结果，迟到的历史不再插入。成功打开的历史结果与相同网站地址的标签页共用偏好。主搜索与全部历史子页均只在同词同相关性等级内按习惯排序，有偏好记录时显示历史图标。悬停或聚焦图标可查看原因和删除范围，点击即可忘记，也可按 Shift+Backspace 忘记选中项。忘记对历史与标签页共同生效。" },
+  "helpSearchBody": { "message": "首页最多推荐 10 个页面与命令，依据在 zing 中成功使用的习惯，记录不足时展示精选命令；推荐顺序下次打开时更新。直接输入中英文关键词，即可统一搜索标签页、书签、命令和设置，无需模式前缀。支持组合页面标题、域名、标签组或书签目录（词序不限），例如「新建标签页」「恢复标签」「主题」「下载」。最近一周的浏览历史也参与搜索。「搜索全部历史」位于第 7 条，结果较少时放末尾，可继续搜索全部时间；历史查询较慢时先显示其他结果，迟到的历史不再插入。成功打开的历史结果与相同网站地址的标签页共用偏好。主搜索与全部历史子页均只在同词同相关性等级内按习惯排序，有偏好记录时显示历史图标。悬停或聚焦图标可查看原因和删除范围，点击即可忘记，也可按 Shift+Backspace 忘记选中项。忘记对历史与标签页共同生效。" },
   "helpControlsTitle": { "message": "更多操作与返回" },
   "helpControlsBody": { "message": "右键点击结果、点击底栏「操作」或按 Cmd/Ctrl+K，可打开针对当前选中项的操作菜单。除方向键外，列表也支持 Ctrl+P / Ctrl+N 上下选择。" },
   "helpBackBody": { "message": "按 Esc、点击返回箭头，或在二级页的空搜索框中按 Backspace，均逐层返回并恢复原搜索与选中项；在主搜索层按 Esc 关闭面板。" },
   "helpTabsTitle": { "message": "整理与切换标签页" },
   "helpTabsBody": { "message": "对搜索结果执行固定、静音或关闭时，直接作用于所选标签页且面板保持打开，便于连续整理；批量关闭会自动保留固定标签页。搜索标签组名称可进入组管理。选择「Zing: Tab Switcher」可在面板内筛选最近标签页，点击或 Enter 确认切换，取消则返回原搜索。通过快捷键启动切换器时，按住修饰键选择、松开即切换；若点击搜索框或按 Cmd/Ctrl+F 进入筛选，则暂停松键切换，改由输入后按 Enter 或点击确认。" },
   "helpTuckBody": { "message": "「收起标签页」将页面移入窗口末尾的折叠组，不关闭或主动卸载页面；随时搜索并切换到该页即可移回标签栏。可在设置中开启「自动收起标签页」，自动收起 7 天未使用的页面。浏览器重启后若有无法自动确认归属的收起组，搜索「恢复收起组」核对即可。" },
-  "helpScriptsTitle": { "message": "保存与运行脚本" },
-  "helpScriptsBody": { "message": "搜索「脚本」管理本机保存的 JavaScript：选中可预览并复制代码，从「操作」菜单编辑、新建或删除（Cmd/Ctrl+Enter 保存）。在目标网页直接搜索脚本名称或「运行脚本」，即可显式运行一次；代码最后一个表达式的值（支持 Promise）会显示在当前面板中。脚本不会随网页加载自动执行。" },
-  "helpScriptPermissionBody": { "message": "运行脚本需要 Chrome 135+，且仅支持普通 HTTP/HTTPS 网页。首次使用前，请在 Chrome 的 zing 扩展详情中开启「允许用户脚本」（Chrome 135–137 需开启开发者模式）。" },
   "helpStorageTitle": { "message": "查看网站存储" },
   "helpStorageBody": { "message": "在网页中搜索「local storage」「session storage」或「cookies」，左侧选择 key，右侧预览 value；Enter 或「复制值」复制原始字符串。JSON 自动格式化预览，不修改数据。首次读取 Cookie 时只按需申请当前网站域名的访问权限，可随时在 Chrome 扩展设置中撤销。" },
   "helpQuestionsTitle": { "message": "常见问题" },
   "helpShortcutBody": { "message": "若快捷键未生效或存在冲突，可在「设置 → 键盘」中前往 Chrome 扩展快捷键页修改。由于浏览器限制，Ctrl+Tab 需手动配置，搜索「ctrl tab」即可查看配置代码与步骤。" },
   "helpWindowBody": { "message": "zing 在普通网页中以页面浮层打开；在 Chrome 内置页、扩展商店等受限页面或地址栏聚焦时，会自动切换为独立面板或工具栏弹窗。" },
-  "helpPrivacyBody": { "message": "zing 无账号、服务端或遥测。设置偏好、保存的脚本与搜索习惯仅保存在本机；网站存储值与脚本结果仅保留在当前面板内存中。浏览历史权限在安装时申请；zing 不持久复制历史库，仅记住你显式选择并成功打开的搜索词与网站地址。读取历史本身和打开失败均不记录。无痕窗口不读取普通历史，也不记录选择。" },
+  "helpPrivacyBody": { "message": "zing 无账号、服务端或遥测。设置偏好与搜索习惯仅保存在本机；网站存储值仅保留在当前面板内存中。浏览历史权限在安装时申请；zing 不持久复制历史库，仅记住你显式选择并成功打开的搜索词与网站地址。读取历史本身和打开失败均不记录。无痕窗口不读取普通历史，也不记录选择。" },
   "settings": {
     "message": "设置"
   },
@@ -513,15 +510,6 @@
   "recentNavigate": {
     "message": "方向键、Ctrl+N / Ctrl+P 或点击选择 · Esc 取消"
   },
-  "scriptLibrary": {
-    "message": "脚本收藏"
-  },
-  "scriptLibraryHint": {
-    "message": "在本机保存常用脚本，从主搜索随时在当前网页运行。"
-  },
-  "manageScripts": {
-    "message": "管理脚本"
-  },
   "bindCtrlTab": {
     "message": "设置 Ctrl+Tab"
   },
@@ -546,153 +534,28 @@
   "openShortcutPage": {
     "message": "打开 Chrome 快捷键页"
   },
-  "copyScript": {
+  "copyBindingCode": {
     "message": "复制代码"
   },
-  "scriptCopied": {
+  "bindingCodeCopied": {
     "message": "代码已复制到剪贴板。"
   },
-  "scriptCopyError": {
+  "bindingCopyError": {
     "message": "复制失败，请选中代码手动复制。"
   },
-  "scriptRequired": {
-    "message": "请填写名称和代码后再保存。"
-  },
-  "scriptSaved": {
-    "message": "脚本已保存"
-  },
-  "scriptDeleted": {
-    "message": "脚本已删除"
-  },
-  "scriptName": {
-    "message": "名称"
-  },
-  "scriptCode": {
+  "bindingCode": {
     "message": "JavaScript 代码"
   },
-  "editScript": {
-    "message": "编辑脚本"
-  },
-  "newScript": {
-    "message": "新建脚本"
-  },
-  "saveScript": {
-    "message": "保存"
-  },
-  "deleteScript": {
-    "message": "删除"
-  },
-  "confirmDeleteScript": {
-    "message": "确认删除"
-  },
-  "searchScripts": {
-    "message": "搜索脚本"
-  },
-  "scriptPreview": { "message": "代码预览" },
-  "scriptInformation": { "message": "信息" },
-  "scriptContentType": { "message": "内容类型" },
-  "scriptPreviewEmpty": { "message": "选择脚本以预览代码" },
-  "builtInScript": {
-    "message": "内置"
-  },
-  "scriptKind": {
-    "message": "脚本"
-  },
-  "scriptLocalOnly": {
-    "message": "仅保存在此设备"
-  },
-  "viewScriptSetup": {
-    "message": "查看设置说明"
-  },
-  "scriptDeletePrompt": {
-    "message": "删除“$1”？此操作无法撤销。"
-  },
-  "cancelScriptDelete": {
+  "previewInformation": { "message": "信息" },
+  "previewContentType": { "message": "内容类型" },
+  "cancel": {
     "message": "取消"
   },
   "keyboardShortcuts": {
     "message": "快捷键"
   },
-  "runScript": {
-    "message": "运行脚本"
-  },
-  "runCopyScript": {
-    "message": "运行并复制结果"
-  },
-  "rerunScript": {
-    "message": "重新运行"
-  },
-  "copyScriptResult": {
-    "message": "复制结果"
-  },
-  "scriptResult": {
-    "message": "运行结果"
-  },
-  "scriptRunFailed": {
-    "message": "脚本运行失败"
-  },
-  "scriptExecuting": {
-    "message": "正在运行脚本…"
-  },
-  "scriptRunningBack": {
-    "message": "你可以随时返回，已启动的脚本会在后台继续执行。"
-  },
-  "scriptRunTarget": {
-    "message": "当前网页：$1"
-  },
-  "scriptResultsTemporary": {
-    "message": "结果仅在当前面板展示，不会上传或永久保存"
-  },
-  "scriptResultCopied": {
-    "message": "结果已复制"
-  },
-  "scriptResultCopyFailed": {
-    "message": "脚本执行完成但复制失败，请点击下方“复制结果”重试。"
-  },
-  "noRunnableScripts": {
-    "message": "还没有保存的脚本。搜索“新建脚本”即可创建并运行。"
-  },
-  "enableUserScripts": {
-    "message": "打开扩展详情"
-  },
-  "scriptEnableHint": {
-    "message": "在 Chrome 的 zing 详情页开启“允许用户脚本”，然后返回并重新运行。Chrome 135–137 请开启开发者模式。"
-  },
-  "errorScriptDisabled": {
-    "message": "请先在 Chrome 中允许用户脚本，再运行保存的 JavaScript。"
-  },
-  "errorScriptVersion": {
-    "message": "运行脚本需要 Chrome 135 或更高版本。"
-  },
-  "errorScriptTarget": {
-    "message": "无法在此页面运行脚本，请切换到目标网页后重新打开 zing。"
-  },
-  "errorScriptChanged": {
-    "message": "网页已更新或不再是当前标签页，请在目标网页重新打开 zing。"
-  },
-  "errorScriptUnsupported": {
-    "message": "脚本仅支持在普通 HTTP 或 HTTPS 网页运行，不支持 Chrome 系统内置页面。"
-  },
-  "errorScriptAccess": {
-    "message": "Chrome 无法访问此页面，请在普通网页通过快捷键或工具栏按钮重新打开 zing。"
-  },
-  "errorScriptInterrupted": {
-    "message": "脚本执行被中断或未能返回结果，请检查网页后重试。"
-  },
-  "errorScriptMissing": {
-    "message": "未找到所选脚本，或脚本代码为空。"
-  },
-  "errorScriptBusy": {
-    "message": "当前标签页已有脚本正在运行，请稍候再试。"
-  },
-  "scriptExecutionHint": {
-    "message": "代码最后一行表达式的求值将作为返回结果（支持 Promise），例如 localStorage.getItem(\"token\")。脚本在独立沙箱中运行，可安全访问当前页面的 DOM 与存储；不侵入网页原生的 JS 变量环境。"
-  },
   "categoryTab": {
     "message": "标签页"
-  },
-  "categoryScript": {
-    "message": "脚本"
   },
   "categoryStorage": {
     "message": "存储"

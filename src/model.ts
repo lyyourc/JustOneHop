@@ -102,18 +102,11 @@ export function entries(snapshot: Snapshot): Entry[] {
     }),
     ...(snapshot.canUndoTuck ? [{ id: 'command:undoTuck', kind: 'command' as const, category: 'tab' as const, action: 'undoTuck' as const,
       icon: 'restore' as const, title: t('undoTuck'), subtitle: '', keywords: 'undo tuck away 撤销 收起' }] : []),
-    { id: 'command:runScript', kind: 'command', category: 'script', action: 'runScript', icon: 'script', title: t('runScript'), subtitle: '',
-      keywords: 'javascript js 执行 运行 脚本', aliases: ['run script', 'execute script', '执行脚本', '运行脚本'], searchOnly: true },
-    { id: 'command:runCopyScript', kind: 'command', category: 'script', action: 'runCopyScript', icon: 'script', title: t('runCopyScript'), subtitle: '',
-      keywords: 'javascript js result 结果', aliases: ['run and copy result', 'run copy script', '运行并复制结果', '执行并复制'], searchOnly: true },
-    { id: 'command:newScript', kind: 'command', category: 'script', action: 'newScript', icon: 'plus', title: t('newScript'), subtitle: '',
-      keywords: 'javascript js snippet 脚本 代码 新增 添加', aliases: ['new script', 'create script', 'add script', '新建脚本', '添加脚本'], searchOnly: true },
-    { id: 'command:scriptLibrary', kind: 'command', category: 'script', action: 'scriptLibrary', icon: 'script', title: t('manageScripts'), subtitle: '',
-      keywords: 'scripts snippets javascript js 收藏 脚本', aliases: ['scripts', 'script library', 'manage scripts', '脚本', '脚本收藏', '管理脚本'] },
     ...([
       ['language', 'language', ['language', 'change language', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
       ['theme', 'theme', ['theme', 'appearance', 'change theme', 'dark mode', 'light mode', '深色模式', '浅色模式', '主题', '外观', '换主题', '切换主题']],
       ['keyboard', 'keyboardShortcuts', ['hotkey', 'shortcut', 'keyboard shortcuts', '快捷键', '快捷键设置']],
+      ['binding', 'bindCtrlTab', ['ctrl tab', 'Ctrl+Tab', 'bind Ctrl+Tab', 'set up Ctrl+Tab', '设置 Ctrl+Tab', '绑定 Ctrl+Tab']],
       ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '重置排序', '清除排序', '使用习惯']],
       ['tabs', 'autoTuck', ['auto tuck tabs', 'auto tuck', 'automatic tuck', '自动收起闲置标签页', '自动收起', '收起设置']],
     ] as const).map(([settingsSection, title, aliases]): Entry => ({
@@ -141,7 +134,7 @@ export interface HomeRecommendations {
   targets: Map<string, string[]>;
 }
 
-const homeCommandOrder = ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'searchAllHistory', 'newTab', 'reload', 'pin', 'localStorage', 'cookies'];
+const homeCommandOrder = ['settings', 'help', 'tabSwitcher', 'searchAllHistory', 'newTab', 'reload', 'pin', 'localStorage', 'cookies'];
 const stableTextOrder = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
 export function homeRecommendations(items: Entry[], usageScores: ReadonlyMap<string, number> = new Map()): HomeRecommendations {
@@ -301,11 +294,11 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
         Math.abs(name.length - normalized.length) <= 1 && termMatches(name, normalized).length > 0)) return 6;
     return 7;
   };
-  const kindOrder = { tab: 0, bookmark: 1, history: 2, command: 3, script: 4 };
+  const kindOrder = { tab: 0, bookmark: 1, history: 2, command: 3 };
   const explicitExtensionReload = terms.includes('zing') || hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
   return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
     (item.action !== 'bookmarkTab' || !explicitUnbookmark) &&
-    (!item.danger || item.action === 'deleteScript' || (['unbookmarkTab', 'removeBookmark'].includes(item.action) ? explicitUnbookmark || explicitBookmarkState :
+    (!item.danger || (['unbookmarkTab', 'removeBookmark'].includes(item.action) ? explicitUnbookmark || explicitBookmarkState :
       ['close', 'closeOthers', 'closeRight'].includes(item.action) && explicitClose)) && terms.every(term =>
     // Metadata is searchable, but must not manufacture typo matches. Only
     // visible names and natural-language command aliases receive typo tolerance.
@@ -339,18 +332,6 @@ export function copyUrlAction(entry: Entry): Entry | undefined {
 }
 
 export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
-  if (entry.kind === 'script') {
-    const builtin = entry.scriptId === 'builtin-ctrl-tab';
-    return [
-      ...(!builtin ? [
-        { ...entry, action: 'runScript' as const, title: t('runScript'), subtitle: '', keywords: 'run execute 运行 执行' },
-        { ...entry, id: `${entry.id}:runCopy`, action: 'runCopyScript' as const, title: t('runCopyScript'), subtitle: '', keywords: 'run copy result 运行 复制 结果' },
-      ] : []),
-      { ...entry, id: `${entry.id}:copy`, action: 'copyScript', title: t('copyScript'), subtitle: '', keywords: 'copy code 复制代码' },
-      { ...entry, id: `${entry.id}:edit`, action: 'editScript', icon: 'edit', title: t(builtin ? 'viewScriptSetup' : 'editScript'), subtitle: '', keywords: builtin ? 'view setup 设置 说明' : 'edit 修改 编辑' },
-      ...(!builtin ? [{ ...entry, id: `${entry.id}:delete`, action: 'deleteScript' as const, icon: 'close' as const, title: t('deleteScript'), subtitle: '', keywords: 'delete remove 删除', danger: true }] : []),
-    ];
-  }
   if (entry.kind === 'command') return [entry];
   const copy = copyUrlAction(entry);
   const copyActions = copy ? [copy] : [];

@@ -7,7 +7,6 @@ const sections: { title: MessageKey; paragraphs: MessageKey[] }[] = [
   { title: 'helpStartTitle', paragraphs: ['helpStartBody', 'helpSearchBody'] },
   { title: 'helpControlsTitle', paragraphs: ['helpControlsBody', 'helpBackBody'] },
   { title: 'helpTabsTitle', paragraphs: ['helpTabsBody', 'helpTuckBody'] },
-  { title: 'helpScriptsTitle', paragraphs: ['helpScriptsBody', 'helpScriptPermissionBody'] },
   { title: 'helpStorageTitle', paragraphs: ['helpStorageBody'] },
   { title: 'helpQuestionsTitle', paragraphs: ['helpShortcutBody', 'helpWindowBody', 'helpPrivacyBody'] },
 ];

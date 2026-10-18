@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { matchingHelp } from '../src/helpSearch';
 
 test('help searches bilingual titles and body, retaining whole matching sections', () => {
-  assert.equal(matchingHelp('  ').length, 6);
+  assert.equal(matchingHelp('  ').length, 5);
   assert.deepEqual(matchingHelp('⌘⇧P', '⌘⇧P (Command + Shift + P)').map(section => section.title), ['helpStartTitle']);
   assert.deepEqual(matchingHelp('Alt+Z', 'Alt+Z').map(section => section.title), ['helpStartTitle']);
   assert.deepEqual(matchingHelp('未绑定', '未绑定').map(section => section.title), ['helpStartTitle']);
@@ -12,8 +12,8 @@ test('help searches bilingual titles and body, retaining whole matching sections
     assert.deepEqual(matchingHelp(query).map(section => section.title), ['helpStorageTitle'], query);
   }
   assert.deepEqual(matchingHelp('网站存储').map(section => section.title), ['helpStorageTitle', 'helpQuestionsTitle']);
-  assert.deepEqual(matchingHelp('135').map(section => section.title), ['helpScriptsTitle']);
-  assert.deepEqual(matchingHelp('保存 运行').map(section => section.title), ['helpScriptsTitle']);
+  assert.deepEqual(matchingHelp('135').map(section => section.title), []);
+  assert.deepEqual(matchingHelp('保存 运行').map(section => section.title), []);
   assert.deepEqual(matchingHelp('cookie    domains').map(section => section.title), ['helpStorageTitle']);
   assert.ok(matchingHelp('cookie')[0].paragraphs.includes('helpStorageBody'));
   assert.deepEqual(matchingHelp('cookie 不存在的说明'), []);

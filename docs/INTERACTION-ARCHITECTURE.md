@@ -10,12 +10,12 @@
 
 ### 通用列表与操作契约
 
-- 默认候选行左键单击、普通 Enter 与底栏主操作执行同一主动作，使用同一目标和可用性判断。脚本收藏按用户提供的 Raycast Snippets 截图采用明确的预览列表例外，Storage 沿用此契约：单击只选择并更新只读预览，普通 Enter 与底栏主操作复制代码／原始值，脚本编辑从操作菜单进入。收起恢复核对卡片也只选择，接管需从底栏或菜单显式确认。配备 `ActionMenu` 的列表提供 `onContextMenu`：先 `event.preventDefault()`、选中该项并保存输入框光标，再打开对应菜单。
+- 默认候选行左键单击、普通 Enter 与底栏主操作执行同一主动作，使用同一目标和可用性判断。Storage 采用明确的预览列表例外：单击只选择并更新只读预览，普通 Enter 与底栏主操作复制原始值。收起恢复核对卡片也只选择，接管需从底栏或菜单显式确认。配备 `ActionMenu` 的列表提供 `onContextMenu`：先 `event.preventDefault()`、选中该项并保存输入框光标，再打开对应菜单。
 - 主搜索与全部历史页通过共享 `SearchResultItem` 支持标题、说明等结果文字的原生拖选；拖选文字后松开鼠标不得触发行主动作、导航或学习写入。普通左键单击仍执行主动作，不改为只选择或要求双击；行内按钮继续执行各自操作。手势判断由共享行负责，不能只在某个视图阻止 click，也不能因此前残留的文字选区吞掉后续普通单击。
-- 采用悬停选择的列表，其 `onMouseMove` 比对物理坐标 `event.screenX / event.screenY`，使键盘滚动时静止的指针不抢选中项。脚本收藏与 Storage 悬停不改变选择或预览，保证阅读稳定；Tab Switcher 悬停只展示可点击描边，不改变松开修饰键时的确认目标。
-- 所有关键词过滤列表（主搜索、Storage、Tab Group、Script Library、Script Runner 及 ActionMenu）使用 `HighlightedText` 渲染命中高亮：仅以 600 字重强调，继承所在文字的颜色，背景透明且无内边距，避免词内命中被色块和额外间距切断。每个菜单动作同时提供 `icon` 与中英文 `keywords`，筛选同时匹配 `title` 和 `keywords`，支持跨界面语言检索。
+- 采用悬停选择的列表，其 `onMouseMove` 比对物理坐标 `event.screenX / event.screenY`，使键盘滚动时静止的指针不抢选中项。Storage 悬停不改变选择或预览，保证阅读稳定；Tab Switcher 悬停只展示可点击描边，不改变松开修饰键时的确认目标。
+- 所有关键词过滤列表（主搜索、Storage、Tab Group 及 ActionMenu）使用 `HighlightedText` 渲染命中高亮：仅以 600 字重强调，继承所在文字的颜色，背景透明且无内边距，避免词内命中被色块和额外间距切断。每个菜单动作同时提供 `icon` 与中英文 `keywords`，筛选同时匹配 `title` 和 `keywords`，支持跨界面语言检索。
 - 所有列表支持 ↑/↓ 与无额外修饰键的 Ctrl+P / Ctrl+N；选中项变化后调用 `scrollIntoView({ block: 'nearest' })`。长列表支持 PageUp / PageDown、Option+↑/↓ 翻页和 Cmd/Ctrl+↑/↓ 首尾跳转。
-- `isComposing` 或 `keyCode === 229` 期间，Enter / Escape / Backspace 留给输入法，不执行业务或返回。带修饰键或 `event.repeat` 的 Enter 不执行主动作；明确定义的 Cmd/Ctrl+Enter 保存除外，编辑字段的普通 Enter 保留编辑语义。
+- `isComposing` 或 `keyCode === 229` 期间，Enter / Escape / Backspace 留给输入法，不执行业务或返回。带修饰键或 `event.repeat` 的 Enter 不执行主动作；编辑字段的普通 Enter 保留编辑语义。
 
 ### Chrome 原生视觉
 
@@ -29,18 +29,17 @@ Chrome Native 约束配色、控件语义、焦点、悬浮、选中和禁用状
 
 ## 面板布局与操作组件
 
-内部标识统一使用 zing：消息 source、runtime port 名称、注入标记、DOM/ARIA ID、CSS 类和动画名与产品名一致。偏好、脚本和排序记录继续使用原存储键，无需数据迁移。浏览器测试配置使用 ZING_CHROMIUM_PATH、ZING_VIMIUM_PATH。
+内部标识统一使用 zing：消息 source、runtime port 名称、注入标记、DOM/ARIA ID、CSS 类和动画名与产品名一致。偏好和排序记录继续使用原存储键，无需数据迁移。旧版 `saved-script:*` 数据原样保留，不读取或使用，也不迁移或自动删除。浏览器测试配置使用 ZING_CHROMIUM_PATH、ZING_VIMIUM_PATH。
 
-主搜索、脚本新建和编辑共用同一套操作呈现，避免每个功能各自添加底部按钮。此边界基于已经存在的页面和行为；不引入全局命令注册器或路由框架。
+主搜索、Storage 和 Ctrl+Tab 配置指南共用同一套操作呈现，避免每个功能各自添加底部按钮。此边界基于已经存在的页面和行为；不引入全局命令注册器或路由框架。
 
 - `PaletteFooter` 渲染固定高度、不可收缩的底栏。左侧 API 统一为 `navigation?: { kind: 'settings' | 'back'; label: string; tooltip: string; disabled?: boolean; buttonRef?: Ref<HTMLButtonElement>; onAction: () => void }`、`title?: string`、`context?: ReactNode` 与 `status?: ReactNode`。组件根据 `navigation.kind` 自己渲染唯一的 26px 单色图标按钮，统一尺寸、圆角、悬浮态和禁用态；`label` 提供可访问名称，`tooltip` 提供悬浮提示，`onAction` 调用共享设置操作或页面现有返回回调。`buttonRef` 可用于恢复焦点或作为复制操作的锚点；返回按钮在 `mousedown` 阶段阻止默认行为和冒泡，避免外部点击处理先关弹层、随后 click 又退出父页。页面不再通过 `leading` 或 `title.onBack` 拼装控件。按钮后依次是只读位置名称和以留白分开的补充信息；标题后不渲染圆点或竖线，紧随标题的 context／status 使用统一 16px 左外边距（叠加容器 8px gap），提示内部的同级动作组才用圆点分隔；位置名称统一为 11.5px / 500 的弱化文字，主搜索传 `zing`，Storage 传存储类型名称（如 `Local Storage`），标签组传 `groupLabel`。标题旁不得另加品牌装饰、类型图标或组色图标。
 - `context` 承载只读背景（站点来源、成员数量），显式使用 11px 字号、400 字重、16px 行高的弱化文字；主搜索 `App` 与 Tab Switcher 的 `RecentSwitcherView` 均传 `context={<NavigationHint />}`，继承同一排版，共用本地化「Ctrl+P 上一个 · Ctrl+N 下一个」（英文「Ctrl+P Previous · Ctrl+N Next」），与设置统一按键在前、动作在后、先上一个再下一个、组间圆点分隔；Ctrl+P / Ctrl+N 直接显示，不展示方向键，`navigationHelp` 仅提供补充解释；不得各自拼装。二级列表页仍显示站点来源或成员数量。快捷键共用 `key-chord` 与 `formatShortcut` 的语义结构（一个 `kbd` 对应一个完整快捷键组合：符号修饰键直接拼接如 `⌘T` / `⌘⇧T` / `⌘K`，文字修饰键以 `+` 连接如 `Ctrl+P` / `Ctrl+K`，Mod 按平台显示 ⌘/Ctrl），但左侧导航键的 `kbd` 继承上下文的字体与颜色，无边框、背景、内边距或最小宽度，宽度自动、高度 16px，左侧补充信息不显示键帽框。右侧主操作与 Actions 键帽保持 20px 高及原有边框、背景。短暂 `status` 出现时替换 `context`，占据同一位置与留白结构，不增加独立槽位，不挤走位置名称。右侧 `primary` 保留标签、键帽、可用性、回调与危险态；可选 `secondary?: { label: string; keys: string[]; icon?: ReactNode; disabled?: boolean; onAction: () => void }` 提供次要操作，与主操作共用按钮规则，均文字在前、键帽在后。`actions` 仍是可选菜单开关；`isMac?: boolean` 默认为 `false`，只用于 Actions 的平台快捷键显示。业务页面不能在滚动正文末尾另放主要提交按钮。
-- `ActionMenu` 渲染统一操作面板，负责焦点、方向键与 Ctrl+N/P、翻页、首尾跳转、Enter 执行、Cmd/Ctrl+K 切换和菜单内 Tab 焦点限制；通过 BackLayer 登记 Esc 返回。页面提供过滤后的动作、查询、选中项与回调；主搜索保留现有搜索排序算法，编辑器使用简单动作筛选。菜单打开时，`PaletteFooter.primary` 的文案和行为跟随当前高亮动作；关闭、删除、放弃恢复等动作标记 `danger: true` 时，底栏也传入 `danger: true`，保持相同的危险提示。
-- 页面保留自己的业务状态、执行/保存逻辑及退出菜单后的编辑焦点。编辑器只记住真实表单字段，忽略复制代码时创建的临时 textarea，避免复制后光标丢失。
-- 脚本编辑的主操作为保存：macOS `Cmd+Enter`，其他平台 `Ctrl+Enter`。普通 Enter 保持表单/代码编辑语义。复制、删除从底栏「操作」按钮或 Cmd/Ctrl+K 进入，删除仍经默认聚焦取消的确认框。
-- 主搜索、脚本收藏列表／编辑、脚本执行结果、Storage 列表／详情与收起恢复核对共用 PaletteFooter 和 ActionMenu；脚本运行选择列表复用底栏但不另设操作菜单。Storage 保留自己的数据读取与复制逻辑，菜单统一提供高亮、键盘导航、滚动和焦点行为；设置同样复用 PaletteFooter，返回与位置名称放在底栏左侧。
-- 列表型二级页（Storage、标签组、脚本收藏／运行选择）不渲染独立标题栏，顶部仅保留共享搜索栏；脚本新建／编辑、内置配置、执行结果及收起恢复核对同样移除旧标题栏。位置名称走底栏字符串 `title`，返回走 `navigation.kind: 'back'`；主搜索用 `navigation.kind: 'settings'` 调用共用设置操作。返回按钮与 Esc 逐层返回语义一致，匹配最深活动 `BackLayer` 的返回行为；适用的 Backspace 同样每次只退最深一层（先关菜单或确认，再退编辑层，最后回搜索），不能直接跳回主搜索；`label` 说明真实行为（如 `返回 · Local Storage`），不能只报地名。`disabled` 不得仅因业务忙碌而阻断鼠标返回，必须与键盘路径的可用性一致。只读站点来源、成员数量、本机保存／临时结果说明或恢复记录名称走 `context`，不是第二个可点目标。设置保留与主搜索一致的搜索输入 header，底栏使用返回按钮、Settings／设置标题及 Tab / Shift+Tab 控件导航提示；下拉展开时底栏返回经 `useNavigateBack` 仅关闭下拉并恢复触发器焦点。没有搜索需求的表单、结果与恢复核对层不强加搜索框。
-- 面板尺寸由 `.palette` 统一给出：常规总高 516px（含边框），网页浮层受可用视口高度约束，独立窗口填满视口；页面不得分别硬编码高度。正文以 `flex: 1; min-height: 0` 占满剩余空间并内部滚动，使 44px 底栏在主搜索、列表/详情和编辑层之间保持位置；列表切层时搜索框与底栏均保持位置。候选行共用 `.result` 的 40px 高度、26px 图标槽和 `.entry-copy` 的单行文字布局；Storage 与脚本收藏共享分栏预览布局：左侧 key 列表、右侧完整 value 与 Cookie 属性，独立滚动；≤520px 时列表在上、预览在下。两页的右侧共用 `ReadOnlyPreview`：上方无标题、无说明条的只读 textarea，下方为信息标题与属性行；字号、内边距、文本选择与横纵滚动一致。Storage 信息为 key、JSON／Text 内容类型及实际 Cookie 属性，脚本为名称与 JavaScript 类型；信息区最多占一半高度并可滚动，保证内容区可见。预览字段保留原生文本导航与选择，不将其方向键和 Enter 转为列表动作。JSON 格式化仅影响预览，复制保留原始字符串；双击或菜单仍可进入单独详情层。
+- `ActionMenu` 渲染统一操作面板，负责焦点、方向键与 Ctrl+N/P、翻页、首尾跳转、Enter 执行、Cmd/Ctrl+K 切换和菜单内 Tab 焦点限制；通过 BackLayer 登记 Esc 返回。页面提供过滤后的动作、查询、选中项与回调；主搜索保留现有搜索排序算法，二级页面使用简单动作筛选。菜单打开时，`PaletteFooter.primary` 的文案和行为跟随当前高亮动作；关闭、删除、放弃恢复等动作标记 `danger: true` 时，底栏也传入 `danger: true`，保持相同的危险提示。
+- 页面保留自己的业务状态、执行逻辑及退出菜单后的焦点，恢复焦点时忽略复制操作创建的临时 textarea。
+- 主搜索、Ctrl+Tab 配置指南、Storage 列表／详情与收起恢复核对共用 PaletteFooter 和 ActionMenu。Storage 保留自己的数据读取与复制逻辑，菜单统一提供高亮、键盘导航、滚动和焦点行为；设置同样复用 PaletteFooter，返回与位置名称放在底栏左侧。
+- 列表型二级页（Storage、标签组）不渲染独立标题栏，顶部仅保留共享搜索栏；Ctrl+Tab 配置指南及收起恢复核对同样不设独立标题栏。位置名称走底栏字符串 `title`，返回走 `navigation.kind: 'back'`；主搜索用 `navigation.kind: 'settings'` 调用共用设置操作。返回按钮与 Esc 逐层返回语义一致，匹配最深活动 `BackLayer` 的返回行为；适用的 Backspace 同样每次只退最深一层（先关菜单或确认，再退编辑层，最后回搜索），不能直接跳回主搜索；`label` 说明真实行为（如 `返回 · Local Storage`），不能只报地名。`disabled` 不得仅因业务忙碌而阻断鼠标返回，必须与键盘路径的可用性一致。只读站点来源、成员数量、配置说明或恢复记录名称走 `context`，不是第二个可点目标。设置保留与主搜索一致的搜索输入 header，底栏使用返回按钮、Settings／设置标题及 Tab / Shift+Tab 控件导航提示；下拉展开时底栏返回经 `useNavigateBack` 仅关闭下拉并恢复触发器焦点。没有搜索需求的配置说明与恢复核对层不强加搜索框。
+- 面板尺寸由 `.palette` 统一给出：常规总高 516px（含边框），网页浮层受可用视口高度约束，独立窗口填满视口；页面不得分别硬编码高度。正文以 `flex: 1; min-height: 0` 占满剩余空间并内部滚动，使 44px 底栏在主搜索、列表/详情和编辑层之间保持位置；列表切层时搜索框与底栏均保持位置。候选行共用 `.result` 的 40px 高度、26px 图标槽和 `.entry-copy` 的单行文字布局；Storage 使用分栏预览布局：左侧 key 列表、右侧完整 value 与 Cookie 属性，独立滚动；≤520px 时列表在上、预览在下。右侧使用 `ReadOnlyPreview`：上方无标题、无说明条的只读 textarea，下方为信息标题与属性行；字号、内边距、文本选择与横纵滚动一致。信息为 key、JSON／Text 内容类型及实际 Cookie 属性；信息区最多占一半高度并可滚动，保证内容区可见。预览字段保留原生文本导航与选择，不将其方向键和 Enter 转为列表动作。JSON 格式化仅影响预览，复制保留原始字符串；双击或菜单仍可进入单独详情层。
 - 快捷键启动的 Tab Switcher 网页浮层与独立窗口共用 `RecentSwitcherView`，首行复用主搜索的 `.search-bar` 输入胶囊，列表复用 `.results`、`.result` 与 `.entry-copy`，标题和 URL 使用 `HighlightedText`。输入框初始为空且原生 `disabled`，不显示输入光标或编辑蓝框，焦点留在可聚焦列表，使用本地化 `recentSearch` 占位文字与可访问名称；默认由列表持有 `aria-activedescendant`，点击搜索图标、输入区域或 Ctrl/Cmd+F 后才启用并聚焦输入，以 `combobox` 的 `aria-controls` / `aria-activedescendant` 关联列表与当前选中项；搜索栏右侧提供取消按钮。实际启动快捷键仍放在 `header` 的 `title` 属性，未绑定时不提供该提示。底栏直接复用 `PaletteFooter`，不另加 `recent-help` 行：`title` 在快速切换时使用本地化 `recentRelease`（如「松开 Ctrl 切换」，按 `releaseKey` 显示对应修饰键），显式进入搜索后改为 `recentSwitcher`，`context={<NavigationHint />}` 与根 `App` 相同，共用本地化「Ctrl+P 上一个 · Ctrl+N 下一个」（英文「Ctrl+P Previous · Ctrl+N Next」）和 `navigationHelp` 补充提示，继承 11px / 400 / 16px 的共享样式。右侧 `primary` 是「切换 ↵」，未加载、无有效选中项或关闭期间禁用；`secondary` 是「取消 esc」，调用共享取消回调。浮层 `.recent-overlay .recent-switcher` 用 `flex: 1; min-height: 0; height: auto` 填满父 `.palette` 的可用空间，避免单独的 516px／最大高度造成底栏溢出或底部空白；独立窗口仍为 `100vh`。
 - 底栏骨架为「左＝可选控件 + 位置／提示 + 补充信息／状态，右＝主操作、可选次要操作与操作菜单」；设置／返回入口不重复，Tab Switcher 的搜索栏右侧提供取消入口。列表页的搜索胶囊几何由 `.search-bar` / `.storage-search` 共享的规则给出，包含窄屏间距；新增列表页必须复用，不得另写一份胶囊样式。宽度 ≤520px 时仅隐藏补充信息 `.palette-footer-context`（包括主搜索与 Tab Switcher 的导航提示），不隐藏 `status`；Tab Switcher 的松键提示或搜索状态标题位于 `title`，窄屏仍保留。复制成功、执行中及危险操作等状态继续在原位置替换上下文，必要时可截断。导航按钮、位置名称与右侧操作始终保留，按钮不收缩，长标题先于操作控件截断。分区参考 Raycast [A fresh look and feel](https://www.raycast.com/blog/a-fresh-look-and-feel) 中左侧命令身份／状态、右侧上下文操作的思路；共享导航按钮、弱化位置名称与窄屏策略是 zing 自己的适配，决策见 [ADR 0009](adr/0009-list-page-footer-breadcrumb.md)。
 
@@ -48,7 +47,7 @@ Chrome Native 约束配色、控件语义、焦点、悬浮、选中和禁用状
 
 本节描述当前实现。后续定位目标已改为所在显示器屏幕水平居中、从屏幕顶部计算垂直位置，具体垂直偏移未定，工作仍暂停且未解决；目标与保留普通网页浮层的约束见 [ADR 0010 的待实现目标](adr/0010-content-anchor-panel-geometry.md#待实现目标)。
 
-网页浮层的位置由 `content.tsx` 和 `.zing-app.overlay` / `.palette` 控制，独立窗口通过 `src/panelGeometry.ts` 复用同一内容区几何；子页面不能决定自己的承载方式或另设位置。普通网页当前为内容区水平居中、偏上的浮层，新建/编辑切换时沿用相同坐标。
+网页浮层的位置由 `content.tsx` 和 `.zing-app.overlay` / `.palette` 控制，独立窗口通过 `src/panelGeometry.ts` 复用同一内容区几何；子页面不能决定自己的承载方式或另设位置。普通网页当前为内容区水平居中、偏上的浮层，子页面切换时沿用相同坐标。
 
 `panelRect(viewport)` 对齐网页浮层 CSS：宽度为 `min(750, viewport.width - 48)`，宽度 ≤520 时改为减 20；顶部 inset 为 `clamp(28, viewport.height × 0.16, 150)`，窄屏为 24；高度为 `min(516, viewport.height - inset - 24)`，水平居中，底部至少预留 24px。几何函数将极小视口的宽高下限保护为 1px。这里的 750×516 是面板内容矩形，不含独立窗口的系统标题栏和边框。
 
@@ -68,13 +67,13 @@ Chrome 原生页（chrome / chrome-search / chrome-untrusted / devtools）的 Co
 
 主搜索与主搜索的操作菜单共用 `model.search`：关闭动作接受完整词或明确前缀 `clo / clos / close`、`guan / guanb / guanbi` 和中文「关闭」；仅命中其他词中的片段、关闭动作错字及单独类别名不解锁关闭命令。空搜索首页仍隐藏危险操作；静音切换、恢复关闭标签页与 Session Storage 使用 `searchOnly` 排除，即使有学习权重也不进入首页，搜索与标签页操作菜单的可用动作保持不变。扩展重载的扩展指向也接受 `ext` 起的前缀。所有查询词均须匹配，词序不强制；名称前缀优先于分散的词首，词首优先于词内片段。学习权重仅在同一相关性等级内排序，不能跨越名称、辅助字段或模糊命中的等级。跨语言的部分词、多词换序和有限错字命中，均尽可能显示可解释命中的别名并使用共享高亮。上述变化不改变点击、普通 Enter 与底栏主操作的执行契约。
 
-所有可见搜索输入的尾部使用同一个 `SearchDismissButton` 显示可点击 `esc`，包括主搜索、设置、Storage、标签组、脚本收藏／运行选择、ActionMenu 以及两种 Tab Switcher。标题／读屏文案明确 Escape 的实际用途（关闭、返回或取消），设置的清空输入按钮保持独立。组件调用 `Navigation.useNavigateBack`，与实体 Esc 使用同一最深活动层判定；下拉或菜单开启时只关闭该层，不能因鼠标先触发外部关闭再退出父页。菜单 Tab 在输入与 Esc 按钮间循环，聚焦按钮后 Enter／Space 只执行返回。没有搜索输入的编辑／结果／恢复层不强加搜索框。
+所有可见搜索输入的尾部使用同一个 `SearchDismissButton` 显示可点击 `esc`，包括主搜索、设置、Storage、标签组、ActionMenu 以及两种 Tab Switcher。标题／读屏文案明确 Escape 的实际用途（关闭、返回或取消），设置的清空输入按钮保持独立。组件调用 `Navigation.useNavigateBack`，与实体 Esc 使用同一最深活动层判定；下拉或菜单开启时只关闭该层，不能因鼠标先触发外部关闭再退出父页。菜单 Tab 在输入与 Esc 按钮间循环，聚焦按钮后 Enter／Space 只执行返回。没有搜索输入的配置说明／恢复层不强加搜索框。
 
 主搜索、标签组成员和 Tab Switcher 使用 `CurrentTabBadge`，以面板来源 ID 判定当前标签，统一显示「当前 / Current」。共享组件使用与历史时间一致的弱化纯文本样式，去除胶囊背景、边框及徽标内边距；主搜索中位于右侧分类文字之后，不放在分类左侧。所有调用方沿用此样式，身份语义不变。首页推荐排除当前完整 URL，包括同 URL 的其他标签页和书签；不为显示当前标记强行保留来源页。搜索结果不强行加入不匹配的来源标签。后台快照来源 ID 是身份依据，不用临时活动窗口／标签的 active 标志替代。
 
 ### 首页推荐（2026-10-18）
 
-空查询只呈现一组「推荐 / Suggested」，页面与命令混排且最多 10 项。无学习时默认顺序为 Settings、Help、Tab Switcher、Script Library、Search All History、New Tab、Reload Tab、Pin/Unpin、Local Storage、Cookies；有状态时可加入安全的撤销收起／恢复收起组入口，仍受总数上限约束。关闭等危险命令与 `searchOnly` 项不进入首页。页面候选来自当前窗口标签页及书签，必须有 zing 显式成功选择的有效记录，不以 MRU 或历史预加载补位；完整 URL 去重、排除当前 URL，并优先用当前窗口已打开标签页代表。
+空查询只呈现一组「推荐 / Suggested」，页面与命令混排且最多 10 项。无学习时默认顺序为 Settings、Help、Tab Switcher、Search All History、New Tab、Reload Tab、Pin/Unpin、Local Storage、Cookies；有状态时可加入安全的撤销收起／恢复收起组入口，仍受总数上限约束。关闭等危险命令与 `searchOnly` 项不进入首页。页面候选来自当前窗口标签页及书签，必须有 zing 显式成功选择的有效记录，不以 MRU 或历史预加载补位；完整 URL 去重、排除当前 URL，并优先用当前窗口已打开标签页代表。
 
 首页跨查询汇总频次与衰减权重，含显式空查询；沿用 14 天半衰期、90 天未使用失效、最多 500 条记录。仅首页聚合同 URL 的 `tab:<URL>` 与对应已学习 `bookmark:<id>`，有词搜索的身份及同词同级排序不变。推荐分数在打开面板／来源会话开始时捕获，查询往返、子页返回、新增学习或忘记均不重排当次首页，下次打开再取新分数；关闭／移走页面等真实数据变化仍更新候选。本面板 Settings 全量 Reset 是例外，立即恢复默认首页与排序。无痕首页仅默认入口，隐藏 Search All History，不使用普通窗口习惯，不新增权限，也不增加独立收藏页、隐藏或推荐管理页；收藏动作从搜索或标签页菜单进入。Search All History 在首页仅提供导航，打开空历史搜索页，不预加载历史；有查询时仍沿用原来的独立插入规则，避免重复入口。
 
@@ -82,7 +81,7 @@ Chrome 原生页（chrome / chrome-search / chrome-untrusted / devtools）的 Co
 
 ### 本机学习身份、解释与忘记
 
-`usageTarget` 以 `entry.url` 为标签页与历史生成同一个 `tab:<URL>` 身份，不读取检索用 keywords；完整 URL 保留查询参数与片段差异，历史打开后变为标签页或「已收起」状态均不改变身份。书签沿用独立的 `bookmark:<bookmarkId>`。设置子项各用 `command:settings:<section>`，通用设置沿用 `command:settings`；旧记录不拆分或分摊给子项，仅用于通用设置。其他已接入命令沿用 `command:<action>`。学习范围为普通标签页、浏览历史、书签、浏览器命令、设置与 Storage 入口；脚本、帮助、Tab Switcher 导航入口、标签组导航、收起恢复核对和扩展重载未接入。仅显式成功执行写入；主搜索页面选择显式传入空查询 `''` 时也学习，切换器未提供查询的执行不学习，不能把缺省查询自动补为空串。无痕不记录选择；历史 API 读取本身和打开失败均不记录。
+`usageTarget` 以 `entry.url` 为标签页与历史生成同一个 `tab:<URL>` 身份，不读取检索用 keywords；完整 URL 保留查询参数与片段差异，历史打开后变为标签页或「已收起」状态均不改变身份。书签沿用独立的 `bookmark:<bookmarkId>`。设置子项各用 `command:settings:<section>`，通用设置沿用 `command:settings`；旧记录不拆分或分摊给子项，仅用于通用设置。其他已接入命令沿用 `command:<action>`。学习范围为普通标签页、浏览历史、书签、浏览器命令、设置与 Storage 入口；帮助、Tab Switcher 导航入口、标签组导航、收起恢复核对和扩展重载未接入。仅显式成功执行写入；主搜索页面选择显式传入空查询 `''` 时也学习，切换器未提供查询的执行不学习，不能把缺省查询自动补为空串。无痕不记录选择；历史 API 读取本身和打开失败均不记录。
 
 主搜索与全部历史子页以 `queryUsage` 读取当前归一化查询的权重，采用同词、同相关性等级内的学习排序；空首页以 `homeUsage` 汇总各查询的权重，再由 `homeRecommendations` 合并页面身份、去重并与命令混排，使用当次会话捕获的分数。`rankingInfo` 对比同批候选的学习顺序与无习惯默认顺序，在截断与插入固定历史入口前判断位置：有有效权重且位置确实前移才标为 promoted，不能仅凭非零权重显示前移。`SearchResultItem` 对有适用学习记录的结果只在右侧显示历史小图标；有快捷键时，图标位于键帽左侧，键帽保持最右侧对齐，不常驻「习惯前移 / Habit boost」「已有记录 / Remembered」文字。有查询时仍限同词、同相关性等级；首页按页面聚合权重解释，Tab Switcher 保留独立 MRU。
 
@@ -104,27 +103,26 @@ Chrome 原生页（chrome / chrome-search / chrome-untrusted / devtools）的 Co
 
 `NavigationRoot` 是面板唯一的 Esc 捕获入口。监听器安装在实际承载 UI 的 ownerDocument.defaultView，而非代码运行环境的全局 window；普通网页还覆盖承载 iframe 的父窗口，处理焦点落回宿主时的按键。卸载时移除监听器。页面与菜单不得再各自添加 Esc 按键分支。
 
-`BackLayer` 只登记返回回调，不添加 DOM 容器。优先级由 React 嵌套深度决定，不依赖 effect 的执行或注册顺序。每次 Esc 仅调用最深的活动层：主搜索 → 设置 → 脚本管理 → 编辑 → 操作菜单；Storage 列表/详情/菜单、脚本选择/执行结果、设置下拉框及删除确认同样接入。Command Palette 中只有主搜索层的返回会关闭整个面板，内嵌 Tab Switcher 取消只退回主搜索；快捷键启动的 Tab Switcher 使用 `NavigationRoot` + `BackLayer` 将 Esc 路由到取消回调；启动时在异步初始化前挂载返回路由，加载期间也可取消。
+`BackLayer` 只登记返回回调，不添加 DOM 容器。优先级由 React 嵌套深度决定，不依赖 effect 的执行或注册顺序。每次 Esc 仅调用最深的活动层：主搜索 → 设置 → Ctrl+Tab 配置指南 → 操作菜单；Storage 列表/详情/菜单、设置下拉框及删除确认同样接入。Command Palette 中只有主搜索层的返回会关闭整个面板，内嵌 Tab Switcher 取消只退回主搜索；快捷键启动的 Tab Switcher 使用 `NavigationRoot` + `BackLayer` 将 Esc 路由到取消回调；启动时在异步初始化前挂载返回路由，加载期间也可取消。
 
-每次独立按键同步提交一次返回，阻止后续冒泡和浏览器默认行为；长按产生的 repeat 不再弹出下一层，输入法组合期间的 Esc 留给输入法。返回回调更新页面状态；从 ActionMenu、详情或重命名、换色、脚本编辑等内嵌编辑态返回列表时，页面恢复原搜索词、选中项与保存的光标／选区（`setSelectionRange(...caret.current)`）。执行中的脚本返回选择列表后，旧请求可能继续运行，但不得覆盖新页面或触发自动复制。
-
-Backspace 也进入同一返回路由，但保留编辑语义：二级页面搜索框标记 `data-back-on-empty`，只有这类搜索框为空，或焦点位于非编辑控件时才返回。搜索框有内容时正常删字；名称、代码、执行结果及其他编辑区域不触发返回。带修饰键、输入法组合和长按重复不触发返回；主搜索层的 Backspace 不关闭面板。面板可能运行在闭合 Shadow DOM + 沙箱 iframe、独立窗口或原生 popup 中，焦点从面板自身的 `getRootNode()` / `ownerDocument` 解析，不能依赖全局 `window` 或被闭合 Shadow DOM 重定向后的事件 target。
+每次独立按键同步提交一次返回，阻止后续冒泡和浏览器默认行为；长按产生的 repeat 不再弹出下一层，输入法组合期间的 Esc 留给输入法。返回回调更新页面状态；从 ActionMenu、详情或重命名、换色等内嵌编辑态返回列表时，页面恢复原搜索词、选中项与保存的光标／选区（`setSelectionRange(...caret.current)`）。
+Backspace 也进入同一返回路由，但保留编辑语义：二级页面搜索框标记 `data-back-on-empty`，只有这类搜索框为空，或焦点位于非编辑控件时才返回。搜索框有内容时正常删字；名称、只读内容及其他编辑区域不触发返回。带修饰键、输入法组合和长按重复不触发返回；主搜索层的 Backspace 不关闭面板。面板可能运行在闭合 Shadow DOM + 沙箱 iframe、独立窗口或原生 popup 中，焦点从面板自身的 `getRootNode()` / `ownerDocument` 解析，不能依赖全局 `window` 或被闭合 Shadow DOM 重定向后的事件 target。
 
 `.palette` 与菜单保留 `tabIndex=-1` 以承接鼠标焦点，但 Esc 不依赖这些容器或任何输入框获得焦点。即使焦点位于 iframe body，仍通过同一路由返回。
 
 ## 验收边界
 
-除了直接加载 UI 的功能测试，还要从后台真实命令回调驱动全新普通网页的启动，断言浮层存在且未降级、面板水平居中、进入子页面后坐标不变。编辑器需验证菜单开关、选区恢复、普通 Enter 换行、保存快捷键、删除取消、较矮窗口底栏可见，以及真实闭合 Shadow DOM/iframe 与 Vimium 组合。
+除了直接加载 UI 的功能测试，还要从后台真实命令回调驱动全新普通网页的启动，断言浮层存在且未降级、面板水平居中、进入子页面后坐标不变。相关页面需验证菜单开关、选区恢复、配置指南复制与跨页保留、确认取消、较矮窗口底栏可见，以及真实闭合 Shadow DOM/iframe 与 Vimium 组合。
 
 ## 候选项呈现
 
-主搜索的 tab、bookmark、history、command（以及 script）统一使用 `SearchResultItem`，全部历史页也复用它。组件根据 Entry 与展示上下文统一处理图标、分类标题、命令别名／说明、高亮、截断、状态徽标、来源和快捷键；`ResultContent` 只负责共享视觉槽，页面保留选择、指针、菜单与执行回调。`HistoryMetadata` 与 `formatVisitTime` 提供统一最近访问时间：刚刚／分钟前／今天或昨天时分／今年月日／往年年月日，按本地日历判断昨天，完整本地时间用于 time 的 title 与无障碍名称，dateTime 使用 ISO。无效或未来时间不显示。主搜索显示来源与时间，历史页省略来源；窄屏仅隐藏有时间的历史来源文字，时间不隐藏。没有后台定时刷新或新增持久状态。Tab Group、Tab Switcher 与脚本预览列表保持现有契约。
+主搜索的 tab、bookmark、history、command统一使用 `SearchResultItem`，全部历史页也复用它。组件根据 Entry 与展示上下文统一处理图标、分类标题、命令别名／说明、高亮、截断、状态徽标、来源和快捷键；`ResultContent` 只负责共享视觉槽，页面保留选择、指针、菜单与执行回调。`HistoryMetadata` 与 `formatVisitTime` 提供统一最近访问时间：刚刚／分钟前／今天或昨天时分／今年月日／往年年月日，按本地日历判断昨天，完整本地时间用于 time 的 title 与无障碍名称，dateTime 使用 ISO。无效或未来时间不显示。主搜索显示来源与时间，历史页省略来源；窄屏仅隐藏有时间的历史来源文字，时间不隐藏。没有后台定时刷新或新增持久状态。Tab Group、Tab Switcher 与 Storage 预览列表保持各自契约。
 
 主搜索与全部历史页的标签页、历史、书签等带 URL 候选由共享 `actionsFor` 提供「复制 URL / Copy URL」，无 URL 的候选不提供此动作；标签组成员页仍使用自己的动作集，不因此获得复制入口。右键、底栏 Actions 与 Cmd/Ctrl+K 使用同一动作集合，主搜索与全部历史页接入同一复制语义。复制读取候选完整 `entry.url`，保留路径、查询参数和片段，不使用截断的说明文字或检索 keywords；不调用导航动作，也不写入学习记录。成功后关闭菜单并保持面板打开，保留 query 与选中身份，恢复输入焦点及原 caret／选区，在现有底栏 status 显示结果；失败反馈错误并允许重试，不冒充导航成功。普通行单击与复制动作分开，拖选保护由共享 `SearchResultItem` 处理。
 
-Entry 的可选 category、shortcut、faviconPageUrl 仅承载呈现信息，不改变命令 ID、存储或后台接口。主搜索命令按 Tab / Script / Storage / Settings / Chrome Pages / Zing 添加本地化前缀，自建脚本归入 Script；根设置与帮助显示为 Zing: Settings／Zing: Help（中文 Zing: 设置／Zing: 使用帮助），具体设置项使用 Settings: Theme／Language 等设置项名称，只打开并定位控件，不直接修改值。标签页、书签保留网站原始标题。分类参与中英文检索，支持 `Script: new`，沿用严格匹配、命令意图优先和使用习惯排序，不另增分组标题或模式。
+Entry 的可选 category、shortcut、faviconPageUrl 仅承载呈现信息，不改变命令 ID、存储或后台接口。主搜索命令按 Tab / Storage / Settings / Chrome Pages / Zing 添加本地化前缀；根设置与帮助显示为 Zing: Settings／Zing: Help（中文 Zing: 设置／Zing: 使用帮助），具体设置项使用 Settings: Theme／Language 等设置项名称，只打开并定位控件，不直接修改值。标签页、书签保留网站原始标题。分类参与中英文检索，支持 `Settings: Theme`，沿用严格匹配、命令意图优先和使用习惯排序，不另增分组标题或模式。
 
-右侧键帽由共用 Shortcut 渲染，一个 `<kbd>` 容纳完整快捷键组合（如 `⌘T`、`⌘⇧T`、`⌘↵`、`Ctrl+↵`），Mod 按平台显示 Command 或 Control。仅展示已支持的快捷键；非当前标签页操作不展示浏览器 Close/Reload 快捷键，原生 popup 中也隐藏这两个快捷键，避免指向错误目标。ActionMenu 使用相同绑定匹配执行动作，编辑器 Save 保留 Cmd/Ctrl+Enter。`describeShortcut` 将符号和文字组合展开为真实按键名称（如 `Shift + Command + P`），供候选项／菜单键帽的 title 与 aria-label、设置说明及底栏按钮悬浮提示复用；可见键帽保持紧凑，不改变绑定。
+右侧键帽由共用 Shortcut 渲染，一个 `<kbd>` 容纳完整快捷键组合（如 `⌘T`、`⌘⇧T`、`⌘↵`、`Ctrl+↵`），Mod 按平台显示 Command 或 Control。仅展示已支持的快捷键；非当前标签页操作不展示浏览器 Close/Reload 快捷键，原生 popup 中也隐藏这两个快捷键，避免指向错误目标。ActionMenu 使用相同绑定匹配执行动作。`describeShortcut` 将符号和文字组合展开为真实按键名称（如 `Shift + Command + P`），供候选项／菜单键帽的 title 与 aria-label、设置说明及底栏按钮悬浮提示复用；可见键帽保持紧凑，不改变绑定。
 
 标签页、书签与最近标签切换器使用共用 Favicon，读取 Chrome 扩展 `_favicon` 缓存资源；manifest 声明 favicon 权限及网页浮层所需的资源访问。内部页面、加载失败或加载完成前显示现有类型图标，不请求第三方图标服务。快捷键区域不收缩，长标题截断，保持窄窗口下可见。
 
@@ -190,23 +188,19 @@ source 是本次唤起绑定的来源标签页，网页浮层、action popup 与
 
 ## 列表与设置键盘一致性
 
-设置保留 56px 顶部区域，复用搜索图标、输入胶囊和聚焦样式，提供「搜索设置」输入框。`settingsSearch.ts` 从两份语言包的名称、说明、分区名和别名建立本地索引，不区分大小写、空白分词后按 AND 字面匹配；空输入展示全部，未命中行不渲染，空分区隐藏，文字使用 `HighlightedText` 且关闭拼写容错，与筛选语义一致。无结果显示状态和清空按钮，清空后聚焦输入框。普通进入聚焦搜索，主搜索直达仍聚焦指定控件；Tab / Shift+Tab 按 DOM 顺序只遍历可见控件，搜索框的 Enter 不执行设置操作。搜索输入标记 `data-back-on-empty`，沿用统一 Esc / Backspace 返回路由。脚本库返回设置时保留筛选词并恢复原入口焦点和可见位置。使用共享 PaletteFooter 在底部左侧显示返回按钮与 Settings／设置标题，正文按「通用（General）」「键盘（Keyboard）」「实验性功能（Experimental Features）」分为三个独立纯白圆角模块卡片，卡片上方为带 14px 单色图标的弱化模块标题，卡片内部各项以独立设置行与轻分隔线上下排列：语言与主题共用通用卡片，名称／说明在左，等宽选择框在右，极窄空间允许换行；键盘卡片两行左侧以纯文案陈述功能名称与作用，右侧统一以单个 `<kbd>` 键帽（面板与 Tab Switcher 均读取 Chrome 实际绑定，未绑定显示本地化「未绑定」；title 与 aria-label 展开当前按键名称）加动作按钮呈现；自动收起、搜索排序和脚本收藏共用实验性功能卡片，说明控制在单行内，设置页正文操作按钮借鉴 Chromium WebUI `cr-button` 的视觉语言，按紧凑面板适配为 32px 高、100px 胶囊圆角、12px 横向内边距、透明底与主题色文字，500 字重；hover／active 使用轻量状态底色，保留共用焦点轮廓与禁用态。下拉框使用 160px 宽、32px 高、8px 圆角的透明底矩形字段，内侧焦点轮廓；菜单间隔 4px、圆角 8px，选项最小高度 32px，13px 字号与触发器一致，选中项通过勾选与 500 字重标识，键盘／鼠标高亮使用柔和蓝色。展开方向按实际菜单内容高度与正文剩余空间选择，空间不足时菜单内部滚动。正文上下留白 8px／12px、水平 16px，卡片内侧水平 12px，行上下 8px、最小高度 48px；模块标题上方 12px（首模块为 0）、下方 4px；说明可换行，窄屏控件换行后靠右；开关以 32px 点击区域承载 26×16px 轨道，关闭／开启分别使用 8px／12px 滑块，两种状态都有 hover／active 反馈。返回与清空继续使用紧凑图标按钮。这些是本项目对 Chrome 外观的适配，不等同于直接使用 Chrome 私有 WebUI 控件。各控件保留独立标签和原搜索直达焦点，分区不引入额外模式或折叠层。设置行统一使用「Tab Switcher」术语，Ctrl+Tab 说明明确通过一次性配置片段设置 VSCode 风格的最近标签切换；自动收起标题使用「Auto Tuck Tabs / 自动收起标签页」，具体闲置触发条件留在说明中。设置名称没有点击动作时使用普通指针，只有关联开关的 `label[for]` 保留手形；键帽 title 与 aria-label 展开实际按键名称和用途，面板快捷键跟随 Chrome 实际绑定，Ctrl+Tab 配置入口不声称已绑定。设置底栏标题后以 `context` 固定显示 `Tab 下一个 · Shift+Tab 上一个`（英文 `Tab Next · Shift+Tab Previous`），常用 Tab 在前，每组按键与动作靠近、组间以圆点分隔；设置标题与提示沿用共用留白规则，不使用页面特例或添加竖线，悬浮说明向前／向后移动控件焦点，与列表的选择提示区分；全项目统一一个 `kbd` 对应一个快捷键组合，沿用弱化无框样式。窄屏仍保留这条设置提示。
+设置保留 56px 顶部区域，复用搜索图标、输入胶囊和聚焦样式，提供「搜索设置」输入框。`settingsSearch.ts` 从两份语言包的名称、说明、分区名和别名建立本地索引，不区分大小写、空白分词后按 AND 字面匹配；空输入展示全部，未命中行不渲染，空分区隐藏，文字使用 `HighlightedText` 且关闭拼写容错，与筛选语义一致。无结果显示状态和清空按钮，清空后聚焦输入框。普通进入聚焦搜索，主搜索直达仍聚焦指定控件；Tab / Shift+Tab 按 DOM 顺序只遍历可见控件，搜索框的 Enter 不执行设置操作。搜索输入标记 `data-back-on-empty`，沿用统一 Esc / Backspace 返回路由。Ctrl+Tab 配置指南返回设置时保留筛选词并恢复原入口焦点和可见位置。使用共享 PaletteFooter 在底部左侧显示返回按钮与 Settings／设置标题，正文按「通用（General）」「键盘（Keyboard）」「实验性功能（Experimental Features）」分为三个独立纯白圆角模块卡片，卡片上方为带 14px 单色图标的弱化模块标题，卡片内部各项以独立设置行与轻分隔线上下排列：语言与主题共用通用卡片，名称／说明在左，等宽选择框在右，极窄空间允许换行；键盘卡片两行左侧以纯文案陈述功能名称与作用，右侧统一以单个 `<kbd>` 键帽（面板与 Tab Switcher 均读取 Chrome 实际绑定，未绑定显示本地化「未绑定」；title 与 aria-label 展开当前按键名称）加动作按钮呈现；自动收起和搜索排序共用实验性功能卡片，说明控制在单行内，设置页正文操作按钮借鉴 Chromium WebUI `cr-button` 的视觉语言，按紧凑面板适配为 32px 高、100px 胶囊圆角、12px 横向内边距、透明底与主题色文字，500 字重；hover／active 使用轻量状态底色，保留共用焦点轮廓与禁用态。下拉框使用 160px 宽、32px 高、8px 圆角的透明底矩形字段，内侧焦点轮廓；菜单间隔 4px、圆角 8px，选项最小高度 32px，13px 字号与触发器一致，选中项通过勾选与 500 字重标识，键盘／鼠标高亮使用柔和蓝色。展开方向按实际菜单内容高度与正文剩余空间选择，空间不足时菜单内部滚动。正文上下留白 8px／12px、水平 16px，卡片内侧水平 12px，行上下 8px、最小高度 48px；模块标题上方 12px（首模块为 0）、下方 4px；说明可换行，窄屏控件换行后靠右；开关以 32px 点击区域承载 26×16px 轨道，关闭／开启分别使用 8px／12px 滑块，两种状态都有 hover／active 反馈。返回与清空继续使用紧凑图标按钮。这些是本项目对 Chrome 外观的适配，不等同于直接使用 Chrome 私有 WebUI 控件。各控件保留独立标签和原搜索直达焦点，分区不引入额外模式或折叠层。设置行统一使用「Tab Switcher」术语，Ctrl+Tab 说明明确通过一次性配置片段设置 VSCode 风格的最近标签切换；自动收起标题使用「Auto Tuck Tabs / 自动收起标签页」，具体闲置触发条件留在说明中。设置名称没有点击动作时使用普通指针，只有关联开关的 `label[for]` 保留手形；键帽 title 与 aria-label 展开实际按键名称和用途，面板快捷键跟随 Chrome 实际绑定，Ctrl+Tab 配置入口不声称已绑定。设置底栏标题后以 `context` 固定显示 `Tab 下一个 · Shift+Tab 上一个`（英文 `Tab Next · Shift+Tab Previous`），常用 Tab 在前，每组按键与动作靠近、组间以圆点分隔；设置标题与提示沿用共用留白规则，不使用页面特例或添加竖线，悬浮说明向前／向后移动控件焦点，与列表的选择提示区分；全项目统一一个 `kbd` 对应一个快捷键组合，沿用弱化无框样式。窄屏仍保留这条设置提示。
 
-脚本收藏与运行选择复用 `ScriptList` 的搜索、行呈现与导航：固定 `.search-bar`、独立滚动 `.results`、40px `.result`、26px 图标槽及 `.entry-copy` 单行名称，按名称过滤并高亮。共享行样式不要求共享列表宽度：收藏左侧为较窄选择列表，右侧实时显示选中项的只读代码预览与基本信息；运行选择保持全宽列表。预览信息只使用实际名称与内容类型 JavaScript，不虚构存储中没有的创建／修改时间、复制次数或标签。列表与预览各自滚动，搜索与底栏保持固定；≤520px 时列表在上、预览在下，仍独立滚动，不隐藏预览。
-
-搜索输入以 `combobox`、`aria-controls` 和 `aria-activedescendant` 关联 `listbox`／`option`；候选行不逐项加入 Tab 焦点。两页以 `useResultSelection` 按脚本 ID 保持选中身份，鼠标点击或右键先同步选择，进入下一层前保存搜索选区；返回后恢复输入焦点、选区并使选中项可见。收藏单击只更新选择和预览，悬停不改变选择；方向键与 Ctrl+N/P 等列表导航同步更新预览。查询或数据改变导致目标消失时沿用共享选择回退规则。主搜索从任意二级页面返回、标签组从编辑或菜单返回时，同样使原选中项重新进入视口。
-
-脚本收藏的普通 Enter 与底栏主操作均复制选中脚本的代码，无结果时禁用；行点击只选择预览，不复制、编辑或运行。底栏次要操作「新建脚本」与 Cmd/Ctrl+Shift+N 共用新建入口；≤520px 时通过 secondary.icon 显示加号按钮，保留完整可访问名称和含快捷键的悬浮说明，菜单中仍可检索新建；避免与 Windows/Linux 的 Ctrl+N 列表导航冲突。右键候选项、底栏「操作」或 Cmd/Ctrl+K 打开同一动作集合：编辑、复制代码、新建及删除，删除仍经默认聚焦取消的确认框；内置 Ctrl+Tab 项以「查看配置说明」替代编辑，不可修改、删除或直接运行。进入配置说明时聚焦底栏「复制并打开」主操作，点击与 Enter 共用先复制、成功后打开 Chrome 快捷键页并保留说明的流程；普通网页浮层通过 host 提供的 `BindingNavigation` 在配置说明挂载期间暂停隐藏销毁，保留原 Settings／配置上下文；允许反复切换标签页，返回设置／脚本列表或卸载说明时恢复正常规则，持久标签页直接保留，工具栏 action popup 和 `#window=` 独立面板在跳转前由后台在来源窗口创建或复用非激活的 `popup.html#binding` 说明标签页，避免失焦销毁说明，菜单单独打开快捷键页沿用此策略；复制失败留在原页，返回或切换内容后忽略旧复制请求的后续导航。配置代码为填入当前扩展 ID 的一行命令，一次设置正反向绑定，仍须用户在 Chrome Console 显式执行；说明层菜单保留单独复制代码与打开 Chrome 快捷键页。名称＋代码表单保留 Cmd/Ctrl+Enter 保存、普通 Enter 编辑和菜单关闭后的字段选区恢复。列表与预览的组织方式以用户提供的 Raycast Snippets 截图为参考，相关产品说明见 [Raycast Snippets](https://manual.raycast.com/snippets)；这次契约修订取代点击即编辑的方案，不据此声称此前已有预览实现或验收。不引入自动展开、自动执行、标签或同步。
-
-脚本运行选择的行点击、普通 Enter 与底栏主操作均显式运行一次。两个脚本列表支持 ↑/↓、无其他修饰键的 Ctrl+N/P、按可见高度的 PageUp／PageDown 或 Alt+↑/↓ 翻页，以及 Cmd/Ctrl+↑/↓ 首尾跳转；Shift 保留文本选区语义。带修饰键、长按重复及输入法组合的 Enter 不触发复制／执行；保存快捷键是明确例外。设置下拉框同样支持 Ctrl+N/P，Esc 关闭后保留触发控件焦点。根面板 Tab 遍历排除 inert、禁用及 tabIndex 为负的控件，弹层背后的输入框不参与焦点循环。
+主搜索从任意二级页面返回、标签组从编辑或菜单返回时，使原选中项重新进入视口。设置下拉框支持 Ctrl+N/P，Esc 关闭后保留触发控件焦点。根面板 Tab 遍历排除 inert、禁用及 tabIndex 为负的控件，弹层背后的输入框不参与焦点循环。
 
 快捷键启动的 Tab Switcher 默认禁用输入框并聚焦列表，通过搜索图标按钮、输入区域外层 `pointerdown` 或标准 Ctrl/Cmd+F 显式启用搜索，暂停本次会话的修饰键松开确认；初始列表聚焦不触发此状态。进入搜索后可松开启动修饰键正常输入，用普通 Enter、行点击或底栏主操作确认；再次点击搜索图标或按 Ctrl/Cmd+F 都恢复输入焦点。独立窗口加载期间的导航按原始按键语义与重复启动步骤依次缓冲，列表挂载后按实际可见高度重放翻页，再处理已缓冲的松键。`recentSearch.ts` 在本次会话的来源窗口候选内按标题／URL 筛选：不区分大小写，空白分词后按 AND 匹配，保留 MRU。查询变化保留仍可见的选中标签，否则选首项；选中标签被关闭或移走时，仅在源页仍可见时回退到源页，否则保持无选择，直到导航、点击或修改查询。无匹配或无选择时，Enter、松键与底栏主操作均不激活标签页。输入框控制列表，↑/↓、Ctrl+P/N、Tab / Shift+Tab 循环选择，PageUp/PageDown 或 Alt+↑/↓ 翻页，Ctrl/Cmd+↑/↓ 跳首尾，选中项滚动到可见区域。所有带修饰键、重复、输入法组合或 `keyCode === 229` 的 Enter 均不执行；普通 Enter 确认当前选择，未进入搜索时松开启动修饰键也可确认。
 
-## 脚本执行结果操作
+## Ctrl+Tab 配置指南
 
-成功结果以「复制结果」为底栏主操作，失败以「重新运行」为主操作；Cmd/Ctrl+K 菜单列出当前可用的复制与重新运行动作，底栏跟随菜单选中项。执行中禁用主操作和菜单，重复 Enter 或带修饰键 Enter 不再次执行。正文保留脚本名称、目标站点、结果、执行状态、错误说明及权限引导；底栏显示返回、结果层名称及「结果仅保留在当前面板」上下文。复制成功或失败在底栏 `status` 原位替换上下文，不另加反馈行；复制失败以 alert 提示并保留结果以便重试。
+`BindingGuide` 独立承载只读 Ctrl+Tab 配置说明，由设置页「键盘 → Tab Switcher」与 `popup.html#binding` 复用；主搜索以仅搜索可见的 `settings:binding` 入口（标题使用 `bindCtrlTab`，别名含 Ctrl+Tab／bind Ctrl+Tab／设置 Ctrl+Tab）打开 Settings 并聚焦配置控件。它不依赖脚本收藏、已保存脚本或 UserScript 执行接口，不提供创建、编辑、删除或运行任意代码的入口。脚本收藏、运行选择和执行结果页面及相应搜索、设置入口、执行接口与 `userScripts` 权限已移除，决策见 [ADR 0017](adr/0017-remove-script-library.md)。
 
-菜单统一使用搜索高亮、Ctrl+N/P、Tab 焦点约束和 BackLayer 返回。关闭菜单恢复原控件及结果文本选区；执行完成聚焦底栏主操作，结果文本仍支持原生选中/复制。重新运行保留既有运行模式（包括自动复制），执行与复制回调校验当前运行版本；返回选择页后的旧结果不得覆盖界面或自动复制。结果仍只存当前面板，后台接口、权限与存储结构不变。
+指南复用 `PaletteFooter`、`ActionMenu` 与 `BackLayer`，没有独立标题栏或搜索框。进入时聚焦底栏「复制并打开」主操作，点击与普通 Enter 共用先复制、成功后打开 Chrome 快捷键页的流程；菜单提供单独「复制代码」和「打开 Chrome 快捷键页」，沿用搜索高亮、Ctrl+N/P、Tab 焦点约束及逐层返回。复制反馈显示在底栏 status；复制失败留在原页，返回或卸载后忽略旧复制请求的后续导航。带修饰键、长按重复及输入法组合的 Enter 不触发主操作。
+
+配置代码为填入当前扩展 ID 的一行命令，一次设置正反向绑定，仍须用户在 Chrome 快捷键页 Console 显式粘贴执行，扩展不代为运行。普通网页浮层通过 host 提供的 `BindingNavigation` 在指南挂载期间暂停隐藏销毁，保留原 Settings／配置上下文，允许反复切走和切回；返回设置或卸载指南时恢复正常规则。持久标签页直接保留；工具栏 action popup 和 `#window=` 独立面板在跳转前，由后台在来源窗口创建或复用非激活的 `popup.html#binding` 说明标签页，避免失焦销毁说明。菜单单独打开快捷键页沿用相同策略。返回设置恢复筛选词、入口焦点与可见位置，指南例外不改变其他页面的生命周期或定位。
 
 ## 内置使用帮助
 
@@ -231,7 +225,6 @@ source 是本次唤起绑定的来源标签页，网页浮层、action popup 与
 - 页面内容脚本使用隔离的 Shadow DOM 和原生 modal dialog，在浏览器 top layer 中显示；内部空白沙箱框架隔离键盘事件，兼容 Vimium 的字母快捷键和 Esc。框架不加载外部页面或执行脚本，UI 仍由原内容脚本渲染。
 - Service worker 负责读取浏览器状态和执行命令。每次执行会重新核对标签页所属窗口、当前位置与固定 / 静音状态。
 - `activeTab`、`scripting`：仅用户唤起时注入命令面板。
-- `userScripts`：用户主动选择已保存脚本时，在隔离的 USER_SCRIPT 环境运行一次；不注册自动执行脚本。执行前核对当前页面，并绑定具体文档，防止导航期间误在新页面执行。
 - `tabs`：读取标签页标题、URL、状态并执行标签管理。
 - `contextMenus`：仅向扩展图标的 `action` 菜单添加快捷键修改与帮助入口；菜单外观和分组由 Chrome 控制，不增加网站访问权限。
 - `bookmarks`：读取原生书签供搜索；用户显式收藏／取消收藏标签页时创建或删除精确 URL 的书签，从书签结果取消收藏时只删除所选 `bookmarkId`。复用既有权限，原生书签同步由 Chrome 设置控制。
@@ -239,7 +232,7 @@ source 是本次唤起绑定的来源标签页，网页浮层、action popup 与
 - `cookies`：读取 Cookie，包含 HttpOnly；不增删或修改 Cookie。
 - `content_scripts.matches`：普通 HTTP(S) 页面及其匹配子框架预加载轻量修饰键监听，只在内存保存 Control/Alt/Meta 状态，按需转发松键；不记录输入文字、不拦截网页快捷键、不上传数据。未增加全站 `host_permissions`，Cookie 仍逐站授权。
 - `optional_host_permissions`：声明可按需申请 HTTP(S) 网站权限；首次查看 Cookies 时只请求授权页列出的具体域名，不预先授予所有网站访问权。
-- `storage`：仅在本机保存语言、主题偏好、脚本收藏及搜索选择记录，不使用云端同步。搜索记录最多 500 条，90 天未使用的记录不再参与排序，并在下次记录时清理；频次权重每 14 天减半，让新习惯逐渐取代旧习惯。
+- `storage`：仅在本机保存语言、主题偏好及搜索选择记录，不使用云端同步。搜索记录最多 500 条，90 天未使用的记录不再参与排序，并在下次记录时清理；频次权重每 14 天减半，让新习惯逐渐取代旧习惯。
 
 ## 标签组
 
@@ -252,7 +245,7 @@ source 是本次唤起绑定的来源标签页，网页浮层、action popup 与
 
 ## 鼠标与键盘混用（2026-10-16）
 
-Command Palette、标签组管理页（`TabGroupView`）、页面存储列表（`StorageView`）、脚本收藏（`ScriptLibrary`）及收起恢复页（`TuckRecoveryView`）的候选项右键均直接打开该项的共享操作菜单，选中项与菜单目标同时更新；关闭菜单恢复原列表焦点，有搜索框时恢复搜索词与选区，继续支持 Ctrl+N/P。与底栏和 Cmd+K 使用相同动作集合、图标、中英跨语言关键词及危险操作红色提示。`StorageView` 与脚本收藏一致，单击候选项只选择并更新右侧只读 value 预览，悬停不改变选择；普通 Enter 或底栏「复制值」复制原始字符串，双击或从操作菜单进入详情。
+Command Palette、标签组管理页（`TabGroupView`）、页面存储列表（`StorageView`）及收起恢复页（`TuckRecoveryView`）的候选项右键均直接打开该项的共享操作菜单，选中项与菜单目标同时更新；关闭菜单恢复原列表焦点，有搜索框时恢复搜索词与选区，继续支持 Ctrl+N/P。与底栏和 Cmd+K 使用相同动作集合、图标、中英跨语言关键词及危险操作红色提示。`StorageView` 单击候选项只选择并更新右侧只读 value 预览，悬停不改变选择；普通 Enter 或底栏「复制值」复制原始字符串，双击或从操作菜单进入详情。
 
 收起恢复核对保留成员详情卡片，点击卡片只选择候选组；底栏或菜单的「继续管理这组」才显式确认接管。底栏显示返回、恢复核对层名与记录名称，菜单开启时返回仅关闭菜单。此页不强加搜索框或压成 40px 单行，需让用户核对成员；无候选时焦点落在底栏返回控件，停止恢复仅删除记录的行为保持不变。
 

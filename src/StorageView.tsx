@@ -207,7 +207,7 @@ function StorageValue({ entry, preview = false }: { entry: StorageEntry; preview
     content={{ id: entry.id, value: formatted, label: t('storageValue'), placeholder: t('storageEmptyValue') }}
     information={[
       { label: 'Key', value: entry.name || t('storageEmptyName') },
-      { label: t('scriptContentType'), value: json ? 'JSON' : 'Text' },
+      { label: t('previewContentType'), value: json ? 'JSON' : 'Text' },
       ...metadata,
     ]} />;
   return <>

@@ -32,7 +32,7 @@ test('explicit empty queries learn home pages and reject unsupported blank-query
   assert.deepEqual(new Set(normalizeUsage(history, now).map(record => record.query)), new Set(['']));
   assert.equal(queryUsage(history, '', now).get('tab:https://example.com'), 2);
   assert.equal(queryUsage(history, 'example', now).size, 0);
-  for (const target of ['', 'tab:', 'bookmark:', 'command:', 'script:one', 'unknown']) {
+  for (const target of ['', 'tab:', 'bookmark:', 'command:', 'unsupported:one', 'unknown']) {
     assert.deepEqual(addUsage([], '', target, now), []);
   }
 });
@@ -96,9 +96,9 @@ test('home learns mixed page and command order while retaining safe defaults and
   const before = items.map(item => item.id);
   const learned = homeEntries(items, new Map([['command:mute', 5], ['command:pin', 3], ['command:closeOthers', 100], ['tab:https://example.com/7', 100]]));
   assert.equal(learned[0].id, 'tab:8');
-  assert.deepEqual(learned.slice(1).map(item => item.action), ['pin', 'settings', 'help', 'tabSwitcher', 'scriptLibrary', 'newTab', 'reload', 'localStorage', 'cookies']);
+  assert.deepEqual(learned.slice(1).map(item => item.action), ['pin', 'settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'localStorage', 'cookies']);
   assert.equal(learned[1].title, 'Unpin Tab');
-  assert.ok(learned.slice(1).every(item => item.tabId === 3 || ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'localStorage', 'cookies'].includes(item.action)));
+  assert.ok(learned.slice(1).every(item => item.tabId === 3 || ['settings', 'help', 'tabSwitcher', 'localStorage', 'cookies'].includes(item.action)));
   assert.deepEqual(items.map(item => item.id), before);
   assert.deepEqual(homeEntries(items, commandUsage([], now)), original);
 });

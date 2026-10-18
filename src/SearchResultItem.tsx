@@ -2,7 +2,7 @@ import { useRef, type ComponentProps } from 'react';
 import type { RankingInfo } from './usage';
 import { RankingButton } from './RankingButton';
 import {
-  BookOpen, Code, Copy, Pencil, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
+  BookOpen, Copy, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
   Layers, Pin, Plus, RotateCcw, Puzzle, KeyRound, Download, History, Keyboard,
   Settings2, Volume2, VolumeX, X, PanelTop,
 } from 'lucide-react';
@@ -17,7 +17,7 @@ import { t, countMessage } from './i18n';
 import type { Entry, IconName } from './types';
 
 const icons = { copy: Copy, help: BookOpen, extension: Puzzle, password: KeyRound, download: Download, history: History, keyboard: Keyboard, tab: PanelTop, bookmark: Bookmark, plus: Plus, reload: RotateCcw, close: X,
-  others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, script: Code, edit: Pencil, tuck: ArrowDownToLine };
+  others: Layers, right: ArrowRight, restore: RotateCcw, pin: Pin, volume: Volume2, settings: Settings2, database: Database, cookie: Cookie, tuck: ArrowDownToLine };
 export function EntryGlyph({ name, size = 18 }: { name: IconName; size?: number }) {
   const Icon = icons[name]; return <Icon size={size} strokeWidth={1.7} aria-hidden="true" />;
 }

@@ -12,7 +12,7 @@ ADR 解释“为什么这样做”，保留背景、决策、备选方案和接�
 | 0002 | [共用操作组件与逐层返回](0002-shared-actions-and-navigation.md) | 已采纳 |
 | 0003 | [统一搜索、相关性优先与本机学习](0003-unified-search-and-local-learning.md) | 已采纳 |
 | 0004 | [只读页面存储与逐网站 Cookie 授权](0004-page-storage-permissions.md) | 已采纳 |
-| 0005 | [主动运行保存的脚本并隔离结果](0005-explicit-user-script-execution.md) | 已采纳 |
+| 0005 | [主动运行保存的脚本并隔离结果](0005-explicit-user-script-execution.md) | 已被 0017 替代；配置指南独立保留 |
 | 0006 | [标签切换浮层与独立窗口兜底](0006-recent-tab-switcher.md) | 已采纳 |
 | 0007 | [实时快照、局部复用与延迟加载提示](0007-refresh-and-loading.md) | 已采纳 |
 | 0008 | [原生标签组收起与持久恢复](0008-native-tab-tucking.md) | 已采纳 |
@@ -24,6 +24,7 @@ ADR 解释“为什么这样做”，保留背景、决策、备选方案和接�
 | 0014 | [最近一周历史混搜与显式全部时间搜索](0014-history-search.md) | 已采纳 |
 | 0015 | [原生标签页收藏与明确取消范围](0015-native-tab-bookmarks.md) | 已采纳；补充书签结果仅删除所选 ID |
 | 0016 | [来源页删除即结束面板](0016-source-close-ends-palette.md) | 已采纳；部分替代 0012，承载与定位不变 |
+| 0017 | [移除脚本收藏与 UserScript，独立保留快捷键配置指南](0017-remove-script-library.md) | 已采纳；替代 0005，部分更新 0002／0003／0009 |
 
 ## 维护方式
 

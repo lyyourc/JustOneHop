@@ -7,7 +7,7 @@ import { matchingSettings, type SettingRow } from './settingsSearch';
 import { PaletteFooter } from './PaletteFooter';
 import { describeShortcut } from './Shortcut';
 import type { SettingsSection } from './types';
-import { ScriptLibrary } from './ScriptLibrary';
+import { BindingGuide } from './BindingGuide';
 import { HelpView } from './HelpView';
 import { systemLanguage, t } from './i18n';
 import { savePreferences, type Preferences } from './preferences';
@@ -84,7 +84,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   initialSection?: SettingsSection; preferences: Preferences; shortcut: string; tabSwitcherShortcut: string; onBack: () => void; onClose: () => void; isMac: boolean; onRankingReset?: () => void;
 }) {
   const back = useNavigateBack();
-  const [library, setLibrary] = useState<'all' | 'binding' | null>(null);
+  const [bindingOpen, setBindingOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [error, setError] = useState(false);
   const [rankingReset, setRankingReset] = useState<'idle' | 'busy' | 'done'>('idle');
@@ -100,19 +100,19 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const paletteHotkeyHelp = `${shortcut ? describeShortcut(shortcut) : t('notAssigned')} — ${t('paletteHotkey')}. ${t('hotkeyHint')}`;
   const bindingHelp = `${tabSwitcherShortcut ? describeShortcut(tabSwitcherShortcut) : t('notAssigned')} — ${t('bindingHint')}`;
   const highlight = (text: string) => <HighlightedText text={text} query={query} allowTypos={false} />;
-  function openLibrary(mode: 'all' | 'binding') {
-    returnTo.current = mode === 'all' ? 'scripts' : 'binding';
+  function openBinding() {
+    returnTo.current = 'binding';
     scrollTop.current = body.current?.scrollTop ?? 0;
-    setLibrary(mode);
+    setBindingOpen(true);
   }
   function clearSearch() { setQuery(''); input.current?.focus(); }
   useLayoutEffect(() => {
-    if (library || helpOpen) return;
+    if (bindingOpen || helpOpen) return;
     const target = returnTo.current && body.current?.querySelector<HTMLElement>(`[data-setting="${returnTo.current}"] button`);
     if (body.current) body.current.scrollTop = scrollTop.current;
     if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'nearest' }); }
     else input.current?.focus();
-  }, [library, helpOpen]);
+  }, [bindingOpen, helpOpen]);
   async function change(patch: Partial<Preferences>) {
     setError(false);
     try { await savePreferences(patch); } catch { setError(true); }
@@ -132,7 +132,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
     try { await resetSearchRanking(); onRankingReset?.(); setRankingReset('done'); }
     catch { setError(true); setRankingReset('idle'); }
   }
-  return <BackLayer onBack={onBack}>{helpOpen ? <HelpView shortcut={shortcut} onBack={() => setHelpOpen(false)} /> : library ? <ScriptLibrary initialBinding={library === 'binding'} onBack={() => setLibrary(null)} onClose={onClose} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
+  return <BackLayer onBack={onBack}>{helpOpen ? <HelpView shortcut={shortcut} onBack={() => setHelpOpen(false)} /> : bindingOpen ? <BindingGuide onBack={() => setBindingOpen(false)} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
     <header className="search-bar settings-search">
       <span className="search-icon"><Search size={20} /></span>
       <input ref={input} data-back-on-empty aria-label={t('searchSettings')} placeholder={t('searchSettingsPlaceholder')}
@@ -179,10 +179,10 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
           </div> : null}
           {matches.has('binding') ? <div className="setting-row" data-setting="binding"><div className="setting-copy"><label>{highlight(t('ctrlTabSetting'))}</label><p>{highlight(t('bindingHint'))}</p></div>
             <div className="hotkey-controls"><kbd className="hotkey-value" title={bindingHelp} aria-label={bindingHelp}>{tabSwitcherShortcut || t('notAssigned')}</kbd>
-              <button className="ranking-reset" onClick={() => openLibrary('binding')}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
+              <button className="ranking-reset" onClick={() => openBinding()}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
         </div>
       </> : null}
-      {matches.has('tabs') || matches.has('ranking') || matches.has('scripts') ? <>
+      {matches.has('tabs') || matches.has('ranking') ? <>
         <h2><FlaskConical size={14} />{highlight(t('experimentalFeatures'))}</h2>
         <div className="settings-group settings-experiments">
           {matches.has('tabs') ? <div data-setting="tabs">
@@ -198,8 +198,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
               <button className="ranking-reset" onClick={() => void resetRanking()} aria-disabled={rankingReset === 'busy'}>{highlight(t('resetSearchRanking'))}</button>
             </div>
           </div> : null}
-          {matches.has('scripts') ? <div className="setting-row" data-setting="scripts"><div className="setting-copy"><label>{highlight(t('scriptLibrary'))}</label><p>{highlight(t('scriptLibraryHint'))}</p></div>
-            <button className="ranking-reset" onClick={() => openLibrary('all')}>{highlight(t('manageScripts'))}</button></div> : null}
         </div>
       </> : null}
       {!matches.size ? <div className="empty"><Search size={26} /><strong role="status">{t('noResults')}</strong>

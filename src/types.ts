@@ -69,11 +69,7 @@ export interface StorageEntry {
   cookie?: Pick<chrome.cookies.Cookie, 'domain' | 'path' | 'secure' | 'httpOnly' | 'sameSite' | 'session' | 'expirationDate' | 'partitionKey'>;
 }
 export interface PageStorage { kind: StorageKind; url: string; entries: StorageEntry[] }
-export interface ScriptRun { scriptId: string; tabId: number; windowId: number; expectedUrl: string }
-export interface ScriptResult { success: boolean; text: string }
 export type Request =
-  | { source: 'zing'; type: 'run-saved-script'; payload: ScriptRun }
-  | { source: 'zing'; type: 'open-script-settings' }
   | { source: 'zing'; type: 'snapshot' }
   | { source: 'zing'; type: 'search-history'; payload: { query: string; scope: 'week' | 'all' } }
   | { source: 'zing'; type: 'palette-state' }
@@ -85,21 +81,21 @@ export type Request =
   | { source: 'zing'; type: 'forget-usage'; payload: { target: string | string[]; query?: string } }
   | { source: 'zing'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
-export type IconName = 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'script' | 'edit' | 'tuck';
-export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'ranking' | 'tabs';
+export type IconName = 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'tuck';
+export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'binding' | 'ranking' | 'tabs';
 export interface Entry {
-  category?: 'tabGroup' | 'tab' | 'script' | 'storage' | 'settings' | 'chromePages' | 'zing';
+  category?: 'tabGroup' | 'tab' | 'storage' | 'settings' | 'chromePages' | 'zing';
   shortcut?: string;
   faviconPageUrl?: string;
   url?: string;
   lastVisitTime?: number;
   id: string;
-  kind: 'command' | 'tab' | 'bookmark' | 'history' | 'script';
+  kind: 'command' | 'tab' | 'bookmark' | 'history';
   title: string;
   subtitle: string;
   keywords: string;
   icon: IconName;
-  action: ActionId | 'copyUrl' | 'settings' | 'help' | 'tabSwitcher' | 'searchAllHistory' | StorageAction | 'copyScript' | 'editScript' | 'deleteScript' | 'newScript' | 'scriptLibrary' | 'runScript' | 'runCopyScript' | 'reviewTuck' | 'manageGroup';
+  action: ActionId | 'copyUrl' | 'settings' | 'help' | 'tabSwitcher' | 'searchAllHistory' | StorageAction | 'reviewTuck' | 'manageGroup';
   settingsSection?: SettingsSection;
   recoveryId?: string;
   groupId?: number;
@@ -108,7 +104,6 @@ export interface Entry {
   groupColor?: chrome.tabGroups.TabGroup['color'];
   aliases?: string[];
   searchOnly?: boolean;
-  scriptId?: string;
   tabId?: number;
   bookmarkId?: string;
   expectedUrl?: string;

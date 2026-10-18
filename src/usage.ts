@@ -19,7 +19,7 @@ export function usageTarget(entry: Entry): string {
   if (entry.kind !== 'command') return '';
   if (entry.action === 'settings') return settingsUsageTarget(entry.settingsSection);
   // Only actions with a successful-execution recording path can learn.
-  if (['help', 'tabSwitcher', 'manageGroup', 'reviewTuck', 'runScript', 'runCopyScript', 'newScript', 'scriptLibrary', 'reloadExtension', 'searchAllHistory'].includes(entry.action)) return '';
+  if (['help', 'tabSwitcher', 'manageGroup', 'reviewTuck', 'reloadExtension', 'searchAllHistory'].includes(entry.action)) return '';
   return `command:${entry.action}`;
 }
 

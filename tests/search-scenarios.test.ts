@@ -58,7 +58,7 @@ const scenarios: [string, string, string[]][] = [
   ['浏览器设置', 'command:openChromeSettings', ['browser settings', '浏览器设置']],
   ['找书签管理', 'command:openBookmarks', ['bookmarks', '打开书签', '书签']],
   ['调整排序', 'command:settings:ranking', ['清除排序', '重置排序', 'reset ranking']],
-  ['脚本入口', 'command:runScript', ['run script', '执行脚本']],
+  ['设置切换快捷键', 'command:settings:binding', ['ctrl tab', '绑定 Ctrl+Tab']],
   ['查看站点数据', 'command:cookies', ['查看 cookie', 'cookies']],
   ['明确关闭意图', 'command:close', ['clo', 'tab clo', '关闭']],
 ];
@@ -168,7 +168,7 @@ test('identical titles remain separate and prefer pinned then open pages before 
 test('case, whitespace and copied category labels do not change command intent', () => {
   const items = entries(snapshot);
   for (const [query, action] of [['  NEW\tTAB  ', 'newTab'], ['Tab：refresh page', 'reload'],
-    ['脚本：new', 'newScript'], ['Chrome Pages：password', 'openPasswords'],
+    ['存储：local', 'localStorage'], ['Chrome Pages：password', 'openPasswords'],
     ['\nGITHUB PULL\n', 'switch']] as const) {
     assert.equal(search(items, query)[0]?.action, action, query);
   }
@@ -225,18 +225,15 @@ test('a page title in an action query does not silently retarget current-tab com
   assert.equal(search(items, 'reload ext')[0]?.action, 'reloadExtension');
 });
 
-test('script names and built-in command intents retain distinct execution identities', () => {
-  const scripts = ['Release helper', 'Settings', 'New Script'].map((title, i) => ({
-    id: `script:${i}`, scriptId: String(i), kind: 'script' as const, category: 'script' as const,
-    action: 'copyScript' as const, icon: 'script' as const, title, subtitle: '', keywords: '',
-  }));
-  const items = [...entries(snapshot), ...scripts];
-  assert.equal(search(items, 'Release helper')[0]?.action, 'copyScript');
+test('bookmark names and built-in command intents retain distinct execution identities', () => {
+  const items = entries({ ...snapshot, bookmarks: ['Release helper', 'Settings', 'New Tab'].map((title, i) => ({
+    id: `named-${i}`, title, url: `https://named.example/${i}`, folder: '',
+  })) });
+  assert.equal(search(items, 'Release helper')[0]?.action, 'openBookmark');
   assert.equal(search(items, 'settings')[0]?.id, 'command:settings');
-  assert.ok(search(items, 'settings').some(item => item.id === 'script:1'));
-  assert.equal(search(items, 'new script')[0]?.id, 'command:newScript');
-  assert.ok(search(items, 'new script').some(item => item.id === 'script:2'));
-  assert.equal(search(items, 'run script')[0]?.id, 'command:runScript');
+  assert.ok(search(items, 'settings').some(item => item.id === 'bookmark:named-1'));
+  assert.equal(search(items, 'new tab')[0]?.id, 'command:newTab');
+  assert.ok(search(items, 'new tab').some(item => item.id === 'bookmark:named-2'));
 });
 
 test('everyday tab actions use the same vocabulary and keep the selected target', () => {

@@ -603,14 +603,14 @@ test('searching zed again after switching tabs retains its learned marker, inclu
 });
 
 test('settings sections learn independently and preserve the generic settings target', async () => {
-  for (const settingsSection of ['language', 'theme', 'keyboard', 'ranking', 'tabs'] as const) {
+  for (const settingsSection of ['language', 'theme', 'keyboard', 'binding', 'ranking', 'tabs'] as const) {
     await perform({ action: 'settings', windowId: 10, settingsSection, query: ' Preferences ' });
     await perform({ action: 'settings', windowId: 10, settingsSection });
   }
   await perform({ action: 'settings', windowId: 10, query: 'preferences' });
   await perform({ action: 'settings', windowId: 10 });
-  assert.equal(usage.length, 12);
-  for (const target of ['command:settings', 'command:settings:language', 'command:settings:theme', 'command:settings:keyboard', 'command:settings:ranking', 'command:settings:tabs']) {
+  assert.equal(usage.length, 14);
+  for (const target of ['command:settings', 'command:settings:language', 'command:settings:theme', 'command:settings:keyboard', 'command:settings:binding', 'command:settings:ranking', 'command:settings:tabs']) {
     assert.deepEqual(usage.filter(record => record.target === target).map(({ query, weight }) => ({ query, weight }))
       .sort((a, b) => a.query.localeCompare(b.query)), [{ query: '', weight: 1 }, { query: 'preferences', weight: 1 }]);
   }

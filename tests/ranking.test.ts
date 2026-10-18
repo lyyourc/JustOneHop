@@ -81,9 +81,7 @@ test('home defaults at the top can be learned without an inaccurate promotion cl
 
 test('unsupported results cannot inherit phantom action preferences', () => {
   const items = entries(snapshot);
-  for (const action of ['help', 'tabSwitcher', 'runScript', 'runCopyScript', 'scriptLibrary', 'newScript', 'reloadExtension']) {
+  for (const action of ['help', 'tabSwitcher', 'reloadExtension']) {
     assert.equal(usageTarget(items.find(item => item.action === action)!), '');
   }
-  const script = { ...items[0], id: 'script:a', kind: 'script' as const, action: 'runScript' as const, scriptId: 'a' };
-  assert.equal(usageTarget(script), '');
 });

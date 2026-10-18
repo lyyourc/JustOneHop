@@ -46,7 +46,7 @@ test('omitted queries and invalid home targets never access storage', async () =
   chrome.storage.local.get = (async () => { reads++; return {}; }) as typeof chrome.storage.local.get;
   await recordUsage(undefined as never, 'tab:first');
   await recordUsage(null as never, 'command:reload');
-  await recordUsage('', 'script:first');
+  await recordUsage('', 'unsupported:first');
   await recordUsage('', 'tab:');
   assert.equal(reads, 0);
   assert.deepEqual(stored, {});

@@ -245,22 +245,19 @@
   "helpStartTitle": { "message": "Open and search" },
   "toolbarShortcut": { "message": "Open zing: $1 · Change shortcut" },
   "helpStartBody": { "message": "Click the zing toolbar icon or press the launch shortcut to open the palette (current: $1). Change the shortcut in Settings → Keyboard, or right-click the toolbar icon to edit the binding or open this guide in a new tab." },
-  "helpSearchBody": { "message": "The empty home shows up to 10 suggested pages and commands based on successful use in zing, with curated commands when there is little history. Recommendations keep their order until the next opening. Search tabs, bookmarks, commands, and settings in one place using English or Chinese keywords, without mode prefixes. Combine page titles, domains, tab groups, or bookmark folders in any order—for example, “new tab”, “reopen last tab”, “scripts”, “theme”, or “downloads”. Browsing history from the past week joins search results. Search All History appears seventh, or at the end of shorter lists, to search all time. A slow history query does not block other results; late replies do not insert rows. Successfully opened history results share preferences with tabs at the same website address. Main search and Search All History apply habits only within the same relevance tier for the same query, show a history icon for remembered preferences. Hover or focus the icon to see why and what will be forgotten; click it to forget. You can also press Shift+Backspace on the selected result. Forgetting affects both history and tab results." },
+  "helpSearchBody": { "message": "The empty home shows up to 10 suggested pages and commands based on successful use in zing, with curated commands when there is little history. Recommendations keep their order until the next opening. Search tabs, bookmarks, commands, and settings in one place using English or Chinese keywords, without mode prefixes. Combine page titles, domains, tab groups, or bookmark folders in any order—for example, “new tab”, “reopen last tab”, “theme”, or “downloads”. Browsing history from the past week joins search results. Search All History appears seventh, or at the end of shorter lists, to search all time. A slow history query does not block other results; late replies do not insert rows. Successfully opened history results share preferences with tabs at the same website address. Main search and Search All History apply habits only within the same relevance tier for the same query, show a history icon for remembered preferences. Hover or focus the icon to see why and what will be forgotten; click it to forget. You can also press Shift+Backspace on the selected result. Forgetting affects both history and tab results." },
   "helpControlsTitle": { "message": "Actions and going back" },
   "helpControlsBody": { "message": "Right-click a result, click Actions in the footer, or press Cmd/Ctrl+K to open actions for the selected item. Lists also support Ctrl+P and Ctrl+N alongside the arrow keys." },
   "helpBackBody": { "message": "Press Esc, click the back arrow, or press Backspace in an empty secondary search field to go back one level with your search and selection restored. At the main search, Esc closes zing." },
   "helpTabsTitle": { "message": "Manage and switch tabs" },
   "helpTabsBody": { "message": "Pin, mute, and close actions apply directly to the selected result and keep the palette open for continuous cleanup; bulk close preserves pinned tabs. Search a tab group’s name to manage its tabs. Choose Zing: Tab Switcher to filter recent tabs inside the palette, then click a row or press Enter to switch; Cancel returns to your search. When launching the switcher with its shortcut, hold the modifier key to select and release to switch; click the search field or press Cmd/Ctrl+F to pause release-to-switch and filter by text instead." },
   "helpTuckBody": { "message": "“Tuck Away Tab” moves a tab into a collapsed group at the end of the window without closing or discarding it; switch to the tab from search anytime to bring it back. Enable “Auto Tuck Tabs” in Settings to automatically tuck tabs unused for 7 days. If a group needs confirmation after a browser restart, search for “recover tucked tabs”." },
-  "helpScriptsTitle": { "message": "Save and run scripts" },
-  "helpScriptsBody": { "message": "Search for “scripts” to manage saved JavaScript snippets: select a script to preview and copy its code, or use Actions to edit, create, or delete it (save with Cmd/Ctrl+Enter). On a target webpage, search the script name or “run script” to run it once; the value of the final expression (including Promises) is shown in the current panel. Scripts never run automatically on page load." },
-  "helpScriptPermissionBody": { "message": "Running scripts requires Chrome 135+ and works on ordinary HTTP/HTTPS webpages. Before first use, enable “Allow user scripts” in Chrome’s zing extension details (or Developer mode on Chrome 135–137)." },
   "helpStorageTitle": { "message": "View website storage" },
   "helpStorageBody": { "message": "Search for “local storage”, “session storage”, or “cookies” on a webpage. Select a key on the left to preview its value on the right; Enter or Copy Value copies the original string. JSON is formatted for reading; storage is read-only. Reading cookies requests permission only for the current site’s domains, which you can revoke anytime in Chrome’s extension settings." },
   "helpQuestionsTitle": { "message": "Common questions" },
   "helpShortcutBody": { "message": "If a shortcut is unassigned or conflicts, open Settings → Keyboard to change it in Chrome’s extension shortcuts page. Due to browser limits, Ctrl+Tab requires one-time manual setup—search for “ctrl tab” for the setup code and steps." },
   "helpWindowBody": { "message": "zing opens as an in-page overlay on ordinary webpages, and automatically falls back to a separate panel or toolbar popup on Chrome internal pages, restricted sites, or when the address bar has focus." },
-  "helpPrivacyBody": { "message": "zing has no account, server, or telemetry. Preferences, saved scripts, and learned search ranking stay on your device; website storage values and script results stay only in the current panel’s memory. Browsing history requires the history permission at installation. zing keeps no persistent copy of the history database; it remembers only search terms and website addresses you explicitly select and successfully open. Reading history or a failed open creates no learning record. Incognito windows do not read ordinary history or record selections." },
+  "helpPrivacyBody": { "message": "zing has no account, server, or telemetry. Preferences and learned search ranking stay on your device; website storage values stay only in the current panel’s memory. Browsing history requires the history permission at installation. zing keeps no persistent copy of the history database; it remembers only search terms and website addresses you explicitly select and successfully open. Reading history or a failed open creates no learning record. Incognito windows do not read ordinary history or record selections." },
   "settings": {
     "message": "Settings"
   },
@@ -513,15 +510,6 @@
   "recentNavigate": {
     "message": "Use ↑/↓, Ctrl+N/P, or click to select · Esc to cancel"
   },
-  "scriptLibrary": {
-    "message": "Script Library"
-  },
-  "scriptLibraryHint": {
-    "message": "Save custom scripts locally and run them on the active page."
-  },
-  "manageScripts": {
-    "message": "Manage Scripts"
-  },
   "bindCtrlTab": {
     "message": "Set Up Ctrl+Tab"
   },
@@ -546,153 +534,28 @@
   "openShortcutPage": {
     "message": "Open Chrome Shortcuts"
   },
-  "copyScript": {
+  "copyBindingCode": {
     "message": "Copy Code"
   },
-  "scriptCopied": {
+  "bindingCodeCopied": {
     "message": "Code copied. Paste it into the intended execution environment."
   },
-  "scriptCopyError": {
+  "bindingCopyError": {
     "message": "Could not copy code. Select the code and copy it manually."
   },
-  "scriptRequired": {
-    "message": "Enter a name and code before saving."
-  },
-  "scriptSaved": {
-    "message": "Script saved"
-  },
-  "scriptDeleted": {
-    "message": "Script deleted"
-  },
-  "scriptName": {
-    "message": "Name"
-  },
-  "scriptCode": {
+  "bindingCode": {
     "message": "JavaScript code"
   },
-  "editScript": {
-    "message": "Edit Script"
-  },
-  "newScript": {
-    "message": "New Script"
-  },
-  "saveScript": {
-    "message": "Save"
-  },
-  "deleteScript": {
-    "message": "Delete"
-  },
-  "confirmDeleteScript": {
-    "message": "Confirm Delete"
-  },
-  "searchScripts": {
-    "message": "Search scripts"
-  },
-  "scriptPreview": { "message": "Code Preview" },
-  "scriptInformation": { "message": "Information" },
-  "scriptContentType": { "message": "Content Type" },
-  "scriptPreviewEmpty": { "message": "Select a script to preview its code" },
-  "builtInScript": {
-    "message": "Built-in"
-  },
-  "scriptKind": {
-    "message": "Script"
-  },
-  "scriptLocalOnly": {
-    "message": "Stored only on this device"
-  },
-  "viewScriptSetup": {
-    "message": "View Setup Instructions"
-  },
-  "scriptDeletePrompt": {
-    "message": "Delete “$1”? This cannot be undone."
-  },
-  "cancelScriptDelete": {
+  "previewInformation": { "message": "Information" },
+  "previewContentType": { "message": "Content Type" },
+  "cancel": {
     "message": "Cancel"
   },
   "keyboardShortcuts": {
     "message": "Keyboard Shortcuts"
   },
-  "runScript": {
-    "message": "Run Script"
-  },
-  "runCopyScript": {
-    "message": "Run and Copy Result"
-  },
-  "rerunScript": {
-    "message": "Run Again"
-  },
-  "copyScriptResult": {
-    "message": "Copy Result"
-  },
-  "scriptResult": {
-    "message": "Result"
-  },
-  "scriptRunFailed": {
-    "message": "Script failed"
-  },
-  "scriptExecuting": {
-    "message": "Running script…"
-  },
-  "scriptRunningBack": {
-    "message": "You can go back anytime; the running script will continue in the background."
-  },
-  "scriptRunTarget": {
-    "message": "Current page: $1"
-  },
-  "scriptResultsTemporary": {
-    "message": "Results stay in this panel only"
-  },
-  "scriptResultCopied": {
-    "message": "Result copied"
-  },
-  "scriptResultCopyFailed": {
-    "message": "The script finished. Copying failed; use Copy Result to retry."
-  },
-  "noRunnableScripts": {
-    "message": "No saved scripts yet. Search “New Script” to create one."
-  },
-  "enableUserScripts": {
-    "message": "Open Extension Details"
-  },
-  "scriptEnableHint": {
-    "message": "Turn on “Allow user scripts” for zing in Chrome, then return here and run again. On Chrome 135–137, enable Developer mode instead."
-  },
-  "errorScriptDisabled": {
-    "message": "Enable user scripts in Chrome to run saved JavaScript."
-  },
-  "errorScriptVersion": {
-    "message": "Running scripts requires Chrome 135 or later."
-  },
-  "errorScriptTarget": {
-    "message": "This script cannot run on that target. Reopen zing on the intended page."
-  },
-  "errorScriptChanged": {
-    "message": "The page changed or is no longer active. Reopen zing on the intended page."
-  },
-  "errorScriptUnsupported": {
-    "message": "Scripts can run only on ordinary HTTP or HTTPS pages. Chrome internal pages are not supported."
-  },
-  "errorScriptAccess": {
-    "message": "Chrome cannot access this page. Reopen zing with its shortcut or toolbar button on an ordinary webpage."
-  },
-  "errorScriptInterrupted": {
-    "message": "Execution was interrupted or returned no usable result. Check the page before running again."
-  },
-  "errorScriptMissing": {
-    "message": "The saved script is missing or empty."
-  },
-  "errorScriptBusy": {
-    "message": "A script is already running in this tab. Wait for it to finish."
-  },
-  "scriptExecutionHint": {
-    "message": "The last expression is the result, for example localStorage.getItem(\"token\"). Promises are awaited. Runs in an isolated user-script world with access to this page’s DOM and storage; page JavaScript variables and GM_* APIs are not available."
-  },
   "categoryTab": {
     "message": "Tab"
-  },
-  "categoryScript": {
-    "message": "Script"
   },
   "categoryStorage": {
     "message": "Storage"

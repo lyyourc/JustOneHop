@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import type { Reply, Request, Snapshot, PaletteState, Execution, StorageRead, PageStorage, CookieAccessRequest, ScriptRun, ScriptResult, HistorySearchResult } from './types';
+import type { Reply, Request, Snapshot, PaletteState, Execution, StorageRead, PageStorage, CookieAccessRequest, HistorySearchResult } from './types';
 
 async function send<T>(request: Request): Promise<T> {
   const reply = await chrome.runtime.sendMessage<Request, Reply<T>>(request);
@@ -19,6 +19,3 @@ export const forgetSearchRanking = (target: string | string[], query?: string) =
 export const readPageStorage = (payload: StorageRead) => send<PageStorage>({ source: 'zing', type: 'read-page-storage', payload });
 
 export const openCookieAccess = (payload: CookieAccessRequest) => send<void>({ source: 'zing', type: 'open-cookie-access', payload });
-
-export const runSavedScript = (payload: ScriptRun) => send<ScriptResult>({ source: 'zing', type: 'run-saved-script', payload });
-export const openScriptSettings = () => send<void>({ source: 'zing', type: 'open-script-settings' });

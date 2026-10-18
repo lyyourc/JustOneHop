@@ -181,7 +181,7 @@ chrome.contextMenus.update = async (id, properties) => {
   }
   popupUrl = worker.url().replace('background.js', 'popup.html');
   await ui.goto(popupUrl);
-  await expect(ui.locator('.result.command')).toHaveCount(10);
+  await expect(ui.locator('.result.command')).toHaveCount(9);
   testInfo.annotations.push({ type: 'fixture-timing', description: JSON.stringify({
     prepareMs: Math.round(prepared - started), launchMs: Math.round(launched - prepared),
     workerMs: Math.round(ready - launched), uiMs: Math.round(performance.now() - ready),
@@ -567,7 +567,7 @@ test.describe(() => {
       })) as typeof chrome.history.search;
     }, { query, origin });
     await ui.reload();
-    await expect(ui.locator('.result.command')).toHaveCount(10);
+    await expect(ui.locator('.result.command')).toHaveCount(9);
     await ui.clock.install(); await ui.clock.pauseAt(new Date());
     // Observe delivery separately from rendering, so absence checks follow the late reply.
     await ui.evaluate(() => {
@@ -1660,7 +1660,7 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     await input.press('Home'); await input.press('Shift+ArrowRight');
     await input.press('Enter');
     await expect(helpSearch).toBeFocused();
-    await expect(article.getByRole('heading')).toHaveCount(6);
+    await expect(article.getByRole('heading')).toHaveCount(5);
     await expect(article).toContainText(shortcut);
     await helpSearch.fill('cookies');
     await expect(article.getByRole('heading')).toHaveText(english ? 'View website storage' : '查看网站存储');
@@ -1672,7 +1672,7 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     await helpSearch.fill(english ? '查看网站存储' : 'view website storage');
     await expect(article.getByRole('heading')).toHaveCount(1);
     await helpSearch.fill('135');
-    await expect(article.getByRole('heading')).toHaveText(english ? 'Save and run scripts' : '保存与运行脚本');
+    await expect(article.getByRole('heading')).toHaveCount(0);
     await helpSearch.fill('zzzz-no-help');
     await expect(article.getByRole('heading')).toHaveCount(0);
     await expect(article.getByText(english ? 'No results found' : '没有找到匹配结果')).toBeVisible();
@@ -1797,7 +1797,7 @@ test.describe(() => {
   expect(themeBox!.width).toBe(languageBox!.width);
   const experiments = ui.locator('.settings-experiments');
   await expect(experiments.getByRole('switch')).toHaveCount(1);
-  await expect(experiments.getByRole('button')).toHaveText(['Reset Ranking', 'Manage Scripts']);
+  await expect(experiments.getByRole('button')).toHaveText(['Reset Ranking']);
   const changeButton = ui.getByRole('button', { name: 'Change in Chrome' });
   await expect(changeButton).toHaveCSS('height', '32px');
   await expect(changeButton).toHaveCSS('border-radius', '100px');
@@ -1814,7 +1814,7 @@ test.describe(() => {
   // Tab follows visible controls and wraps through the footer back to search.
   const controls = [header.locator('.search-dismiss'), language, theme, ui.getByRole('button', { name: 'Read Help' }), ui.getByRole('button', { name: 'Change in Chrome' }),
     ui.getByRole('button', { name: 'Set Up', exact: true }), experiments.getByRole('switch'),
-    experiments.getByRole('button', { name: 'Reset Ranking' }), experiments.getByRole('button', { name: 'Manage Scripts' }),
+    experiments.getByRole('button', { name: 'Reset Ranking' }),
     ui.locator('.footer-back'), settingsSearch];
   for (const control of controls) { await ui.keyboard.press('Tab'); await expect(control).toBeFocused(); }
   await ui.keyboard.press('Shift+Tab');
@@ -1847,12 +1847,12 @@ test.describe(() => {
   await ui.locator('.settings-body').getByRole('button', { name: 'Clear search' }).click();
   await expect(settingsSearch).toBeFocused();
   await expect(settingsSearch).toHaveValue('');
-  await settingsSearch.fill('scripts');
-  await ui.getByRole('button', { name: 'Manage Scripts' }).click();
-  await expect(ui.getByRole('combobox', { name: 'Search scripts' })).toBeVisible();
+  await settingsSearch.fill('ctrl tab');
+  await ui.getByRole('button', { name: 'Set Up', exact: true }).click();
+  await expect(ui.locator('.binding-view')).toBeVisible();
   await ui.keyboard.press('Escape');
-  await expect(settingsSearch).toHaveValue('scripts');
-  await expect(ui.getByRole('button', { name: 'Manage Scripts' })).toBeFocused();
+  await expect(settingsSearch).toHaveValue('ctrl tab');
+  await expect(ui.getByRole('button', { name: 'Set Up', exact: true })).toBeFocused();
   await header.getByRole('button', { name: 'Clear search' }).click();
   await ui.keyboard.press('Escape');
   for (const [query, role, name] of [
@@ -2010,7 +2010,7 @@ test('unified results mix tabs bookmarks and commands; searched tabs switch with
   const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await expect(input).toHaveValue('');
   await expect(ui.locator('.result.tab')).toHaveCount(0);
-  await expect(ui.locator('.result.command')).toHaveCount(10);
+  await expect(ui.locator('.result.command')).toHaveCount(9);
   await expect(ui.locator('.result.danger')).toHaveCount(0);
   await input.fill('new tab');
   await expect(ui.locator('.result.tab')).toHaveCount(2);
@@ -2723,7 +2723,7 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     const surface = await openStorageOverlay(page);
     const input = surface.getByRole('combobox', { name: chinese ? '搜索命令、标签页、书签和历史' : 'Search commands, tabs, bookmarks, and history' });
     const ids = () => surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
-    const defaults = ['settings', 'help', 'tabSwitcher', 'scriptLibrary', 'searchAllHistory', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']
+    const defaults = ['settings', 'help', 'tabSwitcher', 'searchAllHistory', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']
       .map(action => action === 'searchAllHistory' ? 'zing-search-all-history' : `zing-command:${action}`);
     await expect.poll(ids).toEqual(defaults);
     await expect(surface.locator('.suggested-label')).toHaveText(chinese ? '推荐' : 'Suggested');
@@ -2903,7 +2903,7 @@ async function openStorageOverlay(page: Page) {
     await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
   }, id);
   const surface = page.frameLocator('.zing-frame');
-  await expect(surface.locator('.result.command')).toHaveCount(10);
+  await expect(surface.locator('.result.command')).toHaveCount(9);
   return surface;
 }
 
@@ -3941,194 +3941,6 @@ test.describe(() => {
 });
 });
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English script library preview selects without activation and copies exact code', async () => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  const alpha = 'globalThis.__zingPreviewExecuted = true;\nconst text = "<script> & 中文";\n\n';
-  const beta = 'globalThis.__zingPreviewExecuted = true;\n  "Beta keeps indentation";\n\n';
-  await worker.evaluate(({ alpha, beta }) => chrome.storage.local.set({
-    'saved-script:preview-alpha': { title: 'Preview alpha', code: alpha },
-    'saved-script:preview-beta': { title: 'Preview beta', code: beta },
-  }), { alpha, beta });
-  await ui.evaluate(async () => {
-    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
-    const scope = window as unknown as { previewRunRequests: number };
-    scope.previewRunRequests = 0;
-    chrome.runtime.sendMessage = ((request: { type?: string }) => {
-      if (request.type === 'run-saved-script') scope.previewRunRequests++;
-      return send(request);
-    }) as typeof chrome.runtime.sendMessage;
-    await navigator.clipboard.writeText('clipboard before preview');
-  });
-  await ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' }).fill('manage scripts');
-  await ui.keyboard.press('Enter');
-  const search = ui.getByRole('combobox', { name: 'Search scripts' });
-  const preview = ui.getByRole('region', { name: 'Code Preview', exact: true });
-  const code = preview.locator('.preview-code');
-  const primary = ui.locator('.palette-footer .primary-action');
-  const first = ui.getByRole('option', { name: 'Preview alpha', exact: true });
-  const second = ui.getByRole('option', { name: 'Preview beta', exact: true });
-  await search.fill('Preview');
-  await expect(first).toHaveAttribute('aria-selected', 'true');
-  await expect(code).toHaveValue(alpha);
-  await expect(code).toHaveAttribute('readonly', '');
-  await expect(preview).toBeVisible();
-  await expect(preview).toHaveAccessibleName('Code Preview');
-  await expect(primary).toHaveAccessibleName('Copy Code');
-
-  // A click changes the preview only; pointer motion must not steal its target.
-  await second.click();
-  await expect(second).toHaveAttribute('aria-selected', 'true');
-  await expect(code).toHaveValue(beta);
-  await expect(preview.locator('.preview-info')).toContainText('Name');
-  await expect(preview.locator('.preview-info')).toContainText('Preview beta');
-  await expect(preview.locator('.preview-info')).toContainText('Content Type');
-  await expect(preview.locator('.preview-info')).toContainText('JavaScript');
-  await first.hover(); await second.hover(); await first.hover();
-  await expect(second).toHaveAttribute('aria-selected', 'true');
-  await expect(code).toHaveValue(beta);
-  await expect(ui.locator('.script-editor-body, .script-run-status, .script-output')).toHaveCount(0);
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe('clipboard before preview');
-  await search.press('ArrowUp');
-  await expect(first).toHaveAttribute('aria-selected', 'true');
-  await expect(code).toHaveValue(alpha);
-  await search.press('ArrowDown');
-  await expect(second).toHaveAttribute('aria-selected', 'true');
-  await search.press('Control+p');
-  await expect(first).toHaveAttribute('aria-selected', 'true');
-  await search.press('Control+n');
-  await expect(second).toHaveAttribute('aria-selected', 'true');
-  await expect(search).toHaveAttribute('aria-activedescendant', (await second.getAttribute('id'))!);
-  await search.press('Shift+Enter'); await search.press('Meta+Enter');
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe('clipboard before preview');
-  await search.press('Enter');
-  await expect(ui.getByRole('status')).toContainText('Code copied');
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(beta);
-  await expect(search).toBeFocused();
-  await first.click(); await primary.click();
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(alpha);
-  await code.focus(); await expect(code).toBeFocused();
-  expect(await code.evaluate(node => getComputedStyle(node).userSelect)).not.toBe('none');
-  await expect(ui.locator('.script-editor-body')).toHaveCount(0);
-
-  // Menu editing returns to the same filtered target and input selection.
-  await search.focus();
-  await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-  await ui.locator('.palette-footer .actions-button').click();
-  await ui.getByRole('option', { name: 'Edit Script', exact: true }).click();
-  await expect(ui.getByLabel('Name', { exact: true })).toHaveValue('Preview alpha');
-  await expect(ui.getByLabel('JavaScript code')).toHaveValue(alpha);
-  await ui.keyboard.press('Escape');
-  await expect(search).toBeFocused(); await expect(search).toHaveValue('Preview');
-  expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
-  await expect(first).toHaveAttribute('aria-selected', 'true');
-  await expect(code).toHaveValue(alpha);
-  await search.fill('no matching script');
-  await expect(ui.locator('.script-item')).toHaveCount(0);
-  await expect(code).toHaveCount(0);
-  await expect(ui.locator('.preview-info')).toHaveCount(0);
-  await expect(primary).toBeDisabled();
-  await expect(search).not.toHaveAttribute('aria-activedescendant', /.+/);
-  await search.press('Enter');
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(alpha);
-
-  // Built-in setup is previewable and reaches its read-only instructions via Actions.
-  await search.fill('Ctrl+Tab');
-  await expect(code).toBeVisible();
-  await ui.locator('.palette-footer .actions-button').click();
-  await expect(ui.getByRole('dialog').getByRole('option', { name: 'Edit Script', exact: true })).toHaveCount(0);
-  await ui.getByRole('option', { name: 'View Setup Instructions', exact: true }).click();
-  await expect(ui.getByLabel('JavaScript code')).toHaveAttribute('readonly', '');
-  await ui.keyboard.press('Escape');
-  await expect(search).toHaveValue('Ctrl+Tab');
-  expect(await ui.evaluate(() => (window as unknown as { previewRunRequests: number }).previewRunRequests)).toBe(0);
-  expect(await ui.evaluate(() => '__zingPreviewExecuted' in globalThis)).toBe(false);
-  expect(await worker.evaluate(() => '__zingPreviewExecuted' in globalThis)).toBe(false);
-  expect(await worker.evaluate(async () => (await chrome.storage.local.get('saved-script:preview-alpha'))['saved-script:preview-alpha'])).toEqual({ title: 'Preview alpha', code: alpha });
-});
-
-  test('English script library saves edits searches copies and deletes without executing code', async () => {
-  await context.grantPermissions(['clipboard-read']);
-  const code = 'globalThis.__zingSavedScriptExecuted = true;\nconst text = "<script> & Unicode 中文";\n\n';
-  await ui.getByRole('button', { name: 'Settings', exact: true }).click();
-  await ui.getByRole('button', { name: 'Manage Scripts' }).click();
-  await ui.getByRole('button', { name: 'New Script', exact: true }).click();
-  await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(ui.getByRole('alert')).toContainText('Enter a name and code');
-  await ui.getByLabel('Name', { exact: true }).fill('Storage helper');
-  await ui.getByLabel('JavaScript code').fill(code);
-  await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(ui.getByRole('option', { name: 'Storage helper', exact: true })).toBeVisible();
-  await ui.reload();
-  await ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' }).fill('Storage helper');
-  await expect(ui.getByRole('option').first()).toContainText('Storage helper');
-  await expect(ui.locator('.primary-action')).toContainText('Run Script');
-  await ui.keyboard.press('Meta+k'); await ui.getByRole('combobox', { name: 'Search actions' }).fill('copy code'); await ui.keyboard.press('Enter');
-  await expect(ui.getByText('Code copied. Paste it into the intended execution environment.', { exact: true })).toBeVisible();
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
-  expect(await ui.evaluate(() => '__zingSavedScriptExecuted' in globalThis)).toBe(false);
-  expect(await worker.evaluate(() => '__zingSavedScriptExecuted' in globalThis)).toBe(false);
-  // Code is not part of the search index.
-  await ui.getByRole('combobox').fill('__zingSavedScriptExecuted');
-  await expect(ui.getByRole('option')).toHaveCount(0);
-  await ui.getByRole('button', { name: 'Settings', exact: true }).click();
-  await ui.getByRole('button', { name: 'Manage Scripts' }).click();
-  const scripts = ui.getByRole('combobox', { name: 'Search scripts' });
-  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:decoy': { title: 'Storage alpha', code: '"Do not copy this script"' } }));
-  await scripts.fill('Storage');
-  await expect(ui.locator('.script-item')).toHaveCount(2);
-  await scripts.press('Meta+ArrowUp');
-  await expect(ui.locator('.script-item.selected')).toHaveText('Storage alpha');
-  await scripts.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-  const helper = ui.getByRole('option', { name: 'Storage helper', exact: true });
-  const helperId = await helper.getAttribute('id');
-  // Right-click must choose the clicked script, even when another row was selected.
-  await helper.click({ button: 'right' });
-  const actions = ui.getByRole('combobox', { name: 'Search actions' });
-  await expect(actions).toBeFocused();
-  await expect(ui.locator('.action-heading')).toContainText('Storage helper');
-  await expect(ui.locator('.action-row')).toContainText(['Copy Code', 'Edit Script', 'New Script', 'Delete']);
-  await actions.fill('copy'); await actions.press('Enter');
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
-  await expect(scripts).toBeFocused();
-  expect(await scripts.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
-  await helper.click({ button: 'right' });
-  await actions.fill('delete'); await actions.press('Enter');
-  const confirmation = ui.getByRole('alertdialog');
-  await expect(confirmation).toContainText('Storage helper');
-  await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
-  await ui.keyboard.press('Enter');
-  await expect(confirmation).toHaveCount(0);
-  await expect(scripts).toBeFocused();
-  await expect(helper).toHaveAttribute('aria-selected', 'true');
-  expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')).length)).toBe(2);
-  await helper.click({ button: 'right' });
-  await actions.fill('edit'); await ui.locator('.palette-footer .primary-action').click();
-  await expect(ui.getByLabel('JavaScript code')).toHaveValue(code);
-  // Rename across the sort order: restoration follows identity, not the old index.
-  await ui.getByLabel('Name', { exact: true }).fill('Storage 0 renamed');
-  await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(scripts).toBeFocused(); await expect(scripts).toHaveValue('Storage');
-  expect(await scripts.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
-  const renamed = ui.getByRole('option', { name: 'Storage 0 renamed', exact: true });
-  await expect(renamed).toHaveAttribute('id', helperId!);
-  await expect(renamed).toHaveAttribute('aria-selected', 'true');
-  await renamed.click({ button: 'right' });
-  await actions.fill('new'); await actions.press('Enter');
-  await expect(ui.locator('.palette-footer-title')).toHaveText('New Script');
-  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
-  await expect(ui.getByLabel('Name', { exact: true })).toHaveValue('');
-  await ui.keyboard.press('Escape');
-  await expect(renamed).toHaveAttribute('aria-selected', 'true');
-  await renamed.click({ button: 'right' });
-  await actions.fill('delete'); await actions.press('Enter');
-  await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect(renamed).toHaveCount(0);
-  await expect(ui.getByRole('option', { name: 'Storage alpha', exact: true })).toBeVisible();
-  expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')))).toEqual(['saved-script:decoy']);
-});
-});
 
 for (const host of ['overlay', 'native', 'toolbar'] as const) test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true } });
@@ -4192,7 +4004,55 @@ for (const host of ['overlay', 'native', 'toolbar'] as const) test.describe(() =
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English script binding guide copies this installation ID and opens Chrome shortcuts', async () => {
+  test('English retired scripts stay absent from search and Settings while binding setup remains available', async () => {
+    await worker.evaluate(() => chrome.storage.local.set({
+      'saved-script:legacy': { title: 'Legacy helper unique', code: 'globalThis.__legacyScriptExecuted = true' },
+    }));
+    await ui.reload();
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await expect(ui.locator('.result.command')).toHaveCount(9);
+    for (const query of ['scripts', 'script library', 'new script', 'run script', 'userscript', '脚本', 'Legacy helper unique']) {
+      await search.fill(query);
+      await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+      await expect(ui.locator('#zing-results .result:not(#zing-search-all-history)')).toHaveCount(0);
+    }
+    const permissions = await worker.evaluate(() => {
+      const manifest = chrome.runtime.getManifest();
+      return [...(manifest.permissions || []), ...(manifest.optional_permissions || [])];
+    });
+    expect(permissions).not.toContain('userScripts');
+    expect(await ui.evaluate(() => '__legacyScriptExecuted' in globalThis)).toBe(false);
+    await ui.locator('.settings-button').click();
+    await expect(ui.locator('[data-setting]')).toHaveCount(7);
+    await expect(ui.getByRole('button', { name: 'Manage Scripts', exact: true })).toHaveCount(0);
+    const settings = ui.getByRole('textbox', { name: 'Search settings', exact: true });
+    await settings.fill('scripts'); await expect(ui.locator('[data-setting]')).toHaveCount(0);
+    await settings.fill('ctrl tab');
+    const setup = ui.getByRole('button', { name: 'Set Up', exact: true });
+    await setup.click();
+    await expect(ui.getByRole('region', { name: 'Set Up Ctrl+Tab', exact: true })).toBeVisible();
+    await expect(ui.locator('.binding-code-field textarea')).toHaveAttribute('readonly', '');
+    await ui.locator('.footer-back').click();
+    await expect(settings).toHaveValue('ctrl tab'); await expect(setup).toBeFocused();
+    await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
+    await search.fill('Ctrl+Tab');
+    await expect(ui.locator('[id="zing-command:settings:binding"]')).toHaveAttribute('aria-selected', 'true');
+    await search.press('Enter'); await expect(setup).toBeFocused();
+    await ui.keyboard.press('Escape'); await search.fill('help');
+    await expect(ui.locator('[id="zing-command:help"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(ui.locator('.palette-footer .primary-action')).toBeEnabled();
+    await search.press('Enter');
+    const help = ui.getByRole('textbox', { name: 'Search help', exact: true });
+    await help.fill('userscript');
+    await expect(ui.getByRole('article').getByRole('heading')).toHaveCount(0);
+    expect(await worker.evaluate(async () => (await chrome.storage.local.get('saved-script:legacy'))['saved-script:legacy']))
+      .toEqual({ title: 'Legacy helper unique', code: 'globalThis.__legacyScriptExecuted = true' });
+  });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English binding guide copies this installation ID and opens Chrome shortcuts', async () => {
   await context.grantPermissions(['clipboard-read']);
   const before = await worker.evaluate(() => chrome.commands.getAll());
   await ui.locator('.settings-button').click();
@@ -4200,11 +4060,11 @@ test.describe(() => {
   await expect(ui.locator('.palette-footer-title').filter({ hasText: 'Set Up Ctrl+Tab' })).toBeVisible();
   await expect(ui.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
   await expect(ui.getByRole('textbox', { name: 'JavaScript code' })).toHaveAttribute('readonly', '');
-  await expect(ui.locator('.script-library .settings-header')).toHaveCount(0);
+  await expect(ui.locator('.binding-view .settings-header')).toHaveCount(0);
   const copy = ui.locator('.palette-footer .primary-action');
   await expect(copy).toHaveAccessibleName('Copy & Open');
   await expect(copy).toBeFocused();
-  await expect(ui.locator('.script-editor-body')).toBeVisible();
+  await expect(ui.locator('.binding-body')).toBeVisible();
   await ui.locator('.palette-footer .actions-button').click();
   await ui.getByRole('dialog').getByRole('option', { name: /^Copy Code/ }).click();
   await expect(ui.getByRole('status')).toContainText('Code copied');
@@ -4220,9 +4080,9 @@ test.describe(() => {
   expect(await worker.evaluate(() => chrome.commands.getAll())).toEqual(before);
   await ui.setViewportSize({ width: 390, height: 500 });
   await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
-  expect(await ui.locator('.script-editor-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await ui.locator('.binding-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await expect(ui.locator('.palette-footer .primary-action')).toBeInViewport({ ratio: 1 });
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('script-binding-guide.png') });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('binding-guide.png') });
   await ui.locator('.palette-footer .actions-button').click();
   await expect(ui.getByRole('dialog').getByRole('option', { name: 'Delete', exact: true })).toHaveCount(0);
   await ui.locator('.palette-footer .footer-back').click();
@@ -4246,39 +4106,12 @@ test.describe(() => {
 });
 });
 
-test('Chinese script library supports keyboard editing and nested Escape', async () => {
-  await ui.getByRole('button', { name: '设置', exact: true }).click();
-  await ui.getByRole('button', { name: '管理脚本' }).click();
-  await ui.getByRole('button', { name: '新建脚本', exact: true }).click();
-  await expect(ui.getByLabel('名称', { exact: true })).toBeFocused();
-  await ui.keyboard.type('Keyboard script');
-  await ui.keyboard.press('Tab');
-  await expect(ui.getByLabel('JavaScript 代码')).toBeFocused();
-  await ui.keyboard.type('const value = 42;');
-  await ui.keyboard.press('Tab');
-  await expect(ui.locator('.palette-footer .footer-back')).toBeFocused();
-  await ui.keyboard.press('Tab');
-  await expect(ui.getByRole('button', { name: '保存', exact: true })).toBeFocused();
-  await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('combobox', { name: '搜索脚本' })).toBeFocused();
-  await ui.getByRole('combobox', { name: '搜索脚本' }).fill('Keyboard');
-  await ui.keyboard.press('Meta+k');
-  await ui.locator('.action-search input').fill('编辑');
-  await ui.keyboard.press('Enter');
-  await expect(ui.getByLabel('JavaScript 代码')).toHaveValue('const value = 42;');
-  await ui.keyboard.press('Escape');
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: '脚本收藏' })).toBeVisible();
-  await ui.keyboard.press('Escape');
-  await expect(ui.getByRole('region', { name: '设置', exact: true })).toBeVisible();
-  await ui.keyboard.press('Escape');
-  await expect(ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' })).toBeFocused();
-});
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true } });
-  test('English script overlay copies from unified search inside the closed keyboard frame', async () => {
+  test('English binding guide copies from unified search inside the closed keyboard frame', async () => {
   await context.grantPermissions(['clipboard-read']);
-  const page = await context.newPage(); await page.goto(`${origin}/Script-overlay`);
+  const page = await context.newPage(); await page.goto(`${origin}/Binding-overlay`);
   const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
   await worker.evaluate(async id => {
     await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
@@ -4290,92 +4123,48 @@ test.describe(() => {
     const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
     return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes.some(node => node.role?.value === 'combobox');
   }).toBe(true);
+  const focused = async (name: string) => {
+    const { frameTree } = await cdp.send('Page.getFrameTree');
+    const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+    return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes.some(node => node.name?.value === name && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true));
+  };
+  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.type('ctrl tab');
+  await expect.poll(async () => {
+    const { frameTree } = await cdp.send('Page.getFrameTree');
+    const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+    const nodes = (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
+    return nodes.some(node => node.role?.value === 'option' && node.name?.value?.includes('Settings: Set Up Ctrl+Tab') && node.properties?.some(prop => prop.name === 'selected' && prop.value.value === true)) &&
+      nodes.some(node => node.role?.value === 'button' && node.name?.value === 'Set Up Ctrl+Tab' && !node.properties?.some(prop => prop.name === 'disabled' && prop.value.value === true));
+  }).toBe(true);
   await page.keyboard.press('Enter');
+  await expect.poll(() => focused('Set Up')).toBe(true);
+  await page.keyboard.press('Enter'); await expect.poll(() => focused('Copy & Open')).toBe(true);
+  await page.keyboard.press('Meta+k'); await expect.poll(() => focused('Search actions')).toBe(true);
+  await page.keyboard.type('copy'); await page.keyboard.press('Enter');
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('chrome.developerPrivate.updateExtensionCommand');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(new URL(worker.url()).hostname);
+  await page.keyboard.press('Escape'); await expect.poll(() => focused('Set Up')).toBe(true);
+  await page.keyboard.press('Escape'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
 });
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English script actions edit in place, preserve selection and caret, and confirm deletion', async () => {
-  await context.grantPermissions(['clipboard-read']);
-  const code = 'const value = "中文";\n\n';
-  await worker.evaluate(async code => chrome.storage.local.set({
-    'saved-script:alpha': { title: 'Action alpha', code },
-    'saved-script:beta': { title: 'Action beta', code },
-  }), code);
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('Action');
-  await expect(ui.locator('.result.script')).toHaveCount(2);
-  await ui.keyboard.press('ArrowDown');
-  await expect(ui.locator('.result[aria-selected=true]')).toContainText('Action beta');
-  await search.evaluate(node => (node as HTMLInputElement).setSelectionRange(2, 4));
-  await ui.keyboard.press('Meta+k');
-  const actions = ui.getByRole('combobox', { name: 'Search actions' });
-  await expect(actions).toBeFocused();
-  await expect(ui.locator('.action-row')).toHaveCount(5);
-  await actions.fill('edit');
-  await expect(ui.locator('.primary-action')).toContainText('Edit Script');
-  await ui.keyboard.press('Enter');
-  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
-  await expect(ui.getByLabel('JavaScript code')).toHaveValue(code);
-  await ui.getByLabel('Name', { exact: true }).fill('Action beta edited');
-  await ui.getByLabel('JavaScript code').fill(code + '42;');
-  // Newlines and arrows remain normal editing keys, not palette commands.
-  await ui.keyboard.press('End'); await ui.keyboard.press('Enter');
-  await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(search).toBeFocused();
-  await expect(search).toHaveValue('Action');
-  expect(await search.evaluate(node => [(node as HTMLInputElement).selectionStart, (node as HTMLInputElement).selectionEnd])).toEqual([2, 4]);
-  await expect(ui.locator('.result[aria-selected=true]')).toContainText('Action beta edited');
-  await ui.keyboard.press('Meta+k'); await actions.fill('copy code'); await ui.keyboard.press('Enter');
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code + '42;\n');
-  await ui.keyboard.press('Meta+k'); await actions.fill('edit'); await ui.keyboard.press('Enter');
-  await ui.getByLabel('Name', { exact: true }).fill('Unsaved draft');
-  await ui.keyboard.press('Escape');
-  await expect(search).toBeFocused();
-  await expect(ui.locator('.result[aria-selected=true]')).toContainText('Action beta edited');
-  await ui.keyboard.press('Meta+k'); await actions.fill('delete'); await ui.keyboard.press('Enter');
-  const confirm = ui.getByRole('alertdialog');
-  await expect(confirm).toContainText('Action beta edited');
-  await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused();
-  await ui.keyboard.press('Escape');
-  await expect(confirm).toHaveCount(0); await expect(actions).toBeFocused();
-  await expect(actions).toHaveValue('delete');
-  await ui.keyboard.press('Enter');
-  await ui.keyboard.press('Enter'); // Default focused action is Cancel, never Delete.
-  await expect(confirm).toHaveCount(0);
-  await ui.keyboard.press('Enter');
-  await ui.keyboard.press('Tab');
-  await expect(confirm.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
-  await ui.keyboard.press('Enter');
-  await expect(search).toBeFocused();
-  await expect(ui.locator('.result.script')).toHaveCount(1);
-  expect(await worker.evaluate(async () => (await chrome.storage.local.get('saved-script:beta'))['saved-script:beta'])).toBeUndefined();
-  await ui.reload(); await search.fill('Action');
-  await expect(ui.locator('.result.script')).toHaveCount(1);
-  await ui.keyboard.press('Meta+k');
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-script-actions.png') });
-});
-});
 
-test('Chinese script actions protect built-in setup and return directly to search', async () => {
+test('Chinese binding guide returns to settings and retains its standalone handoff', async () => {
   const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
-  await search.fill('ctrl tab'); await ui.keyboard.press('Meta+k');
-  await expect(ui.locator('.action-row')).toHaveCount(2);
-  await expect(ui.locator('.action-row')).toContainText(['复制代码', '查看设置说明']);
-  await ui.keyboard.press('Control+n'); await ui.keyboard.press('Enter');
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: '设置 Ctrl+Tab' })).toBeVisible();
+  await search.fill('ctrl tab'); await search.press('Enter');
+  const setup = ui.locator('[data-setting=binding] button');
+  await expect(setup).toBeFocused(); await setup.press('Enter');
+  await expect(ui.getByRole('region', { name: '设置 Ctrl+Tab', exact: true })).toBeVisible();
   await expect(ui.getByLabel('JavaScript 代码')).toHaveAttribute('readonly', '');
-  await expect(ui.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
-  await ui.keyboard.press('Escape');
-  await expect(search).toBeFocused(); await expect(search).toHaveValue('ctrl tab');
   await ui.keyboard.press('Meta+k');
-  await ui.keyboard.press('Control+n'); await ui.keyboard.press('Enter');
+  await expect(ui.locator('.action-row')).toContainText(['复制代码', '打开 Chrome 快捷键页']);
+  await ui.keyboard.press('Escape'); await ui.keyboard.press('Escape');
+  await expect(setup).toBeFocused();
+  await ui.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('ctrl tab');
+  await search.press('Enter'); await expect(setup).toBeFocused(); await setup.press('Enter');
   const created = context.waitForEvent('page');
   await ui.getByRole('button', { name: '复制并打开', exact: true }).click();
   await expect(await created).toHaveURL('chrome://extensions/shortcuts');
@@ -4397,87 +4186,6 @@ test('Chinese script actions protect built-in setup and return directly to searc
   expect(context.pages().filter(page => page.url().endsWith('popup.html#binding'))).toHaveLength(1);
 });
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true } });
-  test('English script overlay actions edit and delete through the closed keyboard frame', async () => {
-  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:overlay-menu': { title: 'Overlay helper', code: '42;' } }));
-  const page = await context.newPage(); await page.goto(`${origin}/Script-menu-overlay`);
-  const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
-  await worker.evaluate(async id => {
-    await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
-  }, tabId);
-  const cdp = await context.newCDPSession(page);
-  const ax = async () => {
-    const { frameTree } = await cdp.send('Page.getFrameTree');
-    const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
-    return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
-  };
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox')).toBe(true);
-  await page.keyboard.type('Overlay helper');
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value?.includes('Overlay helper'))).toBe(true);
-  await page.keyboard.press('Meta+k');
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search actions')).toBe(true);
-  await page.keyboard.type('edit'); await page.keyboard.press('Enter');
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'textbox' && node.name?.value === 'Name')).toBe(true);
-  await page.keyboard.press('Meta+a'); await page.keyboard.type('Overlay helper edited');
-  await page.keyboard.press('Tab'); await page.keyboard.press('Meta+a'); await page.keyboard.type('43;');
-  await page.keyboard.press('Meta+k');
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search actions')).toBe(true);
-  await page.keyboard.type('copy'); await page.keyboard.press('Enter');
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'textbox' && node.name?.value === 'JavaScript code' && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true))).toBe(true);
-  await page.keyboard.press('Meta+Enter');
-  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('saved-script:overlay-menu'))['saved-script:overlay-menu'])).toEqual({ title: 'Overlay helper edited', code: '43;' });
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.press('Meta+k'); await page.keyboard.type('delete'); await page.keyboard.press('Enter');
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'alertdialog')).toBe(true);
-  await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
-  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('saved-script:overlay-menu'))['saved-script:overlay-menu'])).toBeUndefined();
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.name?.value === 'Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
-});
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English command discovery completes the script lifecycle entirely from search and keyboard', async () => {
-  await context.grantPermissions(['clipboard-read']);
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('new script');
-  await expect(ui.locator('.result[aria-selected=true]')).toContainText('New Script');
-  await ui.keyboard.press('Enter');
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
-  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
-  await ui.keyboard.type('Clipboard helper'); await ui.keyboard.press('Tab');
-  await ui.keyboard.type('localStorage.getItem("demo");');
-  await ui.keyboard.press('Meta+Enter');
-  await expect(search).toBeFocused();
-  await ui.keyboard.press('Meta+a'); await ui.keyboard.type('Clipboard helper');
-  await expect(ui.locator('.result[aria-selected=true]')).toContainText('Clipboard helper');
-  await ui.keyboard.press('Meta+k'); await ui.keyboard.type('copy code'); await ui.keyboard.press('Enter');
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe('localStorage.getItem("demo");');
-  await ui.keyboard.press('Meta+k'); await ui.keyboard.type('edit'); await ui.keyboard.press('Enter');
-  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
-  await ui.keyboard.press('Meta+a'); await ui.keyboard.type('Clipboard helper edited');
-  await ui.keyboard.press('Meta+Enter');
-  await expect(search).toBeFocused();
-  await expect(ui.locator('.result[aria-selected=true]')).toContainText('Clipboard helper edited');
-  await ui.keyboard.press('Meta+k'); await ui.keyboard.type('delete'); await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('alertdialog')).toBeVisible();
-  await ui.keyboard.press('Tab'); await ui.keyboard.press('Enter');
-  await expect(search).toBeFocused();
-  await expect(ui.locator('.result.script')).toHaveCount(0);
-  await ui.keyboard.press('Meta+a'); await ui.keyboard.type('scripts'); await ui.keyboard.press('Enter');
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'Script Library' })).toBeVisible();
-  await expect(ui.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
-  await ui.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('scripts');
-  await search.fill('new script'); await ui.keyboard.press('Enter');
-  await ui.keyboard.type('Unsaved'); await ui.keyboard.press('Escape');
-  await expect(search).toBeFocused();
-  expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('saved-script:')))).toEqual([]);
-});
-});
 
 test('Chinese command discovery opens each preference at its keyboard control', async () => {
   const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
@@ -4495,163 +4203,15 @@ test('Chinese command discovery opens each preference at its keyboard control', 
   await search.fill('重置搜索排序'); await ui.keyboard.press('Enter');
   await expect(ui.locator('[data-setting=ranking] button')).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
-  await search.fill('脚本'); await ui.keyboard.press('Enter');
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: '脚本收藏' })).toBeVisible();
-  await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
-  await search.fill('新建脚本'); await ui.keyboard.press('Enter');
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: '新建脚本' })).toBeVisible();
-});
-
-async function enableScriptExecution() {
-  const settings = await context.newPage();
-  await settings.goto(`chrome://extensions/?id=${new URL(worker.url()).hostname}`);
-  const toggle = settings.locator('#allow-user-scripts cr-toggle');
-  await expect(toggle).toBeVisible(); await toggle.click();
-  await settings.close();
-}
-async function scriptExecutionFixture(code: string, enable = true) {
-  await worker.evaluate(code => chrome.storage.local.set({ 'saved-script:runner': { title: 'Execution helper', code } }), code);
-  if (enable) await enableScriptExecution();
-  const page = await context.newPage(); await page.goto(`${origin}/Execution-fixture`);
-  await page.evaluate(() => localStorage.setItem('demo', '中文\n\n'));
-  const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
-  await worker.evaluate(async id => {
-    await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
-  }, tabId);
-  const surface = page.frameLocator('.zing-frame');
-  await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
-  return { page, surface, tabId };
-}
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
-  test('English script execution storage overlay runs once, copies exact results and restores search', async () => {
-  await context.grantPermissions(['clipboard-read']);
-  const { page, surface } = await scriptExecutionFixture('localStorage.setItem("runs", String(Number(localStorage.getItem("runs") || 0) + 1)); localStorage.getItem("demo")');
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('Execution helper'); await expect(surface.locator('.result.script')).toHaveCount(1);
-  await page.keyboard.press('Meta+k'); await surface.getByRole('combobox', { name: 'Search actions' }).fill('run and copy'); await page.keyboard.press('Enter');
-  await expect(surface.getByLabel('Result', { exact: true })).toHaveValue('中文\n\n');
-  await expect(surface.getByText('Result copied', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('中文\n\n');
-  expect(await page.evaluate(() => localStorage.getItem('runs'))).toBe('1');
-  await page.keyboard.press('Enter'); // Copy Result has focus; must not rerun.
-  expect(await page.evaluate(() => localStorage.getItem('runs'))).toBe('1');
-  await page.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('Execution helper');
-  expect(await worker.evaluate(async () => Object.keys(await chrome.storage.local.get(null)).filter(key => /result|execution/i.test(key)))).toEqual([]);
-});
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
-  test('English script execution storage searches the run command and handles async objects and errors', async () => {
-  const { page, surface } = await scriptExecutionFixture('Promise.resolve({ answer: 42, markup: "<script>not HTML</script>" })');
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('run script'); await page.keyboard.press('Enter');
-  await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
-  await page.keyboard.type('Execution helper'); await page.keyboard.press('Enter');
-  await expect(surface.getByLabel('Result', { exact: true })).toHaveValue('{\n  "answer": 42,\n  "markup": "<script>not HTML</script>"\n}');
-  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
-  await expect(search).toBeFocused();
-  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:runner': { title: 'Execution helper', code: 'throw new Error("Expected failure")' } }));
-  await search.fill('Execution helper'); await page.keyboard.press('Enter');
-  await expect(surface.getByLabel('Result', { exact: true })).toHaveValue('Error: Expected failure');
-  await expect(surface.getByRole('button', { name: 'Copy Result', exact: true })).toHaveCount(0);
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-script-run-error.png') });
-});
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
-  test('English script execution storage explains disabled permission and never runs before enabling', async () => {
-  const { page, surface } = await scriptExecutionFixture('localStorage.setItem("ran", "yes"); 42', false);
-  await surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' }).fill('Execution helper'); await page.keyboard.press('Enter');
-  await expect(surface.getByRole('alert')).toContainText('Enable user scripts');
-  expect(await page.evaluate(() => localStorage.getItem('ran'))).toBeNull();
-  await expect(surface.getByRole('button', { name: 'Open Extension Details' })).toBeVisible();
-  const created = context.waitForEvent('page'); await surface.getByRole('button', { name: 'Open Extension Details' }).click();
-  const detail = await created; await expect(detail).toHaveURL(`chrome://extensions/?id=${new URL(worker.url()).hostname}`);
-});
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
-  test('English script execution storage leaves the clipboard alone after returning from a pending run', async () => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  const { page, surface } = await scriptExecutionFixture('new Promise(resolve => setTimeout(() => { localStorage.setItem("done", "yes"); resolve("late result"); }, 700))');
-  await page.evaluate(() => navigator.clipboard.writeText('unchanged'));
-  const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('Execution helper'); await page.keyboard.press('Meta+k');
-  await surface.getByRole('combobox', { name: 'Search actions' }).fill('run and copy'); await page.keyboard.press('Enter');
-  await expect(surface.locator('.script-run-status')).toContainText('Running script…');
-  await page.keyboard.press('Escape'); await expect(search).toBeFocused();
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('done'))).toBe('yes');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('unchanged');
-});
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English script execution refuses a Chrome internal page and keeps built-in setup copy-only', async () => {
-  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:runner': { title: 'Execution helper', code: '42' } }));
-  await ui.getByRole('combobox').fill('Execution helper'); await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('alert')).toContainText('ordinary HTTP or HTTPS');
-  await ui.keyboard.press('Escape');
-  await ui.getByRole('combobox').fill('ctrl tab'); await ui.keyboard.press('Meta+k');
-  await expect(ui.locator('.action-row')).toHaveCount(2);
-  await expect(ui.locator('.action-row')).toContainText(['Copy Code', 'View Setup Instructions']);
-});
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English script save stays visible without scrolling the editor', async () => {
-  await ui.setViewportSize({ width: 750, height: 516 });
-  await ui.getByRole('combobox').fill('new script');
+  await search.fill('设置 Ctrl+Tab'); await ui.keyboard.press('Enter');
+  await expect(ui.locator('[data-setting=binding] button')).toBeFocused();
   await ui.keyboard.press('Enter');
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
-  await ui.getByLabel('Name', { exact: true }).fill('Visible save regression');
-  await ui.getByLabel('JavaScript code').fill('localStorage.getItem("demo")');
-  await expect(ui.getByRole('button', { name: 'Save', exact: true })).toBeInViewport({ ratio: 1 });
-  await ui.screenshot({ path: test.info().outputPath('zing-save-visible.png') });
-  await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(ui.getByRole('combobox')).toHaveValue('new script');
-  expect(await worker.evaluate(async () => Object.values(await chrome.storage.local.get(null)).some((value: any) => value?.title === 'Visible save regression'))).toBe(true);
-});
+  await expect(ui.locator('.binding-view')).toBeVisible();
+  await ui.keyboard.press('Escape'); await expect(ui.locator('[data-setting=binding] button')).toBeFocused();
+  await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
+
 });
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, pageAccess: true, shadow: 'open' } });
-  test('Chinese script save storage overlay remains visible in a short viewport and enlarged editor', async () => {
-  const page = await context.newPage();
-  await page.setViewportSize({ width: 390, height: 400 });
-  await page.goto(`${origin}/Script-save-short`);
-  const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
-  await worker.evaluate(async id => {
-    await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
-  }, tabId);
-  const surface = page.frameLocator('.zing-frame');
-  await surface.getByRole('combobox').fill('新建脚本');
-  await page.keyboard.press('Enter');
-  const save = surface.getByRole('button', { name: '保存', exact: true });
-  await expect(save).toBeInViewport({ ratio: 1 });
-  await save.click();
-  await expect(surface.getByRole('alert')).toBeInViewport({ ratio: 1 });
-  await surface.getByLabel('名称', { exact: true }).fill('短窗口验收');
-  const code = surface.getByLabel('JavaScript 代码');
-  await code.fill('42');
-  await code.evaluate(el => (el as HTMLElement).style.height = '650px');
-  await expect(save).toBeInViewport({ ratio: 1 });
-  await surface.locator('.script-editor-body').evaluate(el => { el.scrollTop = el.scrollHeight; });
-  await expect(save).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: test.info().outputPath('zing-save-short.png') });
-  await save.click();
-  await expect(surface.getByRole('combobox')).toHaveValue('新建脚本');
-  expect(await worker.evaluate(async () => Object.values(await chrome.storage.local.get(null)).some((value: any) => value?.title === '短窗口验收' && value?.code === '42'))).toBe(true);
-});
-});
 
 
 test.describe(() => {
@@ -4674,10 +4234,10 @@ test.describe(() => {
   await expect(surface.getByRole('combobox')).toBeFocused();
   const bounds = await surface.locator('.palette').boundingBox();
   expect(Math.abs(bounds!.x + bounds!.width / 2 - 550)).toBeLessThan(1);
-  await surface.getByRole('combobox').fill('new script'); await page.keyboard.press('Enter');
-  await expect(surface.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
-  const editor = await surface.locator('.palette').boundingBox();
-  expect(editor!.x).toBe(bounds!.x); expect(editor!.y).toBe(bounds!.y);
+  await surface.getByRole('combobox').fill('settings'); await page.keyboard.press('Enter');
+  await expect(surface.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+  const settings = await surface.locator('.palette').boundingBox();
+  expect(settings!.x).toBe(bounds!.x); expect(settings!.y).toBe(bounds!.y);
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await expect(page.locator('#zing-command-palette')).not.toBeAttached();
   // A successful launch must also recover any per-tab popup left by an earlier failure.
@@ -4693,59 +4253,44 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English script editor shares the footer and action menu while preserving code editing', async () => {
+  test('English binding guide preserves code selection through the shared action menu', async () => {
   await context.grantPermissions(['clipboard-read']);
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await expect(ui.locator('.palette-footer .actions-button')).toBeVisible();
-  await search.fill('new script'); await ui.keyboard.press('Enter');
-  const name = ui.getByLabel('Name', { exact: true });
-  const code = ui.getByLabel('JavaScript code');
-  await name.fill('Shared actions helper'); await code.fill('const value = 42;');
-  await ui.keyboard.press('End'); await ui.keyboard.press('Enter');
-  await expect(code).toHaveValue('const value = 42;\n');
-  await expect(ui.locator('.palette-footer .primary-action')).toHaveText('Save⌘↵');
-  await expect(ui.getByRole('button', { name: 'Copy Code', exact: true })).toHaveCount(0);
-  await code.evaluate(el => (el as HTMLTextAreaElement).setSelectionRange(6, 11));
-  await ui.keyboard.press('Meta+k');
-  const actionSearch = ui.getByRole('combobox', { name: 'Search actions' });
-  await expect(actionSearch).toBeFocused();
-  await expect(ui.locator('.action-row')).toHaveCount(2);
-  await ui.keyboard.press('Control+n');
+  await search.fill('ctrl tab'); await search.press('Enter');
+  const setup = ui.getByRole('button', { name: 'Set Up', exact: true });
+  await expect(setup).toBeFocused(); await setup.press('Enter');
+  const code = ui.locator('.binding-code-field textarea');
+  const original = await code.inputValue();
+  await expect(code).toHaveAttribute('readonly', '');
+  await code.focus(); await code.evaluate((node: HTMLTextAreaElement) => node.setSelectionRange(6, 11));
+  await code.press('Meta+k');
+  const actions = ui.getByRole('combobox', { name: 'Search actions' });
+  await expect(actions).toBeFocused();
+  await expect(ui.locator('#binding-actions')).toBeVisible();
+  await expect(ui.locator('.action-row')).toContainText(['Copy Code', 'Open Chrome Shortcuts']);
+  await actions.press('Control+n');
+  await expect(ui.locator('.action-row[aria-selected=true]')).toContainText('Open Chrome Shortcuts');
+  await actions.press('Control+p');
   await expect(ui.locator('.action-row[aria-selected=true]')).toContainText('Copy Code');
-  await ui.keyboard.press('Control+p');
-  await expect(ui.locator('.action-row[aria-selected=true]')).toContainText('Save');
-  await ui.keyboard.press('Escape'); await expect(code).toBeFocused();
-  expect(await code.evaluate(el => [(el as HTMLTextAreaElement).selectionStart, (el as HTMLTextAreaElement).selectionEnd])).toEqual([6, 11]);
-  await ui.keyboard.press('Meta+k'); await actionSearch.fill('copy'); await ui.keyboard.press('Enter');
+  await actions.press('Escape'); await expect(code).toBeFocused();
+  expect(await code.evaluate((node: HTMLTextAreaElement) => [node.selectionStart, node.selectionEnd])).toEqual([6, 11]);
+  await code.press('Meta+k'); await actions.fill('copy'); await actions.press('Enter');
   await expect(code).toBeFocused();
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe('const value = 42;\n');
-  await ui.keyboard.press('Meta+k'); await actionSearch.fill('save');
-  await ui.locator('.palette-footer .primary-action').click();
-  await expect(search).toBeFocused();
-  await search.fill('Shared actions'); await ui.keyboard.press('Meta+k');
-  await actionSearch.fill('edit'); await ui.keyboard.press('Enter');
-  await expect(name).toBeFocused(); await name.fill('Shared actions updated');
-  await ui.keyboard.press('Meta+Enter'); await expect(search).toBeFocused();
-  await expect(ui.locator('.result.script')).toContainText('Shared actions updated');
-  await ui.keyboard.press('Meta+k'); await actionSearch.fill('edit'); await ui.keyboard.press('Enter');
-  await ui.keyboard.press('Meta+k'); await actionSearch.fill('delete'); await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('alertdialog').getByRole('button', { name: 'Cancel' })).toBeFocused();
-  await ui.keyboard.press('Escape'); await expect(name).toBeFocused();
-  await expect(name).toHaveValue('Shared actions updated');
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-shared-editor.png') });
-  await ui.keyboard.press('Meta+k'); await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-shared-editor-menu.png') });
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(original);
+  expect(await code.evaluate((node: HTMLTextAreaElement) => [node.selectionStart, node.selectionEnd])).toEqual([6, 11]);
+  await code.press('Escape'); await expect(setup).toBeFocused();
+  await ui.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('ctrl tab');
 });
 });
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
-  test('English palette launch overlay Escape returns one level from script management', async () => {
-  const page = await context.newPage(); await page.goto(`${origin}/Escape-management`);
-  const open = () => worker.evaluate(async () => {
+  test('English palette launch overlay Escape returns one level from binding setup', async () => {
+  const page = await context.newPage(); await page.goto(`${origin}/Escape-binding`);
+  await worker.evaluate(async () => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  await open();
   const cdp = await context.newCDPSession(page);
   const ax = async () => {
     const { frameTree } = await cdp.send('Page.getFrameTree');
@@ -4754,40 +4299,16 @@ test.describe(() => {
   };
   const focused = async (name: string) => (await ax()).some(node => node.name?.value === name && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true));
   await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.type('manage scripts'); await page.keyboard.press('Enter');
-  await expect.poll(() => focused('Search scripts')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
-  await expect(page.locator('#zing-command-palette')).toBeAttached();
-  await page.keyboard.press('Meta+a'); await page.keyboard.type('settings'); await page.keyboard.press('Enter');
-  await expect.poll(() => focused('Back')).toBe(true);
-  await page.keyboard.press('Shift+Tab');
-  await expect.poll(() => focused('Manage Scripts')).toBe(true);
-  await page.keyboard.press('Enter');
-  await expect.poll(() => focused('Search scripts')).toBe(true);
-  await expect.poll(async () => (await ax()).some(node => node.role?.value === 'button' && node.name?.value === 'New Script' && !node.properties?.some(prop => prop.name === 'disabled' && prop.value.value === true))).toBe(true);
-  await page.keyboard.press('Meta+Shift+n');
-  await expect.poll(() => focused('Name')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Search scripts')).toBe(true);
-  // Search dismiss, footer back, primary Edit, then secondary New; rows are not Tab stops.
-  for (let at = 0; at < 4; at++) await page.keyboard.press('Tab');
-  await expect.poll(() => focused('New Script')).toBe(true);
-  await page.keyboard.press('Enter');
-  await expect.poll(() => focused('Name')).toBe(true);
-  await page.keyboard.press('Meta+k');
-  await expect.poll(() => focused('Search actions')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Name')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Search scripts')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Language')).toBe(true);
+  await page.keyboard.type('ctrl tab'); await page.keyboard.press('Enter');
+  await expect.poll(() => focused('Set Up')).toBe(true);
+  await page.keyboard.press('Enter'); await expect.poll(() => focused('Copy & Open')).toBe(true);
+  await page.keyboard.press('Meta+k'); await expect.poll(() => focused('Search actions')).toBe(true);
+  await page.keyboard.press('Escape'); await expect.poll(() => focused('Copy & Open')).toBe(true);
+  await page.keyboard.press('Escape'); await expect.poll(() => focused('Set Up')).toBe(true);
   await expect.poll(async () => (await ax()).some(node => node.role?.value === 'region' && node.name?.value === 'Settings')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#zing-command-palette')).toBeAttached();
+  await page.keyboard.press('Escape'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
+  await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
 });
 
@@ -4801,35 +4322,24 @@ test.describe(() => {
   });
   const surface = page.frameLocator('.zing-frame');
   const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('manage scripts'); await page.keyboard.press('Enter');
-  await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
-  await surface.locator('.palette-footer-title').filter({ hasText: 'Script Library' }).click();
-  await page.keyboard.press('Escape');
-  await expect(search).toBeFocused();
-  await expect(search).toHaveValue('manage scripts');
-  // Central routing handles each page, including clicks on non-input content.
-  for (const [query, heading] of [['settings', 'Settings'], ['new script', 'New Script'], ['run script', 'Run Script']]) {
+  for (const [query, heading] of [['settings', 'Settings'], ['local storage', 'Local Storage'], ['session storage', 'Session Storage']]) {
     await search.fill(query); await page.keyboard.press('Enter');
     await surface.locator('.palette-footer-title').filter({ hasText: heading }).click();
     await page.keyboard.press('Escape'); await expect(search).toBeFocused();
     await expect(search).toHaveValue(query);
   }
-  await search.fill('new script'); await page.keyboard.press('Enter');
+  await search.fill('ctrl tab'); await page.keyboard.press('Enter');
+  await surface.getByRole('button', { name: 'Set Up', exact: true }).click();
   await page.keyboard.press('Meta+k');
   await surface.locator('.action-heading').click(); await page.keyboard.press('Escape');
-  await expect(surface.locator('.palette-footer-title').filter({ hasText: 'New Script' })).toBeVisible();
-  await expect(surface.getByLabel('Name', { exact: true })).toBeFocused();
+  await expect(surface.locator('.binding-view .primary-action')).toBeFocused();
+  await surface.locator('.binding-guide p').first().click(); await page.keyboard.press('Escape');
+  await expect(surface.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+  await surface.locator('.settings-view .palette-footer-title').click();
   await page.keyboard.press('Escape'); await expect(search).toBeFocused();
   await search.fill('local storage'); await page.keyboard.press('Enter');
   await surface.locator('.palette-footer-context').click(); await page.keyboard.press('Escape');
   await expect(search).toBeFocused();
-  await search.fill('settings'); await page.keyboard.press('Enter');
-  await surface.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
-  await surface.locator('.palette-footer-title').filter({ hasText: 'Script Library' }).click();
-  await page.keyboard.press('Escape');
-  await expect(surface.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
-  await surface.locator('.settings-view .palette-footer-title').click();
-  await page.keyboard.press('Escape'); await expect(search).toBeFocused();
   await search.fill('no-such-command'); await surface.getByText('No results found', { exact: true }).click();
   await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
@@ -4837,49 +4347,26 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English Escape routing survives lost control focus through every script and settings layer', async () => {
-  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:escape-fixture': { title: 'Escape fixture', code: 'return "fixture";' } }));
+  test('English Escape routing survives lost control focus through binding and settings layers', async () => {
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const escapeWithoutControlFocus = async () => {
     await ui.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await ui.keyboard.press('Escape');
   };
-  await search.fill('manage scripts'); await search.press('Enter');
-  await expect(ui.getByRole('combobox', { name: 'Search scripts' })).toBeFocused();
-  await escapeWithoutControlFocus();
-  await expect(search).toBeFocused();
   await search.fill('settings'); await search.press('Enter');
-  await ui.getByRole('combobox', { name: 'Language', exact: true }).press('Enter');
-  await escapeWithoutControlFocus();
-  await expect(ui.getByRole('combobox', { name: 'Language', exact: true })).toHaveAttribute('aria-expanded', 'false');
-  await expect(ui.getByRole('combobox', { name: 'Language', exact: true })).toBeFocused();
-  await ui.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
-  const scripts = ui.getByRole('combobox', { name: 'Search scripts' });
-  await scripts.fill('Escape fixture'); await scripts.press('Meta+k');
-  await ui.getByRole('combobox', { name: 'Search actions' }).fill('edit');
-  await ui.keyboard.press('Enter');
-  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
-  await ui.keyboard.press('Meta+k');
-  await escapeWithoutControlFocus();
-  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
-  await ui.keyboard.press('Meta+k');
-  await ui.getByRole('combobox', { name: 'Search actions' }).fill('delete');
-  await ui.keyboard.press('Enter');
-  await expect(ui.getByRole('alertdialog')).toBeVisible();
-  await escapeWithoutControlFocus();
-  await expect(ui.getByRole('alertdialog')).toHaveCount(0);
-  await expect(ui.getByLabel('Name', { exact: true })).toBeFocused();
-  await escapeWithoutControlFocus(); await expect(scripts).toBeFocused();
-  await expect(scripts).toHaveValue('Escape fixture');
-  await escapeWithoutControlFocus(); await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
-  await escapeWithoutControlFocus(); await expect(search).toBeFocused();
-  await expect(search).toHaveValue('settings');
-  await search.fill('run script'); await search.press('Enter');
-  await scripts.fill('Escape fixture'); await scripts.press('Enter');
-  // The popup is a restricted target; the error result is still a navigation layer.
-  await expect(ui.getByRole('alert')).toBeVisible();
-  await escapeWithoutControlFocus(); await expect(scripts).toBeFocused();
-  await escapeWithoutControlFocus(); await expect(search).toBeFocused();
+  const language = ui.getByRole('combobox', { name: 'Language', exact: true });
+  await language.press('Enter'); await escapeWithoutControlFocus();
+  await expect(language).toHaveAttribute('aria-expanded', 'false'); await expect(language).toBeFocused();
+  const setup = ui.getByRole('button', { name: 'Set Up', exact: true });
+  await setup.click();
+  await ui.keyboard.press('Meta+k'); await escapeWithoutControlFocus();
+  await expect(ui.locator('.binding-view .primary-action')).toBeFocused();
+  await escapeWithoutControlFocus(); await expect(setup).toBeFocused();
+  await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+  await escapeWithoutControlFocus(); await expect(search).toBeFocused(); await expect(search).toHaveValue('settings');
+  await search.fill('help'); await search.press('Enter');
+  await expect(ui.getByRole('article', { name: 'Help', exact: true })).toBeVisible();
+  await escapeWithoutControlFocus(); await expect(search).toBeFocused(); await expect(search).toHaveValue('help');
 });
 });
 
@@ -4913,86 +4400,48 @@ test.describe(() => {
     await escape(); await expect(search).toBeFocused();
     await expect(search).toHaveValue(command);
   }
-  await search.fill('manage scripts'); await page.keyboard.press('Enter');
+  await search.fill('local storage'); await page.keyboard.press('Enter');
   // Composition owns Escape until committed; repeated keydown must not pop again.
   await surface.locator('.zing-app').evaluate(node => {
     const doc = node.ownerDocument;
     doc.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, isComposing: true }));
     doc.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, repeat: true }));
   });
-  await expect(surface.getByRole('combobox', { name: 'Search scripts' })).toBeVisible();
+  await expect(surface.getByRole('combobox', { name: 'Search storage keys' })).toBeVisible();
   await escape(); await expect(search).toBeFocused();
   await escape(); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
   // Reopen to catch stale registrations/listeners left behind by the prior mount.
   await open(); await expect(search).toBeFocused();
-  await search.fill('manage scripts'); await page.keyboard.press('Enter');
+  await search.fill('local storage'); await page.keyboard.press('Enter');
   await escape(); await expect(search).toBeFocused();
   await escape(); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
 });
 });
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English Escape returns from pending and completed script results without stale updates', async () => {
-  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:pending-fixture': { title: 'Pending fixture', code: '42' } }));
-  // Defer only execution transport in this isolated popup to control completion
-  // order. Navigation, selection and rendering use the production components.
-  await ui.evaluate(() => {
-    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
-    const scope = window as unknown as { finishRun?: (value: unknown) => void };
-    chrome.runtime.sendMessage = ((request: { type?: string }) => request.type === 'run-saved-script'
-      ? new Promise<unknown>(resolve => { scope.finishRun = resolve; }) : send(request)) as typeof chrome.runtime.sendMessage;
-  });
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('run script'); await search.press('Enter');
-  const picker = ui.getByRole('combobox', { name: 'Search scripts' });
-  await picker.fill('Pending fixture'); await picker.press('Enter');
-  await expect(ui.locator('.script-run-status')).toBeVisible();
-  await ui.keyboard.press('Escape'); await expect(picker).toBeFocused();
-  await ui.evaluate(() => (window as unknown as { finishRun: (value: unknown) => void }).finishRun({ ok: true, data: { success: true, text: 'stale result' } }));
-  await expect(picker).toBeFocused(); await expect(ui.locator('.script-output')).toHaveCount(0);
-  await picker.press('Enter'); await expect(ui.locator('.script-run-status')).toBeVisible();
-  await ui.evaluate(() => (window as unknown as { finishRun: (value: unknown) => void }).finishRun({ ok: true, data: { success: true, text: 'current result' } }));
-  await expect(ui.locator('.script-output')).toHaveValue('current result');
-  await ui.evaluate(() => (document.activeElement as HTMLElement)?.blur());
-  await ui.keyboard.press('Escape'); await expect(picker).toBeFocused();
-  await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
-});
-});
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English Backspace returns from empty searches while preserving text editing and the root', async () => {
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('settings'); await search.press('Enter');
-  await ui.getByRole('button', { name: 'Manage Scripts', exact: true }).click();
-  const scripts = ui.getByRole('combobox', { name: 'Search scripts' });
-  await scripts.fill('test'); await scripts.press('Backspace');
-  await expect(scripts).toHaveValue('tes');
-  await scripts.press('Meta+a'); await scripts.press('Backspace');
-  await expect(scripts).toHaveValue('');
-  await ui.getByRole('button', { name: 'New Script', exact: true }).click();
-  const name = ui.getByLabel('Name', { exact: true });
-  await name.press('Backspace'); await expect(name).toBeFocused();
+  const settings = ui.getByRole('textbox', { name: 'Search settings', exact: true });
+  await settings.fill('test'); await settings.press('Backspace'); await expect(settings).toHaveValue('tes');
+  await settings.press('Meta+a'); await settings.press('Backspace'); await expect(settings).toHaveValue('');
+  const setup = ui.getByRole('button', { name: 'Set Up', exact: true });
+  await setup.click();
   const code = ui.getByLabel('JavaScript code');
-  await code.fill('x'); await code.press('Backspace'); await code.press('Backspace');
-  await expect(code).toBeFocused(); await expect(code).toHaveValue('');
+  const original = await code.inputValue();
+  await code.focus(); await code.press('Backspace'); await expect(code).toBeFocused(); await expect(code).toHaveValue(original);
   await code.press('Meta+k');
   const actions = ui.getByRole('combobox', { name: 'Search actions' });
-  await actions.fill('save'); await actions.press('Backspace'); await expect(actions).toHaveValue('sav');
+  await actions.fill('copy'); await actions.press('Backspace'); await expect(actions).toHaveValue('cop');
   await actions.fill(''); await actions.press('Backspace'); await expect(code).toBeFocused();
-  await ui.locator('.footer-back').first().focus();
-  await ui.keyboard.press('Backspace'); await expect(scripts).toBeFocused();
-  await scripts.press('Backspace');
-  await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+  await ui.locator('.footer-back').focus(); await ui.keyboard.press('Backspace'); await expect(setup).toBeFocused();
   const language = ui.getByRole('combobox', { name: 'Language', exact: true });
-  await language.press('Enter'); await language.press('Backspace');
-  await expect(language).toHaveAttribute('aria-expanded', 'false');
+  await language.press('Enter'); await language.press('Backspace'); await expect(language).toHaveAttribute('aria-expanded', 'false');
   await language.press('Backspace'); await expect(search).toBeFocused();
-  await search.fill(''); await search.press('Backspace');
-  await expect(search).toBeFocused();
-  await search.press('Meta+k'); await ui.keyboard.press('Backspace');
-  await expect(search).toBeFocused();
+  await search.fill(''); await search.press('Backspace'); await expect(search).toBeFocused();
+  await search.press('Meta+k'); await ui.keyboard.press('Backspace'); await expect(search).toBeFocused();
 });
 });
 
@@ -5013,18 +4462,18 @@ test.describe(() => {
   };
   const focused = async (name: string) => (await ax()).some(node => node.name?.value === name && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true));
   await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.type('manage scripts'); await page.keyboard.press('Enter');
-  await expect.poll(() => focused('Search scripts')).toBe(true);
+  await page.keyboard.type('help'); await page.keyboard.press('Enter');
+  await expect.poll(() => focused('Search help')).toBe(true);
   await page.keyboard.type('x'); await page.keyboard.press('Backspace');
-  await expect.poll(() => focused('Search scripts')).toBe(true);
+  await expect.poll(() => focused('Search help')).toBe(true);
   await page.keyboard.press('Backspace');
   await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.press('Meta+a'); await page.keyboard.type('new script'); await page.keyboard.press('Enter');
-  await expect.poll(() => focused('Name')).toBe(true);
-  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Name')).toBe(true);
+  await page.keyboard.press('Meta+a'); await page.keyboard.type('ctrl tab'); await page.keyboard.press('Enter');
+  await expect.poll(() => focused('Set Up')).toBe(true);
+  await page.keyboard.press('Enter'); await expect.poll(() => focused('Copy & Open')).toBe(true);
   await page.keyboard.press('Meta+k'); await expect.poll(() => focused('Search actions')).toBe(true);
-  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Name')).toBe(true);
-  await page.keyboard.press('Shift+Tab'); await expect.poll(() => focused('Back')).toBe(true);
+  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Copy & Open')).toBe(true);
+  await page.keyboard.press('Backspace'); await expect.poll(() => focused('Set Up')).toBe(true);
   await page.keyboard.press('Backspace'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Meta+a'); await page.keyboard.type('local storage'); await page.keyboard.press('Enter');
   await expect.poll(() => focused('Search storage keys')).toBe(true);
@@ -5081,7 +4530,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
 
 for (const language of ['English', 'Chinese']) test.describe(() => {
   test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
-  test(`${language} categorized candidates show real shortcuts and keep search matching and save binding`, async () => {
+  test(`${language} categorized candidates show real shortcuts and keep search matching and binding setup`, async () => {
   const en = language === 'English';
   const search = ui.locator('.search-bar input');
   const switcher = ui.locator('[id="zing-command:tabSwitcher"]');
@@ -5096,9 +4545,9 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await expect(switcher.locator('.entry-subtitle mark')).toHaveText('Code');
   if (actualBinding) await expect(switcher.locator('.entry-shortcut kbd')).toHaveText(actualBinding);
   else await expect(switcher.locator('.entry-shortcut')).toHaveCount(0);
-  await search.fill('script:new');
+  await search.fill('storage:local');
   const first = ui.locator('#zing-results [role="option"]').first();
-  await expect(first.locator('.entry-title')).toHaveText(en ? 'Script: New Script' : '脚本: 新建脚本');
+  await expect(first.locator('.entry-title')).toHaveText(en ? 'Storage: View Local Storage' : '存储: 查看 Local Storage');
   await expect(first.locator('mark')).not.toHaveCount(0);
   await expect(first.locator('.entry-shortcut')).toHaveCount(0);
   await search.fill('new tab');
@@ -5110,14 +4559,13 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await expect(ui.locator('.action-row .entry-shortcut kbd')).toHaveText(['⌘,']);
   await ui.keyboard.press('Meta+,'); await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText(en ? 'Settings' : '设置');
   await ui.keyboard.press('Escape');
-  await search.fill('script: new'); await search.press('Enter');
-  await ui.locator('.script-field input').fill('Prefix fixture');
-  await ui.locator('.script-field textarea').fill('42');
-  await ui.keyboard.press('Meta+k');
-  await expect(ui.locator('.action-row .entry-shortcut kbd')).toHaveText(['⌘↵']);
-  await ui.keyboard.press('Meta+Enter');
-  await expect(search).toBeFocused();
-  await expect.poll(() => worker.evaluate(async () => Object.values(await chrome.storage.local.get(null)).some(value => (value as { title?: string })?.title === 'Prefix fixture'))).toBe(true);
+  await search.fill('ctrl tab'); await search.press('Enter');
+  const setup = ui.locator('[data-setting=binding] button');
+  await expect(setup).toBeFocused(); await setup.press('Enter');
+  await expect(ui.locator('.binding-view')).toHaveAccessibleName(en ? 'Set Up Ctrl+Tab' : '设置 Ctrl+Tab');
+  await expect(ui.locator('.binding-code-field textarea')).toHaveAttribute('readonly', '');
+  await ui.keyboard.press('Escape'); await expect(setup).toBeFocused();
+  await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
   for (const theme of ['light', 'dark']) {
     await worker.evaluate(preferences => chrome.storage.local.set({ preferences }), { language: en ? 'en' : 'zh', theme });
     await search.fill('new tab'); await ui.setViewportSize({ width: 390, height: 516 });
@@ -5181,7 +4629,7 @@ test.describe(() => {
   for (let run = 0; run < 3; run++) {
     const start = performance.now();
     await ui.reload();
-    await expect(ui.locator('.result.command')).toHaveCount(10);
+    await expect(ui.locator('.result.command')).toHaveCount(9);
     timings.push(Math.round(performance.now() - start));
   }
   const reads = await worker.evaluate(() => (globalThis as unknown as { __bookmarkReads: number }).__bookmarkReads);
@@ -5246,7 +4694,7 @@ test.describe(() => {
   });
   const surface = page.frameLocator('.zing-frame');
   const start = performance.now(); await launch();
-  await expect(surface.locator('.result.command')).toHaveCount(10);
+  await expect(surface.locator('.result.command')).toHaveCount(9);
   const coldMs = Math.round(performance.now() - start);
   const input = surface.locator('.search-bar input');
   const searchMs: number[] = [];
@@ -5259,7 +4707,7 @@ test.describe(() => {
   }
   await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
   const warm = performance.now(); await launch();
-  await expect(surface.locator('.result.command')).toHaveCount(10);
+  await expect(surface.locator('.result.command')).toHaveCount(9);
   const warmMs = Math.round(performance.now() - warm);
   console.log(JSON.stringify({ performance: 'large-library', bookmarks: 5000, coldMs, warmMs, searchMs }));
   // Broad bounds catch a blocked UI; detailed timings remain observational.
@@ -5331,7 +4779,7 @@ for (const scenario of ['fast', 'slow', 'failure and retry']) {
     if (scenario === 'fast') {
       await ui.clock.runFor(100);
       await release();
-      await expect(ui.locator('.result.command')).toHaveCount(10);
+      await expect(ui.locator('.result.command')).toHaveCount(9);
       await ui.clock.runFor(200);
       await expect(ui.locator('.results .spinner')).toHaveCount(0);
     } else if (scenario === 'slow') {
@@ -5365,7 +4813,7 @@ for (const scenario of ['fast', 'slow', 'failure and retry']) {
       await ui.clock.runFor(1);
       await expect(ui.locator('.results .spinner')).toBeVisible();
       await release();
-      await expect(ui.locator('.result.command')).toHaveCount(10);
+      await expect(ui.locator('.result.command')).toHaveCount(9);
       await expect(ui.getByRole('alert')).toHaveCount(0);
       await expect(ui.locator('.results .spinner')).toHaveCount(0);
     }
@@ -5373,56 +4821,6 @@ for (const scenario of ['fast', 'slow', 'failure and retry']) {
   });
 }
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('English interaction polish script navigation scrolls and returns to the same selection and caret', async () => {
-  await worker.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 35 }, (_, i) => [
-    `saved-script:polish-${i}`, { title: `Polish ${String(i).padStart(2, '0')}`, code: '42' },
-  ]))));
-  await ui.locator('.search-bar input').fill('manage scripts'); await ui.keyboard.press('Enter');
-  const search = ui.getByRole('combobox', { name: 'Search scripts' });
-  await search.fill('Polish');
-  await expect(ui.locator('.script-item')).toHaveCount(35);
-  await expect(ui.locator('.script-item mark').first()).toHaveText('Polish');
-  expect(await ui.locator('.script-list [role=option]').evaluateAll(rows => rows.every(row => (row as HTMLElement).tabIndex === -1))).toBe(true);
-  await search.press('Tab'); await expect(ui.locator('.script-search .search-dismiss')).toBeFocused();
-  await ui.keyboard.press('Tab'); await expect(ui.locator('.preview-code')).toBeFocused();
-  await ui.keyboard.press('Tab'); await expect(ui.locator('.palette-footer .footer-back')).toBeFocused();
-  await search.click();
-  await ui.getByRole('option', { name: 'Polish 03', exact: true }).hover();
-  await ui.getByRole('option', { name: 'Polish 04', exact: true }).hover();
-  await expect(ui.locator('.script-item.selected')).toHaveText('Polish 00');
-  await ui.getByRole('option', { name: 'Polish 04', exact: true }).click();
-  await expect(ui.locator('.script-item.selected')).toHaveText('Polish 04');
-  await ui.keyboard.press('Control+n'); await expect(ui.locator('.script-item.selected')).toHaveText('Polish 05');
-  await ui.keyboard.press('Control+p'); await expect(ui.locator('.script-item.selected')).toHaveText('Polish 04');
-  await search.press('Meta+ArrowUp');
-  await search.press('Shift+Enter'); await expect(search).toBeVisible();
-  await search.press('Control+Shift+n');
-  await expect(ui.locator('.script-item.selected')).toContainText('Polish 00');
-  await search.press('Meta+ArrowDown');
-  await expect(ui.locator('.script-item.selected')).toContainText('Polish 34');
-  await search.press('PageUp');
-  await expect(ui.locator('.script-item.selected')).not.toContainText('Polish 34');
-  await search.press('Meta+ArrowUp');
-  for (let i = 0; i < 28; i++) await search.press('Control+n');
-  await expect(ui.locator('.script-item.selected')).toContainText('Polish 28');
-  expect(await ui.locator('.script-item.selected').evaluate(node => {
-    const row = node.getBoundingClientRect(); const body = node.closest('.script-list')!.getBoundingClientRect();
-    return row.top >= body.top - 1 && row.bottom <= body.bottom + 1;
-  })).toBe(true);
-  await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 4));
-  await expect(ui.locator('.script-search .search-dismiss')).toHaveText('esc');
-  await ui.locator('.palette-footer .actions-button').click();
-  await ui.getByRole('combobox', { name: 'Search actions' }).fill('edit');
-  await ui.locator('.palette-footer .primary-action').click();
-  await expect(ui.getByLabel('Name', { exact: true })).toHaveValue('Polish 28');
-  await ui.keyboard.press('Escape');
-  await expect(search).toBeFocused(); await expect(search).toHaveValue('Polish');
-  expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 4]);
-  await expect(ui.locator('.script-item.selected')).toContainText('Polish 28');
-});
-});
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
@@ -5575,275 +4973,6 @@ test.describe(() => {
 });
 });
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
-  test('English shared script lists preserve main geometry at normal and narrow widths', async () => {
-  const longCode = Array.from({ length: 100 }, (_, index) => `// Preview line ${index}: ${'long code '.repeat(16)}`).join('\n');
-  const { page, surface } = await scriptExecutionFixture(longCode, false);
-  await worker.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 24 }, (_, index) => [
-    `saved-script:geometry-${index}`, { title: `Geometry ${String(index).padStart(2, '0')}`, code: `// Script ${index}\n43` },
-  ]))));
-  const root = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  const geometry = () => surface.locator('.palette').evaluate(panel => {
-    const box = (node: Element) => {
-      const rect = node.getBoundingClientRect();
-      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-    };
-    const first = (selector: string) => box(panel.querySelector(selector)!);
-    return { panel: box(panel), search: first('.search-bar'), input: first('.search-bar input'),
-      row: first('.result'), icon: first('.result .entry-icon'), footer: first('.palette-footer'),
-      navigation: first('.footer-navigation') };
-  });
-  for (const size of [{ width: 1100, height: 760 }, { width: 390, height: 440 }]) {
-    await page.setViewportSize(size);
-    await root.fill('manage scripts');
-    await expect(surface.getByRole('option').first()).toBeVisible();
-    const main = await geometry();
-    expect(main.search.height).toBe(56); expect(main.row.height).toBe(40);
-    expect(main.icon.width).toBe(26); expect(main.icon.height).toBe(26);
-    expect(main.footer.height).toBe(44);
-    for (const [command, title] of [['manage scripts', 'Script Library'], ['run script', 'Run Script']]) {
-      await root.fill(command); await root.press('Enter');
-      const picker = surface.getByRole('combobox', { name: 'Search scripts' });
-      await expect(picker).toBeFocused();
-      await expect(surface.locator('.palette-footer-title')).toHaveText(title);
-      await expect(surface.locator('.settings-header')).toHaveCount(0);
-      const current = await geometry();
-      for (const key of ['panel', 'search', 'input', 'footer', 'navigation'] as const) expect(current[key]).toEqual(main[key]);
-      expect(current.row.height).toBe(main.row.height);
-      expect(current.icon.width).toBe(main.icon.width); expect(current.icon.height).toBe(main.icon.height);
-      expect(current.row.y).toBe(main.row.y);
-      expect(await surface.locator('.script-item').evaluateAll(rows => rows.every(row => (row as HTMLElement).tabIndex === -1))).toBe(true);
-      if (command === 'run script') {
-        expect(current.row).toEqual(main.row);
-        expect(current.icon).toEqual(main.icon);
-        await expect(surface.locator('.script-list-detail, .script-preview')).toHaveCount(0);
-      }
-      await picker.press('Tab'); await expect(surface.locator('.script-search .search-dismiss')).toBeFocused();
-      if (command === 'manage scripts') {
-        await page.keyboard.press('Tab'); await expect(surface.locator('.preview-code')).toBeFocused();
-      }
-      await page.keyboard.press('Tab');
-      await test.info().attach(`script-tab-focus-${size.width}-${command}`, { contentType: 'application/json', body: JSON.stringify(await surface.locator('.palette').evaluate(panel => {
-        const root = panel.getRootNode() as Document | ShadowRoot;
-        return { active: root.activeElement?.outerHTML, documentFocused: panel.ownerDocument.hasFocus() };
-      })) });
-      await expect(surface.locator('.palette-footer .footer-back')).toBeFocused();
-      await picker.click();
-      await picker.press('Meta+ArrowUp');
-      const firstId = await surface.locator('.script-item.selected').getAttribute('id');
-      await picker.press('Control+n'); await expect(surface.locator('.script-item.selected')).not.toHaveAttribute('id', firstId!);
-      await picker.press('Control+p'); await expect(surface.locator('.script-item.selected')).toHaveAttribute('id', firstId!);
-      await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport({ ratio: 1 });
-      if (command === 'manage scripts') {
-        const list = surface.locator('.script-list');
-        const detail = surface.locator('.script-list-detail');
-        const preview = surface.getByRole('region', { name: 'Code Preview', exact: true });
-        const code = preview.locator('.preview-code');
-        await surface.getByRole('option', { name: 'Execution helper', exact: true }).click();
-        await expect(code).toHaveValue(longCode);
-        await expect(list).toBeInViewport({ ratio: 1 });
-        await expect(preview).toBeInViewport({ ratio: 1 });
-        const listBox = (await list.boundingBox())!;
-        const detailBox = (await detail.boundingBox())!;
-        if (size.width > 520) {
-          expect(listBox.x + listBox.width).toBeLessThanOrEqual(detailBox.x + 1);
-          expect(Math.abs(listBox.y - detailBox.y)).toBeLessThanOrEqual(1);
-          expect(current.row.width).toBeLessThan(main.row.width);
-        } else {
-          expect(listBox.y + listBox.height).toBeLessThanOrEqual(detailBox.y + 1);
-          expect(Math.abs(listBox.x - detailBox.x)).toBeLessThanOrEqual(1);
-          expect(Math.abs(listBox.width - detailBox.width)).toBeLessThanOrEqual(1);
-        }
-        expect(listBox.height).toBeGreaterThanOrEqual(40);
-        expect(detailBox.height).toBeGreaterThan(60);
-        await expect(preview.locator('.preview-info')).toContainText('Execution helper');
-        await expect(preview.locator('.preview-info')).toContainText('JavaScript');
-        await expect(code).toHaveAttribute('readonly', '');
-        await code.focus();
-        await expect(code).toBeFocused();
-        await code.evaluate((node: HTMLTextAreaElement) => node.setSelectionRange(0, 20));
-        const selectedId = await picker.getAttribute('aria-activedescendant');
-        await code.press('ArrowDown');
-        await expect(picker).toHaveAttribute('aria-activedescendant', selectedId!);
-        await expect(code).toHaveValue(longCode);
-        const fixedGeometry = await geometry();
-        const listScroll = await list.evaluate(node => node.scrollTop);
-        expect(await code.evaluate(node => node.scrollHeight > node.clientHeight && node.scrollWidth > node.clientWidth)).toBe(true);
-        await code.evaluate(node => { node.scrollTop = node.scrollHeight; node.scrollLeft = node.scrollWidth; });
-        expect(await code.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
-        expect(await code.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
-        expect(await list.evaluate(node => node.scrollTop)).toBe(listScroll);
-        for (const key of ['panel', 'search', 'footer'] as const) expect((await geometry())[key]).toEqual(fixedGeometry[key]);
-        const previewScroll = await code.evaluate(node => ({ top: node.scrollTop, left: node.scrollLeft }));
-        await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
-        expect(await list.evaluate(node => node.scrollTop)).toBeGreaterThan(listScroll);
-        expect(await code.evaluate(node => ({ top: node.scrollTop, left: node.scrollLeft }))).toEqual(previewScroll);
-        await list.evaluate(node => { node.scrollTop = 0; });
-        await code.evaluate(node => { node.scrollTop = 0; node.scrollLeft = 0; });
-        await picker.focus();
-        for (const theme of ['light', 'dark'] as const) {
-          await page.emulateMedia({ colorScheme: theme });
-          await surface.locator('.palette').screenshot({ path: test.info().outputPath(`script-preview-${theme}-${size.width}.png`) });
-        }
-        await expect(surface.locator('.script-item .kind-label')).toHaveText('Built-in');
-        await expect(surface.locator('.palette-footer .secondary-action')).toHaveAccessibleName('New Script');
-        await expect(surface.locator('.palette-footer .secondary-action')).toBeInViewport({ ratio: 1 });
-        if (size.width <= 520) {
-          await expect(surface.locator('.secondary-compact-icon')).toBeVisible();
-          expect((await surface.locator('.palette-footer-title').boundingBox())!.width).toBeGreaterThan(50);
-        }
-        await picker.press('Meta+Shift+n');
-        await expect(surface.getByLabel('Name', { exact: true })).toBeFocused();
-        await expect(surface.locator('.palette-footer-title')).toHaveText('New Script');
-        await surface.locator('.palette').screenshot({ path: test.info().outputPath(`script-editor-${size.width}.png`) });
-        await surface.locator('.palette-footer .footer-back').click();
-        await expect(picker).toBeFocused();
-      }
-      expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-      await surface.locator('.palette-footer .footer-back').click();
-      await expect(root).toBeFocused(); await expect(root).toHaveValue(command);
-    }
-  }
-});
-
-  test('English interaction polish storage script picker ignores modified Enter before execution', async () => {
-  const { page, surface } = await scriptExecutionFixture('42', false);
-  await surface.locator('.search-bar input').fill('run script'); await page.keyboard.press('Enter');
-  const search = surface.getByRole('combobox', { name: 'Search scripts' });
-  await expect(search).toBeFocused();
-  await search.press('Shift+Enter'); await expect(search).toBeFocused();
-  await search.press('Meta+Enter'); await expect(search).toBeFocused();
-  await expect(surface.locator('.script-run-status')).toHaveCount(0);
-  await expect(surface.getByRole('alert')).toHaveCount(0);
-  await search.press('Enter');
-  await expect(surface.getByRole('alert')).toContainText('Enable user scripts');
-  await page.keyboard.press('Escape');
-  await worker.evaluate(() => chrome.storage.local.set(Object.fromEntries(Array.from({ length: 20 }, (_, at) => [
-    `saved-script:context-${at}`, { title: `Context ${String(at).padStart(2, '0')}`, code: '42' },
-  ]))));
-  await search.fill('Context');
-  await expect(surface.locator('.script-item')).toHaveCount(20);
-  await search.press('Meta+ArrowDown');
-  await expect(surface.locator('.script-item.selected')).toContainText('Context 19');
-  await search.press('PageUp');
-  await expect(surface.locator('.script-item.selected')).not.toContainText('Context 19');
-  await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-  await surface.getByRole('option', { name: 'Context 18' }).click();
-  await expect(surface.getByRole('alert')).toContainText('Enable user scripts');
-  await page.keyboard.press('Escape');
-  await expect(search).toBeFocused();
-  await expect(surface.locator('.script-item.selected')).toContainText('Context 18');
-  expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
-  await expect(surface.locator('.script-search .search-dismiss')).toHaveText('esc');
-  await surface.locator('.script-search .search-dismiss').click();
-  await expect(surface.locator('.script-runner')).toHaveCount(0);
-});
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
-  test('English result footer storage overlay copies reruns and restores output selection through the shared menu', async () => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  const { page, surface } = await scriptExecutionFixture('localStorage.setItem("runs", String(Number(localStorage.getItem("runs") || 0) + 1)); "Exact result\\n\\n"');
-  const search = surface.locator('.search-bar input');
-  await search.fill('Execution helper'); await search.press('Enter');
-  const output = surface.getByLabel('Result', { exact: true });
-  const primary = surface.locator('.palette-footer .primary-action');
-  await expect(output).toHaveValue('Exact result\n\n');
-  await expect(primary).toHaveAccessibleName('Copy Result'); await expect(primary).toBeFocused();
-  await expect(surface.locator('.script-result-body')).toBeVisible();
-  await expect(surface.locator('.script-runner .settings-header')).toHaveCount(0);
-  await expect(surface.locator('.palette-footer-title')).toHaveText('Result');
-  await expect(surface.locator('.script-result-body .script-controls')).toHaveCount(0);
-  await output.focus(); await output.evaluate((node: HTMLTextAreaElement) => node.setSelectionRange(2, 8));
-  await output.press('Meta+k');
-  const menu = surface.getByRole('combobox', { name: 'Search actions' });
-  await expect(menu).toBeFocused();
-  await expect(surface.locator('.action-row')).toContainText(['Copy Result', 'Run Again']);
-  await menu.press('Control+n'); await expect(primary).toHaveAccessibleName('Run Again');
-  await menu.press('Control+p'); await expect(primary).toHaveAccessibleName('Copy Result');
-  await menu.press('Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
-  await page.keyboard.press('Tab'); await expect(menu).toBeFocused();
-  await surface.locator('.palette-footer .footer-back').click();
-  await expect(menu).toHaveCount(0); await expect(output).toBeFocused();
-  await expect(surface.locator('.palette-footer-title')).toHaveText('Result');
-  expect(await output.evaluate((node: HTMLTextAreaElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 8]);
-  await output.press('Meta+k'); await menu.fill('copy');
-  await expect(surface.locator('.action-row mark')).toHaveText('Copy');
-  await menu.press('Enter');
-  await expect(surface.getByText('Result copied', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('Exact result\n\n');
-  await expect(output).toBeFocused();
-  expect(await output.evaluate((node: HTMLTextAreaElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 8]);
-  expect(await page.evaluate(() => localStorage.getItem('runs'))).toBe('1');
-  await output.press('Meta+k'); await menu.fill('run again');
-  await primary.click();
-  await expect(output).toHaveValue('Exact result\n\n');
-  await expect(primary).toHaveAccessibleName('Copy Result'); await expect(primary).toBeFocused();
-  expect(await page.evaluate(() => localStorage.getItem('runs'))).toBe('2');
-  await page.setViewportSize({ width: 390, height: 440 });
-  await expect(primary).toBeInViewport();
-  expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  expect(await primary.locator('.primary-label').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-result-footer-narrow.png') });
-  await primary.click(); expect(await page.evaluate(() => localStorage.getItem('runs'))).toBe('2');
-  await page.keyboard.press('Escape'); await expect(search).toBeFocused(); await expect(search).toHaveValue('Execution helper');
-});
-});
-
-test('Chinese result footer guards busy and failed runs and supports retry and menu back navigation', async () => {
-  await worker.evaluate(() => chrome.storage.local.set({ 'saved-script:result-fixture': { title: 'Result fixture', code: '42' } }));
-  await ui.evaluate(() => {
-    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
-    const scope = window as unknown as { finishRun?: (value: unknown) => void; runCount: number };
-    scope.runCount = 0;
-    chrome.runtime.sendMessage = ((request: { type?: string }) => {
-      if (request.type !== 'run-saved-script') return send(request);
-      scope.runCount++;
-      return new Promise<unknown>(resolve => { scope.finishRun = resolve; });
-    }) as typeof chrome.runtime.sendMessage;
-  });
-  const finish = (success: boolean, text: string) => ui.evaluate(({ success, text }) => (window as unknown as { finishRun: (value: unknown) => void }).finishRun({ ok: true, data: { success, text } }), { success, text });
-  const root = ui.locator('.search-bar input'); await root.fill('run script'); await root.press('Enter');
-  const picker = ui.locator('.script-search input'); await picker.fill('Result fixture');
-  await picker.press('Enter');
-  const primary = ui.locator('.palette-footer .primary-action');
-  await expect(primary).toBeDisabled(); await expect(ui.locator('.actions-button')).toBeDisabled();
-  await ui.keyboard.press('Meta+k'); await expect(ui.locator('.action-menu')).toHaveCount(0);
-  await finish(false, 'Expected failure');
-  await expect(primary).toHaveAccessibleName('重新运行'); await expect(primary).toBeFocused();
-  await primary.press('Meta+k');
-  await expect(ui.locator('.action-row')).toHaveCount(1); await expect(ui.locator('.action-row')).toContainText('重新运行');
-  const menu = ui.locator('.action-search input');
-  await menu.fill('copy'); await expect(primary).toBeDisabled();
-  await menu.fill(''); await menu.press('Backspace'); await expect(primary).toBeFocused();
-  await primary.dispatchEvent('keydown', { key: 'Enter', repeat: true });
-  await primary.press('Shift+Enter');
-  expect(await ui.evaluate(() => (window as unknown as { runCount: number }).runCount)).toBe(1);
-  await primary.press('Enter'); await expect(primary).toBeDisabled();
-  expect(await ui.evaluate(() => (window as unknown as { runCount: number }).runCount)).toBe(2);
-  await finish(true, '');
-  await expect(ui.locator('.script-output')).toHaveValue('');
-  await expect(primary).toHaveAccessibleName('复制结果'); await expect(primary).toBeEnabled();
-  await ui.evaluate(() => {
-    document.execCommand = () => false;
-    navigator.clipboard.writeText = async () => { throw new Error('Clipboard fixture unavailable'); };
-  });
-  await primary.click();
-  await expect(ui.getByRole('alert')).toContainText('复制失败');
-  await expect(primary).toBeEnabled(); await expect(ui.locator('.script-output')).toHaveValue('');
-  // Native popup uses its declared 750×516 surface; the overlay case above covers small viewports.
-  await ui.setViewportSize({ width: 750, height: 516 });
-  await expect(primary).toBeInViewport();
-  expect(await primary.locator('.primary-label').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-result-footer-chinese.png') });
-  await primary.press('Meta+k'); await menu.press('Control+n'); await menu.press('Enter');
-  await expect(primary).toBeDisabled();
-  await ui.keyboard.press('Escape'); await expect(picker).toBeFocused(); await expect(picker).toHaveValue('Result fixture');
-  await finish(true, 'Late result');
-  await expect(picker).toBeFocused(); await expect(ui.locator('.script-output')).toHaveCount(0);
-});
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });

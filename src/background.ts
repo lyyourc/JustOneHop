@@ -1,6 +1,5 @@
 import { isNativePage, togglePaletteWindow, paletteSender, closePaletteWindowForShortcut, getPaletteWindowState, performPaletteAction, cancelPaletteContinuation } from './paletteWindow';
 import { startTabTucking } from './tabTuck';
-import { runSavedScript } from './scriptExecution';
 import { openRecentSwitcher } from './recentTabs';
 import { readPageStorage, openCookieAccess } from './pageStorage';
 import { preferencesReady } from './preferences';
@@ -9,7 +8,7 @@ import { openChromePage } from './chromePages';
 import { historyWindow, searchHistory, snapshot } from './browser';
 import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
 import { forgetUsage, resetUsage } from './usageStorage';
-import type { Request, Snapshot, PageStorage, ScriptResult, PaletteState, HistorySearchResult } from './types';
+import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult } from './types';
 
 const opening = new Set<number>();
 async function launch(tab: chrome.tabs.Tab) {
@@ -48,20 +47,18 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 });
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'zing') return;
-  if (!['run-saved-script', 'open-script-settings', 'snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
+  if (!['snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
   let responded = false;
-  const success = (data?: void | Snapshot | PageStorage | ScriptResult | PaletteState | HistorySearchResult) => {
+  const success = (data?: void | Snapshot | PageStorage | PaletteState | HistorySearchResult) => {
     if (responded) return;
     responded = true;
     // Switching/closing a tab can remove the caller before the reply. That
     // must not interrupt the successful action's queued usage write.
     try { respond({ ok: true, data }); } catch { /* Caller already gone. */ }
   };
-  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | ScriptResult | PaletteState | HistorySearchResult> => {
+  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | PaletteState | HistorySearchResult> => {
     if (request.type === 'palette-state') return getPaletteWindowState(sender);
     sender = await paletteSender(sender);
-    if (request.type === 'run-saved-script') return runSavedScript(request.payload, sender);
-    if (request.type === 'open-script-settings') return chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}`, ...(sender.tab ? { windowId: sender.tab.windowId } : {}) }).then(() => undefined);
     if (request.type === 'open-cookie-access') return openCookieAccess(request.payload, sender);
     if (request.type === 'read-page-storage') return readPageStorage(request.payload, sender);
     if (request.type === 'snapshot') { void refreshToolbarMenu(); return snapshot(sender.tab); }
