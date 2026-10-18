@@ -3404,6 +3404,15 @@ async function recentPopup(source: Page, direction = 1) {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English wheel back cancels the standalone switcher without switching tabs', async () => {
+    const source = await context.newPage(); await source.goto(`${origin}/Wheel-switcher-source`);
+    const other = await context.newPage(); await other.goto(`${origin}/Wheel-switcher-other`);
+    const popup = await recentPopup(source);
+    await popup.page.getByRole('button', { name: 'Search recent tabs…', exact: true }).click();
+    await popup.page.locator('.palette-footer-title').hover(); await popup.page.mouse.wheel(-140, 0);
+    await expect.poll(popup.closed).toBe(true);
+    expect(await popup.active()).toBe(popup.target.id);
+  });
   test('English recent switcher keeps the source active while selecting and switches only on release', async () => {
   const a = await context.newPage(); await a.goto(`${origin}/Recent-A`);
   const b = await context.newPage(); await b.goto(`${origin}/Recent-B`);
@@ -4358,7 +4367,123 @@ test.describe(() => {
 });
 
 test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English wheel back preserves layers readers and cancels on other input', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Wheel-readers`);
+    await page.evaluate(() => localStorage.setItem('wide', 'wide text '.repeat(400)));
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
+    const surface = page.frameLocator('.zing-frame');
+    const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await search.fill('local storage');
+    await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await expect(surface.locator('.primary-action')).toBeEnabled();
+    await search.press('Enter');
+    const keys = surface.getByRole('combobox', { name: 'Search storage keys' });
+    await expect(surface.locator('.storage-row')).toHaveCount(1);
+    const reader = surface.locator('.storage-preview .preview-code');
+    await reader.hover(); await page.mouse.wheel(300, 0);
+    await expect.poll(() => reader.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
+    await page.mouse.wheel(-1000, 0);
+    await expect.poll(() => reader.evaluate(node => node.scrollLeft)).toBe(0);
+    await page.mouse.wheel(-200, 0);
+    await page.waitForTimeout(300);
+    await expect(keys).toBeVisible();
+    await keys.fill('wide'); await keys.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 3));
+    await surface.locator('.storage-row').click({ button: 'right' });
+    await expect(surface.locator('.action-menu')).toBeVisible();
+    await surface.locator('.action-heading').hover();
+    for (const amount of [-45, -70, -30, -12, -4]) await page.mouse.wheel(amount, 0);
+    await expect(surface.locator('.action-menu')).toHaveCount(0);
+    await expect(keys).toBeFocused(); await expect(keys).toHaveValue('wide');
+    expect(await keys.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 3]);
+    // Playwright wheel calls may span several native sequences. End the reader's
+    // final tail before starting a distinct gesture over the footer.
+    await page.waitForTimeout(300);
+    await surface.locator('.palette-footer-title').hover();
+    await page.mouse.wheel(-60, 0);
+    await expect(surface.locator('.wheel-back-hint')).toHaveAttribute('data-ready', 'false');
+    await keys.evaluate(node => ((node.getRootNode() as ShadowRoot).activeElement as HTMLElement)?.blur());
+    await page.keyboard.press('ArrowLeft');
+    await page.waitForTimeout(300); await expect(keys).toBeVisible();
+    await surface.locator('.palette-footer-title').hover();
+    await page.mouse.wheel(-20, 0); await page.waitForTimeout(300); await expect(keys).toBeVisible();
+    await page.mouse.wheel(0, 150); await page.waitForTimeout(300); await expect(keys).toBeVisible();
+    await page.mouse.wheel(-140, 0); await expect(search).toBeFocused();
+    await expect(search).toHaveValue('local storage');
+    await search.fill('tab switcher');
+    await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await expect(surface.locator('.primary-action')).toBeEnabled();
+    await search.press('Enter');
+    await expect(surface.locator('.recent-switcher')).toBeVisible();
+    await page.waitForTimeout(300);
+    await surface.locator('.palette-footer-title').hover(); await page.mouse.wheel(-140, 0);
+    await expect(search).toBeFocused(); await expect(search).toHaveValue('tab switcher');
+    await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  });
+});
+
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
+  test('English wheel back works in the closed iframe and closes only the palette', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Wheel-closed`);
+    await page.getByRole('textbox', { name: 'Page input' }).focus();
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
+    const cdp = await context.newCDPSession(page);
+    const focused = async (name: string) => {
+      const { frameTree } = await cdp.send('Page.getFrameTree');
+      const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+      const { nodes } = await cdp.send('Accessibility.getFullAXTree', { frameId });
+      return nodes.some(node => node.name?.value === name && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true));
+    };
+    await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
+    // Wait for the settings button before using the shared keyboard shortcut.
+    await expect.poll(async () => {
+      const { frameTree } = await cdp.send('Page.getFrameTree');
+      const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+      return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes.some(node =>
+        node.role?.value === 'button' && node.name?.value === 'Settings' &&
+        !node.properties?.some(prop => prop.name === 'disabled' && prop.value.value === true));
+    }).toBe(true);
+    await page.keyboard.press('Meta+,');
+    await expect.poll(() => focused('Search settings')).toBe(true);
+    const size = page.viewportSize()!;
+    await page.mouse.move(size.width / 2, Math.min(150, Math.max(28, size.height * .16)) + 30);
+    await page.mouse.wheel(-140, 0);
+    await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
+    await page.waitForTimeout(300);
+    await page.mouse.wheel(-140, 0);
+    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(page.getByRole('textbox', { name: 'Page input' })).toBeFocused();
+    await expect(page).toHaveURL(`${origin}/Wheel-closed`);
+    await cdp.detach();
+  });
+});
+
+test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English wheel back returns from settings in the extension page', async () => {
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await search.fill('settings'); await search.press('Enter');
+    await expect(ui.getByRole('textbox', { name: 'Search settings' })).toBeFocused();
+    const result = await ui.locator('.palette-footer-title').evaluate(node => {
+      const swipe = () => new WheelEvent('wheel', { deltaX: -140, bubbles: true, cancelable: true });
+      const first = swipe(); node.dispatchEvent(first);
+      // Inspect synchronously: a timer-based return must fail this assertion.
+      const returned = !!document.querySelector('input[aria-label="Search commands, tabs, bookmarks, and history"]');
+      const tail = swipe(); document.querySelector('.palette-footer-title')!.dispatchEvent(tail);
+      return { returned, captured: first.defaultPrevented, tailCaptured: tail.defaultPrevented };
+    });
+    expect(result).toEqual({ returned: true, captured: true, tailCaptured: true });
+    await ui.waitForTimeout(300);
+    await expect(search).toBeFocused();
+    expect(ui.isClosed()).toBe(false);
+  });
   test('English Escape routing survives lost control focus through binding and settings layers', async () => {
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const escapeWithoutControlFocus = async () => {
@@ -6084,6 +6209,18 @@ for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test('English wheel back returns and closes the native palette', async () => {
+    const { palette, source } = await openNativePalette();
+    const search = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await search.fill('settings'); await search.press('Enter');
+    await expect(palette.getByRole('textbox', { name: 'Search settings' })).toBeFocused();
+    await palette.locator('.palette-footer-title').hover(); await palette.mouse.wheel(-140, 0);
+    await expect(search).toBeFocused(); await expect(search).toHaveValue('settings');
+    await palette.waitForTimeout(300);
+    await palette.locator('.palette-footer-title').hover(); await palette.mouse.wheel(-140, 0);
+    await expect.poll(() => palette.isClosed()).toBe(true);
+    expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).url).toBe('chrome://version/');
+  });
   test('English palette launch native window closes on Escape shortcut and focus loss', async () => {
   let opened = await openNativePalette();
   await opened.palette.keyboard.press('Escape').catch(error => { if (!opened.palette.isClosed()) throw error; });

@@ -1,7 +1,9 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
+import { useWheelBack } from './useWheelBack';
+import { t } from './i18n';
 
-type Layer = { depth: number; back: () => void };
+type Layer = { depth: number; closes: boolean; back: () => void };
 const Layers = createContext<Map<symbol, Layer> | null>(null);
 const Depth = createContext(0);
 
@@ -24,6 +26,14 @@ export function useNavigateBack() {
 export function NavigationRoot({ children }: { children: ReactNode }) {
   const surface = useRef<HTMLDivElement>(null);
   const [layers] = useState(() => new Map<symbol, Layer>());
+  const wheelHint = useWheelBack(surface, () => {
+    const top = topLayer(layers);
+    if (!top) return;
+    const palette = surface.current?.querySelector('.palette, .recent-switcher');
+    const dismiss = palette?.querySelector('.search-dismiss');
+    return { identity: top, defer: top.closes, back: () => flushSync(top.back),
+      label: top.depth === 1 ? dismiss?.getAttribute('aria-label') || t('closePalette') : t('back') };
+  });
   useLayoutEffect(() => {
     // Overlay React code runs in the content-script realm, but its DOM lives in
     // an iframe. Listening to the ambient `window` alone misses those keys.
@@ -54,11 +64,11 @@ export function NavigationRoot({ children }: { children: ReactNode }) {
     for (const target of views) target.addEventListener('keydown', navigateBack, true);
     return () => { for (const target of views) target.removeEventListener('keydown', navigateBack, true); };
   }, [layers]);
-  return <Layers.Provider value={layers}><div ref={surface} style={{ display: 'contents' }}>{children}</div></Layers.Provider>;
+  return <Layers.Provider value={layers}><div ref={surface} className="navigation-root">{children}{wheelHint}</div></Layers.Provider>;
 }
 
 /** Depth follows the rendered hierarchy, never effect/registration order. */
-export function BackLayer({ onBack, active = true, children }: { onBack: () => void; active?: boolean; children: ReactNode }) {
+export function BackLayer({ onBack, active = true, closes, children }: { onBack: () => void; active?: boolean; closes?: boolean; children: ReactNode }) {
   const layers = useContext(Layers);
   const parentDepth = useContext(Depth);
   const depth = parentDepth + (active ? 1 : 0);
@@ -68,8 +78,8 @@ export function BackLayer({ onBack, active = true, children }: { onBack: () => v
     if (!layers) throw new Error('BackLayer requires NavigationRoot');
     if (!active) return;
     const id = Symbol();
-    layers.set(id, { depth, back: () => callback.current() });
+    layers.set(id, { depth, closes: closes ?? depth === 1, back: () => callback.current() });
     return () => { layers.delete(id); };
-  }, [layers, depth, active]);
+  }, [layers, depth, active, closes]);
   return <Depth.Provider value={depth}>{children}</Depth.Provider>;
 }

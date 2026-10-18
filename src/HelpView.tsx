@@ -20,7 +20,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
   useEffect(() => { article.current?.scrollTo({ top: 0 }); }, [query]);
   function clearSearch() { setQuery(''); input.current?.focus(); }
 
-  return <BackLayer onBack={onBack}><section tabIndex={-1} className="palette help-view" aria-label={t('help')} onKeyDown={event => {
+  return <BackLayer onBack={onBack} closes={standalone}><section tabIndex={-1} className="palette help-view" aria-label={t('help')} onKeyDown={event => {
     if (event.nativeEvent.isComposing || event.keyCode === 229 || event.key !== 'Tab') return;
     event.preventDefault(); event.stopPropagation();
     const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input, button:not(:disabled), article[tabindex]'));

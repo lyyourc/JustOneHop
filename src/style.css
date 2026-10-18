@@ -27,7 +27,13 @@
 .palette { position: relative; display: flex; flex-direction: column; width: min(750px, 100%); height: 516px; margin: 0 auto; border-radius: 16px; background: var(--bg);
   border: 1px solid var(--border); box-shadow: 0 14px 40px rgb(32 33 36 / .20), 0 3px 10px rgb(32 33 36 / .08);
   overflow: hidden; animation: zing-enter 110ms ease-out both; }
+.navigation-root { min-height: 100%; }
 .zing-app.settled .palette { animation: none; }
+.wheel-back-hint { position: absolute; z-index: 30; left: 12px; top: 50%; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 8px 12px; border: 1px solid var(--border); border-radius: 24px; color: var(--muted); background: var(--raised); box-shadow: 0 2px 8px rgb(0 0 0 / .12); pointer-events: none; }
+.wheel-back-hint span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wheel-back-hint[data-ready='true'] { color: var(--accent); background: var(--selected); }
+/* Contain horizontal overscroll within the actual panel, including readers. */
+.palette, .palette textarea, .palette input { overscroll-behavior-x: contain; }
 @media (prefers-color-scheme: dark) {
   .palette { box-shadow: 0 18px 48px rgb(0 0 0 / .52), 0 4px 12px rgb(0 0 0 / .32); }
 }
@@ -296,7 +302,7 @@ body.zing-popup { margin: 0; width: 750px; height: 516px; overflow: hidden; back
 .permission-buttons .permission-allow { background: var(--selected); color: var(--accent); border-color: transparent; font-weight: 600; }
 
 body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: light-dark(#ffffff, #292a2d); color-scheme: light dark; }
-.recent-switcher { background: var(--bg); height: 100vh; display: flex; flex-direction: column; }
+.recent-switcher { position: relative; overflow: hidden; overscroll-behavior-x: contain; background: var(--bg); height: 100vh; display: flex; flex-direction: column; }
 .recent-search-field { display: flex; flex: 1; min-width: 0; height: 100%; }
 .recent-search-field input:disabled { pointer-events: none; cursor: default; caret-color: transparent; }
 .recent-search-activate { justify-content: center; }
