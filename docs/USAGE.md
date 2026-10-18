@@ -47,6 +47,14 @@
 
 **手动聚焦**：如果打开后焦点落在面板空白处，搜索栏会提示「按 Tab 聚焦搜索框」；按一次 Tab 或点击左侧小范围瞬移 logo即可恢复输入，提示随之隐藏。保留搜索词与输入选区，不执行结果或清空内容。焦点已在底栏等控件上时，Tab／Shift+Tab 沿正常顺序移动，不强行拉回搜索，也不显示失焦提示。设置、历史、Storage、标签组、帮助与操作菜单沿用同一入口；菜单打开时只恢复菜单搜索，确认弹窗不跳到背景。不新增 Cmd/Ctrl+F 聚焦绑定。若焦点仍在 Chrome 地址栏或其他应用，页面收不到按键，需要鼠标点击搜索框或小范围瞬移 logo。
 
+### 命令别名白名单
+
+内置命令在现有搜索规则上补充固定别名：`prefs / setings` 找设置，`pwd / passowrd` 找密码管理，`plugins / addons / extention / 插件管理` 找扩展管理，`favorites / favourites / 收藏夹` 找书签管理，`donwload` 找下载，`histroy` 找历史，`refesh / relaod` 找刷新，`恢复误关页面 / 撤销关闭` 找恢复标签页，`langauge` 找语言设置，`keybindings / 热键 / shorcut` 找快捷键设置，`local stroage / session stroage / cokies` 找相应存储入口。别名沿用现有排序、说明和高亮，不新增通用纠错算法；关闭、删除仍要求明确意图。
+
+品牌名支持 `justonehop`、`just one hop`、`just-one-hop`、`joh`、`小范围瞬移`、`瞬移`，英文不区分大小写。可搜 `joh settings`、`joh: help`、`瞬移：语言`、`reload joh`、`重载瞬移`；品牌别名同时用于产品命令和设置分类。仅搜 `reload / refesh / relaod` 仍指向页面刷新，不能解锁扩展重载。
+
+英文错拼摘选自 [Codespell 词典](https://github.com/codespell-project/codespell/blob/master/codespell_lib/data/dictionary.txt)，缩写参考 [prefs](https://en.wiktionary.org/wiki/prefs) 与 [PWD](https://www.abbreviations.com/term/172103/password)，收藏夹叫法参考 [Microsoft 的收藏夹／书签说明](https://support.microsoft.com/zh-cn/edge/organize-favorites-in-microsoft-edge)。这些来源证明词形或叫法存在，不代表本产品输入频率；品牌简称是本项目约定。候选经现有搜索回归筛选，例如 `sesion storage` 会引入 `design` 的无关匹配，因此未加入白名单。
+
 ### 访问网址
 
 输入 `example.com/docs`、`https://example.com/Docs?q=A#Part` 或 `localhost:3000`，首项显示「访问网址」及实际目标地址；匹配结果中的标签页、书签或历史已有相同完整 URL 时，不再重复显示地址候选。协议、路径、查询参数及片段不同仍保留访问入口，主机名大小写、默认端口和根路径末尾斜线按 URL 标准规范化后比较。域名默认补 HTTPS；localhost、127.x.x.x 与 `[::1]` 回环地址默认 HTTP；明确输入的 HTTP(S) 协议优先，保留路径、查询参数及片段。仅接受 HTTP(S)，其他协议、带凭据或包含空白的输入不会生成地址候选。普通关键词继续搜索本地结果，同时提供下述 Google 搜索候选；输入本身不会发起网页搜索，没有在线联想。

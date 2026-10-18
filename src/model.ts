@@ -1,4 +1,4 @@
-import { categoryTerms, entrySearchQuery, entryTitle } from './entryPresentation';
+import { brandAliases, categoryTerms, entrySearchQuery, entryTitle } from './entryPresentation';
 import { t } from './i18n';
 import { chromePages } from './chromePages';
 import Fuse, { type Expression } from 'fuse.js';
@@ -95,7 +95,7 @@ export function entries(snapshot: Snapshot): Entry[] {
     { id: 'command:reloadExtension', kind: 'command', category: 'justonehop', action: 'reloadExtension', icon: 'reload',
       title: t('reloadExtension'), subtitle: t('reloadExtensionHint'), searchOnly: true,
       keywords: 'reload restart justonehop extension extention 重载 重新加载 重启 扩展',
-      aliases: ['reload justonehop', 'reload justonehop extension', 'reload extension', 'reload justonehop extention', 'restart justonehop', '重载 justonehop', '重载扩展', '重新加载扩展', '重新加载 justonehop 扩展', '重启扩展'] },
+      aliases: [...brandAliases.flatMap(brand => [`reload ${brand}`, `restart ${brand}`, `重载 ${brand}`, `重新加载 ${brand}`, `重启 ${brand}`, ...(/[㐀-鿿]/.test(brand) ? [`重载${brand}`, `重新加载${brand}`, `重启${brand}`] : [])]), 'reload justonehop extension', 'reload extension', 'reload justonehop extention', '重载扩展', '重新加载扩展', '重新加载 justonehop 扩展', '重启扩展'] },
     ...(Object.keys(chromePages) as ChromePageAction[]).map((action): Entry => {
       const page = chromePages[action];
       return { id: `command:${action}`, kind: 'command', category: 'chromePages', action, icon: page.icon,
@@ -104,9 +104,9 @@ export function entries(snapshot: Snapshot): Entry[] {
     ...(snapshot.canUndoTuck ? [{ id: 'command:undoTuck', kind: 'command' as const, category: 'tab' as const, action: 'undoTuck' as const,
       icon: 'restore' as const, title: t('undoTuck'), subtitle: '', keywords: 'undo tuck away 撤销 收起' }] : []),
     ...([
-      ['language', 'language', ['language', 'change language', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
+      ['language', 'language', ['language', 'change language', 'lang', 'langauge', 'languge', 'laguage', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
       ['theme', 'theme', ['theme', 'appearance', 'change theme', 'dark mode', 'light mode', '深色模式', '浅色模式', '主题', '外观', '换主题', '切换主题']],
-      ['keyboard', 'keyboardShortcuts', ['hotkey', 'shortcut', 'keyboard shortcuts', '快捷键', '快捷键设置']],
+      ['keyboard', 'keyboardShortcuts', ['hotkey', 'hotkeys', 'shortcut', 'keyboard shortcuts', 'keybindings', 'shorcut', 'shotcut', '快捷键', '快捷键设置', '热键', '按键绑定']],
       ['binding', 'bindCtrlTab', ['ctrl tab', 'Ctrl+Tab', 'bind Ctrl+Tab', 'set up Ctrl+Tab', '设置 Ctrl+Tab', '配置 Ctrl+Tab', '绑定 Ctrl+Tab']],
       ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '重置排序', '清除排序', '使用习惯']],
       ['tabs', 'autoTuck', ['auto tuck tabs', 'auto tuck', 'automatic tuck', '自动收起闲置标签页', '自动收起标签页', '自动收起', '收起设置']],
@@ -187,19 +187,20 @@ export function homeEntries(items: Entry[], usageScores: ReadonlyMap<string, num
 
 // Intent aliases are phrases, not the loose keyword bag. Keep them independent
 // of the display language so an English command works equally well in Chinese.
+// Selected typo spellings come from codespell's dictionary; see docs/USAGE.md.
 const commandAliases: Partial<Record<Entry['action'], string[]>> = {
   newTab: ['new tab', 'open tab', 'open new tab', 'create tab', '新建标签页', '新标签页', '新建页面', '打开新标签页', '新建', 'xinjian'],
   close: ['close', 'close tab', 'close current tab', '关闭', '关闭标签页', '关闭当前标签页', 'guanbi'],
   closeOthers: ['close others', 'close other tabs', '关闭其他标签页', 'guanbi qita'],
   closeRight: ['close right', 'close tabs to the right', '关闭右侧标签页', 'guanbi youce'],
-  restore: ['restore tab', 'reopen tab', 'reopen closed tab', 'reopen last tab', 'restore last closed tab', 'undo close tab', 'restore', 'reopen', '恢复关闭的标签页', '恢复标签页', '恢复上一个标签页', '重新打开', '重新打开关闭的标签页', '恢复', 'huifu'],
-  reload: ['reload', 'refresh', 'reload tab', 'refresh tab', 'reload page', 'refresh page', 'refresh this page', '刷新标签页', '刷新页面', '重新加载页面', '刷新', 'shuaxin'],
+  restore: ['restore tab', 'reopen tab', 'reopen closed tab', 'reopen last tab', 'restore last closed tab', 'undo close tab', 'restore', 'reopen', '恢复关闭的标签页', '恢复标签页', '恢复上一个标签页', '重新打开', '重新打开关闭的标签页', '恢复', 'huifu', 'resotre', 'restrore', '恢复误关页面', '撤销关闭'],
+  reload: ['reload', 'refresh', 'reload tab', 'refresh tab', 'reload page', 'refresh page', 'refresh this page', '刷新标签页', '刷新页面', '重新加载页面', '刷新', 'shuaxin', 'refesh', 'referesh', 'relaod', 'realod'],
   tuck: ['tuck away tab', 'tuck tab', '收起标签页', '收起'],
   undoTuck: ['undo tuck away', 'undo tuck', '撤销收起'],
-  localStorage: ['local storage', 'localstorage', '查看本地存储', '本地存储'],
-  sessionStorage: ['session storage', 'sessionstorage', '查看会话存储', '会话存储'],
-  cookies: ['cookies', 'cookie', '查看 cookie', '查看 cookies'],
-  settings: ['settings', 'open settings', 'preferences', '设置', '打开设置', '偏好设置', 'shezhi'],
+  localStorage: ['local storage', 'localstorage', '查看本地存储', '本地存储', 'local storeage', 'local stroage', 'local storge'],
+  sessionStorage: ['session storage', 'sessionstorage', '查看会话存储', '会话存储', 'seesion storage', 'session stroage'],
+  cookies: ['cookies', 'cookie', '查看 cookie', '查看 cookies', 'cokies'],
+  settings: ['settings', 'open settings', 'preferences', '设置', '打开设置', '偏好设置', 'shezhi', 'prefs', 'setings', 'settigns', 'settngs', 'perferences'],
 };
 
 const normalizeSearch = (value: string) => entrySearchQuery(value).trim().toLowerCase().replace(/\s+/g, ' ');
@@ -302,7 +303,9 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     return 7;
   };
   const kindOrder = { tab: 0, bookmark: 1, history: 2, command: 3 };
-  const explicitExtensionReload = (terms.includes('justonehop') || normalized.includes('小范围瞬移')) || hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
+  const explicitExtensionReload = brandAliases.some(alias => /[㐀-鿿]/.test(alias)
+    ? normalized.includes(alias) : ` ${normalized} `.includes(` ${alias} `)) ||
+    hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
   return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
     (item.action !== 'bookmarkTab' || !explicitUnbookmark) &&
     (!item.danger || (['unbookmarkTab', 'removeBookmark'].includes(item.action) ? explicitUnbookmark || explicitBookmarkState :

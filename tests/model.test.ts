@@ -150,6 +150,65 @@ test('justonehop commands use shared category titles and bilingual colon searche
   } finally { globalThis.chrome = original; }
 });
 
+test('brand aliases find commands and settings without changing reload intent boundaries', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      const items = entries(data);
+      for (const brand of ['justonehop', 'JOH', 'just one hop', 'just-one-hop', '小范围瞬移', '瞬移']) {
+        for (const [suffix, id] of [['settings', 'command:settings'], ['help', 'command:help'], ['reload', 'command:reloadExtension'], ['语言', 'command:settings:language']]) {
+          for (const query of [`${brand} ${suffix}`, `${brand}: ${suffix}`, `${brand}：${suffix}`]) {
+            assert.equal(search(items, query)[0]?.id, id, `${locale}: ${query}`);
+          }
+        }
+        for (const query of [`reload ${brand}`, `重载 ${brand}`, `重启 ${brand}`, ...(/[㐀-鿿]/.test(brand) ? [`重载${brand}`] : [])]) {
+          assert.equal(search(items, query)[0]?.action, 'reloadExtension', `${locale}: ${query}`);
+        }
+        assert.ok(search(items, brand).some(item => item.id === 'command:help'), brand);
+      }
+      for (const query of ['reload', 'refresh', 'refesh', 'relaod', 'john reload', 'johx reload']) {
+        assert.ok(!search(items, query).some(item => item.action === 'reloadExtension'), query);
+      }
+      const reload = items.find(item => item.action === 'reloadExtension')!;
+      assert.equal(matchingAlias(reload, 'reload joh'), 'reload joh');
+    }
+  } finally { globalThis.chrome = original; }
+});
+
+test('curated command aliases resolve in both languages and preserve destructive intent gates', () => {
+  const original = globalThis.chrome;
+  const cases: [string, string[]][] = [
+    ['settings', ['prefs', 'setings', 'settigns', 'settngs', 'perferences']],
+    ['reload', ['refesh', 'referesh', 'relaod', 'realod']],
+    ['restore', ['resotre', 'restrore', '恢复误关页面', '撤销关闭']],
+    ['openExtensions', ['plugins', 'addons', 'add-ons', '插件管理', 'extention', 'extentions', 'extenstion', 'extensons']],
+    ['openPasswords', ['pwd', '密码管理', 'pasword', 'passowrd', 'passwrod']],
+    ['openDownloads', ['下载记录', '下载管理', 'donwload', 'dowload', 'downlaod', 'downlod']],
+    ['openHistory', ['浏览历史', '访问记录', 'histroy', 'histry', 'hisory']],
+    ['openBookmarks', ['favorites', 'favourites', '收藏夹', '收藏夹管理']],
+    ['settings:language', ['lang', 'langauge', 'languge', 'laguage']],
+    ['settings:keyboard', ['hotkeys', 'keybindings', '热键', '按键绑定', 'shorcut', 'shotcut']],
+    ['localStorage', ['local storeage', 'local stroage', 'local storge']],
+    ['sessionStorage', ['seesion storage', 'session stroage']],
+    ['cookies', ['cokies']],
+  ];
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      const items = entries(data);
+      for (const [id, queries] of cases) {
+        for (const query of queries) assert.equal(search(items, query)[0]?.id, `command:${id}`, `${locale}: ${query}`);
+      }
+      const menu = actionsFor(items.find(item => item.id === 'tab:3')!, data);
+      assert.equal(search(menu, 'refesh')[0]?.action, 'reload');
+      for (const query of ['clsoe', 'colse', 'deleet bookmark']) {
+        assert.ok(!search(items, query).some(item => item.danger), query);
+      }
+    }
+  } finally { globalThis.chrome = original; }
+});
+
 test('search finds bookmark folders and URLs', () => {
   assert.equal(search(entries(data), '开发')[0].bookmarkId, 'b');
   assert.equal(search(entries(data), 'docs.github')[0].bookmarkId, 'b');
