@@ -519,10 +519,13 @@
     "message": "借助 Chrome 内部设置接口，将 Ctrl+Tab 和 Ctrl+Shift+Tab 绑定到 zing 的最近标签页切换。"
   },
   "bindingStepCopy": {
-    "message": "复制下方配置代码（已自动填入当前扩展 ID）。"
+    "message": "点击「复制并打开」，复制一行命令并打开快捷键页。命令已填入扩展 ID，一次设置正反向快捷键。"
   },
-  "bindingStepOpen": {
-    "message": "从「操作」菜单选择「打开 Chrome 快捷键页」，前往扩展快捷键设置页。"
+  "bindingCopyOpen": {
+    "message": "复制并打开"
+  },
+  "bindingPasteHint": {
+    "message": "若 Chrome 阻止粘贴，请先查看命令并按控制台提示确认，再重新粘贴。这是 Chrome 控制台命令，不是终端命令。"
   },
   "bindingStepConsole": {
     "message": "在该页面按 $1 打开控制台 (Console)，粘贴代码并回车执行。"

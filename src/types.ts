@@ -78,7 +78,7 @@ export type Request =
   | { source: 'zing'; type: 'cancel-palette-continuation' }
   | { source: 'zing'; type: 'read-page-storage'; payload: StorageRead }
   | { source: 'zing'; type: 'open-cookie-access'; payload: CookieAccessRequest }
-  | { source: 'zing'; type: 'open-shortcuts' }
+  | { source: 'zing'; type: 'open-shortcuts'; preserveBindingGuide?: boolean }
   | { source: 'zing'; type: 'reset-usage' }
   | { source: 'zing'; type: 'forget-usage'; payload: { target: string | string[]; query?: string } }
   | { source: 'zing'; type: 'execute'; payload: Execution };

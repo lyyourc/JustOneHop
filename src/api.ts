@@ -12,7 +12,7 @@ export const getPaletteState = () => send<PaletteState | undefined>({ source: 'z
 export const cancelPaletteContinuation = () => send<void>({ source: 'zing', type: 'cancel-palette-continuation' });
 export const execute = (payload: Execution) => send<void>({ source: 'zing', type: 'execute', payload });
 
-export const openShortcuts = () => send<void>({ source: 'zing', type: 'open-shortcuts' });
+export const openShortcuts = (preserveBindingGuide = false) => send<void>({ source: 'zing', type: 'open-shortcuts', preserveBindingGuide });
 export const resetSearchRanking = () => send<void>({ source: 'zing', type: 'reset-usage' });
 export const forgetSearchRanking = (target: string | string[], query?: string) => send<void>({ source: 'zing', type: 'forget-usage', payload: { target, query } });
 

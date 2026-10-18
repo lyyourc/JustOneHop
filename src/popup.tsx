@@ -13,5 +13,5 @@ const alignment = params.has('window') && params.has('tab') && params.has('owner
 void Promise.all([preferencesReady, usageReady, alignment, getPaletteState()]).then(([, , , initialState]) => {
   document.documentElement.lang = t('languageTag');
   document.body.className = location.hash.startsWith('#window=') ? 'zing-popup centered-palette' : 'zing-popup';
-  createRoot(document.getElementById('root')!).render(<App mode="popup" initialState={initialState} onClose={() => window.close()} />);
+  createRoot(document.getElementById('root')!).render(<App mode="popup" initialState={initialState} initialBinding={location.hash === '#binding'} onClose={() => window.close()} />);
 });

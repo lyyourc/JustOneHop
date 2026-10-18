@@ -3,6 +3,7 @@ import { usageReady } from './usageState';
 import { t } from './i18n';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from './App';
+import { BindingNavigation } from './BindingNavigation';
 import { flushSync } from 'react-dom';
 import { RecentOverlay, type RecentOverlaySession } from './RecentOverlay';
 import styles from './style.css';
@@ -16,7 +17,13 @@ if (!scope[marker]) {
   let root: Root | null = null;
   let recentSession: string | undefined;
   let previousFocus: HTMLElement | null = null;
+  let retainBindingGuide = false;
+  const retainGuide = () => {
+    retainBindingGuide = true;
+    return () => { retainBindingGuide = false; };
+  };
   const close = () => {
+    retainBindingGuide = false;
     try {
       if (recentSession) void chrome.runtime.sendMessage({ source: 'zing-recent', type: 'cancel-overlay', session: recentSession }).catch(() => {});
     } catch { /* Extension reload invalidates the old content-script context. */ }
@@ -71,7 +78,7 @@ if (!scope[marker]) {
     frameShadow.append(surface);
     root = createRoot(surface);
     dialog.showModal();
-    flushSync(() => root!.render(recent ? <RecentOverlay initial={recent} onClose={close} /> : <App mode="overlay" onClose={close} />));
+    flushSync(() => root!.render(recent ? <RecentOverlay initial={recent} onClose={close} /> : <BindingNavigation.Provider value={retainGuide}><App mode="overlay" onClose={close} /></BindingNavigation.Provider>));
     dialog.addEventListener('cancel', event => event.preventDefault());
     // React handles keys first; then prevent page-level bubbling shortcuts.
     dialog.addEventListener('keydown', event => event.stopPropagation());
@@ -111,5 +118,7 @@ if (!scope[marker]) {
       return true;
     }
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && host) close(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && host && !retainBindingGuide) close();
+  });
 }

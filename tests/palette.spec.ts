@@ -3867,29 +3867,87 @@ test.describe(() => {
 });
 });
 
+for (const host of ['overlay', 'native', 'toolbar'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true } });
+  test(`English Settings Keyboard binding guide survives real ${host} navigation`, async () => {
+    const source = await context.newPage();
+    await source.goto(host === 'overlay' ? `${origin}/Binding-guide-source` : 'chrome://version/');
+    await source.bringToFront();
+    const visibilitySession = await context.newCDPSession(source);
+    await visibilitySession.send('Emulation.setFocusEmulationEnabled', { enabled: false });
+    await expect.poll(() => source.evaluate(() => document.hasFocus())).toBe(true);
+    let toolbar: Page | undefined;
+    if (host === 'toolbar') {
+      const created = context.waitForEvent('page');
+      await worker.evaluate(async () => {
+        const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        await chrome.action.setPopup({ tabId: tab.id!, popup: 'popup.html' });
+        await chrome.action.openPopup({ windowId: tab.windowId });
+      });
+      toolbar = await created;
+    } else {
+      await worker.evaluate(async () => {
+        const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+        await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+      });
+    }
+    if (host === 'native') await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
+    const native = host === 'native' ? context.pages().find(page => page.url().includes('popup.html#window='))! : undefined;
+    const surface = toolbar || native || source.frameLocator('.zing-frame');
+    await surface.locator('.settings-button').click();
+    await surface.getByRole('button', { name: 'Set Up', exact: true }).click();
+    const code = await surface.getByRole('textbox', { name: 'JavaScript code' }).inputValue();
+    await surface.getByRole('button', { name: 'Copy & Open', exact: true }).click();
+    await expect.poll(() => context.pages().some(page => page.url() === 'chrome://extensions/shortcuts')).toBe(true);
+    const shortcuts = context.pages().find(page => page.url() === 'chrome://extensions/shortcuts')!;
+    await shortcuts.bringToFront();
+    await expect.poll(() => source.evaluate(() => document.hidden)).toBe(true);
+    if (host === 'overlay') {
+      for (let round = 0; round < 3; round++) {
+        await source.bringToFront();
+        await expect(surface.locator('.binding-guide')).toBeVisible();
+        await expect(surface.getByRole('textbox', { name: 'JavaScript code' })).toHaveValue(code);
+        await expect.poll(() => source.evaluate(() => document.hidden)).toBe(false);
+        await shortcuts.bringToFront();
+        await expect.poll(() => source.evaluate(() => document.hidden)).toBe(true);
+      }
+      await source.bringToFront();
+      await surface.locator('.footer-back').click();
+      await shortcuts.bringToFront();
+      await expect.poll(() => source.evaluate(() => document.hidden)).toBe(true);
+      await source.bringToFront();
+      await expect(source.locator('#zing-command-palette')).toHaveCount(0);
+    } else {
+      await expect.poll(() => context.pages().some(page => page.url().endsWith('popup.html#binding'))).toBe(true);
+      const guide = context.pages().find(page => page.url().endsWith('popup.html#binding'))!;
+      await guide.bringToFront();
+      await expect(guide.locator('.binding-guide')).toBeVisible();
+      await expect(guide.getByRole('textbox', { name: 'JavaScript code' })).toHaveValue(code);
+    }
+  });
+});
+
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English script binding guide copies this installation ID and opens Chrome shortcuts', async () => {
   await context.grantPermissions(['clipboard-read']);
   const before = await worker.evaluate(() => chrome.commands.getAll());
-  await ui.getByRole('button', { name: 'Settings', exact: true }).click();
+  await ui.locator('.settings-button').click();
   await ui.getByRole('button', { name: 'Set Up', exact: true }).click();
   await expect(ui.locator('.palette-footer-title').filter({ hasText: 'Set Up Ctrl+Tab' })).toBeVisible();
   await expect(ui.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
   await expect(ui.getByRole('textbox', { name: 'JavaScript code' })).toHaveAttribute('readonly', '');
   await expect(ui.locator('.script-library .settings-header')).toHaveCount(0);
   const copy = ui.locator('.palette-footer .primary-action');
-  await expect(copy).toHaveAccessibleName('Copy Code');
+  await expect(copy).toHaveAccessibleName('Copy & Open');
   await expect(copy).toBeFocused();
   await expect(ui.locator('.script-editor-body')).toBeVisible();
-  await ui.keyboard.press('Enter');
+  await ui.locator('.palette-footer .actions-button').click();
+  await ui.getByRole('dialog').getByRole('option', { name: /^Copy Code/ }).click();
   await expect(ui.getByRole('status')).toContainText('Code copied');
-  await expect(copy).toBeFocused();
   const code = await ui.evaluate(() => navigator.clipboard.readText());
-  await ui.keyboard.press('Enter');
-  await expect(copy).toBeFocused();
+  expect(code).not.toMatch(/[\r\n]/);
   await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
-  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
   const calls: unknown[] = [];
   new Function('chrome', code)({ developerPrivate: { updateExtensionCommand: (value: unknown) => calls.push(value) } });
   expect(calls).toEqual([
@@ -3907,10 +3965,21 @@ test.describe(() => {
   await ui.locator('.palette-footer .footer-back').click();
   await expect(ui.locator('.action-menu')).toHaveCount(0);
   await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
-  await ui.locator('.palette-footer .actions-button').click();
+  await ui.evaluate(() => navigator.clipboard.writeText('before combined action'));
+  await copy.focus();
   const created = context.waitForEvent('page');
-  await ui.getByRole('dialog').getByRole('option', { name: /Open Chrome Shortcuts/ }).click();
+  await ui.keyboard.press('Enter');
   await expect(await created).toHaveURL('chrome://extensions/shortcuts');
+  expect(ui.isClosed()).toBe(false);
+  await ui.bringToFront();
+  await expect(ui.locator('.binding-guide')).toBeVisible();
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
+  expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  await ui.locator('.palette-footer .actions-button').click();
+  await ui.getByRole('dialog').getByRole('option', { name: /Open Chrome Shortcuts/ }).click();
+  expect(ui.isClosed()).toBe(false);
+  await ui.bringToFront();
+  await expect(ui.locator('.binding-guide')).toBeVisible();
 });
 });
 
@@ -4042,6 +4111,27 @@ test('Chinese script actions protect built-in setup and return directly to searc
   await expect(ui.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
   await ui.keyboard.press('Escape');
   await expect(search).toBeFocused(); await expect(search).toHaveValue('ctrl tab');
+  await ui.keyboard.press('Meta+k');
+  await ui.keyboard.press('Control+n'); await ui.keyboard.press('Enter');
+  const created = context.waitForEvent('page');
+  await ui.getByRole('button', { name: '复制并打开', exact: true }).click();
+  await expect(await created).toHaveURL('chrome://extensions/shortcuts');
+  expect(ui.isClosed()).toBe(false);
+  await ui.bringToFront();
+  await expect(ui.locator('.binding-guide')).toBeVisible();
+  // Exercise the transient-host handoff separately from the persistent test tab.
+  const guideCreated = context.waitForEvent('page');
+  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'open-shortcuts', preserveBindingGuide: true }));
+  const guide = await guideCreated;
+  await expect(guide).toHaveURL(/popup\.html#binding$/);
+  await guide.bringToFront();
+  await expect(guide.locator('.binding-guide')).toBeVisible();
+  await expect(guide.getByRole('button', { name: '复制并打开', exact: true })).toBeVisible();
+  await guide.getByRole('button', { name: '复制并打开', exact: true }).click();
+  await guide.bringToFront();
+  await expect(guide.locator('.binding-guide')).toBeVisible();
+  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'open-shortcuts', preserveBindingGuide: true }));
+  expect(context.pages().filter(page => page.url().endsWith('popup.html#binding'))).toHaveLength(1);
 });
 
 test.describe(() => {

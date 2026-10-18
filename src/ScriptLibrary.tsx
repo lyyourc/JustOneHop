@@ -1,5 +1,6 @@
 import { BackLayer } from './Navigation';
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { BindingNavigation } from './BindingNavigation';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Copy, ExternalLink, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import { t } from './i18n';
 import { bindingScript, deleteScript, getScripts, saveScript, scriptsReady, subscribeScripts, type SavedScript } from './scripts';
@@ -14,6 +15,7 @@ import { useResultSelection } from './useResultSelection';
 export function ScriptLibrary({ initialBinding = false, initialScript, onComplete, onBack, onClose, isMac }: {
   initialBinding?: boolean; initialScript?: SavedScript; onComplete?: (notice: string) => void; onBack: () => void; onClose: () => void; isMac: boolean;
 }) {
+  const retainGuide = useContext(BindingNavigation);
   const scripts = useSyncExternalStore(subscribeScripts, getScripts);
   const [draft, setDraft] = useState<SavedScript | null>(initialScript ?? (initialBinding ? bindingScript() : null));
   const [query, setQuery] = useState('');
@@ -35,6 +37,9 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
   const wasModal = useRef(false);
   const revision = useRef(0);
   const builtin = draft?.id === 'builtin-ctrl-tab';
+  useLayoutEffect(() => {
+    if (builtin) return retainGuide();
+  }, [builtin, retainGuide]);
   const mod = isMac ? '⌘' : 'Ctrl';
   const results = [bindingScript(), ...scripts].filter(script => script.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const { selected, setSelection } = useResultSelection(results, query);
@@ -94,7 +99,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
     if (draft) { setDraft(null); setNotice(''); setError(''); }
     else onBack();
   }
-  async function copy(script = target) {
+  async function copy(script = target, openSettings = false) {
     const anchor = !draft && !menu ? search.current : back.current?.closest('.palette-footer')?.querySelector<HTMLButtonElement>('.primary-action') || back.current;
     if (!script || !anchor || busy || !ready || deleting) return;
     const version = revision.current;
@@ -102,8 +107,20 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
     try {
       await copyText(script.code, anchor);
       if (version === revision.current) { setNotice(t('scriptCopied')); setError(''); }
-    } catch { if (version === revision.current) setError(t('scriptCopyError')); }
+    } catch { if (version === revision.current) setError(t('scriptCopyError')); return; }
+    if (openSettings && version === revision.current) {
+      setBusy(true);
+      try { await openBindingShortcuts(); }
+      catch { if (version === revision.current) setError(t('errorGeneric')); }
+      finally { setBusy(false); }
+    }
     if (anchor === search.current && selection) search.current?.setSelectionRange(...selection);
+  }
+  function openBindingShortcuts() {
+    const page = back.current?.ownerDocument;
+    const transient = back.current?.closest('.zing-app.popup') &&
+      (page?.location.hash.startsWith('#window=') || chrome.extension.getViews({ type: 'popup' }).includes(page?.defaultView as Window));
+    return openShortcuts(Boolean(transient));
   }
   function select(id: string) { revision.current++; setSelection(id); setNotice(''); setError(''); }
   function filter(value: string) { revision.current++; setQuery(value); setNotice(''); setError(''); }
@@ -129,7 +146,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
     if (id === 'edit' && selected) edit(selected);
     if (id === 'new') create();
     if (id === 'copy') void copy();
-    if (id === 'shortcuts') void openShortcuts().then(onClose).catch(() => setError(t('errorGeneric')));
+    if (id === 'shortcuts') void openBindingShortcuts().catch(() => setError(t('errorGeneric')));
     if (id === 'delete' && target && target.id !== 'builtin-ctrl-tab') setDeleting(target);
   }
   return <BackLayer onBack={onBack}><BackLayer active={!!draft} onBack={leave}><section tabIndex={-1} className="palette script-library" aria-label={t('scriptLibrary')} onFocusCapture={event => {
@@ -150,7 +167,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
       event.preventDefault(); event.stopPropagation(); return;
     }
     if (builtin && event.key === 'Enter' && !['BUTTON', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) {
-      event.preventDefault(); void copy();
+      event.preventDefault(); void copy(target, true);
     }
     if (deleting && event.key === 'Tab') {
       event.preventDefault(); event.stopPropagation();
@@ -162,7 +179,8 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
       {draft ? <div className="script-editor-body">
         {builtin ? <div className="binding-guide">
           <p>{t('bindingEffect')}</p>
-          <ol><li>{t('bindingStepCopy')}</li><li>{t('bindingStepOpen')}</li><li>{t('bindingStepConsole', isMac ? '⌘⌥J' : 'Ctrl+Shift+J')}</li></ol>
+          <ol><li>{t('bindingStepCopy')}</li><li>{t('bindingStepConsole', isMac ? '⌘⌥J' : 'Ctrl+Shift+J')}</li></ol>
+          <p>{t('bindingPasteHint')}</p>
         </div> : <label className="script-field">{t('scriptName')}<input ref={title} value={draft.title} maxLength={120} onChange={event => setDraft({ ...draft, title: event.target.value })} /></label>}
         <label className="script-field script-code-field">{t('scriptCode')}<textarea aria-label={t('scriptCode')} value={draft.code} readOnly={builtin} spellCheck={false}
           onChange={event => setDraft({ ...draft, code: event.target.value })} /></label>
@@ -189,7 +207,7 @@ export function ScriptLibrary({ initialBinding = false, initialScript, onComplet
       status={notice ? <span role="status">{notice}</span> : busy ? <span role="status">{t('running')}</span> : undefined}
       primary={menu ? { label: activeAction?.title || t('actions'), keys: ['↵'], disabled: busy || !ready || !activeAction, danger: !!activeAction?.danger, onAction: () => { if (activeAction) act(activeAction.id); } }
         : draft && !builtin ? { label: t('saveScript'), keys: [mod, '↵'], disabled: busy || !ready || !!deleting, onAction: () => void save() }
-          : builtin ? { label: t('copyScript'), keys: ['↵'], disabled: busy || !ready, onAction: () => void copy() }
+          : builtin ? { label: t('bindingCopyOpen'), keys: ['↵'], disabled: busy || !ready, onAction: () => void copy(target, true) }
             : { label: t('copyScript'), keys: ['↵'], disabled: busy || !ready || !selected || !!deleting, onAction: () => void copy() }}
       secondary={!draft && !menu ? { label: t('newScript'), keys: [mod, isMac ? '⇧' : 'Shift', 'N'], icon: <Plus size={16} />, disabled: busy || !ready || !!deleting, onAction: create } : undefined}
       actions={{ open: menu, disabled: busy || !ready || !!deleting, onToggle: toggleMenu }} />

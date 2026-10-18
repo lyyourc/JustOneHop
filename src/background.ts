@@ -81,6 +81,11 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     if (request.type === 'forget-usage') return forgetUsage(request.payload?.target, request.payload?.query);
     const windowId = sender.tab?.windowId ?? (await chrome.windows.getCurrent()).id;
     if (windowId === undefined) throw new Error(t('errorWindow'));
+    if (request.type === 'open-shortcuts' && request.preserveBindingGuide) {
+      const url = chrome.runtime.getURL('popup.html#binding');
+      const existing = (await chrome.tabs.query({ windowId })).some(tab => tab.url === url || tab.pendingUrl === url);
+      if (!existing) await chrome.tabs.create({ windowId, url, active: false });
+    }
     return openChromePage('openExtensionShortcuts', windowId);
   });
   void result.finally(() => releasePaletteContinuation(ticket)).then(success).catch(error => {

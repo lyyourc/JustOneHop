@@ -139,7 +139,9 @@ zing 在普通网页中以居中偏上的页面浮层展示；在 Chrome 内置�
 
 ### 配置 Ctrl+Tab
 
-受 Chrome 扩展接口限制，`Ctrl+Tab` 无法在扩展设置页直接绑定。可在主搜索中输入 `ctrl tab`（或从「设置 → 键盘 → Tab Switcher」点击「前往配置」），复制已填入当前扩展 ID 的配置代码，再从操作菜单打开 `chrome://extensions/shortcuts`，按页面说明在 DevTools Console 中粘贴执行一次即可。
+受 Chrome 扩展接口限制，`Ctrl+Tab` 无法在扩展设置页直接绑定。从「设置 → 键盘 → Tab Switcher」进入配置说明，或在主搜索输入 `ctrl tab` 后从操作菜单选择「查看设置说明」。点击底栏「复制并打开」（或按 Enter），复制已填入当前扩展 ID 的一行命令，并打开 `chrome://extensions/shortcuts`。配置说明保留在原页面，可多次切走、切回查看；返回设置／脚本列表或关闭说明后，才恢复普通浮层随标签隐藏关闭的行为；工具栏弹窗和会失焦关闭的独立面板先保留一份 Zing 配置说明标签页，重复操作复用该标签页。菜单里的单独「打开 Chrome 快捷键页」同样保留说明。在该页按 macOS `⌘⌥J` / Windows、Linux `Ctrl+Shift+J` 打开 DevTools Console，粘贴并回车，一次设置 `Ctrl+Tab` 和 `Ctrl+Shift+Tab`。
+
+这是 Chrome 控制台命令，不是终端命令；首次粘贴若被 Chrome 阻止，请查看命令后按控制台提示确认，再重新粘贴。复制失败时留在配置页，不打开快捷键页；操作菜单仍提供单独「复制代码」和「打开 Chrome 快捷键页」。扩展不会自动执行命令，重新打开 Zing 可读取实际绑定。
 
 ### 查找、预览与复制脚本
 

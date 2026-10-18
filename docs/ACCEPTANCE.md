@@ -4,6 +4,42 @@
 
 当前定位验收仍有未解决项：`tests/palette.spec.ts` 的屏幕位置对照现包含横向／垂直标签栏 × 80%／100%／125% 缩放，并通过可信 pointer 事件采样来源内容区屏幕原点。下文历史几何通过记录不覆盖这套新增矩阵；特别是垂直标签栏三档缩放尚不能标记通过。当前 `nativePanelBounds` 仍将浏览器外框与内容宽度之差平均分到左右，`alignPanelWindow` 只校准 popup 自身框架，未实现来源屏幕锚点采样或缓存；垂直标签栏的不对称偏移仍待解决。测试中的原点采样是验证手段，不是产品实现。
 
+## 2026-10-18 配置说明在多次切换后仍保留
+
+用户确认单次切回可用，但再次切换仍消失。修复移除 content host 在恢复可见时清除保留标志的逻辑；由 ScriptLibrary 的内置配置说明 layout effect 在挂载时取得保留、离开说明或卸载时清理，覆盖整个说明生命周期，导航失败也不解除仍在展示的说明。正常面板的隐藏关闭不变。更新已有 overlay 回归为三次实际隐藏／可见往返，再离开说明验证普通关闭。
+
+类型检查与构建通过，dist 已更新。未重跑此前受焦点模拟影响的 runner 用例。另用临时 profile、dist 副本（仅开放 shadow roots 并授予 loopback 访问）通过 connectOverCDP noDefaults 尝试真实可见性验证：首次在标签查询尚未返回目标时失败，补注册等待后第二次达到 75 秒上限，未取得三次切换的通过证据，停止复验。临时脚本位于 `/private/tmp/zing-retention.moeLvK/check.mjs`。实际多次切换仍未完成自动化验收，未重载日常 Chrome，未提交。
+
+## 2026-10-18 Settings 配置浮层隐藏销毁遗漏修复
+
+用户报告从 Settings → Keyboard 进入后切回仍丢失说明。源码确认 `content.tsx` 在 `visibilitychange` 且 `document.hidden` 时直接卸载浮层，前一轮只移除了组件主动关闭，未覆盖 host 生命周期。新增仅配置导航使用的 `BindingNavigation` context：复制成功、导航前暂停隐藏销毁，切回可见、导航失败或显式关闭后解除，保留同一个 Settings／配置视图；菜单打开路径共用。
+
+类型检查和 diff 检查通过，runner 已更新 dist。新增三种真实承载的 Settings 路径用例，但本轮不记为通过验收：首批 overlay 未等待实际隐藏就切回而通过，native 在进入 Settings 前失焦关闭；补上独立 `document.hidden` 断言后，overlay/native 都在该断言失败（后台快照原页 active=false，页面仍报告 hidden=false），toolbar 因标签级 popup 未设置而失败。修正 toolbar 夹具并尝试关闭源页 focus emulation 后，仅复验 overlay 一次，仍在隐藏前置条件失败，停止追加批次。共三批 runner 约 61 秒（15.7 / 30.6 / 14.9 秒）。保留用例的严格断言，不改为模拟 visibility 通过。最后报告：`test-results/runs/2026-10-18T04-45-50-252Z-95269-fa9602a7/validation.json`；三承载报告：`test-results/runs/2026-10-18T04-44-50-780Z-93464-b1ca75b0/validation.json`。
+
+真实隐藏／切回回归仍未验证，native 和 toolbar 尚有失败或未复验项。前一节之前的持久页面通过记录不能证明真实浮层保留。未重载日常 Chrome，未提交。
+
+## 2026-10-18 Copy & Open 后保留配置说明
+
+按用户反馈取消 Copy & Open 和说明菜单打开快捷键页后的主动关闭。网页浮层及持久标签页保留原视图；工具栏 action popup 与 `#window=` 独立面板在跳转前请求后台创建或复用来源窗口中的 `popup.html#binding` 说明标签页，承接会因失焦销毁的界面。同步使用说明、交互契约和 ADR 0005。
+
+类型检查通过，Chrome for Testing 145.0.7632.6 的两个定向用例一批通过，runner 共 12.4 秒。英文覆盖键盘复制打开、切回原页说明仍在、剪贴板值、菜单单独打开后保留及窄屏；中文覆盖鼠标打开后保留，并直接发送承接消息验证后台创建、页面初始展示及重复请求复用说明页。后者验证承接接口，不等同于真实 action popup 或原生失焦窗口的全链路验收；本轮没有实体失焦承接或网页闭合浮层专项验证。报告：`test-results/runs/2026-10-18T04-37-41-884Z-79259-6bfba6e9/validation.json`。`dist/` 已构建，未运行全量 E2E、未重载日常 Chrome、未提交。
+
+## 2026-10-18 Ctrl+Tab 单行命令与复制后打开
+
+配置说明的主操作改为「复制并打开 / Copy & Open」，点击与 Enter 共用先复制命令、成功后打开 Chrome 快捷键页并关闭面板的流程；复制失败留在原页。保留菜单单独复制和打开入口。生成代码合并为包含当前扩展 ID 的单行 JavaScript，一次请求正反向绑定，仍需用户在目标页 Console 执行；中英文说明明确首次粘贴提示和非终端命令。同步 README、使用指南和交互契约。
+
+类型检查与 i18n / scriptExecution 定向单测 7 项通过。Chrome for Testing 145.0.7632.6 中选择 2 项浏览器用例：中文主搜索→说明→返回→鼠标复制打开在第一批通过；英文设置入口、菜单单独复制、单行内容与两个目标调用、窄屏、键盘复制打开及剪贴板重新写入在第四批通过。前三批英文分别因旧 Settings 定位歧义、菜单可访问名称包含 Enter 提示，以及测试尝试访问按设计已关闭的面板失败；每次修正对应测试后仅复验英文项，无产品修复或超时放宽。四批 runner 合计约 58 秒（10.0 / 33.2 / 7.8 / 7.1 秒），此前一次启动被历史残留锁阻断，核对无相关进程后清理。最终英文报告：`test-results/runs/2026-10-18T04-27-20-677Z-59561-5b9f238b/validation.json`；中文通过报告：`test-results/runs/2026-10-18T04-25-38-637Z-55912-8767a391/validation.json`。
+
+`dist/` 已由 runner 构建，diff 空白检查通过。模拟接口仅证明命令生成正确；本次没有在真实 Console 执行绑定，也没有验收实体 Ctrl+Tab 触发。未运行全量 E2E，未重载日常 Chrome，未提交。
+
+## 2026-10-18 Ctrl+Tab 书签脚本可行性实验
+
+结论：在本次 macOS / Google Chrome for Testing 145.0.7632.6 环境中，用户点击 `javascript:` 书签不能在 `chrome://extensions/shortcuts` 上执行绑定代码。实验使用独立临时 profile 和最小 MV3 测试扩展，通过 `chrome.bookmarks.create` 创建书签；脚本先写入 DOM 执行标记，再在接口存在时调用 `developerPrivate.updateExtensionCommand` 绑定正反向命令。通过 macOS System Events 实际点击原生 Bookmarks 菜单中的书签，没有用 `evaluate` 或 CDP 代替书签执行；自动化只读取标记和真实 `commands.getAll()` 返回值。
+
+同一个书签在本地 HTTP 对照页面写入执行标记，在 Chrome 快捷键页没有写入标记，绑定仍为 `⌃J` / `⌃⇧J`。没有控制台错误，因此判断依据是成功的对照点击、目标页未执行标记及绑定未变，而非错误文案。首次启动因 Playwright 不接受直接传入 Cocoa 语言参数而失败，改用 launcher 后一次实验完成两种页面的点击。证据保存在 `/private/tmp/zing-bookmarklet-probe.jJ1Dgw/` 的 `probe.mjs`、`report.json` 与截图中，属于临时产物。
+
+此实验不使用 Zing 产品构建，不构成产品 E2E 验收；未验证其他 Chrome 版本或操作系统。未修改日常 Chrome 资料或书签，测试浏览器已关闭。仅追加此记录，未修改产品行为或运行全量测试。
+
 ## 2026-10-18 首页精选入口与快捷键说明补充
 
 首页精选在 Tab Switcher 后加入 Script Library 与 Search All History，普通窗口冷启动为 10 项；无痕窗口隐藏历史入口。历史入口仅打开空历史搜索页，不触发首页预加载，也不加入有词查询候选而造成重复。已有首页候选数量、排序与截断断言同步更新。

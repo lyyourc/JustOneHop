@@ -89,7 +89,7 @@ npm run build
 
 右键点击工具栏的 zing 图标，可查看当前实际绑定并前往修改快捷键，或在新标签页打开内置「使用帮助」（也可从「设置 → 通用 → 使用帮助」或主搜索 `help / 帮助 / 使用说明` 在面板内打开）。
 
-**Tab Switcher** 支持 VSCode 风格的 Ctrl+Tab 切换，可从「设置 → 键盘 → Tab Switcher」通过一次性配置代码设置。切换最近标签页时，按住 `Control+J`（Windows/Linux 为 `Ctrl+,`，或使用已配置的 `Ctrl+Tab`），用 `N` / `P` 或方向键选择，松开修饰键即可切换；若点击切换器搜索框或按 `Cmd/Ctrl+F` 进入筛选，则暂停松键切换，可松开按键正常输入标题或网址，再按 `Enter` 或点击结果确认。
+**Tab Switcher** 支持 VSCode 风格的 Ctrl+Tab 切换，从「设置 → 键盘 → Tab Switcher」点击「复制并打开」，即可复制已填入扩展 ID 的一行命令并打开 Chrome 快捷键页；在该页 Console 粘贴并回车，一次配置正反向快捷键（不是终端命令）。Zing 配置说明支持多次切走、切回查看，退出说明后才恢复普通浮层的自动关闭行为；会失焦关闭的弹窗改由说明标签页承接。切换最近标签页时，按住 `Control+J`（Windows/Linux 为 `Ctrl+,`，或使用已配置的 `Ctrl+Tab`），用 `N` / `P` 或方向键选择，松开修饰键即可切换；若点击切换器搜索框或按 `Cmd/Ctrl+F` 进入筛选，则暂停松键切换，可松开按键正常输入标题或网址，再按 `Enter` 或点击结果确认。
 
 最近标签页切换在 macOS 默认使用 `Control+J`，Windows/Linux 使用 `Ctrl+,`；反向切换均加 `Shift`。其他操作在 Windows/Linux 使用 `Ctrl` 代替 `Command`。更多用法与平台差异见[使用指南](docs/USAGE.md)。
 

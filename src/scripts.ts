@@ -36,8 +36,7 @@ export async function deleteScript(id: string) { await chrome.storage.local.remo
 export function bindingScript(): SavedScript {
   return {
     id: 'builtin-ctrl-tab', title: t('bindCtrlTab'),
-    code: ['switch-recent', 'switch-recent-back'].map((commandName, index) =>
-      `chrome.developerPrivate.updateExtensionCommand({\n  extensionId: ${JSON.stringify(chrome.runtime.id)},\n  commandName: ${JSON.stringify(commandName)},\n  keybinding: ${JSON.stringify(index ? 'Ctrl+Shift+Tab' : 'Ctrl+Tab')}\n});`).join('\n\n'),
+    code: `['switch-recent', 'switch-recent-back'].forEach((commandName, i) => chrome.developerPrivate.updateExtensionCommand({extensionId: ${JSON.stringify(chrome.runtime.id)}, commandName, keybinding: i ? 'Ctrl+Shift+Tab' : 'Ctrl+Tab'}));`,
   };
 }
 export function scriptEntries(scripts: SavedScript[]): Entry[] {

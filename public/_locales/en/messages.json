@@ -519,10 +519,13 @@
     "message": "Uses Chrome’s internal settings API to bind Ctrl+Tab and Ctrl+Shift+Tab to zing’s recent tab switcher."
   },
   "bindingStepCopy": {
-    "message": "Copy the snippet below (your extension ID is already included)."
+    "message": "Choose Copy & Open. The single-line command includes your extension ID and sets both shortcuts."
   },
-  "bindingStepOpen": {
-    "message": "Choose Actions → Open Chrome Shortcuts to open Chrome’s extension shortcuts page."
+  "bindingCopyOpen": {
+    "message": "Copy & Open"
+  },
+  "bindingPasteHint": {
+    "message": "If Chrome blocks pasting, review the command and follow the Console prompt before pasting again. This command runs in Chrome’s Console, not a terminal."
   },
   "bindingStepConsole": {
     "message": "On that page, press $1 to open Console, then paste the code and press Enter."

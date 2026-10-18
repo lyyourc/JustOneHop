@@ -33,7 +33,7 @@ import type { Entry, Snapshot, StorageRead, SettingsSection, ScriptRun, PaletteS
 
 const emptyScores: ReadonlyMap<string, number> = new Map();
 
-export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState }) {
+export function App({ mode, onClose, initialState, initialBinding = false }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState; initialBinding?: boolean }) {
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
   const scripts = useSyncExternalStore(subscribeScripts, getScripts);
   const [notice, setNotice] = useState('');
@@ -46,7 +46,7 @@ export function App({ mode, onClose, initialState }: { mode: 'overlay' | 'popup'
   const [storage, setStorage] = useState<StorageRead | null>(null);
   const [scriptLibraryOpen, setScriptLibraryOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>();
-  const [scriptEditor, setScriptEditor] = useState<SavedScript | null>(null);
+  const [scriptEditor, setScriptEditor] = useState<SavedScript | null>(() => initialBinding ? bindingScript() : null);
   const [deleteTarget, setDeleteTarget] = useState<SavedScript | null>(null);
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
