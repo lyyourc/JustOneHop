@@ -19,9 +19,11 @@
 
 ### 手动恢复搜索焦点
 
-主搜索、设置、历史、Storage、标签组、帮助与 ActionMenu 使用 `SearchFocusButton` 将放大镜作为可点击的「聚焦搜索框」按钮，带悬浮操作说明与键盘焦点轮廓。点击或聚焦按钮后 Enter／Space 仅恢复当前输入焦点，保留搜索词、选择和输入选区；输入禁用时按钮同步禁用。Tab Switcher 保留既有激活搜索的按钮与松键语义。
+主搜索、设置、历史、Storage、标签组、帮助与 ActionMenu 使用 `SearchFocusButton` 将小范围瞬移 logo作为可点击的「聚焦搜索框」按钮，带悬浮操作说明与键盘焦点轮廓。点击或聚焦按钮后 Enter／Space 仅恢复当前输入焦点，保留搜索词、选择和输入选区；输入禁用时按钮同步禁用。Tab Switcher 保留既有激活搜索的按钮与松键语义。
 
-`NavigationRoot` 在实际 owner window 及浮层父 window 处理普通 Tab：仅在面板内没有有效控件焦点时恢复当前搜索输入，保留 caret／选区；有控件焦点时不拦截原有 Tab／Shift+Tab 顺序。`searchFocus` 为恢复和提示共用活动层判定：仅选择可见且不处于 inert 背景中的聚焦按钮；有 modal 时限制在该 modal 内，无搜索输入的确认层不跳回背景搜索。搜索栏在无控件焦点时显示本地化「按 Tab 聚焦搜索框」，获得输入或其他控件焦点后隐藏，不占额外布局高度。输入法、重复及修饰键 Tab 不触发恢复。不注册 Cmd/Ctrl+F 聚焦绑定；Tab Switcher 原有进入筛选行为不在本次新增恢复逻辑中。以承载 iframe 的父文档（非 iframe 时为 ownerDocument）的 `hasFocus()` 区分页面是否持有焦点，同时监听两级 window 的 focus／blur。Chrome 地址栏或其他应用持有焦点时，即使 DOM activeElement 仍是输入框，也显示「点击搜索框开始输入」，页面收不到按键，用户需点击搜索框或放大镜。页面重新获得焦点后按控件焦点状态切回 Tab 提示或隐藏提示。
+`NavigationRoot` 在实际 owner window 及浮层父 window 处理普通 Tab：仅在面板内没有有效控件焦点时恢复当前搜索输入，保留 caret／选区；有控件焦点时不拦截原有 Tab／Shift+Tab 顺序。`searchFocus` 为恢复和提示共用活动层判定：仅选择可见且不处于 inert 背景中的聚焦按钮；有 modal 时限制在该 modal 内，无搜索输入的确认层不跳回背景搜索。搜索栏在无控件焦点时显示本地化「按 Tab 聚焦搜索框」，获得输入或其他控件焦点后隐藏，不占额外布局高度。输入法、重复及修饰键 Tab 不触发恢复。不注册 Cmd/Ctrl+F 聚焦绑定；Tab Switcher 原有进入筛选行为不在本次新增恢复逻辑中。以承载 iframe 的父文档（非 iframe 时为 ownerDocument）的 `hasFocus()` 区分页面是否持有焦点，同时监听两级 window 的 focus／blur。Chrome 地址栏或其他应用持有焦点时，即使 DOM activeElement 仍是输入框，也显示「点击搜索框开始输入」，页面收不到按键，用户需点击搜索框或小范围瞬移 logo。页面重新获得焦点后按控件焦点状态切回 Tab 提示或隐藏提示。
+
+搜索框品牌图形由 `Logo` 复用构建用的小尺寸 SVG，以面板的 `--muted`／`--accent` 配色；主搜索、设置、历史、Storage、标签组、帮助、ActionMenu 和两种 Tab Switcher 承载保持一致。图形对读屏隐藏，按钮仍保留聚焦／启用搜索的可访问名称与操作语义。
 
 ### Chrome 原生视觉
 
@@ -264,6 +266,7 @@ source 是本次唤起绑定的来源标签页，网页浮层与已有独立面�
 - `cookies`：读取 Cookie，包含 HttpOnly；不增删或修改 Cookie。
 - `content_scripts.matches`：普通 HTTP(S) 页面及其匹配子框架预加载轻量修饰键监听，只在内存保存 Control/Alt/Meta 状态，按需转发松键；不记录输入文字、不拦截网页快捷键、不上传数据。未增加全站 `host_permissions`，Cookie 仍逐站授权。
 - `optional_host_permissions`：声明可按需申请 HTTP(S) 网站权限；首次查看 Cookies 时只请求授权页列出的具体域名，不预先授予所有网站访问权。
+- `offscreen`：本地 `theme.html` 以 `MATCH_MEDIA` 监听系统深浅色，经校验来源的消息调用 `chrome.action.setIcon`。不跟随面板强制主题，不读取网站，不发起网络请求或保存主题状态；后台重启及窗口聚焦重新同步，复用 `alarms` 每 30 秒检查作为离屏媒体事件不送达的兜底（Chrome 可延后调度）；创建失败保留默认浅色图标并在后续窗口聚焦或闹钟时重试。无法读取 Chrome 自定义工具栏颜色，见 ADR 0023。
 - `storage`：仅在本机保存语言、主题偏好及搜索选择记录，不使用云端同步。搜索记录最多 500 条，90 天未使用的记录不再参与排序，并在下次记录时清理；频次权重每 14 天减半，让新习惯逐渐取代旧习惯。
 
 ## 标签组

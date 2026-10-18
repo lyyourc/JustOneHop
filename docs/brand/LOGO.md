@@ -1,6 +1,10 @@
 # JustOneHop · 小范围瞬移 · Logo 规范
 
-![预览](sheet.png)
+![完整版预览](sheet.png)
+
+完整版与小尺寸版保持相同的左右关系；以下为实际使用的小尺寸资源。
+
+![当前小尺寸浅色版](logo-small-light.svg) ![当前小尺寸深色版](logo-small-dark.svg)
 
 ## 1. 设计理念
 
@@ -48,7 +52,9 @@
 | 涟漪环 | x71 y40，50 × 50，圆角 15，描边 **4** |
 | 安全区 | 图形四周至少 ½ 个落点方块（16 单位） |
 
-### 工具栏简化版（16 / 32 px）
+### 工具栏与搜索框简化版
+
+保持左侧消散起点、右侧落点与涟漪的横向构图。品牌结构优先于图标槽的填充率；不得为增大小尺寸有效高度而移动元素、改为对角排布或非等比拉伸。
 
 | 元素 | 参数 |
 | --- | --- |
@@ -64,14 +70,14 @@
 | [logo-light.svg](logo-light.svg) | 浅色背景（文档、网页、浅色界面） |
 | [logo-dark.svg](logo-dark.svg) | 深色背景 |
 | [logo-small-light.svg](logo-small-light.svg) | 16 / 32 px 工具栏简化版，**构建使用** |
-| [logo-small-dark.svg](logo-small-dark.svg) | 同上，深色版（暂未使用） |
+| [logo-small-dark.svg](logo-small-dark.svg) | 工具栏深色版，**构建使用** |
 | [logo-app.svg](logo-app.svg) | 48 / 128 px 与商店：白色圆角底板（细灰边）＋完整版，**构建使用**；唯一允许的底板形式 |
 | [logo-mono.svg](logo-mono.svg) | 单色（`currentColor`）：靠不透明度区分主次，用于单色场景 |
 | [logo-lockup.svg](logo-lockup.svg) / [logo-lockup-dark.svg](logo-lockup-dark.svg) | 横向组合：图形 + JustOneHop + 小范围瞬移 |
 | [sheet.svg](sheet.svg) / [sheet.png](sheet.png) | 规范预览总览 |
 
-- **构建**：[build.mjs](../../build.mjs) 在构建时由上表标注的 SVG 生成 `dist/icon{16,32,48,128}.png`。16 / 32 px 会裁掉透明边，让较扁的图形占满宽度。
-- **主题**：Chrome 扩展图标不会自动随浅色／深色切换，目前工具栏只用浅色版。若要跟随主题，需用 `chrome.action.setIcon` 按 `prefers-color-scheme` 切换，须单独评审与验收。
+- **构建**：[build.mjs](../../build.mjs) 从 SVG 裁去透明边后等比生成工具栏 PNG，保持原构图：`icon16/32.png` 与 `icon16/32-dark.png` 为小图标；`toolbar48/128.png` 及其 `-dark` 版用于高密度工具栏；`icon48/128.png` 为管理页白底完整版。搜索框直接复用小尺寸 SVG，按面板主题配色。
+- **主题**：本地离屏页面监听系统 `prefers-color-scheme`，由后台 `chrome.action.setIcon` 切换工具栏资源；需要 `offscreen` 权限。面板关闭时仍更新，不跟随面板手动主题，也不能识别 Chrome 自定义工具栏配色。详见 [ADR 0023](../adr/0023-logo.md)。
 - **组合标志**：英文名字号约 0.34H（H 为图形高度），字重 600；中文名字号约 0.16H、字间距 4、字重 400；字体优先 Google Sans → 系统无衬线（PingFang SC 等）。正式发布前需把文字转为轮廓。
 - **最小尺寸**：工具栏 16 px（使用简化版）；完整版 48 px；组合标志高度 32 px。
 
@@ -93,4 +99,4 @@
 
 ## 7. 验证状态
 
-构建可生成四个尺寸的 PNG，并已检查输出尺寸与缩放外观。**未在 Chrome 工具栏、扩展管理页或商店中实测**；16 px 下图形只有约 9 px 高，辨识度待实际环境确认。该结论只适用于当前构建。
+本轮构图与主题链路的实际检查见 [验收记录](../ACCEPTANCE.md)。输出像素覆盖范围与隔离浏览器内的切换验证，不等同于日常 Chrome 工具栏、扩展管理页或商店的人工验收。

@@ -64,6 +64,8 @@
   box-shadow: 0 1px 6px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .search-icon { color: var(--accent); width: 20px; display: flex; align-items: center; }
+.brand-logo { display: inline-flex; flex-shrink: 0; }
+.brand-logo svg { width: 100%; height: 100%; }
 .search-focus { justify-content: center; flex-shrink: 0; height: 28px; border-radius: 6px; }
 .search-focus:hover { background: var(--hover); }
 .search-focus:disabled { opacity: .5; cursor: default; }

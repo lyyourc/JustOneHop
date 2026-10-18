@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react';
-import { ArrowLeftRight, Pin, Search } from 'lucide-react';
+import { ArrowLeftRight, Pin } from 'lucide-react';
+import { Logo } from './Logo';
 import { HighlightedText } from './HighlightedText';
 import { Favicon } from './Favicon';
 import { CurrentTabBadge } from './CurrentTabBadge';
@@ -29,7 +30,7 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
   }}>
     <header className="search-bar" title={shortcut || undefined}>
       <button className="search-icon recent-search-activate" onPointerDown={event => { event.preventDefault(); activateSearch(); }} onClick={activateSearch}
-        onContextMenu={event => event.preventDefault()} aria-label={t('recentSearch')} title={t('recentSearchHelp')}><Search size={20} /></button>
+        onContextMenu={event => event.preventDefault()} aria-label={t('recentSearch')} title={t('recentSearchHelp')}><Logo /></button>
       <span className="recent-search-field" onPointerDown={event => { if (!searching) { event.preventDefault(); activateSearch(); } }}
         onContextMenu={event => { if (!searching || event.ctrlKey) event.preventDefault(); }} title={t('recentSearchHelp')}>
         <input ref={input} data-back-on-empty={onBack ? true : undefined} disabled={!searching} value={query} onChange={event => onQueryChange(event.target.value)} placeholder={t('recentSearch')}

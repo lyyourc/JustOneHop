@@ -8,6 +8,7 @@ import { errorMessage, t } from './i18n';
 import { openChromePage } from './chromePages';
 import { historyWindow, searchHistory, snapshot } from './browser';
 import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
+import { startToolbarIcon } from './toolbarIcon';
 import { forgetUsage, resetUsage } from './usageStorage';
 import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult } from './types';
 
@@ -94,3 +95,4 @@ chrome.tabGroups.onRemoved.addListener(changed);
 chrome.tabGroups.onMoved.addListener(changed);
 startTabTucking(changed);
 startToolbarMenu();
+startToolbarIcon();

@@ -5866,6 +5866,63 @@ test.describe(() => {
   });
 });
 
+test('brand logo follows panel themes and the offscreen system theme updates toolbar icons', async () => {
+  await expect(ui.locator('.search-bar .brand-logo svg')).toBeVisible();
+  for (const theme of ['light', 'dark'] as const) {
+    await ui.evaluate(theme => chrome.storage.local.set({ preferences: { language: 'en', theme } }), theme);
+    await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', theme);
+    await expect(ui.locator('.search-bar .brand-logo rect').nth(1)).toHaveCSS('fill', theme === 'dark' ? 'rgb(138, 180, 248)' : 'rgb(11, 87, 208)');
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`brand-${theme}.png`) });
+  }
+  await ui.setViewportSize({ width: 390, height: 700 });
+  await ui.evaluate(() => { document.body.style.width = '100%'; });
+  await ui.locator('.search-bar input').fill('tab switcher');
+  await ui.keyboard.press('Enter');
+  await expect(ui.locator('.recent-search-activate .brand-logo svg')).toBeVisible();
+  await ui.locator('.recent-search-activate').click();
+  await expect(ui.locator('.recent-search-field input')).toBeFocused();
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('brand-switcher-narrow.png') });
+
+  await expect.poll(() => worker.evaluate(async () => (await chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT] })).length)).toBe(1);
+  await worker.evaluate(() => {
+    const state = globalThis as unknown as { __iconPaths: unknown[] };
+    state.__iconPaths = [];
+    const setIcon = chrome.action.setIcon.bind(chrome.action);
+    chrome.action.setIcon = (async details => { await setIcon(details); state.__iconPaths.push(details.path); }) as typeof chrome.action.setIcon;
+  });
+  const cdp = await context.newCDPSession(ui);
+  const targets = await cdp.send('Target.getTargets');
+  const target = targets.targetInfos.find(target => target.url === popupUrl.replace('popup.html', 'theme.html'))!;
+  expect(target).toBeTruthy();
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId: target.targetId });
+  let id = 0;
+  const command = (method: string, params: object) => new Promise<{ result?: { value?: unknown } }>((resolve, reject) => {
+    const requestId = ++id;
+    const listener = (event: { sessionId: string; message: string }) => {
+      const reply = JSON.parse(event.message);
+      if (event.sessionId !== sessionId || reply.id !== requestId) return;
+      cdp.off('Target.receivedMessageFromTarget', listener);
+      if (reply.error) reject(new Error(JSON.stringify(reply.error))); else resolve(reply.result);
+    };
+    cdp.on('Target.receivedMessageFromTarget', listener);
+    void cdp.send('Target.sendMessageToTarget', { sessionId, message: JSON.stringify({ id: requestId, method, params }) }).catch(reject);
+  });
+  try {
+    for (const theme of ['light', 'dark', 'light']) {
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
+      // Offscreen documents have no compositor frames; flush the emulated style change.
+      const media = await command('Runtime.evaluate', { expression: `(document.body.offsetWidth, matchMedia('(prefers-color-scheme: dark)').matches)`, returnByValue: true });
+      expect(media.result?.value).toBe(theme === 'dark');
+      // Exercise the real alarm callback without waiting the full 30-second period.
+      await worker.evaluate(() => chrome.alarms.create('justonehop-toolbar-theme', { when: Date.now() + 100 }));
+      await expect.poll(() => worker.evaluate(() => (globalThis as unknown as { __iconPaths: unknown[] }).__iconPaths.at(-1))).toEqual({
+        16: `icon16${theme === 'dark' ? '-dark' : ''}.png`, 32: `icon32${theme === 'dark' ? '-dark' : ''}.png`,
+        48: `toolbar48${theme === 'dark' ? '-dark' : ''}.png`, 128: `toolbar128${theme === 'dark' ? '-dark' : ''}.png`,
+      });
+    }
+  } finally { await cdp.detach(); }
+});
+
 for (const host of ['overlay', 'native'] as const) test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true, pageAccess: true, shadow: 'open' } });
   test(`English manual search focus recovers from body and controls in ${host}`, async () => {

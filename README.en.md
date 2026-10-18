@@ -6,6 +6,8 @@ A Chrome command palette that makes everyday browser tasks easier.
 
 A locally loaded extension for personal use. No account, backend, or telemetry.
 
+The toolbar logo follows the system light/dark scheme, with a 30-second fallback check and resynchronization on window focus (Chrome may delay scheduled checks); search field logos follow the panel theme. The `offscreen` permission lets the toolbar respond while the panel is closed, without reading web pages or making network requests. Chrome custom toolbar theme colors cannot be detected.
+
 ## Features
 
 ### Command Palette
@@ -14,7 +16,7 @@ Find tabs, bookmarks, browsing history, and browser commands in one place. Match
 
 Closing non-source tabs, pinning, muting, and other organizing actions keep JustOneHop open with your search and caret preserved. Removing a result selects a neighboring item so you can keep working. Navigation, such as switching tabs or opening a page, closes the palette on success. Removing the source tab from which JustOneHop was opened always ends the current JustOneHop session, whether it is closed directly, included in a batch closure, or closed externally in Chrome. JustOneHop never creates a separate panel or rebinds an existing panel to another tab to continue that session. Finishing with the current page returns you to the neighboring tab Chrome naturally selects, without an extra popup taking focus. Closing the source window or its last tab also ends the session. Window hosting and positioning stay unchanged.
 
-When focus is lost to the panel background, the search bar shows “Press Tab to focus search.” Press Tab or click the magnifying glass to restore input without changing your query or text selection; the hint then disappears. Tab and Shift+Tab keep their normal order when a control already has focus. An open Actions menu restores its own search field. Cmd/Ctrl+F is not used for focus recovery. If the address bar or another app holds focus, click the search field or magnifying glass.
+When focus is lost to the panel background, the search bar shows “Press Tab to focus search.” Press Tab or click the JustOneHop logo to restore input without changing your query or text selection; the hint then disappears. Tab and Shift+Tab keep their normal order when a control already has focus. An open Actions menu restores its own search field. Cmd/Ctrl+F is not used for focus recovery. If the address bar or another app holds focus, click the search field or JustOneHop logo.
 
 ### Go to URL
 
