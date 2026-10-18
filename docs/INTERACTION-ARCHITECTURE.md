@@ -130,6 +130,8 @@ Entry 的可选 category、shortcut、faviconPageUrl 仅承载呈现信息，不
 
 ## 收藏标签页
 
+`bookmarkTabAction` 仅为添加收藏提供 `Mod+D` 元信息，主搜索复用 `Shortcut` 显示 `⌘D`／`Ctrl+D`；取消收藏不展示此绑定。主搜索 `actionsFor` 沿用来源目标判断，仅当前页菜单保留并通过 `ActionMenu` 执行该快捷键，非当前页菜单隐藏；主搜索行的按键提示沿用现有浏览器原生快捷键语义。
+
 主搜索由 `bookmarkTabAction` 为来源标签生成 `bookmarkTab`／`unbookmarkTab`；主列表 `actionsFor` 与标签组成员菜单为所选标签调用同一 helper。标签行默认仍为 `switch`，菜单通过右键、底栏与 Cmd/Ctrl+K 共用目标。动作属于 tab 分类，带书签图标、中英文别名与目标标题说明；两者均为 `searchOnly`，取消标记 `danger`。`model` 共享明确状态查询别名 `bookmark / bookmark tab / add bookmark / save bookmark / 收藏 / 收藏标签页 / 添加书签`，按当前状态发现收藏或取消动作；收藏后同一 query 直接显示 Unbookmark。单独 `book` 至 `bookmark` 的前缀与 `unbook` 至 `unbookmark` 的取消前缀也通过意图检查，并将对应书签命令归入最高相关性层级，高于页面同名／前缀匹配及其学习权重；可带 `Tab:`／`标签页：` 分类。过短词、错字、`bookcase` 与 `book guide` 等页面词不触发此提升，裸 `书签` 优先保留书签管理器语义。有词搜索的危险意图检查允许这些明确状态查询及 `unbookmark / remove bookmark / 取消收藏 / 删除书签`，单独 `书签 / tab / close` 或错字不放行取消；明确取消仍排除反向收藏，空菜单可展示危险动作。
 
 完整原始 URL（含 query/hash）决定收藏状态。执行携带 `tabId`、`expectedUrl` 与全部匹配 `bookmarkIds`，保留 managed 项；组菜单另携带 `groupId`。复用既有 `bookmarks` 权限，创建时不指定 parentId，由 Chrome 默认放入 Other bookmarks，已有精确匹配则不重复创建。共享 URL 策略仅接受 HTTP(S)、file、FTP、chrome，排除脚本与其他不支持的地址。原生书签遵循 Chrome 同步设置，不属于 zing 的本机偏好存储。

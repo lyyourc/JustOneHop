@@ -5044,6 +5044,42 @@ test.describe(() => {
 });
 
 for (const language of ['English', 'Chinese']) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN', pageAccess: true, shadow: 'open' } });
+  test(`${language} bookmark search shows shortcut and menu dispatch preserves bookmark state`, async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Bookmark-shortcut-source`);
+    await page.bringToFront();
+    await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      await chrome.scripting.executeScript({ target: { tabId: tab.id! }, files: ['content.js'] });
+      await chrome.tabs.sendMessage(tab.id!, { source: 'zing', type: 'toggle' });
+    }, page.url());
+    const surface = page.frameLocator('.zing-frame');
+    const input = surface.locator('.search-bar input');
+    await input.fill(language === 'English' ? 'bookmark tab' : '收藏标签页');
+    const add = surface.locator('[id="zing-command:bookmarkTab"]');
+    await expect(add.locator('.entry-shortcut kbd')).toHaveText('⌘D');
+    await expect(add.locator('.entry-shortcut')).toHaveAttribute('aria-label', 'Command + D');
+    await add.click({ button: 'right' });
+    await expect(surface.locator('.action-row .entry-shortcut kbd')).toHaveText('⌘D');
+    await page.keyboard.press('Meta+d');
+    const bookmarks = () => worker.evaluate(url => chrome.bookmarks.search({ url }), page.url());
+    await expect.poll(async () => (await bookmarks()).length).toBe(1);
+    const remove = surface.locator('[id="zing-command:unbookmarkTab"]');
+    await expect(remove).toBeVisible();
+    await expect(remove.locator('.entry-shortcut')).toHaveCount(0);
+    await remove.click();
+    await expect.poll(async () => (await bookmarks()).length).toBe(0);
+    await expect(add.locator('.entry-shortcut kbd')).toHaveText('⌘D');
+    await input.press('ArrowDown');
+    await expect(add).toHaveAttribute('aria-selected', 'true');
+    await input.press('Enter');
+    await expect.poll(async () => (await bookmarks()).length).toBe(1);
+    await expect(remove).toBeVisible();
+    await expect(remove.locator('.entry-shortcut')).toHaveCount(0);
+  });
+});
+
+for (const language of ['English', 'Chinese']) test.describe(() => {
   test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
   test(`${language} categorized candidates show real shortcuts and keep search matching and save binding`, async () => {
   const en = language === 'English';

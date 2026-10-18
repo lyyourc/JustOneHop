@@ -49,6 +49,7 @@ export function bookmarkTabAction(tab: TabItem | undefined, bookmarks: BookmarkI
     id: `command:${action}`, kind: 'command', category: 'tab', action, icon: 'bookmark',
     title: t(action), subtitle: tab.title, tabId: tab.id, expectedUrl: tab.url, bookmarkIds,
     searchOnly: true, danger: action === 'unbookmarkTab' || undefined,
+    shortcut: action === 'bookmarkTab' ? 'Mod+D' : undefined,
     keywords: 'bookmark tab 书签 标签页',
     aliases: action === 'unbookmarkTab'
       ? [...bookmarkStateAliases, 'unbookmark', 'unbookmark tab', 'remove bookmark', 'remove bookmarks', 'delete bookmark', 'delete bookmarks', '取消收藏', '取消收藏标签页', '删除书签']

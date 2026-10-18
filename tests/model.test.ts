@@ -177,11 +177,13 @@ test('bookmark actions use exact complete URLs and include every duplicate, incl
   assert.equal(remove.category, 'tab');
   assert.equal(remove.searchOnly, true);
   assert.equal(remove.danger, true);
+  assert.equal(remove.shortcut, undefined);
   assert.deepEqual(remove.bookmarkIds, ['first', 'managed']);
   const add = bookmarkTabAction(current, bookmarks.slice(2))!;
   assert.equal(add.action, 'bookmarkTab');
   assert.equal(add.title, t('bookmarkTab'));
   assert.equal(add.expectedUrl, current.url);
+  assert.equal(add.shortcut, 'Mod+D');
   assert.deepEqual(add.bookmarkIds, []);
   assert.ok(!add.danger);
 });
@@ -624,6 +626,9 @@ test('tab action shortcuts are only advertised for the active target', () => {
   assert.equal(inactive.find(item => item.action === 'reload')?.shortcut, undefined);
   assert.equal(active.find(item => item.action === 'close')?.shortcut, 'Mod+W');
   assert.equal(active.find(item => item.action === 'reload')?.shortcut, 'Mod+R');
+  assert.equal(items.find(item => item.action === 'bookmarkTab')?.shortcut, 'Mod+D');
+  assert.equal(inactive.find(item => item.action === 'bookmarkTab')?.shortcut, undefined);
+  assert.equal(active.find(item => item.action === 'bookmarkTab')?.shortcut, 'Mod+D');
 });
 
 test('tab groups are searchable entries and their names find member tabs', () => {
