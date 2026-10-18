@@ -31,6 +31,6 @@ if (process.argv.includes('--watch')) {
   await Promise.all(jobs.map(options => build(options)));
   // Keep the bundled license notices together in the distributable.
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
-  await writeFile('dist/BUILD.txt', `zing ${pkg.version}\nBuilt locally. No remote code or services.\n`);
+  await writeFile('dist/BUILD.txt', `JustOneHop ${pkg.version}\nBuilt locally. No remote code or services.\n`);
   console.log('Built extension → dist/');
 }

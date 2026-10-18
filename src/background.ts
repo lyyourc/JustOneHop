@@ -11,18 +11,18 @@ import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
 import { forgetUsage, resetUsage } from './usageStorage';
 import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult } from './types';
 
-chrome.action.onClicked.addListener(tab => launchPalette(tab).catch(error => console.warn('zing: unable to open palette.', error)));
+chrome.action.onClicked.addListener(tab => launchPalette(tab).catch(error => console.warn('justonehop: unable to open palette.', error)));
 chrome.commands.onCommand.addListener(async command => {
   if (command === 'switch-recent' || command === 'switch-recent-back') { await openRecentSwitcher(command); return; }
   if (command !== 'toggle-palette') return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) await launchPalette(tab).catch(error => console.warn('zing: unable to open palette.', error));
+  if (tab) await launchPalette(tab).catch(error => console.warn('justonehop: unable to open palette.', error));
 });
 chrome.tabs.onUpdated.addListener((tabId, change) => {
   if (change.status === 'loading') void chrome.action.setPopup({ tabId, popup: '' }).catch(() => {});
 });
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
-  if (sender.id !== chrome.runtime.id || request?.source !== 'zing') return;
+  if (sender.id !== chrome.runtime.id || request?.source !== 'justonehop') return;
   if (!['snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
   let responded = false;
   const success = (data?: void | Snapshot | PageStorage | PaletteState | HistorySearchResult) => {
@@ -66,13 +66,13 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
 // Only visible palettes keep a port open; tab lifecycle checks use Chrome alarms.
 const clients = new Set<chrome.runtime.Port>();
 chrome.runtime.onConnect.addListener(port => {
-  if (port.name !== 'zing' || port.sender?.id !== chrome.runtime.id) return;
+  if (port.name !== 'justonehop' || port.sender?.id !== chrome.runtime.id) return;
   clients.add(port);
   port.onDisconnect.addListener(() => { clients.delete(port); });
 });
 const changed = () => {
   for (const port of clients) {
-    try { port.postMessage({ source: 'zing', type: 'changed' }); }
+    try { port.postMessage({ source: 'justonehop', type: 'changed' }); }
     catch { clients.delete(port); }
   }
 };

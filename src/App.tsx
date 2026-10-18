@@ -186,9 +186,9 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     input.current?.setSelectionRange(...savedCaret.current);
     // Content scripts only have runtime access; updates are forwarded by the worker.
     const listener = (message: { source?: string; type?: string }) => {
-      if (message.source === 'zing' && message.type === 'changed') changed();
+      if (message.source === 'justonehop' && message.type === 'changed') changed();
     };
-    const port = chrome.runtime.connect({ name: 'zing' });
+    const port = chrome.runtime.connect({ name: 'justonehop' });
     port.onMessage.addListener(listener);
     return () => { mounted.current = false; refreshVersion.current++; clearTimeout(timer); port.disconnect(); window.removeEventListener('focus', focusWindow); };
   }, []);
@@ -385,32 +385,32 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const primaryLabel = current?.action === 'navigateAddress' ? t('openCurrentTab') : current?.action === 'openAddressNewTab' ? t('openNewTab') : current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
     : current?.kind === 'history' ? t('openHistoryPage') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
-  return <NavigationRoot><BackLayer onBack={dismiss}><div className={`zing-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
+  return <NavigationRoot><BackLayer onBack={dismiss}><div className={`justonehop-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (bookmarkRemoval) setBookmarkRemoval(null); else if (actionTarget) closeActions(); else dismiss(); }
   }}>
     {tabSwitcherOpen && data ? <PaletteTabSwitcher data={data} theme={preferences.theme} onBack={() => setTabSwitcherOpen(false)} onClose={onClose} /> : historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} windowId={data.windowId} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
       initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
       onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : bindingOpen ? <BindingGuide isMac={isMac} onBack={() => setBindingOpen(false)} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} tabSwitcherShortcut={data?.tabSwitcherShortcut || ''} isMac={isMac}
-      onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label="zing" aria-busy={busy}>
-      <span className="sr-only" id="zing-navigation">{t('navigationHelp')}</span>
+      onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label={t('extensionName')} aria-busy={busy}>
+      <span className="sr-only" id="justonehop-navigation">{t('navigationHelp')}</span>
       <div className={`main-surface ${actionTarget || bookmarkRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval ? true : undefined}>
         <header className="search-bar">
           <SearchFocusButton input={input} disabled={busy} />
           <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError(''); setNotice(''); }}
             placeholder={t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
-            aria-autocomplete="list" aria-expanded="true" aria-controls="zing-results"
-            aria-describedby="zing-navigation"
-            aria-activedescendant={!history.pending && selected ? `zing-${selected.id}` : undefined}
+            aria-autocomplete="list" aria-expanded="true" aria-controls="justonehop-results"
+            aria-describedby="justonehop-navigation"
+            aria-activedescendant={!history.pending && selected ? `justonehop-${selected.id}` : undefined}
             autoComplete="off" autoCorrect="off" spellCheck={false} disabled={busy} />
           <SearchDismissButton label={t('closePalette')} />
         </header>
         <span className="sr-only result-status" role="status">{data && !history.pending ? countMessage('resultOne', 'resultMany', visible.length) : loading && showLoading ? t('loading') : ''}</span>
-        <div className="results" ref={list} id="zing-results" role="listbox" aria-label={t(grouped ? 'suggested' : 'resultsLabel')} aria-busy={history.pending}>
+        <div className="results" ref={list} id="justonehop-results" role="listbox" aria-label={t(grouped ? 'suggested' : 'resultsLabel')} aria-busy={history.pending}>
           {loading && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={25} /><p>{t('preparing')}</p></div> : null}
           {data && !history.pending && !visible.length ? <div className="empty"><Search size={30} /><strong>{t('noResults')}</strong>
             <p>{t('noResultsHint')}</p></div> : null}
           {visible.map(item => <div className="result-group" key={item.id}>
-            <SearchResultItem entry={item} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} suppressTabShortcuts={mode === 'popup'} id={`zing-${item.id}`} selected={!history.pending && selected?.id === item.id}
+            <SearchResultItem entry={item} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} suppressTabShortcuts={mode === 'popup'} id={`justonehop-${item.id}`} selected={!history.pending && selected?.id === item.id}
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
@@ -423,7 +423,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
         </div>
       </div>
 
-      {bookmarkRemoval ? <BookmarkConfirmation target={bookmarkRemoval} onCancel={() => setBookmarkRemoval(null)} onConfirm={() => void run(bookmarkRemoval.entry, true)} /> : actionTarget ? <ActionMenu id="zing-actions" isMac={isMac}
+      {bookmarkRemoval ? <BookmarkConfirmation target={bookmarkRemoval} onCancel={() => setBookmarkRemoval(null)} onConfirm={() => void run(bookmarkRemoval.entry, true)} /> : actionTarget ? <ActionMenu id="justonehop-actions" isMac={isMac}
         title={<><span className="action-target-icon"><Favicon pageUrl={actionTarget.faviconPageUrl} fallback={<Glyph name={actionTarget.icon} size={15} />} /></span><span>{liveTarget?.title}</span></>}
         actions={actions.map(action => ({ id: action.id, title: action.title, shortcut: visibleShortcut(action), icon: <Favicon pageUrl={action.faviconPageUrl} fallback={<Glyph name={action.icon} size={16} />} />, danger: action.danger || action.action === 'close', disabled: action.disabled, alias: matchingAlias(action, actionQuery) }))}
         query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }} selectedId={selectedAction?.id} onSelectionChange={setActionSelection}
@@ -433,7 +433,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
         {!data ? <button onClick={() => { setError(''); void refreshSnapshot().catch(reason => setError(errorMessage(reason))); }}>{t('retry')}</button> : null}</div> : null}
       <PaletteFooter isMac={isMac}
         navigation={{ kind: 'settings', label: t('settings'), tooltip: `${t('settings')} (${mod},)`, disabled: busy || !!bookmarkRemoval, onAction: () => openSettings() }}
-        title="zing" context={<NavigationHint />}
+        title={t('extensionName')} context={<NavigationHint />}
         status={busy ? <span className="footer-status"><LoaderCircle className="spinner" size={13} />{t('running')}</span>
           : notice ? <span role="status">{notice}</span>
           : newAddressAction && selected?.disabled ? <span role="status">{t('addressPinned')}</span>

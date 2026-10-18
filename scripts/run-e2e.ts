@@ -88,7 +88,7 @@ export async function runE2E(args: string[], options: RunnerOptions = {}): Promi
   const execute = (command: Command, extraArgs: string[] = []) => new Promise<number>((done, reject) => {
     activeChild = spawn(command.executable, [...command.args, ...extraArgs], {
       cwd: root, stdio: 'inherit', detached: process.platform !== 'win32',
-      env: { ...process.env, ZING_E2E_RUN_DIR: directory, ZING_E2E_RUNNER: '1', ZING_E2E_MODE: mode },
+      env: { ...process.env, JUSTONEHOP_E2E_RUN_DIR: directory, JUSTONEHOP_E2E_RUNNER: '1', JUSTONEHOP_E2E_MODE: mode },
     });
     activeChild.once('error', reject);
     activeChild.once('close', (code, signal) => {

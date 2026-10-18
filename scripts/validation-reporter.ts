@@ -25,11 +25,11 @@ export default class ValidationReporter implements Reporter {
   private tests = new Map<string, RecordEntry>();
   private errors: string[] = [];
   private suite?: Suite;
-  private listOnly = process.env.ZING_E2E_MODE === 'list' || process.argv.includes('--list');
+  private listOnly = process.env.JUSTONEHOP_E2E_MODE === 'list' || process.argv.includes('--list');
   private directory: string;
 
   constructor(options: { directory?: string; listOnly?: boolean } = {}) {
-    this.directory = options.directory ?? process.env.ZING_E2E_RUN_DIR!;
+    this.directory = options.directory ?? process.env.JUSTONEHOP_E2E_RUN_DIR!;
     if (options.listOnly !== undefined) this.listOnly = options.listOnly;
   }
 
@@ -37,7 +37,7 @@ export default class ValidationReporter implements Reporter {
 
   onBegin(config: FullConfig, suite: Suite) {
     this.suite = suite;
-    if (!process.env.ZING_E2E_RUNNER) {
+    if (!process.env.JUSTONEHOP_E2E_RUNNER) {
       const root = config.rootDir.endsWith('/tests') ? join(config.rootDir, '..') : config.rootDir;
       const dist = join(root, 'dist');
       console.warn('Direct Playwright invocation: build freshness is unverified. Use npm run test:e2e -- <selectors> for a fresh build and coordinated browser execution.');

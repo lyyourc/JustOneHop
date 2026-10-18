@@ -114,8 +114,8 @@ test('history API sends the query and scope over IPC and propagates failures', a
     assert.deepEqual(await searchHistory('guide', 'week'), result);
     assert.deepEqual(await searchHistory('guide', 'all'), result);
     assert.deepEqual(requests, [
-      { source: 'zing', type: 'search-history', payload: { query: 'guide', scope: 'week' } },
-      { source: 'zing', type: 'search-history', payload: { query: 'guide', scope: 'all' } },
+      { source: 'justonehop', type: 'search-history', payload: { query: 'guide', scope: 'week' } },
+      { source: 'justonehop', type: 'search-history', payload: { query: 'guide', scope: 'all' } },
     ]);
     chrome.runtime.sendMessage = (async () => ({ ok: false, error: 'History unavailable' })) as typeof chrome.runtime.sendMessage;
     await assert.rejects(searchHistory('guide', 'week'), /History unavailable/);

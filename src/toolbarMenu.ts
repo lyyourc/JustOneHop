@@ -2,8 +2,8 @@ import { getPreferences, preferencesReady, subscribePreferences } from './prefer
 import { t } from './i18n';
 import { openChromePage } from './chromePages';
 
-const shortcutId = 'zing-toolbar-shortcut';
-const helpId = 'zing-toolbar-help';
+const shortcutId = 'justonehop-toolbar-shortcut';
+const helpId = 'justonehop-toolbar-help';
 const titles = new Map<string, string>();
 let pending = Promise.resolve();
 
@@ -29,7 +29,7 @@ export function refreshToolbarMenu(): Promise<void> {
     const shortcut = commands.find(command => command.name === 'toggle-palette')?.shortcut;
     await setItem(shortcutId, t('toolbarShortcut', shortcut || t('notAssigned')));
     await setItem(helpId, t('help'));
-  }).catch(error => { console.warn('zing: unable to update toolbar menu.', error); });
+  }).catch(error => { console.warn('justonehop: unable to update toolbar menu.', error); });
   return pending;
 }
 
@@ -41,7 +41,7 @@ export function startToolbarMenu() {
       if (windowId === undefined) throw new Error(t('errorWindow'));
       if (info.menuItemId === shortcutId) await openChromePage('openExtensionShortcuts', windowId);
       else await chrome.tabs.create({ windowId, url: chrome.runtime.getURL('help.html') });
-    })().catch(error => { console.warn('zing: unable to open toolbar menu target.', error); });
+    })().catch(error => { console.warn('justonehop: unable to open toolbar menu target.', error); });
     void refreshToolbarMenu();
   });
   // Chrome has no action-menu onShown or command-binding change event. Refresh

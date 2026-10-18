@@ -1,4 +1,25 @@
-# zing 0.1.0 验收记录
+# JustOneHop · 小范围瞬移 0.1.0 验收记录
+
+## 2026-10-18 独立面板实际运行与错误日志核对
+
+针对用户提供的 `popup.html#window=…` 未捕获断连异常截图，使用最新 dist 的隔离 Chrome 实际启动独立窗口，连续两次搜索 settings、Enter 进入设置、Esc 返回及关闭，另在扩展页强制消息拒绝并点击 Retry。最终运行收集到 pageerror、console error、unhandledrejection 均为 0，截图已查看，位于 `/tmp/justonehop-live-qytAK9/`。首次驱动在窗口关闭时遇到 keyboard.press 的页面已关闭错误，调整驱动对主动关闭的等待后完成上述两次流程；未据此修改产品行为。测试副本仅添加真实命令回调入口，未更改产品消息协议。
+
+回归测试补充 pageerror／console error 为空及 Retry 后仍正确反馈的断言，1/1 通过，runner 6.351 秒，报告 `test-results/runs/2026-10-18T13-06-52-038Z-81910-04731fc4/validation.json`。未复现截图错误，尚未连接日常 Chrome 或确认截图是否为重载前历史记录；不声称用户现场已解决。dist 已更新。
+
+## 2026-10-18 面板启动断连白屏
+
+用户报告改名后打开白屏。检查发现 popup 在渲染前等待已废弃的 palette-state 消息，后台消息失败会使启动 Promise 拒绝而不渲染任何界面。移除这项无有效恢复状态的启动依赖，让 App 正常呈现快照失败提示及重试入口。不恢复旧命名空间兼容；日常 Chrome 是否仍运行旧后台尚未独立确认，不能将此推断写成实测根因。
+
+类型检查通过。先运行真实网页浮层启动用例 1/1 通过（runner 8.098 秒），再针对修复增加后台消息拒绝时搜索框、错误与重试按钮可见的回归，1/1 通过（runner 5.032 秒），均无复验。报告分别为 `test-results/runs/2026-10-18T13-00-56-576Z-70049-28856961/validation.json`、`test-results/runs/2026-10-18T13-02-09-754Z-72508-8e1470dd/validation.json`。最终 dist 已更新；未重载日常 Chrome，用户现场白屏仍需重载新版扩展后确认。
+
+## 2026-10-18 产品与内部标识更名
+
+按用户最终要求统一产品中文名「小范围瞬移」、英文名 JustOneHop，内部消息、端口、DOM/CSS、注入标记、品牌专用存储键、包名及环境变量使用 justonehop／JUSTONEHOP；不保留旧品牌别名或迁移层。通用 preferences 与 searchUsage 键继续使用，旧品牌收起管理记录不读取，Chrome 原生组保留。历史记录中的旧名称与证据路径保留当时状态，见 ADR 0022。
+
+类型检查、diff 检查通过；i18n／model／toolbarMenu／paletteWindow／tabTuck／e2e-validation 相关单测首轮 137/137 通过。最终将本地化冒号仅限品牌分类后，model 45/45 通过，单独构建成功，dist 已更新。
+
+仅运行 1 项既有浏览器用例 `English settings entries, narrow layout and Chrome hotkey settings`，runner 13.340 秒，未复验：新品牌命令标题、帮助鼠标／键盘进入返回、设置入口等前段检查通过，后段在 settings Tab 循环预期搜索框重新聚焦时失败（`tests/palette.spec.ts:1850`，实际 inactive），不声明整项或窄屏最终验收通过。报告：`test-results/runs/2026-10-18T12-58-10-349Z-63307-f55346a7/validation.json`。本轮未扩展焦点排查或运行全量 E2E；最终标点限定后的构建未再跑浏览器。日常 Chrome 未重载，未提交。
+
 
 本文按迭代保留历史验收证据，以下通过项和测试数量仅适用于各自当时的构建与用例，不代表当前工作区或后来扩展的测试矩阵全部通过。当前使用方式见 [使用指南](USAGE.md)，设计决策见 [ADR](adr/README.md)。
 

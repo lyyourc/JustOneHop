@@ -16,7 +16,7 @@ let popupUrl: string;
 let windowId: number;
 
 async function browserPath() {
-  if (process.env.ZING_CHROMIUM_PATH) return process.env.ZING_CHROMIUM_PATH;
+  if (process.env.JUSTONEHOP_CHROMIUM_PATH) return process.env.JUSTONEHOP_CHROMIUM_PATH;
   try { await access(chromium.executablePath()); return chromium.executablePath(); } catch {}
   if (process.platform === 'darwin') {
     const cache = join(homedir(), 'Library/Caches/ms-playwright');
@@ -40,7 +40,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { server.close(); });
 
 test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
-  profile = await mkdtemp(join(tmpdir(), 'zing-tuck-e2e-'));
+  profile = await mkdtemp(join(tmpdir(), 'justonehop-tuck-e2e-'));
   const extension = join(profile, 'extension');
   await cp(resolve('dist'), extension, { recursive: true });
   // Advance only this disposable worker's clock and dispatch the real registered
@@ -102,7 +102,7 @@ async function seed(...names: string[]) {
   return result.map(tab => tab.id);
 }
 async function execute(action: 'tuck' | 'undoTuck', tabId?: number) {
-  const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }), { action, windowId, tabId });
+  const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }), { action, windowId, tabId });
   expect(reply, `${action} should succeed`).toMatchObject({ ok: true });
 }
 const groupId = (tabId: number) => worker.evaluate(async id => (await chrome.tabs.get(id)).groupId, tabId);
@@ -117,7 +117,7 @@ async function enableAutomaticTucking() {
     await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: true } });
   });
   await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.getAll()).length)).toBeGreaterThan(0);
-  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.session.get('zingTabTuckSession')).zingTabTuckSession as { enabled?: boolean } | undefined)?.enabled === true)).toBe(true);
+  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { enabled?: boolean } | undefined)?.enabled === true)).toBe(true);
 }
 async function runIdleScan() {
   await worker.evaluate(async () => {
@@ -249,7 +249,7 @@ test('English disabling automatic tuck releases its own tabs and keeps a same-na
   expect(await groupId(beta)).toBe(-1);
   expect(await groupId(personal)).toBe(personalGroup);
   expect(await worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuck: boolean }).autoTuck)).toBe(false);
-  await expect.poll(() => worker.evaluate(async () => Object.keys(((await chrome.storage.local.get('zingTabTuckClocks')).zingTabTuckClocks as { clocks: Record<string, number> }).clocks).length)).toBe(0);
+  await expect.poll(() => worker.evaluate(async () => Object.keys(((await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> }).clocks).length)).toBe(0);
 });
 
 test('English automatic tuck stops the batch when the user becomes active', async () => {
@@ -266,7 +266,7 @@ test('English automatic tuck stops the batch when the user becomes active', asyn
   await runIdleScan();
   await expect.poll(async () => (await liveTabs()).filter(tab => ids.includes(tab.id!) && tab.groupId !== -1).length).toBe(1);
   await expect.poll(() => worker.evaluate(async () => {
-    const stored = (await chrome.storage.session.get('zingTabTuckSession')).zingTabTuckSession as { undo: Record<number, { ids: number[] }> };
+    const stored = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { undo: Record<number, { ids: number[] }> };
     return Object.values(stored.undo).flatMap(batch => batch.ids).length;
   })).toBe(1);
   expect(await groupId(ids[1])).toBe(-1);
@@ -287,7 +287,7 @@ test('English tuck preserves a user rename made while a page is joining the grou
   }, owned);
   await execute('tuck', beta);
   expect(await worker.evaluate(id => chrome.tabGroups.get(id), owned)).toMatchObject({ title: 'My renamed group', color: 'blue' });
-  const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
+  const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
   expect(snapshot.ok).toBe(true);
   expect(snapshot.data.tabs.find((tab: { id: number }) => tab.id === alpha).tucked).toBe(false);
   expect(snapshot.data.tabs.find((tab: { id: number }) => tab.id === beta).tucked).toBe(false);
@@ -324,7 +324,7 @@ test.describe(() => {
     const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await search.fill('new tab');
     await expect(ui.getByRole('option').first()).toContainText('New Tab');
-    const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
+    const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
     expect(snapshot.ok).toBe(true);
     expect(snapshot.data.tabs.length).toBeGreaterThan(0);
   });
@@ -339,7 +339,7 @@ test('English tuck gives a long-running active page a fresh grace period when th
     await chrome.tabs.update(next, { active: true });
   }, next);
   await expect.poll(() => worker.evaluate(async ({ windowId, next }) => {
-    const stored = (await chrome.storage.session.get('zingTabTuckSession')).zingTabTuckSession as { active?: Record<number, number> };
+    const stored = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { active?: Record<number, number> };
     return stored.active?.[windowId] === next;
   }, { windowId, next })).toBe(true);
   await runIdleScan();
@@ -365,13 +365,13 @@ async function restartChrome() {
   windowId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
 }
 async function recoverySnapshot() {
-  return ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }).then(reply => reply.data));
+  return ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }).then(reply => reply.data));
 }
 
 async function prepareRestart() {
   const [alpha, beta] = await seed('Restart-Alpha', 'Restart-Beta');
   await execute('tuck', alpha); await execute('tuck', beta);
-  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('zingTabTuckRecovery')).zingTabTuckRecovery as { records: unknown[] }).records.length)).toBe(1);
+  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('justonehopTabTuckRecovery')).justonehopTabTuckRecovery as { records: unknown[] }).records.length)).toBe(1);
   await restartChrome();
   await expect.poll(async () => (await recoverySnapshot()).tabs.filter((tab: { url?: string }) => tab.url?.startsWith(origin)).length).toBe(2);
 }
@@ -393,7 +393,7 @@ test('English actual Chrome restart retains records and safely resumes a group w
     expect(snapshot.tuckRecoveries[0].candidates).toHaveLength(1);
     expect(alpha.tucked).toBe(false);
     const [extra] = await seed('New-Ordinary');
-    const blocked = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }),
+    const blocked = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }),
       { action: 'tuck', windowId, tabId: extra });
     expect(blocked.ok).toBe(false);
     expect(await groupId(extra)).toBe(-1);
@@ -407,13 +407,13 @@ test('English actual Chrome restart retains records and safely resumes a group w
     await expect(ui.getByRole('dialog')).toBeVisible();
     await ui.keyboard.press('Escape');
     await expect(ui.locator('.tuck-recovery .palette-footer-title')).toHaveText('Review Tucked Away Groups');
-    await ui.screenshot({ path: test.info().outputPath('zing-tuck-recovery.png') });
+    await ui.screenshot({ path: test.info().outputPath('justonehop-tuck-recovery.png') });
     await ui.evaluate(async () => {
       const { preferences } = await chrome.storage.local.get('preferences');
       await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), language: 'zh' } });
     });
     await expect(ui.getByRole('button', { name: /继续管理这组/ })).toBeVisible();
-    await ui.screenshot({ path: test.info().outputPath('zing-tuck-recovery-zh.png') });
+    await ui.screenshot({ path: test.info().outputPath('justonehop-tuck-recovery-zh.png') });
     await ui.keyboard.press('Control+n');
     await ui.keyboard.press('Control+p');
     await expect(ui.getByRole('listbox')).toBeFocused();
@@ -441,10 +441,10 @@ test('English recovery requires explicit keyboard confirmation and keeps the can
   await execute('tuck', a); await execute('tuck', b);
   // Require review independently of whether this Chrome version restores names.
   await worker.evaluate(async () => {
-    const { zingTabTuckRecovery } = await chrome.storage.local.get('zingTabTuckRecovery');
-    const saved = zingTabTuckRecovery as { records: { requiresConfirmation?: boolean }[] };
+    const { justonehopTabTuckRecovery } = await chrome.storage.local.get('justonehopTabTuckRecovery');
+    const saved = justonehopTabTuckRecovery as { records: { requiresConfirmation?: boolean }[] };
     saved.records.forEach(record => { record.requiresConfirmation = true; });
-    await chrome.storage.local.set({ zingTabTuckRecovery: saved });
+    await chrome.storage.local.set({ justonehopTabTuckRecovery: saved });
   });
   await restartChrome();
   await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(1);
@@ -484,8 +484,8 @@ test('English recovery requires explicit keyboard confirmation and keeps the can
   await expect.poll(() => groupId(alpha.id)).toBe(-1);
   expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
   await expect.poll(() => worker.evaluate(async () => {
-    const { zingTabTuckRecovery } = await chrome.storage.local.get('zingTabTuckRecovery');
-    return (zingTabTuckRecovery as { records: { title: string; color: string; customTitle: boolean; urls: string[] }[] }).records;
+    const { justonehopTabTuckRecovery } = await chrome.storage.local.get('justonehopTabTuckRecovery');
+    return (justonehopTabTuckRecovery as { records: { title: string; color: string; customTitle: boolean; urls: string[] }[] }).records;
   })).toEqual([expect.objectContaining({ title: 'Read when ready', color: 'purple', customTitle: true,
     urls: expect.arrayContaining([`${origin}/Confirm-Beta`, `${origin}/Confirm-Extra`]) })]);
 });
@@ -509,7 +509,7 @@ test('English recovery rejects stale confirmation and forgetting leaves native p
   expect(snapshot.tuckRecoveries).toHaveLength(1);
   const pending = snapshot.tuckRecoveries[0], candidate = pending.candidates[0];
   await ui.evaluate(id => chrome.tabGroups.update(id, { title: 'My changed group', color: 'blue' }), candidate.id);
-  const stale = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }),
+  const stale = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }),
     { action: 'resumeTuck', windowId, recoveryId: pending.id, groupId: candidate.id, fingerprint: candidate.fingerprint });
   expect(stale.ok).toBe(false);
   expect(await ui.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'My changed group', color: 'blue' });
@@ -537,25 +537,25 @@ test('English recovery rejects stale confirmation and forgetting leaves native p
   await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(0);
   expect((await liveTabs()).map(tab => [tab.id, tab.groupId])).toEqual(before.map(tab => [tab.id, tab.groupId]));
   expect(await ui.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'My changed group', color: 'blue' });
-  expect(await ui.evaluate(async () => ((await chrome.storage.local.get('zingTabTuckRecovery')).zingTabTuckRecovery as { records: unknown[] }).records)).toEqual([]);
+  expect(await ui.evaluate(async () => ((await chrome.storage.local.get('justonehopTabTuckRecovery')).justonehopTabTuckRecovery as { records: unknown[] }).records)).toEqual([]);
 });
 
-test('zing group edits preserve tuck ownership and persist custom title and color', async () => {
+test('justonehop group edits preserve tuck ownership and persist custom title and color', async () => {
   const [a, b, c] = await seed('Managed-A', 'Managed-B', 'Managed-C');
   await execute('tuck', a); await execute('tuck', b);
   const id = await groupId(a);
-  const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }),
+  const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }),
     { action: 'updateGroup', windowId, groupId: id, groupChanges: { title: 'Later', color: 'purple' } });
   expect(reply).toMatchObject({ ok: true });
   await execute('tuck', c);
   expect(await groupId(c)).toBe(id);
   expect(await worker.evaluate(id => chrome.tabGroups.get(id), id)).toMatchObject({ title: 'Later', color: 'purple' });
-  const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
+  const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
   expect(snapshot.data.tabs.filter((tab: { tucked: boolean }) => tab.tucked)).toHaveLength(3);
   await worker.evaluate(id => chrome.tabs.update(id, { active: true }), a);
   await expect.poll(() => groupId(a)).toBe(-1);
   expect(await worker.evaluate(id => chrome.tabGroups.get(id), id)).toMatchObject({ title: 'Later', color: 'purple' });
-  const records = await worker.evaluate(() => chrome.storage.local.get('zingTabTuckRecovery'));
+  const records = await worker.evaluate(() => chrome.storage.local.get('justonehopTabTuckRecovery'));
   expect(JSON.stringify(records)).toContain('Later');
   expect(JSON.stringify(records)).toContain('purple');
 });

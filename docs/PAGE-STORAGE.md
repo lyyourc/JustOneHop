@@ -8,7 +8,7 @@
 
 ```ts
 {
-  source: 'zing';
+  source: 'justonehop';
   type: 'read-page-storage';
   payload: {
     kind: 'local' | 'session' | 'cookies';

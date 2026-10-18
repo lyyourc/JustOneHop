@@ -11,7 +11,7 @@ export function SearchFocusButton({ input, size = 20, disabled = false }: {
   const [focusHint, setFocusHint] = useState<'focusSearchHint' | 'focusSearchClickHint' | null>(null);
   useLayoutEffect(() => {
     const node = button.current!;
-    const scope = node.closest<HTMLElement>('.zing-app')!;
+    const scope = node.closest<HTMLElement>('.justonehop-app')!;
     const view = node.ownerDocument.defaultView!;
     const focusRoot = node.getRootNode();
     let active = true;

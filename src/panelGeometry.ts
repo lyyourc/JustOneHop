@@ -1,7 +1,7 @@
 export interface PanelRect { left: number; top: number; width: number; height: number }
 export interface WindowFrame { left: number; top: number; width: number; height: number }
 
-/** Match .zing-app.overlay inside the source tab's content viewport. */
+/** Match .justonehop-app.overlay inside the source tab's content viewport. */
 export function panelRect(viewport: PanelRect): PanelRect {
   const narrow = viewport.width <= 520;
   const inset = narrow ? 24 : Math.min(150, Math.max(28, viewport.height * .16));

@@ -22,13 +22,13 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
     if (tabId === undefined) return;
     current.closing = true; changed();
     try {
-      const reply = await chrome.runtime.sendMessage({ source: 'zing-recent', type: 'accept-overlay', session: initial.session, tabId });
+      const reply = await chrome.runtime.sendMessage({ source: 'justonehop-recent', type: 'accept-overlay', session: initial.session, tabId });
       if (reply?.ok) onClose();
       else { current.closing = false; current.error = errorMessage(new Error(reply?.error || t('errorGeneric'))); changed(); }
     } catch (error) { current.closing = false; current.error = errorMessage(error); changed(); }
   };
   useLayoutEffect(() => {
-    const port = chrome.runtime.connect({ name: 'zing' });
+    const port = chrome.runtime.connect({ name: 'justonehop' });
     const element = list.current!;
     const view = element.ownerDocument.defaultView!;
     let alive = true;
@@ -65,7 +65,7 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
     // the actual document focus; switching to Chrome UI or another app cancels.
     const blur = () => setTimeout(() => { if (alive && !element.ownerDocument.hasFocus()) onClose(); }, 0);
     const message = (message: any, sender: chrome.runtime.MessageSender) => {
-      if (sender.id !== chrome.runtime.id || message?.source !== 'zing-recent' || message.session !== initial.session) return;
+      if (sender.id !== chrome.runtime.id || message?.source !== 'justonehop-recent' || message.session !== initial.session) return;
       if (message.type === 'step') move(message.direction);
       if (message.type === 'released' && !state.current.searching) void finish();
       if (message.type === 'removed') {
@@ -93,9 +93,9 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [revision]);
   const current = state.current;
   const visible = filterRecentTabs(current.tabs, current.query);
-  return <NavigationRoot><BackLayer onBack={onClose}><div className="zing-app overlay recent-overlay" data-theme={getPreferences().theme} data-closing={current.closing}
+  return <NavigationRoot><BackLayer onBack={onClose}><div className="justonehop-app overlay recent-overlay" data-theme={getPreferences().theme} data-closing={current.closing}
     onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="palette" aria-label="zing">
+    <section className="palette" aria-label={t('extensionName')}>
       <RecentSwitcherView tabs={visible} index={current.index} query={current.query} searching={current.searching}
         onSearch={() => { current.searching = true; changed(); }} onQueryChange={query => {
         if (current.closing) return;

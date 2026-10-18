@@ -54,7 +54,7 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
   function leave() { if (menu) setMenu(false); else { revision.current++; onBack(); } }
   function openBindingShortcuts() {
     const page = back.current?.ownerDocument;
-    const transient = back.current?.closest('.zing-app.popup') &&
+    const transient = back.current?.closest('.justonehop-app.popup') &&
       (page?.location.hash.startsWith('#window=') || chrome.extension.getViews({ type: 'popup' }).includes(page?.defaultView as Window));
     return openShortcuts(Boolean(transient));
   }

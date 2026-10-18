@@ -39,7 +39,7 @@ function CookieAccess() {
     catch { setError(t('cookieAccessError')); }
     finally { setBusy(false); }
   }
-  return <main className="zing-app cookie-access" data-theme={getPreferences().theme} onKeyDown={event => { if (event.key === 'Escape') window.close(); }}>
+  return <main className="justonehop-app cookie-access" data-theme={getPreferences().theme} onKeyDown={event => { if (event.key === 'Escape') window.close(); }}>
     <Cookie size={28} /><h1>{t('cookieAccessTitle')}</h1>
     <strong className="permission-site">{patterns.map(pattern => pattern.replace('*://', '').replace('/*', '')).join(' · ') || origin}</strong>
     <p>{t('cookieAccessHint')}</p>
@@ -49,5 +49,5 @@ function CookieAccess() {
 }
 void preferencesReady.then(() => {
   document.documentElement.lang = t('languageTag'); document.body.style.margin = '0';
-  document.title = 'zing · Cookies'; createRoot(document.getElementById('root')!).render(<CookieAccess />);
+  document.title = `${t('extensionName')} · Cookies`; createRoot(document.getElementById('root')!).render(<CookieAccess />);
 });

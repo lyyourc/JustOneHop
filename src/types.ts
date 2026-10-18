@@ -70,21 +70,21 @@ export interface StorageEntry {
 }
 export interface PageStorage { kind: StorageKind; url: string; entries: StorageEntry[] }
 export type Request =
-  | { source: 'zing'; type: 'snapshot' }
-  | { source: 'zing'; type: 'search-history'; payload: { query: string; scope: 'week' | 'all' } }
-  | { source: 'zing'; type: 'palette-state' }
-  | { source: 'zing'; type: 'cancel-palette-continuation' }
-  | { source: 'zing'; type: 'read-page-storage'; payload: StorageRead }
-  | { source: 'zing'; type: 'open-cookie-access'; payload: CookieAccessRequest }
-  | { source: 'zing'; type: 'open-shortcuts'; preserveBindingGuide?: boolean }
-  | { source: 'zing'; type: 'reset-usage' }
-  | { source: 'zing'; type: 'forget-usage'; payload: { target: string | string[]; query?: string } }
-  | { source: 'zing'; type: 'execute'; payload: Execution };
+  | { source: 'justonehop'; type: 'snapshot' }
+  | { source: 'justonehop'; type: 'search-history'; payload: { query: string; scope: 'week' | 'all' } }
+  | { source: 'justonehop'; type: 'palette-state' }
+  | { source: 'justonehop'; type: 'cancel-palette-continuation' }
+  | { source: 'justonehop'; type: 'read-page-storage'; payload: StorageRead }
+  | { source: 'justonehop'; type: 'open-cookie-access'; payload: CookieAccessRequest }
+  | { source: 'justonehop'; type: 'open-shortcuts'; preserveBindingGuide?: boolean }
+  | { source: 'justonehop'; type: 'reset-usage' }
+  | { source: 'justonehop'; type: 'forget-usage'; payload: { target: string | string[]; query?: string } }
+  | { source: 'justonehop'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
 export type IconName = 'search' | 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'tuck';
 export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'binding' | 'ranking' | 'tabs';
 export interface Entry {
-  category?: 'tabGroup' | 'tab' | 'storage' | 'settings' | 'chromePages' | 'zing';
+  category?: 'tabGroup' | 'tab' | 'storage' | 'settings' | 'chromePages' | 'justonehop';
   shortcut?: string;
   faviconPageUrl?: string;
   url?: string;

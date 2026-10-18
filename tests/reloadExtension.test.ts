@@ -2,20 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { reloadExtension } from '../src/reloadExtension.ts';
 
-test('reload closes only zing panels, waits for overlay cleanup, and preserves ordinary tabs', async () => {
+test('reload closes only justonehop panels, waits for overlay cleanup, and preserves ordinary tabs', async () => {
   const calls: string[] = [];
   let release!: () => void;
   globalThis.chrome = {
-    runtime: { getURL: (path: string) => `chrome-extension://zing/${path}`, reload: () => calls.push('reload') },
+    runtime: { getURL: (path: string) => `chrome-extension://justonehop/${path}`, reload: () => calls.push('reload') },
     tabs: {
       query: async () => [
-        { id: 1, url: 'https://example.com/' }, { id: 2, url: 'chrome-extension://zing/popup.html?token=a' },
-        { id: 3, url: 'chrome-extension://zing/switcher.html' }, { id: 4, url: 'chrome://settings/' },
+        { id: 1, url: 'https://example.com/' }, { id: 2, url: 'chrome-extension://justonehop/popup.html?token=a' },
+        { id: 3, url: 'chrome-extension://justonehop/switcher.html' }, { id: 4, url: 'chrome://settings/' },
         { id: 5, url: 'chrome-extension://another/popup.html' },
       ],
       remove: async (id: number) => { calls.push(`remove:${id}`); },
       sendMessage: async (id: number, message: unknown, options: unknown) => {
-        assert.deepEqual(message, { source: 'zing', type: 'close-for-reload' });
+        assert.deepEqual(message, { source: 'justonehop', type: 'close-for-reload' });
         assert.deepEqual(options, { frameId: 0 });
         calls.push(`close:${id}`);
         if (id === 1) await new Promise<void>(resolve => { release = resolve; });

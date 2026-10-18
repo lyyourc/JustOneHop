@@ -19,7 +19,7 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
   const input = useRef<HTMLInputElement>(null);
   useLayoutEffect(() => { (searching ? input.current : listRef.current)?.focus(); }, [searching, listRef]);
   const activateSearch = () => { onSearch(); input.current?.focus(); };
-  return <main className="zing-app recent-switcher" data-theme={theme} style={onBack ? { flex: 1, minHeight: 0, height: 'auto' } : undefined} onKeyDownCapture={event => {
+  return <main className="justonehop-app recent-switcher" data-theme={theme} style={onBack ? { flex: 1, minHeight: 0, height: 'auto' } : undefined} onKeyDownCapture={event => {
     if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
       event.preventDefault(); event.stopPropagation(); activateSearch();
     }

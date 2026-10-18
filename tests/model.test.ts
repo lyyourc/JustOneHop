@@ -22,7 +22,7 @@ test('one search index contains every source while cold home contains only eight
   const home = homeEntries(items);
   assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
   assert.ok(home.every(entry => entry.kind === 'command' && !entry.danger && !entry.searchOnly));
-  assert.deepEqual(home.slice(0, 2).map(entryTitle), ['zing Settings', 'Zing: Help']);
+  assert.deepEqual(home.slice(0, 2).map(entryTitle), ['JustOneHop Settings', 'JustOneHop: Help']);
   const learned = homeEntries(items, new Map([['command:pin', 10]]));
   assert.deepEqual(learned.slice(0, 3).map(entry => entry.id), ['command:pin', 'command:settings', 'command:help']);
   const many = entries({ ...data, tabs: Array.from({ length: 12 }, (_, i) => tab(i + 1, i)) });
@@ -120,7 +120,7 @@ test('Chinese and English command terms are searchable', () => {
 test('extension reload requires an extension query and stays out of learned home commands', () => {
   const items = entries(data);
   const scores = new Map([['command:reloadExtension', 1e9]]);
-  for (const query of ['reload zing', 'reload extension', 'reload zing extention', '重新加载扩展', '重载扩展']) {
+  for (const query of ['reload justonehop', 'reload extension', 'reload justonehop extention', '重新加载扩展', '重载扩展']) {
     assert.equal(search(items, query)[0].action, 'reloadExtension', query);
   }
   for (const query of ['reload', 'refresh', '刷新']) {
@@ -133,17 +133,17 @@ test('extension reload requires an extension query and stays out of learned home
   assert.equal(command.shortcut, undefined);
 });
 
-test('zing commands use shared category titles and bilingual colon searches', () => {
+test('justonehop commands use shared category titles and bilingual colon searches', () => {
   const original = globalThis.chrome;
   try {
     for (const locale of ['en-US', 'zh-CN']) {
       globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
       const items = entries(data);
       const command = items.find(item => item.action === 'reloadExtension')!;
-      assert.equal(command.category, 'zing');
-      assert.equal(entryTitle(command), locale === 'en-US' ? 'Zing: Reload' : 'Zing: 重新加载');
+      assert.equal(command.category, 'justonehop');
+      assert.equal(entryTitle(command), locale === 'en-US' ? 'JustOneHop: Reload' : '小范围瞬移：重新加载');
       assert.equal(entryTitle(actionsFor(command, data)[0]), entryTitle(command));
-      for (const query of ['Zing: Reload', 'zing:reload', 'Zing：重新加载', 'reload zing', '重新加载扩展']) {
+      for (const query of ['JustOneHop: Reload', 'justonehop:reload', 'JustOneHop：重新加载', 'reload justonehop', '小范围瞬移：重新加载', '重新加载扩展']) {
         assert.equal(search(items, query)[0]?.action, 'reloadExtension', `${locale}: ${query}`);
       }
     }
@@ -499,7 +499,7 @@ test('Tab Switcher describes VSCode style switching and displays only the actual
       globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
       const items = entries({ ...data, tabSwitcherShortcut: 'Alt+Shift+Y' });
       const command = items.find(item => item.action === 'tabSwitcher')!;
-      assert.equal(entryTitle(command), 'Zing: Tab Switcher');
+      assert.equal(entryTitle(command), locale === 'en-US' ? 'JustOneHop: Tab Switcher' : '小范围瞬移：Tab Switcher');
       assert.equal(command.subtitle, 'Switch tabs like in VS Code');
       assert.equal(command.shortcut, 'Alt+Shift+Y');
       for (const query of ['VSCode', 'Switch tabs like in VS Code', 'VSCode style tab switching', 'VSCode 风格标签切换']) {
@@ -512,20 +512,20 @@ test('Tab Switcher describes VSCode style switching and displays only the actual
   } finally { globalThis.chrome = original; }
 });
 
-test('settings command titles identify zing in both languages and remain searchable', () => {
+test('settings command titles identify justonehop in both languages and remain searchable', () => {
   const original = globalThis.chrome;
   try {
     for (const locale of ['en-US', 'zh-CN']) {
       globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
       const items = entries(data);
       for (const [section, english, chinese] of [
-        ['', 'zing Settings', 'zing 设置'],
-        ['theme', 'zing Settings: Theme', 'zing 设置：主题'],
-        ['language', 'zing Settings: Language', 'zing 设置：语言'],
-        ['keyboard', 'zing Settings: Keyboard Shortcuts', 'zing 设置：快捷键'],
-        ['ranking', 'zing Settings: Search Ranking', 'zing 设置：搜索排序'],
-        ['tabs', 'zing Settings: Auto Tuck Tabs', 'zing 设置：自动收起标签页'],
-        ['binding', 'zing Settings: Set Up Ctrl+Tab', 'zing 设置：配置 Ctrl+Tab'],
+        ['', 'JustOneHop Settings', '小范围瞬移 设置'],
+        ['theme', 'JustOneHop Settings: Theme', '小范围瞬移 设置：主题'],
+        ['language', 'JustOneHop Settings: Language', '小范围瞬移 设置：语言'],
+        ['keyboard', 'JustOneHop Settings: Keyboard Shortcuts', '小范围瞬移 设置：快捷键'],
+        ['ranking', 'JustOneHop Settings: Search Ranking', '小范围瞬移 设置：搜索排序'],
+        ['tabs', 'JustOneHop Settings: Auto Tuck Tabs', '小范围瞬移 设置：自动收起标签页'],
+        ['binding', 'JustOneHop Settings: Set Up Ctrl+Tab', '小范围瞬移 设置：配置 Ctrl+Tab'],
       ]) {
         const id = `command:settings${section ? `:${section}` : ''}`;
         assert.equal(entryTitle(items.find(item => item.id === id)!), locale === 'en-US' ? english : chinese);
@@ -541,7 +541,7 @@ test('feature commands are discoverable by intent and help is available on home'
   for (const [query, id] of [
     ['help', 'command:help'], ['帮助', 'command:help'], ['使用说明', 'command:help'],
     ['tab switcher', 'command:tabSwitcher'], ['recent tabs', 'command:tabSwitcher'], ['最近标签页', 'command:tabSwitcher'], ['标签切换器', 'command:tabSwitcher'],
-    ['Zing: Help', 'command:help'], ['Zing: Settings', 'command:settings'],
+    ['JustOneHop: Help', 'command:help'], ['JustOneHop: Settings', 'command:settings'],
     ['Settings: Theme', 'command:settings:theme'], ['change theme', 'command:settings:theme'],
     ['Settings: Language', 'command:settings:language'], ['change language', 'command:settings:language'],
     ['ctrl tab', 'command:settings:binding'], ['设置 Ctrl+Tab', 'command:settings:binding'],

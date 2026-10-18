@@ -6,8 +6,8 @@ import type { Snapshot, TabItem } from '../src/types.ts';
 
 // Representative workday samples, not data read from a personal Chrome profile.
 const pages: [string, string, boolean?, number?][] = [
-  ['Pull requests · acme/zing · GitHub', 'https://github.com/acme/zing/pulls'],
-  ['Issues · acme/zing · GitHub', 'https://github.com/acme/zing/issues'],
+  ['Pull requests · acme/justonehop · GitHub', 'https://github.com/acme/justonehop/pulls'],
+  ['Issues · acme/justonehop · GitHub', 'https://github.com/acme/justonehop/issues'],
   ['产品路线图 Q4 — Notion', 'https://notion.so/roadmap'],
   ['Design System — Figma', 'https://figma.com/design/system'],
   ['日志服务-阿里云控制台', 'https://sls.console.aliyun.com/logs', true],
@@ -39,8 +39,8 @@ const snapshot: Snapshot = {
 };
 
 const scenarios: [string, string, string[]][] = [
-  ['找代码评审', 'tab:1', ['github pull', 'pull github', 'zing pull']],
-  ['找问题列表', 'tab:2', ['github issues', 'issues zing']],
+  ['找代码评审', 'tab:1', ['github pull', 'pull github', 'justonehop pull']],
+  ['找问题列表', 'tab:2', ['github issues', 'issues justonehop']],
   ['只记得中文标题', 'tab:3', ['路线', 'notion 路线', 'Q4 notion']],
   ['只记得服务域名', 'tab:5', ['sls', '日志', 'sls 日志']],
   ['找会议记录', 'tab:6', ['周会', 'google 周会', '周会 docs']],

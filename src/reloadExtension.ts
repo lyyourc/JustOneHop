@@ -12,7 +12,7 @@ export async function reloadExtension(onPrepared?: () => void): Promise<void> {
       await chrome.tabs.remove(tab.id).catch(() => {});
     } else {
       // Most pages have no injected palette; a missing receiver is expected.
-      await chrome.tabs.sendMessage(tab.id, { source: 'zing', type: 'close-for-reload' }, { frameId: 0 }).catch(() => {});
+      await chrome.tabs.sendMessage(tab.id, { source: 'justonehop', type: 'close-for-reload' }, { frameId: 0 }).catch(() => {});
     }
   }));
   chrome.runtime.reload();

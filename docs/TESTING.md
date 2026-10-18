@@ -47,11 +47,11 @@ runner 在终端与 `validation.json.timings` 记录发现用例、构建、Play
 
 ## 浏览器与夹具边界
 
-测试使用临时 Chrome profile 和本地页面，与日常浏览器资料隔离。`ZING_CHROMIUM_PATH` 可指定 Chrome for Testing；默认选择逻辑见 [palette.spec.ts](../tests/palette.spec.ts)，调度配置见 [playwright.config.ts](../playwright.config.ts)。原生窗口与焦点用例通过场景选项启动有界面浏览器，避免默认 viewport 覆盖真实窗口尺寸。此类用例仍受系统前台焦点影响；失败时保存 `native-window-lifecycle.json`（窗口创建／导航／关闭及当前窗口、会话状态），结合 trace 判断，不能仅凭重跑成功认定竞态已解决。
+测试使用临时 Chrome profile 和本地页面，与日常浏览器资料隔离。`JUSTONEHOP_CHROMIUM_PATH` 可指定 Chrome for Testing；默认选择逻辑见 [palette.spec.ts](../tests/palette.spec.ts)，调度配置见 [playwright.config.ts](../playwright.config.ts)。原生窗口与焦点用例通过场景选项启动有界面浏览器，避免默认 viewport 覆盖真实窗口尺寸。此类用例仍受系统前台焦点影响；失败时保存 `native-window-lifecycle.json`（窗口创建／导航／关闭及当前窗口、会话状态），结合 trace 判断，不能仅凭重跑成功认定竞态已解决。
 
 `palette.spec.ts` 在 `test.describe` 作用域内通过 `test.use({ environment: ... })` 显式声明 locale、shadow、pageAccess、cookieDomains、commands、toolbarMenus、headed、verticalTabs 和 vimium 等环境选项，默认保持闭合 Shadow DOM；测试标题仅用于说明和筛选。`tabTuck.spec.ts` 的启动存储失败也通过显式选项选择。开放 Shadow DOM、临时网站权限与后台命令钩子只写入测试扩展副本。结构测试和生产闭合 Shadow DOM / iframe 的键盘测试提供不同证据，修改相关路径时按需覆盖两者。
 
-Vimium 兼容场景需指定 `ZING_VIMIUM_PATH`，指向已解包的 Vimium 扩展；场景会核实其 service worker 已加载。未提供路径时该场景跳过，不计为兼容性通过；开放 Shadow DOM 的视觉夹具不承担 Vimium 兼容验收。
+Vimium 兼容场景需指定 `JUSTONEHOP_VIMIUM_PATH`，指向已解包的 Vimium 扩展；场景会核实其 service worker 已加载。未提供路径时该场景跳过，不计为兼容性通过；开放 Shadow DOM 的视觉夹具不承担 Vimium 兼容验收。
 
 ## 证据与未解决项
 

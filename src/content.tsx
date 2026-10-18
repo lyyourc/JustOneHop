@@ -8,7 +8,7 @@ import { flushSync } from 'react-dom';
 import { RecentOverlay, type RecentOverlaySession } from './RecentOverlay';
 import styles from './style.css';
 
-const marker = '__zingInstalled';
+const marker = '__justonehopInstalled';
 const scope = globalThis as typeof globalThis & { [marker]?: boolean };
 if (!scope[marker]) {
   scope[marker] = true;
@@ -25,7 +25,7 @@ if (!scope[marker]) {
   const close = () => {
     retainBindingGuide = false;
     try {
-      if (recentSession) void chrome.runtime.sendMessage({ source: 'zing-recent', type: 'cancel-overlay', session: recentSession }).catch(() => {});
+      if (recentSession) void chrome.runtime.sendMessage({ source: 'justonehop-recent', type: 'cancel-overlay', session: recentSession }).catch(() => {});
     } catch { /* Extension reload invalidates the old content-script context. */ }
     recentSession = undefined;
     root?.unmount();
@@ -42,15 +42,15 @@ if (!scope[marker]) {
     recentSession = recent?.session;
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     // Remove an inert host left behind if the extension was reloaded in chrome://extensions.
-    document.getElementById('zing-command-palette')?.remove();
+    document.getElementById('justonehop-command-palette')?.remove();
     host = document.createElement('div');
-    host.id = 'zing-command-palette';
+    host.id = 'justonehop-command-palette';
     const shadow = host.attachShadow({ mode: 'closed' });
     const sheet = new CSSStyleSheet();
     sheet.replaceSync(styles);
     shadow.adoptedStyleSheets = [sheet];
     dialog = document.createElement('dialog');
-    dialog.className = recent ? 'zing-dialog recent-dialog' : 'zing-dialog';
+    dialog.className = recent ? 'justonehop-dialog recent-dialog' : 'justonehop-dialog';
     dialog.setAttribute('aria-label', t('paletteLabel'));
     shadow.append(dialog);
     document.documentElement.append(host);
@@ -59,7 +59,7 @@ if (!scope[marker]) {
     // editor and passes through every key, including Escape, without inspecting
     // our private input. The actual UI remains non-editable except its inputs.
     const frame = document.createElement('iframe');
-    frame.className = 'zing-frame';
+    frame.className = 'justonehop-frame';
     frame.title = t('paletteLabel');
     frame.setAttribute('sandbox', 'allow-same-origin');
     dialog.append(frame);
@@ -86,7 +86,7 @@ if (!scope[marker]) {
   };
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (_sender.id !== chrome.runtime.id) return;
-    if (message?.source === 'zing-recent') {
+    if (message?.source === 'justonehop-recent') {
       if (message.type === 'disarm' && recentSession === message.session) { close(); return; }
       if (message.type !== 'open-overlay') return;
       void preferencesReady.then(() => {
@@ -99,7 +99,7 @@ if (!scope[marker]) {
       });
       return true;
     }
-    if (message?.source !== 'zing') return;
+    if (message?.source !== 'justonehop') return;
     if (message.type === 'ping') { respond(true); return; }
     if (message.type === 'close-for-reload') { if (host) close(); respond(true); return; }
     if (message.type === 'toggle') {

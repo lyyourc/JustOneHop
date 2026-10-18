@@ -139,14 +139,14 @@ export function HistoryView({ initialQuery, windowId, isMac, onBack, onClose }: 
       <header className="search-bar"><SearchFocusButton input={input} disabled={busy} />
         <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError(''); setNotice(''); }}
           placeholder={t('historySearchLabel')} aria-label={t('historySearchLabel')} role="combobox" aria-autocomplete="list" aria-expanded="true"
-          aria-controls="zing-history-results" aria-activedescendant={selected ? `zing-${selected.id}` : undefined} autoComplete="off" spellCheck={false} disabled={busy} />
+          aria-controls="justonehop-history-results" aria-activedescendant={selected ? `justonehop-${selected.id}` : undefined} autoComplete="off" spellCheck={false} disabled={busy} />
         <SearchDismissButton label={t('back')} />
       </header>
-      <div className="results" ref={list} id="zing-history-results" role="listbox" aria-label={t('historySearchLabel')} aria-busy={pending}>
+      <div className="results" ref={list} id="justonehop-history-results" role="listbox" aria-label={t('historySearchLabel')} aria-busy={pending}>
         {pending && showLoading ? <div className="empty" role="status"><LoaderCircle className="spinner" size={25} /><p>{t('historySearching')}</p></div> : null}
         {!pending && !failure && !results.length ? <div className="empty" role="status">{t(query.trim() ? 'historyNoResults' : 'historyEnterQuery')}</div> : null}
         {!pending && failure ? <div className="empty"><p role="alert">{failure}</p><button className="surface-button" onClick={retry}>{t('retry')}</button></div> : null}
-        {results.map(entry => <SearchResultItem entry={entry} query={query} ranking={ranking.get(entry.id)} onForget={() => void forget(entry)} disabled={unavailable || menu} isMac={isMac} showKind={false} key={entry.id} id={`zing-${entry.id}`} selected={selected?.id === entry.id} onClick={() => { if (!unavailable) { setSelection(entry.id); void open(entry); } }}
+        {results.map(entry => <SearchResultItem entry={entry} query={query} ranking={ranking.get(entry.id)} onForget={() => void forget(entry)} disabled={unavailable || menu} isMac={isMac} showKind={false} key={entry.id} id={`justonehop-${entry.id}`} selected={selected?.id === entry.id} onClick={() => { if (!unavailable) { setSelection(entry.id); void open(entry); } }}
           onMouseMove={event => { const position = { x: event.screenX, y: event.screenY }; if (!unavailable && pointer.current && (pointer.current.x !== position.x || pointer.current.y !== position.y)) setSelection(entry.id); pointer.current = position; }}
           onContextMenu={event => { event.preventDefault(); if (!unavailable) { rememberCaret(); setSelection(entry.id); setMenu(true); setActionQuery(''); setActionId(''); } }} />)}
         {!pending && outcome.limited ? <p className="more-hint">{t('historyLimitedHint')}</p> : null}

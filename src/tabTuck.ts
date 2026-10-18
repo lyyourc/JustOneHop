@@ -4,10 +4,10 @@ import { getPreferences, preferencesReady, subscribePreferences } from './prefer
 import { t } from './i18n';
 
 export const TUCK_AFTER = 7 * 24 * 60 * 60 * 1000;
-const ALARM = 'zing-auto-tuck';
-const SESSION_KEY = 'zingTabTuckSession';
-const RECOVERY_KEY = 'zingTabTuckRecovery';
-const CLOCK_KEY = 'zingTabTuckClocks';
+const ALARM = 'justonehop-auto-tuck';
+const SESSION_KEY = 'justonehopTabTuckSession';
+const RECOVERY_KEY = 'justonehopTabTuckRecovery';
+const CLOCK_KEY = 'justonehopTabTuckClocks';
 type Clock = { url: string; usedAt: number };
 type Group = { key?: string; id: number; windowId: number; title: string; color?: chrome.tabGroups.TabGroup['color']; customTitle?: boolean; members: number[] };
 type Batch = { groupId: number; ids: number[] };
@@ -80,7 +80,7 @@ export async function resumeTuck(windowId: number, recoveryId: string, groupId: 
     await persist();
   });
 }
-// Group edits from zing preserve ownership; edits made outside zing still
+// Group edits from justonehop preserve ownership; edits made outside justonehop still
 // follow the conservative reconciliation rule and relinquish ownership.
 export async function updateManagedGroup(windowId: number, groupId: number, changes: { title?: string; color?: chrome.tabGroups.TabGroup['color']; collapsed?: boolean }) {
   await ready;
@@ -114,7 +114,7 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
   return pending;
 }
 function background(work: () => Promise<unknown>) {
-  void serial(async () => { await ready; await work(); }).catch(error => console.warn('zing: tab tuck', error));
+  void serial(async () => { await ready; await work(); }).catch(error => console.warn('justonehop: tab tuck', error));
 }
 // A failed optional feature must not prevent the command palette from opening.
 export async function tabTuckingReady() {
@@ -127,7 +127,7 @@ export async function tabTuckingReady() {
     const before = JSON.stringify([state.groups, pendingRecovery]);
     await recover();
     if (JSON.stringify([state.groups, pendingRecovery]) !== before) await persist();
-  }).catch(error => console.warn('zing: recover tab tuck', error));
+  }).catch(error => console.warn('justonehop: recover tab tuck', error));
 }
 const plain = (tab: chrome.tabs.Tab) => !tab.pinned && (tab.groupId ?? -1) === -1 &&
   !tab.incognito && (tab.splitViewId === undefined || tab.splitViewId === -1);
@@ -404,7 +404,7 @@ export function startTabTucking(changed: () => void) {
     await preferencesChanged();
     if (getPreferences().autoTuck && !await chrome.alarms.get(ALARM)) await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: 30 });
   })();
-  void ready.catch(error => console.warn('zing: initialize tab tuck', error));
+  void ready.catch(error => console.warn('justonehop: initialize tab tuck', error));
   subscribePreferences(() => background(preferencesChanged));
   chrome.alarms.onAlarm.addListener(alarm => {
     if (alarm.name === ALARM) background(async () => {

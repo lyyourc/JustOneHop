@@ -31,13 +31,13 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
     <header className="search-bar help-search">
       <SearchFocusButton input={input} />
       <input ref={input} data-back-on-empty value={query} onChange={event => setQuery(event.target.value)}
-        aria-label={t('searchHelp')} placeholder={t('searchHelpPlaceholder')} aria-controls="zing-help-content"
+        aria-label={t('searchHelp')} placeholder={t('searchHelpPlaceholder')} aria-controls="justonehop-help-content"
         autoComplete="off" spellCheck={false} />
       {query ? <button className="settings-clear" aria-label={t('clearSettingsSearch')} title={t('clearSettingsSearch')}
         onClick={clearSearch}><X size={16} /></button> : null}
       <SearchDismissButton label={backLabel} />
     </header>
-    <article ref={article} id="zing-help-content" className={`help-body ${query.trim() ? 'filtered' : ''}`} tabIndex={0} aria-label={t('help')} onKeyDown={event => {
+    <article ref={article} id="justonehop-help-content" className={`help-body ${query.trim() ? 'filtered' : ''}`} tabIndex={0} aria-label={t('help')} onKeyDown={event => {
       if (event.nativeEvent.isComposing || event.keyCode === 229 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.target !== event.currentTarget) return;
       const node = event.currentTarget;
       const distance = ({ ArrowDown: 40, ArrowUp: -40, PageDown: node.clientHeight * .8, PageUp: -node.clientHeight * .8 } as Record<string, number>)[event.key];

@@ -86,16 +86,16 @@ export function entries(snapshot: Snapshot): Entry[] {
     })),
     ...commands(current),
     ...(bookmark ? [bookmark] : []),
-    { id: 'command:help', kind: 'command', category: 'zing', action: 'help', icon: 'help',
+    { id: 'command:help', kind: 'command', category: 'justonehop', action: 'help', icon: 'help',
       title: t('help'), subtitle: t('helpHint'), keywords: 'help guide 帮助 使用说明 使用指南',
       aliases: ['help', 'user guide', '帮助', '使用帮助', '使用说明', '使用指南'] },
-    { id: 'command:tabSwitcher', kind: 'command', category: 'zing', action: 'tabSwitcher', icon: 'others',
+    { id: 'command:tabSwitcher', kind: 'command', category: 'justonehop', action: 'tabSwitcher', icon: 'others',
       title: t('recentSwitcher'), subtitle: t('tabSwitcherHint'), shortcut: snapshot.tabSwitcherShortcut || undefined, keywords: '',
       aliases: ['tab switcher', 'switch tabs', 'recent tabs', 'Switch tabs like in VS Code', 'VSCode style tab switching', 'VSCode 风格标签切换', '最近标签页', '切换标签页', '标签切换器'] },
-    { id: 'command:reloadExtension', kind: 'command', category: 'zing', action: 'reloadExtension', icon: 'reload',
+    { id: 'command:reloadExtension', kind: 'command', category: 'justonehop', action: 'reloadExtension', icon: 'reload',
       title: t('reloadExtension'), subtitle: t('reloadExtensionHint'), searchOnly: true,
-      keywords: 'reload restart zing extension extention 重载 重新加载 重启 扩展',
-      aliases: ['reload zing', 'reload zing extension', 'reload extension', 'reload zing extention', 'restart zing', '重载 zing', '重载扩展', '重新加载扩展', '重新加载 zing 扩展', '重启扩展'] },
+      keywords: 'reload restart justonehop extension extention 重载 重新加载 重启 扩展',
+      aliases: ['reload justonehop', 'reload justonehop extension', 'reload extension', 'reload justonehop extention', 'restart justonehop', '重载 justonehop', '重载扩展', '重新加载扩展', '重新加载 justonehop 扩展', '重启扩展'] },
     ...(Object.keys(chromePages) as ChromePageAction[]).map((action): Entry => {
       const page = chromePages[action];
       return { id: `command:${action}`, kind: 'command', category: 'chromePages', action, icon: page.icon,
@@ -119,7 +119,7 @@ export function entries(snapshot: Snapshot): Entry[] {
       title: t(action), subtitle: '', keywords: action === 'localStorage' ? 'local storage 本地存储' : action === 'sessionStorage' ? 'session storage 会话存储' : 'cookie cookies 浏览器 网站',
     })),
     {
-      id: 'command:settings', kind: 'command', category: 'zing', shortcut: 'Mod+,', action: 'settings', icon: 'settings',
+      id: 'command:settings', kind: 'command', category: 'justonehop', shortcut: 'Mod+,', action: 'settings', icon: 'settings',
       title: t('settings'), subtitle: t('settingsHint'), keywords: 'settings preferences language theme hotkey 设置 偏好 语言 主题 快捷键 shezhi',
     },
   ];
@@ -302,7 +302,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     return 7;
   };
   const kindOrder = { tab: 0, bookmark: 1, history: 2, command: 3 };
-  const explicitExtensionReload = terms.includes('zing') || hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
+  const explicitExtensionReload = (terms.includes('justonehop') || normalized.includes('小范围瞬移')) || hasIntentPrefix(terms, ['extension', 'extention'], 3) || normalized.includes('扩展');
   return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
     (item.action !== 'bookmarkTab' || !explicitUnbookmark) &&
     (!item.danger || (['unbookmarkTab', 'removeBookmark'].includes(item.action) ? explicitUnbookmark || explicitBookmarkState :

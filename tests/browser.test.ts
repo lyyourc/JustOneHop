@@ -21,7 +21,7 @@ beforeEach(() => {
     { id: 4, index: 0, windowId: 20, pinned: false, active: true, title: 'Other window' },
   ] as chrome.tabs.Tab[];
   globalThis.chrome = {
-    runtime: { id: 'zing', getURL: (path: string) => `chrome-extension://zing/${path}` },
+    runtime: { id: 'justonehop', getURL: (path: string) => `chrome-extension://justonehop/${path}` },
     history: { search: async () => [] },
     storage: { local: {
       get: async () => ({ [USAGE_STORAGE_KEY]: structuredClone(usage) }),
@@ -39,7 +39,7 @@ beforeEach(() => {
     sessions: { getRecentlyClosed: async () => [{ tab: { sessionId: 'session' } }], restore: record('restore') },
   } as unknown as typeof chrome;
 });
-const historySender = (): chrome.runtime.MessageSender => ({ id: 'zing', url: 'chrome-extension://zing/popup.html' });
+const historySender = (): chrome.runtime.MessageSender => ({ id: 'justonehop', url: 'chrome-extension://justonehop/popup.html' });
 
 function bookmarkStore(initial: Partial<chrome.bookmarks.BookmarkTreeNode>[] = []) {
   const nodes = structuredClone(initial) as chrome.bookmarks.BookmarkTreeNode[];
@@ -424,11 +424,11 @@ test('history refuses malformed payloads and untrusted or non-palette senders be
     await assert.rejects(searchHistory(request as never, historySender()));
   }
   tabs[1].url = 'https://source.example/';
-  const overlay = { id: 'zing', tab: { ...tabs[1] }, url: tabs[1].url, frameId: 0 };
+  const overlay = { id: 'justonehop', tab: { ...tabs[1] }, url: tabs[1].url, frameId: 0 };
   assert.equal(await historyWindow(overlay), 10);
   for (const sender of [
     { ...historySender(), id: 'other-extension' },
-    { ...historySender(), url: 'chrome-extension://zing/help.html' },
+    { ...historySender(), url: 'chrome-extension://justonehop/help.html' },
     { ...historySender(), frameId: 1 },
     { ...overlay, frameId: 1 },
     { ...overlay, url: 'https://unrelated.example/' },
@@ -567,7 +567,7 @@ test('Chrome Pages reuse the exact destination in the source window, including p
 });
 
 test('Chrome Pages preserve subpages, searches, details and tabs navigating away', async () => {
-  for (const url of ['chrome://extensions/shortcuts', 'chrome://extensions/?id=zing', 'chrome://extensions/?q=zing', 'chrome://extensions/#detail']) {
+  for (const url of ['chrome://extensions/shortcuts', 'chrome://extensions/?id=justonehop', 'chrome://extensions/?q=justonehop', 'chrome://extensions/#detail']) {
     tabs[0].url = url;
     await perform({ action: 'openExtensions', windowId: 10 });
     assert.deepEqual(calls.pop(), ['create', { windowId: 10, url: 'chrome://extensions/' }]);
@@ -613,7 +613,7 @@ test('restore uses the latest session and reports an empty session list', async 
   await assert.rejects(perform({ action: 'restore', windowId: 10 }), /No recently closed/);
 });
 test('extension reload validates the window and needs no target tab', async () => {
-  chrome.runtime = { getURL: path => `chrome-extension://zing/${path}`, reload: () => { calls.push(['extensionReload']); } } as typeof chrome.runtime;
+  chrome.runtime = { getURL: path => `chrome-extension://justonehop/${path}`, reload: () => { calls.push(['extensionReload']); } } as typeof chrome.runtime;
   chrome.tabs.query = async () => [];
   await perform({ action: 'reloadExtension', windowId: 10 }, () => { calls.push(['ack']); });
   assert.deepEqual(calls, [['ack'], ['extensionReload']]);

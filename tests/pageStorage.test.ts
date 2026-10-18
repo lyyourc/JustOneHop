@@ -14,7 +14,7 @@ beforeEach(() => {
   calls = []; saved = {};
   tab = { id: 2, windowId: 10, url, incognito: false } as chrome.tabs.Tab;
   globalThis.chrome = {
-    runtime: { getURL: (path: string) => `chrome-extension://zing/${path}` },
+    runtime: { getURL: (path: string) => `chrome-extension://justonehop/${path}` },
     permissions: { contains: async () => true },
     windows: { create: async (options: unknown) => { calls.push(options); } },
     tabs: { get: async () => structuredClone(tab) },
@@ -80,7 +80,7 @@ test('private and refresh reads do not learn; popup sender can read the captured
   await readPageStorage(request, sender);
   assert.deepEqual(saved, {});
   tab.incognito = false;
-  await readPageStorage({ ...request, query: undefined }, { url: 'chrome-extension://zing/popup.html' });
+  await readPageStorage({ ...request, query: undefined }, { url: 'chrome-extension://justonehop/popup.html' });
   assert.deepEqual(saved, {});
 });
 

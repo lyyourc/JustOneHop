@@ -12,7 +12,7 @@ import ValidationReporter from '../scripts/validation-reporter.ts';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 function temporary(t: { after: (fn: () => void) => void }) {
-  const path = mkdtempSync(join(tmpdir(), 'zing-validation-'));
+  const path = mkdtempSync(join(tmpdir(), 'justonehop-validation-'));
   t.after(() => rmSync(path, { recursive: true, force: true }));
   execFileSync('git', ['init', '--quiet', path]);
   writeFileSync(join(path, '.gitignore'), 'dist/\ntest-results/\n');
@@ -41,7 +41,7 @@ test('failed build records failure, never launches Playwright, and releases the 
 
 test('runner builds first, forwards selectors literally, preserves failure, and isolates output', async t => {
   const path = temporary(t);
-  const playwright = command("const fs = require('fs'); if (fs.readFileSync('dist/app.js', 'utf8') !== 'built') process.exit(99); fs.writeFileSync(require('path').join(process.env.ZING_E2E_RUN_DIR, 'args.json'), JSON.stringify(process.argv.slice(1))); process.exit(4);");
+  const playwright = command("const fs = require('fs'); if (fs.readFileSync('dist/app.js', 'utf8') !== 'built') process.exit(99); fs.writeFileSync(require('path').join(process.env.JUSTONEHOP_E2E_RUN_DIR, 'args.json'), JSON.stringify(process.argv.slice(1))); process.exit(4);");
   const args = ['--grep', 'mouse | keyboard; $literal'];
   assert.equal(await runE2E(args, { root: path, build, playwright }), 4);
   assert.equal(await runE2E(['--list'], { root: path, build, playwright: command('process.exit(0)') }), 0);
@@ -66,7 +66,7 @@ test('discovery forwards selectors without building, requiring dist, or taking t
   const lockPath = join(path, 'test-results', '.e2e.lock');
   const lock = readFileSync(lockPath, 'utf8');
   const forbiddenBuild = command('process.exit(99)');
-  const playwright = command("require('fs').writeFileSync(require('path').join(process.env.ZING_E2E_RUN_DIR, 'args.json'), JSON.stringify(process.argv.slice(1)))");
+  const playwright = command("require('fs').writeFileSync(require('path').join(process.env.JUSTONEHOP_E2E_RUN_DIR, 'args.json'), JSON.stringify(process.argv.slice(1)))");
   try {
     for (const flag of ['--list', '--help', '-h']) {
       const args = ['tests/palette.spec.ts', '--grep', 'settings$', flag];
@@ -161,7 +161,7 @@ test('last-failed copies selector state into the new run and preserves prior evi
   const statePath = join(path, 'previous.json');
   const original = JSON.stringify({ status: 'failed', failedTests: ['previous-failure'] });
   writeFileSync(statePath, original);
-  const playwright = command("const fs = require('fs'); const arg = process.argv.slice(1).find(arg => arg.startsWith('--last-failed-file=')); const state = arg.slice('--last-failed-file='.length); if (!state.startsWith(process.env.ZING_E2E_RUN_DIR) || JSON.parse(fs.readFileSync(state, 'utf8')).failedTests[0] !== 'previous-failure') process.exit(99); fs.writeFileSync(state, JSON.stringify({ status: 'passed', failedTests: [] }));");
+  const playwright = command("const fs = require('fs'); const arg = process.argv.slice(1).find(arg => arg.startsWith('--last-failed-file=')); const state = arg.slice('--last-failed-file='.length); if (!state.startsWith(process.env.JUSTONEHOP_E2E_RUN_DIR) || JSON.parse(fs.readFileSync(state, 'utf8')).failedTests[0] !== 'previous-failure') process.exit(99); fs.writeFileSync(state, JSON.stringify({ status: 'passed', failedTests: [] }));");
   for (const fileArgs of [['--last-failed-file', statePath], [`--last-failed-file=${statePath}`]]) {
     assert.equal(await runE2E(['--last-failed', ...fileArgs], { root: path, build, playwright }), 0);
     assert.equal(readFileSync(statePath, 'utf8'), original);

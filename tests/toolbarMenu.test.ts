@@ -13,8 +13,8 @@ const storageChanged = event<[Record<string, chrome.storage.StorageChange>, stri
 const activated = event<[chrome.tabs.OnActivatedInfo]>();
 const focusChanged = event<[number]>();
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
-const shortcutId = 'zing-toolbar-shortcut';
-const helpId = 'zing-toolbar-help';
+const shortcutId = 'justonehop-toolbar-shortcut';
+const helpId = 'justonehop-toolbar-help';
 const shortcutsUrl = 'chrome://extensions/shortcuts';
 const binding = 'Alt+Shift+K';
 const menus = new Map<string, Pick<chrome.contextMenus.CreateProperties, 'id' | 'title' | 'contexts'>>();
@@ -28,7 +28,7 @@ let tabs: chrome.tabs.Tab[] = [];
 
 globalThis.chrome = {
   runtime: {
-    getURL: (path: string) => `chrome-extension://zing-test/${path}`,
+    getURL: (path: string) => `chrome-extension://justonehop-test/${path}`,
     onInstalled: event<[]>(), onStartup: event<[]>(),
   },
   storage: {
@@ -105,13 +105,13 @@ beforeEach(async () => {
 
 test('toolbar menu shows the actual palette binding and only uses action contexts', async () => {
   assert.deepEqual(startupCreates, [
-    ['menu-create', { id: shortcutId, title: 'Open zing: Alt+Shift+K · Change shortcut', contexts: ['action'] }],
+    ['menu-create', { id: shortcutId, title: 'Open JustOneHop: Alt+Shift+K · Change shortcut', contexts: ['action'] }],
     ['menu-create', { id: helpId, title: 'Help', contexts: ['action'] }],
   ]);
   commands[1].shortcut = 'Ctrl+Shift+9';
   await toolbar.refreshToolbarMenu();
   assert.deepEqual(menus.get(shortcutId), {
-    id: shortcutId, title: 'Open zing: Ctrl+Shift+9 · Change shortcut', contexts: ['action'],
+    id: shortcutId, title: 'Open JustOneHop: Ctrl+Shift+9 · Change shortcut', contexts: ['action'],
   });
   assert.deepEqual(menus.get(helpId), { id: helpId, title: 'Help', contexts: ['action'] });
 });
@@ -120,7 +120,7 @@ test('an empty or missing palette binding shows Not assigned instead of another 
   for (const palette of [{ name: 'toggle-palette', shortcut: '' }, undefined]) {
     commands = [{ name: 'toggle-switcher', shortcut: 'Ctrl+Q' }, ...(palette ? [palette] : [])];
     await toolbar.refreshToolbarMenu();
-    assert.equal(menus.get(shortcutId)?.title, 'Open zing: Not assigned · Change shortcut');
+    assert.equal(menus.get(shortcutId)?.title, 'Open JustOneHop: Not assigned · Change shortcut');
   }
 });
 
@@ -139,17 +139,17 @@ test('a fresh module updates persisted menu items without recreating them', asyn
   const restarted = await import(new URL('../src/toolbarMenu.ts?persisted-menu', import.meta.url).href);
   await restarted.refreshToolbarMenu();
   assert.deepEqual(menuWrites(), [
-    ['menu-update', shortcutId, { title: 'Open zing: Alt+Shift+K · Change shortcut', contexts: ['action'] }],
+    ['menu-update', shortcutId, { title: 'Open JustOneHop: Alt+Shift+K · Change shortcut', contexts: ['action'] }],
     ['menu-update', helpId, { title: 'Help', contexts: ['action'] }],
   ]);
-  assert.equal(menus.get(shortcutId)?.title, 'Open zing: Alt+Shift+K · Change shortcut');
+  assert.equal(menus.get(shortcutId)?.title, 'Open JustOneHop: Alt+Shift+K · Change shortcut');
   assert.equal(menus.get(helpId)?.title, 'Help');
 });
 
 test('a language preference change refreshes both menu labels', async () => {
   storageChanged.emit({ preferences: { newValue: { language: 'zh' } } }, 'local');
   await tick();
-  assert.equal(menus.get(shortcutId)?.title, '打开 zing：Alt+Shift+K · 修改快捷键');
+  assert.equal(menus.get(shortcutId)?.title, '打开小范围瞬移：Alt+Shift+K · 修改快捷键');
   assert.equal(menus.get(helpId)?.title, '使用帮助');
   assert.deepEqual(menuWrites().map(([, id]) => id), [shortcutId, helpId]);
   assert.equal(calls.some(([name]) => name === 'menu-create'), false);
@@ -168,7 +168,7 @@ test('failed command reads preserve existing menus and the next refresh recovers
 
   commandError = undefined;
   await toolbar.refreshToolbarMenu();
-  assert.equal(menus.get(shortcutId)?.title, 'Open zing: Ctrl+Shift+8 · Change shortcut');
+  assert.equal(menus.get(shortcutId)?.title, 'Open JustOneHop: Ctrl+Shift+8 · Change shortcut');
   assert.equal(menus.get(helpId)?.title, 'Help');
   assert.equal(calls.some(([name]) => name === 'menu-create'), false);
   assert.equal(warn.mock.callCount(), 1);
@@ -177,7 +177,7 @@ test('failed command reads preserve existing menus and the next refresh recovers
 test('Help opens the bundled page in the clicked tab window', async () => {
   await click(helpId, 10);
   assert.deepEqual(navigationCalls(), [
-    ['tab-create', { windowId: 10, url: 'chrome-extension://zing-test/help.html' }],
+    ['tab-create', { windowId: 10, url: 'chrome-extension://justonehop-test/help.html' }],
   ]);
 });
 
@@ -197,7 +197,7 @@ test('clicks without a tab use the current window for Help and shortcut creation
   await click(helpId);
   await click(shortcutId);
   assert.deepEqual(navigationCalls(), [
-    ['current-window'], ['tab-create', { windowId: 20, url: 'chrome-extension://zing-test/help.html' }],
+    ['current-window'], ['tab-create', { windowId: 20, url: 'chrome-extension://justonehop-test/help.html' }],
     ['current-window'], ['tab-query', { windowId: 20 }], ['tab-create', { windowId: 20, url: shortcutsUrl }],
   ]);
 });

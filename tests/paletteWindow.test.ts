@@ -67,7 +67,7 @@ async function removeTabs(ids: number | number[]) {
 }
 reset();
 globalThis.chrome = {
-  runtime: { getURL: (path: string) => `chrome-extension://zing/${path}` },
+  runtime: { getURL: (path: string) => `chrome-extension://justonehop/${path}` },
   action: { setPopup: async (options: chrome.action.PopupDetails) => { calls.push(['set-popup', options]); } },
   scripting: { executeScript: async () => { calls.push(['inject']); if (injectionFailure) throw new Error('Cannot access this page'); } },
   storage: {
@@ -135,7 +135,7 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
         await togglePaletteWindow(tabs[1]);
       }
       const sender = host === 'native' ? await paletteSender(nativeSender())
-        : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+        : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
       const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: tabs[1].url, url: 'https://destination.example/', query: 'destination.example' };
       calls = [];
       let acknowledged = 0;
@@ -150,7 +150,7 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
     test(`${host}: ${action} refuses a payload targeting another tab even if it is active`, async () => {
       if (host === 'native') await togglePaletteWindow(tabs[1]);
       const sender = host === 'native' ? await paletteSender(nativeSender())
-        : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+        : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
       // An independently valid target cannot replace the host's own source.
       Object.assign(tabs[2], { active: true, url: 'https://source.example' });
       calls = [];
@@ -165,7 +165,7 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
     test(`${host}: ${action} rejects stale source state before acknowledging`, async () => {
       if (host === 'native') await togglePaletteWindow(tabs[1]);
       const sender = host === 'native' ? await paletteSender(nativeSender())
-        : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+        : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
       const original = { ...tabs[1] };
       const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: original.url, url: 'https://destination.example/', query: 'destination.example' };
       if (host === 'native') focused = 30;
@@ -185,7 +185,7 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
 }
 
 test('toolbar navigation follows the current active tab and rejects the old payload after activation changes', async () => {
-  const sender = { url: 'chrome-extension://zing/popup.html' };
+  const sender = { url: 'chrome-extension://justonehop/popup.html' };
   tabs[1].active = false;
   Object.assign(tabs[2], { active: true, url: 'https://source.example' });
   for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
@@ -204,7 +204,7 @@ test('startup clears default and per-tab toolbar popup overrides', async () => {
 test('ordinary pages open an acknowledged overlay without creating a window', async () => {
   await launchPalette(tabs[1]);
   assert.deepEqual(calls.map(([name]) => name), ['set-popup', 'message', 'inject', 'message']);
-  assert.equal(stored.zingPaletteWindow, undefined);
+  assert.equal(stored.justonehopPaletteWindow, undefined);
 });
 
 for (const reason of ['native', 'restricted', 'overlay unavailable', 'missing acknowledgement'] as const) {
@@ -219,7 +219,7 @@ for (const reason of ['native', 'restricted', 'overlay unavailable', 'missing ac
     assert.ok(calls.filter(([name]) => name === 'set-popup').every(([, options]) => (options as { popup: string }).popup === ''));
     if (reason === 'native') assert.equal(calls.some(([name]) => name === 'inject'), false);
     await launchPalette(tabs.find(tab => tab.id === 30)!);
-    assert.equal(stored.zingPaletteWindow, undefined);
+    assert.equal(stored.justonehopPaletteWindow, undefined);
   });
 }
 
@@ -258,14 +258,14 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
     test(`${host}: ${action} removing the source ends the session even with legacy paletteState`, async () => {
       if (host === 'native') await togglePaletteWindow(tabs[1]);
       const native = host === 'native' ? nativeSender() : undefined;
-      const sender = native ? await paletteSender(native) : host === 'legacy action popup' ? { url: 'chrome-extension://zing/popup.html' } : sourceSender();
+      const sender = native ? await paletteSender(native) : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
       calls = [];
       await execute(action, target, sender);
       await tick();
       assert.deepEqual(calls.filter(([name]) => name === 'remove'), [['remove', removedIds]]);
       assert.ok(tabs.some(tab => tab.id === 1), 'pinned tabs survive batch removal');
       assert.equal(calls.some(([name]) => name === 'create' || name === 'focus'), false);
-      assert.equal(stored.zingPaletteWindow, undefined);
+      assert.equal(stored.justonehopPaletteWindow, undefined);
       assert.equal(usage[0].target, `command:${action}`);
       if (native) {
         assert.deepEqual(calls.filter(([name]) => name === 'close-window'), [['close-window', 30]]);
@@ -284,7 +284,7 @@ for (const [action, target] of [['close', 3], ['closeOthers', 2], ['closeRight',
     await execute(action, target, sender);
     await tick();
     assert.equal((await paletteSender(native)).tab?.id, 2);
-    assert.equal((stored.zingPaletteWindow as { sourceTabId: number }).sourceTabId, 2);
+    assert.equal((stored.justonehopPaletteWindow as { sourceTabId: number }).sourceTabId, 2);
     assert.equal(await getPaletteWindowState(native), undefined);
     assert.equal(calls.some(([name]) => ['create', 'focus', 'close-window'].includes(name)), false);
   });
@@ -298,7 +298,7 @@ test('source removal without paletteState also closes the native host and cleans
   await performPaletteAction({ action: 'close', windowId: 10, tabId: 2 }, sender, () => {});
   await tick();
   assert.deepEqual(calls.filter(([name]) => name === 'close-window'), [['close-window', 30]]);
-  assert.equal(stored.zingPaletteWindow, undefined);
+  assert.equal(stored.justonehopPaletteWindow, undefined);
   assert.equal(calls.some(([name]) => name === 'create'), false);
   await assert.rejects(paletteSender(native));
 });
@@ -316,7 +316,7 @@ test('native source removal closes its host before a delayed remove response res
     await tick();
     await assert.rejects(paletteSender(native));
     assert.deepEqual(calls.filter(([name]) => name === 'close-window'), [['close-window', 30]]);
-    assert.equal(stored.zingPaletteWindow, undefined);
+    assert.equal(stored.justonehopPaletteWindow, undefined);
   } finally { gate.resolve(); await execution; }
   assert.equal(calls.filter(([name]) => name === 'create').length, 1);
 });
@@ -331,7 +331,7 @@ test('action acknowledgement does not wait for usage storage after source closur
   try {
     assert.equal(finished, false);
     assert.equal(calls.some(([name]) => name === 'create'), false);
-    assert.equal(stored.zingPaletteWindow, undefined);
+    assert.equal(stored.justonehopPaletteWindow, undefined);
   } finally { disk.resolve(); await execution; }
   assert.equal(usage[0].target, 'command:close');
 });
@@ -351,7 +351,7 @@ test('failed removal retains the native source and does not acknowledge or recor
   await execute('close', 2, sender);
   await tick();
   await assert.rejects(paletteSender(native));
-  assert.equal(stored.zingPaletteWindow, undefined);
+  assert.equal(stored.justonehopPaletteWindow, undefined);
 });
 
 test('external source closure closes native host and clears session storage', async () => {
@@ -360,7 +360,7 @@ test('external source closure closes native host and clears session storage', as
   await removeTabs(2);
   await tick();
   assert.ok(calls.some(([name, id]) => name === 'close-window' && id === 30));
-  assert.equal(stored.zingPaletteWindow, undefined);
+  assert.equal(stored.justonehopPaletteWindow, undefined);
   await assert.rejects(paletteSender(native));
 });
 
@@ -371,7 +371,7 @@ test('last owner tab closes its native host without creating a replacement', asy
   await execute('close', 2, await paletteSender(native));
   await tick();
   assert.equal(calls.filter(([name]) => name === 'create').length, 1);
-  assert.equal(stored.zingPaletteWindow, undefined);
+  assert.equal(stored.justonehopPaletteWindow, undefined);
   assert.equal(usage[0].target, 'command:close');
   await assert.rejects(paletteSender(native));
 });
@@ -417,7 +417,7 @@ test('an unsuccessful removal that lost its source still cleans the native host'
   await tick();
   await assert.rejects(paletteSender(native));
   assert.equal(usage.length, 0);
-  assert.equal(stored.zingPaletteWindow, undefined);
+  assert.equal(stored.justonehopPaletteWindow, undefined);
   assert.ok(calls.some(([name]) => name === 'close-window'));
 });
 
@@ -433,7 +433,7 @@ test('switching browser windows while explicitly opening the host never focuses 
   assert.equal(focused, 20);
   assert.equal(calls.some(([name]) => name === 'focus'), false);
   assert.ok(calls.some(([name]) => name === 'close-window'));
-  assert.equal(stored.zingPaletteWindow, undefined);
+  assert.equal(stored.justonehopPaletteWindow, undefined);
 });
 
 test('switching to another application during removal does not take focus back', async () => {
@@ -455,7 +455,7 @@ test('native sender and state requests reject invalid token, popup window and so
   await togglePaletteWindow(tabs[1]);
   const native = nativeSender();
   for (const invalid of [
-    { ...native, url: 'chrome-extension://zing/popup.html#window=wrong' },
+    { ...native, url: 'chrome-extension://justonehop/popup.html#window=wrong' },
     { ...native, tab: { ...native.tab, windowId: 20 } },
     { url: native.url },
   ]) {
@@ -463,7 +463,7 @@ test('native sender and state requests reject invalid token, popup window and so
     await assert.rejects(getPaletteWindowState(invalid));
   }
   assert.equal(await getPaletteWindowState(native), undefined);
-  assert.equal(await getPaletteWindowState({ url: 'chrome-extension://zing/popup.html' }), undefined);
+  assert.equal(await getPaletteWindowState({ url: 'chrome-extension://justonehop/popup.html' }), undefined);
   tabs.find(tab => tab.id === 2)!.windowId = 20;
   await assert.rejects(paletteSender(native));
   tabs.find(tab => tab.id === 2)!.windowId = 10;

@@ -101,7 +101,7 @@ window.addEventListener('focus', () => { hadFocus = true; if (loaded && acceptAf
 window.addEventListener('blur', () => { if (hadFocus && !returningFocus) dismiss(); });
 document.addEventListener('visibilitychange', () => { if (hadFocus && document.hidden && !returningFocus) dismiss(); });
 chrome.runtime.onMessage.addListener((message, sender) => {
-  if (sender.id !== chrome.runtime.id || message?.source !== 'zing-recent' || !session || message.session !== session) return;
+  if (sender.id !== chrome.runtime.id || message?.source !== 'justonehop-recent' || !session || message.session !== session) return;
   if (message.type === 'released' && !searching) void finish();
   if (message.type === 'step') move(message.direction);
 });
@@ -128,7 +128,7 @@ function removeTab(id: number) {
 }
 chrome.tabs.onRemoved.addListener(removeTab);
 chrome.tabs.onDetached.addListener(removeTab);
-const port = chrome.runtime.connect({ name: 'zing' });
+const port = chrome.runtime.connect({ name: 'justonehop' });
 window.addEventListener('pagehide', () => { aborted = true; port.disconnect(); }, { once: true });
 
 function Switcher() {
@@ -162,14 +162,14 @@ void Promise.all([
   ownWindowId = own.id;
   shortcut = bindings.find(binding => binding.name === (Number(params.get('direction')) === -1 ? 'switch-recent-back' : 'switch-recent'))?.shortcut || '';
   releaseKey = /Command|⌘/.test(shortcut) ? 'Meta' : /Alt|Option|⌥/.test(shortcut) ? 'Alt' : 'Control';
-  const handoff = session ? await chrome.runtime.sendMessage({ source: 'zing-recent', type: 'ready', session }) : undefined;
+  const handoff = session ? await chrome.runtime.sendMessage({ source: 'justonehop-recent', type: 'ready', session }) : undefined;
   if (session && !handoff) { dismiss(); return; }
   if (aborted) return;
   if (handoff) { offset += handoff.offset; acceptAfterLoad ||= handoff.released && !searching; }
   tabs = (handoff?.tabs as chrome.tabs.Tab[] || all).filter(tab => tab.id !== undefined).sort((a, b) => Number(b.id === sourceId) - Number(a.id === sourceId) || (b.lastAccessed || 0) - (a.lastAccessed || 0) || a.index - b.index);
   index = tabs.length ? (offset % tabs.length + tabs.length) % tabs.length : 0;
   index = recentSelection(visibleTabs(), tabs[index]?.id);
-  loaded = true; document.documentElement.lang = t('languageTag'); document.title = `zing · ${t('recentSwitcher')}`;
+  loaded = true; document.documentElement.lang = t('languageTag'); document.title = `${t('extensionName')} · ${t('recentSwitcher')}`;
   // Mount first so buffered paging uses the actual list height. Keep the queue
   // intact during focus handoff so a pending release cannot confirm too early.
   flushSync(changed);

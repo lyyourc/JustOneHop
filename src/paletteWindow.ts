@@ -3,7 +3,7 @@ import { nativePanelBounds } from './panelGeometry';
 import { perform } from './browser';
 import type { Execution, PaletteState } from './types';
 
-const KEY = 'zingPaletteWindow';
+const KEY = 'justonehopPaletteWindow';
 interface Session { token: string; sourceTabId: number; sourceWindowId: number; popupWindowId?: number }
 
 // Older clients may still send this request; source closure never continues.

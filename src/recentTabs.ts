@@ -16,7 +16,7 @@ interface Session {
 }
 let current: Session | undefined;
 const send = (message: object) => {
-  const payload = { source: 'zing-recent', ...message };
+  const payload = { source: 'justonehop-recent', ...message };
   return (current?.overlay && current.source?.id !== undefined
     ? chrome.tabs.sendMessage(current.source.id, payload, { frameId: 0 })
     : chrome.runtime.sendMessage(payload)).catch(() => {});
@@ -24,7 +24,7 @@ const send = (message: object) => {
 function clear(session: Session, close = true) {
   if (current !== session) return;
   current = undefined;
-  if (session.source?.id !== undefined) void chrome.tabs.sendMessage(session.source.id, { source: 'zing-recent', type: 'disarm', session: session.id }).catch(() => {});
+  if (session.source?.id !== undefined) void chrome.tabs.sendMessage(session.source.id, { source: 'justonehop-recent', type: 'disarm', session: session.id }).catch(() => {});
   if (close && session.popup !== undefined) void chrome.windows.remove(session.popup).catch(() => {});
 }
 async function sourceStillFocused(session: Session) {
@@ -54,7 +54,7 @@ export async function openRecentSwitcher(command: string) {
     const shortcut = bindings.find(binding => binding.name === command)?.shortcut || '';
     const modifier = /Command|⌘/.test(shortcut) ? 'Meta' : /Alt|Option|⌥/.test(shortcut) ? 'Alt' : 'Control';
     try {
-      const state = await chrome.tabs.sendMessage(source.id!, { source: 'zing-recent', type: 'arm', session: session.id, modifier });
+      const state = await chrome.tabs.sendMessage(source.id!, { source: 'justonehop-recent', type: 'arm', session: session.id, modifier });
       session.released ||= state?.held === false;
     } catch { /* Restricted / not-yet-injected page: keep the existing window fallback. */ }
     if (!await sourceStillFocused(session)) { clear(session); return; }
@@ -71,15 +71,15 @@ export async function openRecentSwitcher(command: string) {
     // missing activeTab access, and Chrome UI focus keep the window fallback.
     if (/^https?:/.test(source.url || '')) {
       try {
-        const installed = await chrome.tabs.sendMessage(source.id!, { source: 'zing', type: 'ping' }, { frameId: 0 }).catch(() => false);
+        const installed = await chrome.tabs.sendMessage(source.id!, { source: 'justonehop', type: 'ping' }, { frameId: 0 }).catch(() => false);
         if (installed !== true) await chrome.scripting.executeScript({ target: { tabId: source.id! }, files: ['content.js'] });
         if (!await sourceStillFocused(session)) { clear(session); return; }
         const initialOffset = session.offset;
         session.overlay = true;
-        const shown = await chrome.tabs.sendMessage(source.id!, { source: 'zing-recent', type: 'open-overlay',
+        const shown = await chrome.tabs.sendMessage(source.id!, { source: 'justonehop-recent', type: 'open-overlay',
           session: session.id, tabs: session.tabs, sourceId: source.id, offset: initialOffset, modifier, shortcut }, { frameId: 0 });
         if (current !== session) {
-          if (shown === true) await chrome.tabs.sendMessage(source.id!, { source: 'zing-recent', type: 'disarm', session: session.id }, { frameId: 0 }).catch(() => {});
+          if (shown === true) await chrome.tabs.sendMessage(source.id!, { source: 'justonehop-recent', type: 'disarm', session: session.id }, { frameId: 0 }).catch(() => {});
           return;
         }
         if (shown === true) {
@@ -100,11 +100,11 @@ export async function openRecentSwitcher(command: string) {
     });
     if (current !== session) { if (popup?.id !== undefined) await chrome.windows.remove(popup.id); return; }
     session.popup = popup?.id;
-  } catch (error) { clear(session); console.warn('zing: unable to open recent tabs.', error); }
+  } catch (error) { clear(session); console.warn('justonehop: unable to open recent tabs.', error); }
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const session = current;
-  if (sender.id !== chrome.runtime.id || message?.source !== 'zing-recent' || !session || message.session !== session.id) return;
+  if (sender.id !== chrome.runtime.id || message?.source !== 'justonehop-recent' || !session || message.session !== session.id) return;
   if (['accept-overlay', 'cancel-overlay'].includes(message.type)) {
     if (!session.overlay || sender.tab?.id !== session.source?.id || sender.frameId !== 0) return;
     if (message.type === 'cancel-overlay') { clear(session); respond({ ok: true }); return; }

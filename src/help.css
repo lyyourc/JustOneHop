@@ -1,4 +1,4 @@
-body.zing-help { margin: 0; background: light-dark(#f1f3f4, #202124); }
+body.justonehop-help { margin: 0; background: light-dark(#f1f3f4, #202124); }
 .help-page { min-height: 100dvh; padding: 24px; }
 .help-page .palette { height: calc(100dvh - 48px); max-height: 900px; box-shadow: none; }
 @media (max-width: 520px) {

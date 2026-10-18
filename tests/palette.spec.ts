@@ -33,7 +33,7 @@ let nativeWindowEvents: { event: string; url: string; at: number }[] = [];
 let browserStarted = false;
 
 async function browserPath() {
-  if (process.env.ZING_CHROMIUM_PATH) return process.env.ZING_CHROMIUM_PATH;
+  if (process.env.JUSTONEHOP_CHROMIUM_PATH) return process.env.JUSTONEHOP_CHROMIUM_PATH;
   try { await access(chromium.executablePath()); return chromium.executablePath(); } catch {}
   if (process.platform === 'darwin') {
     const cache = join(homedir(), 'Library/Caches/ms-playwright');
@@ -65,9 +65,9 @@ test.beforeEach(async ({ environment }, testInfo) => {
   testExtension = undefined;
   nativeWindowEvents = [];
   testInfo.annotations.push({ type: 'browser-environment', description: JSON.stringify(environment) });
-  test.skip(environment.vimium && !process.env.ZING_VIMIUM_PATH, 'Vimium compatibility requires ZING_VIMIUM_PATH pointing to an unpacked extension.');
+  test.skip(environment.vimium && !process.env.JUSTONEHOP_VIMIUM_PATH, 'Vimium compatibility requires JUSTONEHOP_VIMIUM_PATH pointing to an unpacked extension.');
   if (environment.vimium && environment.shadow === 'open') throw new Error('Vimium compatibility requires production closed shadow roots.');
-  profile = await mkdtemp(join(tmpdir(), 'zing-e2e-'));
+  profile = await mkdtemp(join(tmpdir(), 'justonehop-e2e-'));
   const { verticalTabs } = environment;
   if (verticalTabs) {
     await mkdir(join(profile, 'Default'));
@@ -140,10 +140,10 @@ chrome.contextMenus.update = async (id, properties) => {
   }
   // Open shadow roots used by visual storage tests change Vimium's focus detection.
   // The separate closed storage test exercises production isolation with Vimium.
-  const vimium = environment.vimium ? resolve(process.env.ZING_VIMIUM_PATH!) : undefined;
+  const vimium = environment.vimium ? resolve(process.env.JUSTONEHOP_VIMIUM_PATH!) : undefined;
   if (vimium) {
     const manifest = JSON.parse(await readFile(join(vimium, 'manifest.json'), 'utf8'));
-    expect(JSON.stringify(manifest), 'ZING_VIMIUM_PATH must identify Vimium').toMatch(/vimium/i);
+    expect(JSON.stringify(manifest), 'JUSTONEHOP_VIMIUM_PATH must identify Vimium').toMatch(/vimium/i);
   }
   const prepared = performance.now();
   context = await chromium.launchPersistentContext(profile, {
@@ -160,15 +160,15 @@ chrome.contextMenus.update = async (id, properties) => {
     });
     page.on('close', () => nativeWindowEvents.push({ event: 'closed', url: page.url(), at: Date.now() }));
   });
-  let zingWorker: Worker | undefined;
+  let justonehopWorker: Worker | undefined;
   await expect.poll(async () => {
     for (const candidate of context.serviceWorkers()) {
-      const isZing = await candidate.evaluate(() => Boolean(chrome.runtime.getManifest().commands?.['toggle-palette'])).catch(() => false);
-      if (isZing) { zingWorker = candidate; return true; }
+      const isJustOneHop = await candidate.evaluate(() => Boolean(chrome.runtime.getManifest().commands?.['toggle-palette'])).catch(() => false);
+      if (isJustOneHop) { justonehopWorker = candidate; return true; }
     }
     return false;
   }).toBe(true);
-  worker = zingWorker!;
+  worker = justonehopWorker!;
   const ready = performance.now();
   ui = await context.newPage();
   const session = await context.newCDPSession(ui);
@@ -193,7 +193,7 @@ test.afterEach(async ({ environment }, testInfo) => {
     if (browserStarted && environment.headed && testInfo.status !== testInfo.expectedStatus) {
       const state = await worker.evaluate(async () => ({
         windows: await chrome.windows.getAll({ populate: true }),
-        session: await chrome.storage.session.get(['zingPaletteWindow']),
+        session: await chrome.storage.session.get(['justonehopPaletteWindow']),
       })).catch(error => ({ error: String(error) }));
       const path = testInfo.outputPath('native-window-lifecycle.json');
       await writeFile(path, JSON.stringify({ events: nativeWindowEvents, state }, null, 2));
@@ -294,7 +294,7 @@ test.describe(() => {
     }
     for (const kind of ['tab', 'bookmark', 'history'] as const) {
       await search.fill(`Urlcopy ${kind}`);
-      const row = ui.locator(`#zing-results .result.${kind}`);
+      const row = ui.locator(`#justonehop-results .result.${kind}`);
       await expect(row).toHaveCount(1);
       if (kind === 'bookmark') {
         await dragResultText(ui, row);
@@ -303,7 +303,7 @@ test.describe(() => {
       }
       await copySelected(search, row, urls[kind], kind === 'bookmark', kind === 'bookmark');
     }
-    await ui.locator('#zing-search-all-history').click();
+    await ui.locator('#justonehop-search-all-history').click();
     const fullSearch = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
     const history = ui.locator('.history-view .result.history');
     await expect(history).toHaveCount(1);
@@ -325,10 +325,10 @@ test.describe(() => {
     const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     for (const query of ['history', '历史', 'search all history']) {
       await input.fill(query);
-      await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
-      await expect(ui.locator('#zing-results .result').first()).toHaveAttribute('id', 'zing-search-all-history');
-      await expect(ui.locator('#zing-search-all-history')).toHaveAttribute('aria-selected', 'true');
-      if (query === '历史') await ui.locator('#zing-search-all-history').click();
+      await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+      await expect(ui.locator('#justonehop-results .result').first()).toHaveAttribute('id', 'justonehop-search-all-history');
+      await expect(ui.locator('#justonehop-search-all-history')).toHaveAttribute('aria-selected', 'true');
+      if (query === '历史') await ui.locator('#justonehop-search-all-history').click();
       else await input.press('Enter');
       const history = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
       await expect(history).toBeFocused(); await expect(history).toHaveValue('');
@@ -336,16 +336,16 @@ test.describe(() => {
       if (query === '历史') await history.press('Escape');
       else await ui.locator('.history-view .footer-back').click();
       await expect(input).toBeFocused(); await expect(input).toHaveValue(query);
-      await expect(ui.locator('#zing-search-all-history')).toHaveAttribute('aria-selected', 'true');
+      await expect(ui.locator('#justonehop-search-all-history')).toHaveAttribute('aria-selected', 'true');
     }
     await input.fill('react history');
-    await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
-    await ui.locator('#zing-search-all-history').click();
+    await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+    await ui.locator('#justonehop-search-all-history').click();
     await expect(ui.getByRole('combobox', { name: 'Search browsing history', exact: true })).toHaveValue('react history');
   });
 
   test('History search: seventh entry follows six results and real visits support mouse opening and keyboard return', async () => {
-    const query = 'ZingHistoryNative';
+    const query = 'JustOneHopHistoryNative';
     const urls = ['mouse', 'keyboard', 'third', 'fourth', 'fifth', 'sixth', 'seventh'].map(suffix => `${origin}/${query}-${suffix}`);
     const baseline: UsageRecord[] = [{ query: 'unrelated', target: 'command:newTab', weight: 1, lastUsed: Date.now() }];
     await worker.evaluate(async ({ urls, baseline }) => {
@@ -358,7 +358,7 @@ test.describe(() => {
     expect(visits.every(visit => typeof visit.lastVisitTime === 'number')).toBe(true);
     const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
     const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    const allHistory = ui.locator('#zing-search-all-history');
+    const allHistory = ui.locator('#justonehop-search-all-history');
     await search.fill(query);
     await expect(ui.locator('.result.history')).toHaveCount(urls.length);
     const mainTimes = await ui.locator('.result.history time').evaluateAll(nodes => nodes.map(node => ({ id: node.closest('.result')!.id, text: node.textContent, dateTime: node.getAttribute('datetime'), title: node.getAttribute('title') })));
@@ -367,7 +367,7 @@ test.describe(() => {
     expect(mainTimes.map(time => Date.parse(time.dateTime!)).sort()).toEqual(visits.map(visit => Math.trunc(visit.lastVisitTime!)).sort());
 
     await expect(allHistory.locator('.entry-title')).toHaveText('Search All History');
-    await expect(ui.locator('#zing-results .result').nth(6)).toHaveAttribute('id', 'zing-search-all-history');
+    await expect(ui.locator('#justonehop-results .result').nth(6)).toHaveAttribute('id', 'justonehop-search-all-history');
     await ui.locator('.palette').screenshot({ path: test.info().outputPath('history-main-regular.png') });
     await search.press('Home'); await search.press('Shift+ArrowRight');
     for (let step = 0; step < 6; step++) await search.press('ArrowDown');
@@ -408,10 +408,10 @@ test.describe(() => {
     const root = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await root.fill(`${query}-keyboard`);
     await expect(ui.locator('.result.history')).toHaveCount(1);
-    await expect(ui.locator('#zing-results .result')).toHaveCount(2);
-    await expect(ui.locator('#zing-results .result').last()).toHaveAttribute('id', 'zing-search-all-history');
+    await expect(ui.locator('#justonehop-results .result')).toHaveCount(2);
+    await expect(ui.locator('#justonehop-results .result').last()).toHaveAttribute('id', 'justonehop-search-all-history');
     await root.press('ArrowUp');
-    await expect(ui.locator('#zing-search-all-history')).toHaveAttribute('aria-selected', 'true');
+    await expect(ui.locator('#justonehop-search-all-history')).toHaveAttribute('aria-selected', 'true');
     await root.press('Enter');
     const fullSearch = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
     await expect(fullSearch).toBeFocused();
@@ -457,7 +457,7 @@ test.describe(() => {
     await expect(ui.locator('.result.history').filter({ hasText: 'gitlab/c2c-web' })).toHaveCount(1);
     await expect(ui.locator('.result.history').first()).toContainText('gitlab/c2c-web');
     await expect(ui.locator('.result.history').first().locator('button.ranking-forget')).toHaveAttribute('data-promoted', 'true');
-    await ui.locator('#zing-search-all-history').click();
+    await ui.locator('#justonehop-search-all-history').click();
     const fullSearch = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
     await expect(fullSearch).toHaveValue('c2c-web');
     const fullTarget = ui.locator('.history-view .result.history').filter({ hasText: 'gitlab/c2c-web' });
@@ -485,7 +485,7 @@ test.describe(() => {
     await ui.locator('.history-view').screenshot({ path: test.info().outputPath('history-learned-tooltip.png') });
     const historyRows = ui.locator('.history-view .result.history');
     const learnedOrder = await historyRows.evaluateAll(nodes => nodes.map(node => node.id));
-    const historyScroll = await ui.locator('#zing-history-results').evaluate(node => node.scrollTop);
+    const historyScroll = await ui.locator('#justonehop-history-results').evaluate(node => node.scrollTop);
     await expect(fullTarget).toHaveAttribute('aria-selected', 'true');
     await ui.keyboard.press('Space');
     await expect(ui.getByRole('dialog')).toHaveCount(0);
@@ -494,7 +494,7 @@ test.describe(() => {
     expect(await fullSearch.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
     await expect(fullTarget).toHaveAttribute('aria-selected', 'true');
     expect(await historyRows.evaluateAll(nodes => nodes.map(node => node.id))).toEqual(learnedOrder);
-    expect(await ui.locator('#zing-history-results').evaluate(node => node.scrollTop)).toBe(historyScroll);
+    expect(await ui.locator('#justonehop-history-results').evaluate(node => node.scrollTop)).toBe(historyScroll);
     await expect(ui.locator('button.ranking-forget')).toHaveCount(0);
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual([]);
     await fullSearch.fill('other/c2c-web');
@@ -509,7 +509,7 @@ test.describe(() => {
     await expect(fullTarget).toHaveAttribute('aria-selected', 'true');
     await fullSearch.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
     const shortcutOrder = await historyRows.evaluateAll(nodes => nodes.map(node => node.id));
-    const shortcutScroll = await ui.locator('#zing-history-results').evaluate(node => node.scrollTop);
+    const shortcutScroll = await ui.locator('#justonehop-history-results').evaluate(node => node.scrollTop);
     for (const guard of [{ isComposing: true }, { keyCode: 229 }, { repeat: true }, { metaKey: true }]) {
       await fullSearch.dispatchEvent('keydown', { key: 'Backspace', shiftKey: true, ...guard });
     }
@@ -523,7 +523,7 @@ test.describe(() => {
     expect(await fullSearch.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
     await expect(fullTarget).toHaveAttribute('aria-selected', 'true');
     expect(await historyRows.evaluateAll(nodes => nodes.map(node => node.id))).toEqual(shortcutOrder);
-    expect(await ui.locator('#zing-history-results').evaluate(node => node.scrollTop)).toBe(shortcutScroll);
+    expect(await ui.locator('#justonehop-history-results').evaluate(node => node.scrollTop)).toBe(shortcutScroll);
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual([]);
     await fullSearch.press('Escape');
     await expect(input()).toBeFocused();
@@ -534,13 +534,13 @@ test.describe(() => {
     await input().press('Meta+ArrowUp');
     await expect(ui.locator('.result.history').first()).toHaveAttribute('aria-selected', 'true');
     await input().evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-    const rootOrder = await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
-    const rootScroll = await ui.locator('#zing-results').evaluate(node => node.scrollTop);
+    const rootOrder = await ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id));
+    const rootScroll = await ui.locator('#justonehop-results').evaluate(node => node.scrollTop);
     await input().press('Shift+Backspace');
     await expect(ui.locator('button.ranking-forget')).toHaveCount(0);
-    expect(await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(rootOrder);
+    expect(await ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(rootOrder);
     await expect(ui.locator('.result.history').first()).toHaveAttribute('aria-selected', 'true');
-    expect(await ui.locator('#zing-results').evaluate(node => node.scrollTop)).toBe(rootScroll);
+    expect(await ui.locator('#justonehop-results').evaluate(node => node.scrollTop)).toBe(rootScroll);
     await expect(input()).toBeFocused();
     await expect(input()).toHaveValue('c2c-web');
     expect(await input().evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
@@ -555,7 +555,7 @@ test.describe(() => {
   });
 
   test('History search: 100ms deadline freezes pending rows and rejects late or superseded replies', async () => {
-    const query = 'ZingHistoryRace';
+    const query = 'JustOneHopHistoryRace';
     await worker.evaluate(async ({ query, origin }) => {
       await chrome.bookmarks.create({ title: `${query} local`, url: `${origin}/${query}-local` });
       const state = globalThis as unknown as { __historyRequests: { text: string; release: () => void }[] };
@@ -587,7 +587,7 @@ test.describe(() => {
     }, text);
     const delivered = (text: string) => expect.poll(() => ui.evaluate(() => (globalThis as unknown as { __historyReplies: string[] }).__historyReplies)).toContain(text);
     const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    const rows = ui.locator('#zing-results');
+    const rows = ui.locator('#justonehop-results');
     const homeRows = await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id));
     const beforeTabs = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id).sort());
     await search.fill(query);
@@ -602,12 +602,12 @@ test.describe(() => {
     await ui.clock.runFor(1);
     await expect(rows).toHaveAttribute('aria-busy', 'false');
     await expect(rows.locator('.result.bookmark')).toHaveCount(1);
-    await expect(ui.locator('#zing-search-all-history')).toContainText('History search unfinished');
+    await expect(ui.locator('#justonehop-search-all-history')).toContainText('History search unfinished');
     await expect(rows.locator('.result.history')).toHaveCount(0);
     const timedOutRows = await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id));
     await release(query); await delivered(query); await ui.clock.runFor(1);
     expect(await rows.locator('.result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(timedOutRows);
-    await expect(ui.locator('#zing-search-all-history')).toContainText('History search unfinished');
+    await expect(ui.locator('#justonehop-search-all-history')).toContainText('History search unfinished');
 
     const stale = `${query} stale`, fresh = `${query} fresh`;
     await search.fill(stale); await expect.poll(requests).toContain(stale);
@@ -628,7 +628,7 @@ test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'zh-CN' } });
   test('History search: Chinese all-time navigation finds an older visit outside the weekly scope', async () => {
-    const query = 'ZingHistoryArchive';
+    const query = 'JustOneHopHistoryArchive';
     const url = `${origin}/${query}-older`;
     await worker.evaluate(({ query, url }) => {
       // Chrome addUrl cannot backdate visits; model an older visit at the Chrome
@@ -643,7 +643,7 @@ test.describe(() => {
     }, { query, url });
     const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
     await search.fill(query);
-    const allHistory = ui.locator('#zing-search-all-history');
+    const allHistory = ui.locator('#justonehop-search-all-history');
     await expect(allHistory.locator('.entry-title')).toHaveText('搜索全部历史');
     await expect(allHistory).toContainText('最近一周无匹配');
     await expect(ui.locator('.result.history')).toHaveCount(0);
@@ -672,7 +672,7 @@ test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
   test('History overlay: source permissions, action menu and narrow viewport retain navigation', async () => {
-    const query = 'ZingOverlayHistory';
+    const query = 'JustOneHopOverlayHistory';
     const url = `${origin}/${query}-saved`;
     await worker.evaluate(url => chrome.history.addUrl({ url }), url);
     const page = await context.newPage();
@@ -681,13 +681,13 @@ test.describe(() => {
     const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
     await worker.evaluate(async tabId => {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-      await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+      await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
     }, tabId);
-    const surface = page.frameLocator('.zing-frame');
+    const surface = page.frameLocator('.justonehop-frame');
     const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill(query);
     await expect(surface.locator('.result.history')).toHaveCount(1);
-    await surface.locator('#zing-search-all-history').click();
+    await surface.locator('#justonehop-search-all-history').click();
     await expect(surface.locator('.history-view .result.history')).toHaveCount(1);
     await expect(surface.locator('.history-view time')).toHaveText('just now');
     const timestamp = await surface.locator('.history-view time').boundingBox();
@@ -708,7 +708,7 @@ test.describe(() => {
     const opened = context.waitForEvent('page');
     await page.keyboard.press('Enter');
     await expect(await opened).toHaveURL(url);
-    await expect(page.locator('.zing-frame')).toHaveCount(0);
+    await expect(page.locator('.justonehop-frame')).toHaveCount(0);
   });
 });
 
@@ -730,7 +730,7 @@ test.describe(() => {
     await root.fill('Urlcopy');
     const current = surface.locator('.result.tab').filter({ has: surface.locator('.current-badge') });
     await expect(current).toHaveCount(1);
-    await expect(surface.locator('#zing-results .result.history time')).toHaveCount(1);
+    await expect(surface.locator('#justonehop-results .result.history time')).toHaveCount(1);
     const badge = current.locator('.current-badge');
     await expect(badge).toHaveText('当前');
     for (const width of [750, 390]) {
@@ -768,12 +768,12 @@ test.describe(() => {
       expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(usage);
     }
     await copyMouse(root, current, sourceUrl);
-    const mainHistory = surface.locator('#zing-results .result.history');
+    const mainHistory = surface.locator('#justonehop-results .result.history');
     await expect(mainHistory).toHaveCount(1);
     await dragResultText(page, mainHistory);
     expect(await tabs()).toEqual(beforeTabs);
     await root.focus();
-    await surface.locator('#zing-search-all-history').click();
+    await surface.locator('#justonehop-search-all-history').click();
     const fullSearch = surface.getByRole('combobox', { name: '搜索浏览历史', exact: true });
     const history = surface.locator('.history-view .result.history').filter({ hasText: 'Urlcopy-archive' });
     await expect(history).toHaveCount(1);
@@ -789,7 +789,7 @@ test.describe(() => {
     const opened = context.waitForEvent('page');
     await history.locator('.entry-title').click();
     await expect(await opened).toHaveURL(historyUrl);
-    await expect(page.locator('.zing-frame')).toHaveCount(0);
+    await expect(page.locator('.justonehop-frame')).toHaveCount(0);
   });
 });
 
@@ -820,7 +820,7 @@ for (const target of chromePageCases) test.describe(() => {
     const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(search).toBeFocused();
     await ui.keyboard.type(target.aliases[0]);
-    const row = ui.locator(`[id="zing-command:${target.action}"]`);
+    const row = ui.locator(`[id="justonehop-command:${target.action}"]`);
     await expect(row).toHaveAttribute('aria-selected', 'true');
     await expect(row.locator('.entry-title')).toHaveText(`Chrome Pages: ${target.en}`);
     const created = context.waitForEvent('page');
@@ -847,7 +847,7 @@ for (const target of chromePageCases) test.describe(() => {
     ui = await reopened;
     await expect(ui.getByRole('combobox')).toBeFocused();
     await ui.getByRole('combobox').fill(target.aliases[0]);
-    await expect(ui.locator('#zing-results [role="option"]').first()).toHaveAttribute('id', `zing-command:${target.action}`);
+    await expect(ui.locator('#justonehop-results [role="option"]').first()).toHaveAttribute('id', `justonehop-command:${target.action}`);
     await ui.locator('.palette-footer .primary-action').click();
     await expect.poll(() => ui.isClosed()).toBe(true);
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, first[0].id!)).toBe(true);
@@ -858,35 +858,35 @@ for (const target of chromePageCases) test.describe(() => {
 
 for (const language of ['English', 'Chinese']) test.describe(() => {
   test.use({ environment: { ...defaults, locale: language === 'English' ? 'en-US' : 'zh-CN' } });
-  test(`Chrome Pages: ${language} labels aliases and mixed right-click Escape footer flow preserve zing settings`, async () => {
+  test(`Chrome Pages: ${language} labels aliases and mixed right-click Escape footer flow preserve justonehop settings`, async () => {
     const en = language === 'English';
     const prefix = en ? 'Chrome Pages' : 'Chrome 内置页面';
     const search = ui.getByRole('combobox', { name: en ? 'Search commands, tabs, bookmarks, and history' : '搜索命令、标签页、书签和历史' });
-    const first = ui.locator('#zing-results [role="option"]').first();
-    for (const target of chromePageCases) await expect(ui.locator(`[id="zing-command:${target.action}"]`)).toHaveCount(0);
+    const first = ui.locator('#justonehop-results [role="option"]').first();
+    for (const target of chromePageCases) await expect(ui.locator(`[id="justonehop-command:${target.action}"]`)).toHaveCount(0);
     for (const category of ['Chrome Pages', 'Chrome 内置页面']) {
       await search.fill(category);
       for (const target of chromePageCases) {
-        const row = ui.locator(`[id="zing-command:${target.action}"]`);
+        const row = ui.locator(`[id="justonehop-command:${target.action}"]`);
         await expect(row.locator('.entry-title')).toHaveText(`${prefix}: ${en ? target.en : target.zh}`);
         await expect(row.locator('.entry-shortcut')).toHaveCount(0);
       }
     }
     for (const target of chromePageCases) for (const alias of target.aliases) {
       await search.fill(alias);
-      await expect(first).toHaveAttribute('id', `zing-command:${target.action}`);
+      await expect(first).toHaveAttribute('id', `justonehop-command:${target.action}`);
       await expect(first.locator('.entry-title')).toHaveText(`${prefix}: ${en ? target.en : target.zh}`);
     }
     for (const query of ['Chrome Pages: downloads', 'Chrome 内置页面：下载']) {
       await search.fill(query);
-      await expect(first).toHaveAttribute('id', 'zing-command:openDownloads');
+      await expect(first).toHaveAttribute('id', 'justonehop-command:openDownloads');
       await expect(first.locator('mark')).not.toHaveCount(0);
     }
 
     const tabIds = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id!).sort((a, b) => a - b));
     for (const query of ['settings', '设置', 'shortcut', '快捷键']) {
       await search.fill(query);
-      await expect(first).toHaveAttribute('id', query === 'settings' || query === '设置' ? 'zing-command:settings' : 'zing-command:settings:keyboard');
+      await expect(first).toHaveAttribute('id', query === 'settings' || query === '设置' ? 'justonehop-command:settings' : 'justonehop-command:settings:keyboard');
       await search.press('Enter');
       await expect(ui.getByRole('region', { name: en ? 'Settings' : '设置', exact: true })).toBeVisible();
       await ui.keyboard.press('Escape');
@@ -897,7 +897,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
 
     await search.fill(prefix);
     await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-    const bookmarks = ui.locator('[id="zing-command:openBookmarks"]');
+    const bookmarks = ui.locator('[id="justonehop-command:openBookmarks"]');
     await expect(bookmarks).toHaveAttribute('aria-selected', 'false');
     await bookmarks.click({ button: 'right' });
     const actions = ui.getByRole('combobox', { name: en ? 'Search actions' : '搜索操作' });
@@ -956,8 +956,8 @@ test.describe(() => {
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
       return { id: tab.id!, windowId: tab.windowId };
     }, page.url());
-    await expect(page.locator('#zing-command-palette')).toBeAttached();
-    expect(await page.locator('#zing-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
+    await expect(page.locator('#justonehop-command-palette')).toBeAttached();
+    expect(await page.locator('#justonehop-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
     const session = await context.newCDPSession(page);
     const ax = async () => {
       const { frameTree } = await session.send('Page.getFrameTree');
@@ -970,7 +970,7 @@ test.describe(() => {
     await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value.includes('Go to URL') && node.properties?.some(property => property.name === 'selected' && property.value.value === true))).toBe(true);
     const shortcut = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter');
     await page.keyboard.press(shortcut);
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toBe(target);
     expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).url, source.id)).toBe(`${origin}/Address-closed-source`);
     await session.detach();
@@ -994,15 +994,15 @@ test.describe(() => {
       const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
       return (await session.send('Accessibility.getFullAXTree', { frameId })).nodes;
     };
-    await expect(page.locator('#zing-command-palette')).toBeAttached();
-    expect(await page.locator('#zing-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
+    await expect(page.locator('#justonehop-command-palette')).toBeAttached();
+    expect(await page.locator('#justonehop-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
     await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.properties?.some(property => property.name === 'focused' && property.value.value === true))).toBe(true);
     await page.keyboard.type('downloads');
     await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value.includes('Chrome Pages: Downloads'))).toBe(true);
     const created = context.waitForEvent('page');
     await page.keyboard.press('Enter');
     await expectChromePageLoaded(await created, { url: 'chrome://downloads/', root: 'downloads-manager' });
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     const tabs = await worker.evaluate(async windowId => chrome.tabs.query({ windowId }), source.windowId);
     expect(tabs.filter(tab => tab.url === 'chrome://downloads/')).toHaveLength(1);
     expect(tabs.find(tab => tab.url === 'chrome://downloads/')).toMatchObject({ active: true, windowId: source.windowId });
@@ -1057,7 +1057,7 @@ test('search isolates windows, merges bookmarks, and target actions mute the sel
   await input.press('Meta+k');
   const action = ui.getByRole('combobox', { name: '搜索操作' });
   await action.fill('mute');
-  await expect(ui.locator('#zing-actions [aria-selected="true"]')).toContainText('静音');
+  await expect(ui.locator('#justonehop-actions [aria-selected="true"]')).toContainText('静音');
   await action.press('Enter');
   await expect.poll(() => worker.evaluate(id => chrome.tabs.get(id).then(t => t.mutedInfo?.muted), target)).toBe(true);
   await expect(ui.getByRole('dialog')).toHaveCount(0);
@@ -1079,10 +1079,10 @@ test.describe(() => {
     await page.bringToFront();
     await worker.evaluate(async tabId => {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-      await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+      await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
     }, source.id!);
-    await expect(page.locator('#zing-command-palette')).toBeAttached();
-    expect(await page.locator('#zing-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
+    await expect(page.locator('#justonehop-command-palette')).toBeAttached();
+    expect(await page.locator('#justonehop-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
     const cdp = await context.newCDPSession(page);
     const ax = async () => {
       const { frameTree } = await cdp.send('Page.getFrameTree');
@@ -1141,13 +1141,13 @@ test.describe(() => {
         await page.keyboard.press('ArrowDown');
         await expect.poll(async () => (await removal())?.properties?.some(property => property.name === 'selected' && property.value.value === true)).toBe(true);
       }
-      await expect(page.locator('#zing-command-palette')).toBeAttached();
+      await expect(page.locator('#justonehop-command-palette')).toBeAttached();
       expect(await worker.evaluate(id => chrome.tabs.get(id), source.id!)).toMatchObject({ active: true, url });
       await page.keyboard.insertText('X');
       await expect.poll(async () => (await combo())?.value?.value).toBe(`${query.slice(0, selection[0])}X${query.slice(selection[1])}`);
     }
     await page.keyboard.press('Escape');
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     await cdp.detach();
   });
 });
@@ -1176,7 +1176,7 @@ test.describe(() => {
     const ids = async () => (await bookmarks()).map(bookmark => bookmark.id).sort();
     await root.fill('Bookmark menu');
     await root.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-    const target = surface.locator(`[id="zing-tab:${seed.target}"]`);
+    const target = surface.locator(`[id="justonehop-tab:${seed.target}"]`);
     await target.click({ button: 'right' });
     await expect(surface.locator('.action-heading')).toContainText('Bookmark menu target');
     await actions.fill('bookmark tab');
@@ -1272,7 +1272,7 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     }, { origin, url });
     const input = ui.getByRole('combobox', { name: english ? 'Search commands, tabs, bookmarks, and history' : '搜索命令、标签页、书签和历史' });
     const actions = ui.getByRole('combobox', { name: english ? 'Search actions' : '搜索操作' });
-    const rows = ui.locator('#zing-results .result.bookmark');
+    const rows = ui.locator('#justonehop-results .result.bookmark');
     const tabs = () => worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => ({ id: tab.id, url: tab.url })));
     const beforeTabs = await tabs();
     expect(beforeTabs.some(tab => tab.url === url)).toBe(false);
@@ -1281,10 +1281,10 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 7));
     const label = english ? 'Unbookmark' : '取消收藏';
     for (const [index, bookmark] of [seed.first, seed.second].entries()) {
-      const row = ui.locator(`[id="zing-bookmark:${bookmark.id}"]`);
-      const remove = ui.locator(`[id="zing-actions-bookmark:${bookmark.id}:removeBookmark"]`);
+      const row = ui.locator(`[id="justonehop-bookmark:${bookmark.id}"]`);
+      const remove = ui.locator(`[id="justonehop-actions-bookmark:${bookmark.id}:removeBookmark"]`);
       const order = await rows.evaluateAll(nodes => nodes.map(node => node.id));
-      const at = order.indexOf(`zing-bookmark:${bookmark.id}`);
+      const at = order.indexOf(`justonehop-bookmark:${bookmark.id}`);
       const next = order[at + 1] ?? order[at - 1];
       if (index === 0) {
         // Right-click and footer Actions must expose the same item-specific action.
@@ -1295,13 +1295,13 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
         await expect(row).toHaveAttribute('aria-selected', 'true');
         await ui.getByRole('button', { name: english ? 'Open action menu' : '打开操作菜单' }).click();
         await expect(remove.locator(':scope > span')).toHaveText(label);
-        await expect(ui.locator('[id="zing-actions-action:unbookmarkTab"]')).toHaveCount(0);
+        await expect(ui.locator('[id="justonehop-actions-action:unbookmarkTab"]')).toHaveCount(0);
         await remove.click();
       } else {
         // Select the remaining duplicate using only the keyboard, then Cmd+K/Enter.
         await input.press('Meta+ArrowUp');
         const remaining = await rows.evaluateAll(nodes => nodes.map(node => node.id));
-        for (let step = 0; step < remaining.indexOf(`zing-bookmark:${bookmark.id}`); step++) await input.press('ArrowDown');
+        for (let step = 0; step < remaining.indexOf(`justonehop-bookmark:${bookmark.id}`); step++) await input.press('ArrowDown');
         await expect(row).toHaveAttribute('aria-selected', 'true');
         await input.press('Meta+k');
         await expect(actions).toBeFocused();
@@ -1317,7 +1317,7 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
       await expect(ui.locator('.palette-footer')).toContainText(english ? 'Bookmark removed' : '已取消收藏');
       await expect(row).toHaveCount(0);
       await expect(rows).toHaveCount(2 - index);
-      await expect(ui.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', next);
+      await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', next);
       await expect(input).toHaveValue('Bookmark item'); await expect(input).toBeFocused();
       expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);
       expect(await tabs()).toEqual(beforeTabs);
@@ -1353,7 +1353,7 @@ test('close others preserves pinned tabs and another window; restore is function
   }, origin);
   await expect.poll(() => worker.evaluate(id => chrome.tabs.get(id).then(tab => tab.status), seed.disposable)).toBe('complete');
   await ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' }).fill('close other');
-  await expect(ui.locator('#zing-results [aria-selected="true"]')).toContainText('关闭其他');
+  await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toContainText('关闭其他');
   await ui.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(t => t.id === id), seed.disposable)).toBe(false);
   const survivors = await worker.evaluate(async () => (await chrome.tabs.query({})).map(t => t.id));
@@ -1365,7 +1365,7 @@ test('close others preserves pinned tabs and another window; restore is function
   await expect.poll(() => worker.evaluate(id => chrome.tabs.get(id).then(tab => tab.status), restorable)).toBe('complete');
   await ui.evaluate(id => chrome.tabs.remove(id), restorable);
   await ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' }).fill('restore');
-  await expect(ui.locator('#zing-results [aria-selected="true"]')).toContainText('恢复');
+  await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toContainText('恢复');
   await ui.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(async base => (await chrome.tabs.query({})).some(t => t.url === `${base}/Restore-Target`), origin)).toBe(true);
 });
@@ -1389,9 +1389,9 @@ test.describe(() => {
   const tabId = await ui.evaluate(async base => (await chrome.tabs.query({})).find(tab => tab.url === `${base}/Focus-fixture`)!.id!, origin);
   await worker.evaluate(async id => {
     await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
+    await chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' });
   }, tabId);
-  await expect(page.locator('#zing-command-palette')).toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).toBeAttached();
   const cdp = await context.newCDPSession(page);
   const comboValue = async () => {
     const { frameTree } = await cdp.send('Page.getFrameTree');
@@ -1415,18 +1415,18 @@ test.describe(() => {
   await page.keyboard.press('Escape');
   await expect.poll(comboValue).toBe('close right');
   await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   await expect(page.getByRole('textbox', { name: 'Page input' })).toBeFocused();
   await page.keyboard.type('-after');
   await expect(page.getByRole('textbox', { name: 'Page input' })).toHaveValue('before-after');
   const tabCount = await worker.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length));
-  await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' }), tabId);
+  await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' }), tabId);
   await expect.poll(comboValue).toBe('');
   await page.keyboard.type('new');
   await expect.poll(comboValue).toBe('new');
   await page.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length))).toBe(tabCount + 1);
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -1444,7 +1444,7 @@ test('Raycast navigation pages, jumps to home endpoints and restores caret when 
   await input.press('Meta+ArrowDown');
   await expect(ui.locator('.result').last()).toHaveAttribute('aria-selected', 'true');
   await input.press('Meta+ArrowUp');
-  await expect(ui.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', await ui.locator('.result').first().getAttribute('id') as string);
+  await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', await ui.locator('.result').first().getAttribute('id') as string);
   await input.press('PageDown');
   const selectedIndex = await ui.locator('.result').evaluateAll(rows => rows.findIndex(row => row.getAttribute('aria-selected') === 'true'));
   expect(selectedIndex).toBeGreaterThan(1);
@@ -1511,9 +1511,9 @@ for (const variant of ['English', 'fallback', 'Taiwan']) {
     const chinese = variant === 'Taiwan';
     const input = ui.getByRole('combobox', { name: chinese ? '搜索命令、标签页、书签和历史' : 'Search commands, tabs, bookmarks, and history' });
     await expect(input).toBeFocused();
-    expect(await ui.evaluate(() => chrome.runtime.getManifest().name)).toBe('zing');
+    expect(await ui.evaluate(() => chrome.runtime.getManifest().name)).toBe(chinese ? '小范围瞬移' : 'JustOneHop');
     await expect(ui.locator('.navigation-label')).toHaveText(chinese ? ['上一个', '下一个'] : ['Previous', 'Next']);
-    if (!chinese) expect(await ui.locator('.zing-app').innerText()).not.toMatch(/[\p{Script=Han}]/u);
+    if (!chinese) expect(await ui.locator('.justonehop-app').innerText()).not.toMatch(/[\p{Script=Han}]/u);
     await input.fill('刷新');
     await expect(ui.locator('.result')).toHaveCount(1);
     await expect(ui.locator('.result')).toContainText(chinese ? '刷新当前标签页' : 'Reload Current Tab');
@@ -1531,7 +1531,7 @@ for (const variant of ['English', 'fallback', 'Taiwan']) {
     await expect(ui.locator('.footer-status')).toHaveText(chinese ? '将关闭 0 个标签页' : 'Will close 0 tabs');
     await ui.setViewportSize({ width: 390, height: 400 });
     // Use the same responsive palette surface as an overlay for layout assertions.
-    await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+    await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
     const footer = await ui.locator('.footer').boundingBox();
     const button = await ui.getByRole('button', { name: chinese ? '打开操作菜单' : 'Open action menu' }).boundingBox();
     expect(button!.x + button!.width).toBeLessThanOrEqual(footer!.x + footer!.width);
@@ -1562,7 +1562,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   const theme = ui.getByRole('combobox', { name: 'Theme', exact: true });
   await theme.click();
   await ui.getByRole('option', { name: 'Dark', exact: true }).click();
-  await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', 'dark');
+  await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', 'dark');
   await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(41, 42, 45)');
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-dark.png') });
   await theme.press('Escape');
@@ -1573,8 +1573,8 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await expect(ui.locator('.result[aria-selected="true"]')).toContainText('Reload Current Tab');
   // A fresh UI reads stored preferences before its first paint.
   const second = await context.newPage(); await second.goto(popupUrl);
-  await expect(second.locator('.zing-app')).toHaveAttribute('lang', 'en');
-  await expect(second.locator('.zing-app')).toHaveAttribute('data-theme', 'dark');
+  await expect(second.locator('.justonehop-app')).toHaveAttribute('lang', 'en');
+  await expect(second.locator('.justonehop-app')).toHaveAttribute('data-theme', 'dark');
   await second.keyboard.press('Meta+,');
   await second.getByRole('combobox', { name: 'Language', exact: true }).click();
   await second.getByRole('option', { name: '简体中文', exact: true }).click();
@@ -1591,8 +1591,8 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await second.getByRole('option', { name: '跟随系统', exact: true }).click();
   await expect(second.getByText('系统语言：简体中文（Chrome 界面语言）')).toBeVisible();
   await second.reload();
-  await expect(second.locator('.zing-app')).toHaveAttribute('lang', 'zh-CN');
-  await expect(second.locator('.zing-app')).toHaveAttribute('data-theme', 'system');
+  await expect(second.locator('.justonehop-app')).toHaveAttribute('lang', 'zh-CN');
+  await expect(second.locator('.justonehop-app')).toHaveAttribute('data-theme', 'system');
   await second.close();
 });
 
@@ -1603,8 +1603,8 @@ test.describe(() => {
     const shortcut = await worker.evaluate(async () => (await chrome.commands.getAll()).find(command => command.name === 'toggle-palette')!.shortcut!);
     await expect.poll(async () => Object.keys(await items()).length).toBe(2);
     expect(await items()).toEqual({
-      'zing-toolbar-shortcut': { id: 'zing-toolbar-shortcut', title: `Open zing: ${shortcut} · Change shortcut`, contexts: ['action'] },
-      'zing-toolbar-help': { id: 'zing-toolbar-help', title: 'Help', contexts: ['action'] },
+      'justonehop-toolbar-shortcut': { id: 'justonehop-toolbar-shortcut', title: `Open JustOneHop: ${shortcut} · Change shortcut`, contexts: ['action'] },
+      'justonehop-toolbar-help': { id: 'justonehop-toolbar-help', title: 'Help', contexts: ['action'] },
     });
     await expect(ui.locator('.launch-hint')).toHaveCount(0);
     await ui.goto('chrome://settings/');
@@ -1616,7 +1616,7 @@ test.describe(() => {
     }
     async function openHelp() {
       const created = context.waitForEvent('page');
-      await clickMenu('zing-toolbar-help');
+      await clickMenu('justonehop-toolbar-help');
       const page = await created;
       await expect(page).toHaveURL(popupUrl.replace('popup.html', 'help.html'));
       return page;
@@ -1638,16 +1638,16 @@ test.describe(() => {
     await page.setViewportSize({ width: 390, height: 400 });
     for (const theme of ['light', 'dark']) {
       await worker.evaluate(async theme => chrome.storage.local.set({ preferences: { language: 'zh', theme } }), theme);
-      await expect(page.locator('.zing-app')).toHaveAttribute('data-theme', theme);
-      await expect(page).toHaveTitle('使用帮助 · zing');
+      await expect(page.locator('.justonehop-app')).toHaveAttribute('data-theme', theme);
+      await expect(page).toHaveTitle('使用帮助 · justonehop');
       await expect(page.locator('.primary-action')).toHaveText('关闭帮助esc');
       expect(await article.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
       const footer = await page.locator('.palette-footer').boundingBox();
       expect(footer!.y + footer!.height).toBeLessThanOrEqual(400);
       await page.screenshot({ path: test.info().outputPath(`toolbar-help-${theme}.png`) });
     }
-    await expect.poll(async () => (await items())['zing-toolbar-shortcut'].title).toBe(`打开 zing：${shortcut} · 修改快捷键`);
-    await expect.poll(async () => (await items())['zing-toolbar-help'].title).toBe('使用帮助');
+    await expect.poll(async () => (await items())['justonehop-toolbar-shortcut'].title).toBe(`打开小范围瞬移：${shortcut} · 修改快捷键`);
+    await expect.poll(async () => (await items())['justonehop-toolbar-help'].title).toBe('使用帮助');
     await page.getByRole('button', { name: '关闭帮助', exact: true }).last().click();
     await expect.poll(() => page.isClosed()).toBe(true);
     async function closeWithKey(key: string) {
@@ -1663,10 +1663,10 @@ test.describe(() => {
     await closeWithKey('Escape');
     await closeWithKey('Backspace');
     const shortcutsCreated = context.waitForEvent('page');
-    await clickMenu('zing-toolbar-shortcut');
+    await clickMenu('justonehop-toolbar-shortcut');
     const shortcuts = await shortcutsCreated;
     await expect(shortcuts).toHaveURL('chrome://extensions/shortcuts');
-    await clickMenu('zing-toolbar-shortcut');
+    await clickMenu('justonehop-toolbar-shortcut');
     await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, url: 'chrome://extensions/shortcuts' })).length, source.windowId)).toBe(1);
     await expect(ui).toHaveURL('chrome://settings/');
   });
@@ -1744,10 +1744,10 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     await ui.locator('.result').first().click();
     await expect(helpSearch).toBeFocused();
     await ui.setViewportSize({ width: 390, height: 400 });
-    await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+    await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
     for (const theme of ['light', 'dark']) {
       await ui.evaluate(async theme => { await chrome.storage.local.set({ preferences: { language: 'system', theme } }); }, theme);
-      await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', theme);
+      await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', theme);
       expect(await article.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight > el.clientHeight)).toBe(true);
       const footer = await ui.locator('.palette-footer').boundingBox();
       expect(footer!.height).toBe(44); expect(footer!.y + footer!.height).toBeLessThanOrEqual(400);
@@ -1769,32 +1769,50 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('Palette startup renders a recoverable error when background messages fail', async () => {
+    const errors: string[] = [];
+    ui.on('pageerror', error => errors.push(error.message));
+    ui.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    await ui.addInitScript(() => {
+      const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+      chrome.runtime.sendMessage = ((message: { type?: string }) =>
+        ['palette-state', 'snapshot', 'cancel-palette-continuation'].includes(message?.type || '')
+          ? Promise.reject(new Error('Receiving end does not exist')) : send(message)) as typeof chrome.runtime.sendMessage;
+    });
+    await ui.reload();
+    await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
+    await expect(ui.getByRole('alert')).toContainText('The extension disconnected');
+    await ui.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(ui.getByRole('alert')).toContainText('The extension disconnected');
+    expect(errors).toEqual([]);
+  });
+
   test('English settings entries, narrow layout and Chrome hotkey settings', async () => {
   const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   const mainFooter = await ui.locator('.palette-footer').boundingBox();
   const mainHeader = await ui.locator('.search-bar').boundingBox();
-  await expect(ui.locator('.result.command .entry-title').nth(0)).toHaveText('zing Settings');
-  await expect(ui.locator('.result.command .entry-title').nth(1)).toHaveText('Zing: Help');
-  await ui.locator('[id="zing-command:help"]').click();
+  await expect(ui.locator('.result.command .entry-title').nth(0)).toHaveText('JustOneHop Settings');
+  await expect(ui.locator('.result.command .entry-title').nth(1)).toHaveText('JustOneHop: Help');
+  await ui.locator('[id="justonehop-command:help"]').click();
   await expect(ui.locator('.help-view')).toBeVisible();
   await ui.keyboard.press('Escape');
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('');
-  await expect(ui.locator('[id="zing-command:help"]')).toHaveAttribute('aria-selected', 'true');
+  await expect(ui.locator('[id="justonehop-command:help"]')).toHaveAttribute('aria-selected', 'true');
   await input.press('Enter');
   await expect(ui.locator('.help-view')).toBeVisible();
   await ui.locator('.help-view .footer-back').click();
   await expect(input).toBeFocused();
   await input.fill('设置');
   await expect(ui.locator('.result').first()).toContainText('Settings');
-  await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+  await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
   await input.press('Enter');
   await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await expect(ui.locator('[data-setting="keyboard"] .hotkey-value')).toHaveText(await worker.evaluate(async () => (await chrome.commands.getAll()).find(c => c.name === 'toggle-palette')!.shortcut!));
   await expect(ui.locator('[data-setting="binding"] .hotkey-value')).toHaveText(await worker.evaluate(async () => (await chrome.commands.getAll()).find(c => c.name === 'switch-recent')?.shortcut || 'Not assigned'));
   await expect(ui.locator('[data-setting="binding"] label')).toHaveText('Tab Switcher');
   await expect(ui.locator('[data-setting="binding"] p')).toHaveText('Switch tabs like in VS Code using the shortcut shown. Prefer Ctrl+Tab? Set it up once.');
-  await expect(ui.locator('[data-setting="keyboard"] .hotkey-value')).toHaveAttribute('title', /(?:Shift \+ Command|Command \+ Shift) \+ P — Open \/ Close zing/);
+  await expect(ui.locator('[data-setting="keyboard"] .hotkey-value')).toHaveAttribute('title', /(?:Shift \+ Command|Command \+ Shift) \+ P — Open \/ Close JustOneHop/);
   await expect(ui.locator('[data-setting="binding"] .hotkey-value')).toHaveAttribute('title', / — Switch tabs like in VS Code using the shortcut shown\./);
   await expect(ui.locator('[data-setting="binding"] .hotkey-value')).toHaveAttribute('aria-label', await ui.locator('[data-setting="binding"] .hotkey-value').getAttribute('title') as string);
   await ui.locator('[data-setting="language"] label').hover();
@@ -1892,7 +1910,7 @@ test.describe(() => {
     ['auto tuck', 'switch', 'Auto Tuck Tabs'],
   ] as const) {
     await input.fill(query);
-    await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
     await input.press('Enter');
     await expect(ui.getByRole(role, { name, exact: true })).toBeFocused();
     await ui.keyboard.press('Escape');
@@ -1900,7 +1918,7 @@ test.describe(() => {
   }
   await ui.locator('.settings-button').click();
   await ui.setViewportSize({ width: 390, height: 400 });
-  await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   expect(await ui.locator('.settings-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   const palette = await ui.locator('.palette').boundingBox();
   expect(palette!.y + palette!.height).toBeLessThanOrEqual(400);
@@ -1957,7 +1975,7 @@ test.describe(() => {
   const tabId = await worker.evaluate(async base => (await chrome.tabs.query({})).find(tab => tab.url === `${base}/Settings-fixture`)!.id!, origin);
   await worker.evaluate(async id => {
     await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
+    await chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' });
   }, tabId);
   const cdp = await context.newCDPSession(page);
   const ax = async () => {
@@ -1995,7 +2013,7 @@ test.describe(() => {
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await ax()).find(n => n.role?.value === 'combobox')?.value?.value).toBe('reload');
   await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   await expect(page.getByRole('textbox', { name: 'Page input' })).toBeFocused();
 });
 });
@@ -2047,7 +2065,7 @@ test('unified results mix tabs bookmarks and commands; searched tabs switch with
   await expect(ui.locator('.result.tab')).toHaveCount(2);
   await expect(ui.locator('.result.bookmark')).toHaveCount(1);
   await expect(ui.locator('.result.command')).toContainText('新建标签页');
-  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
+  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:newTab');
   await expect(ui.locator('.result').first()).toHaveAttribute('aria-selected', 'true');
   await expect(ui.locator('.kind-label').filter({ hasText: '书签' })).toBeVisible();
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('unified-search.png') });
@@ -2058,7 +2076,7 @@ test('unified results mix tabs bookmarks and commands; searched tabs switch with
   await expect(ui.locator('.action-row')).toHaveCount(3);
   await ui.keyboard.press('Escape');
   await expect(input).toHaveValue('New Tab Notes');
-  await expect(ui.locator(`[id="zing-tab:${seed.newer}"]`)).toHaveAttribute('aria-selected', 'true');
+  await expect(ui.locator(`[id="justonehop-tab:${seed.newer}"]`)).toHaveAttribute('aria-selected', 'true');
   const count = await worker.evaluate(() => chrome.tabs.query({}).then(tabs => tabs.length));
   await input.press('Enter');
   await expect.poll(() => worker.evaluate(id => chrome.tabs.get(id).then(tab => tab.active), seed.newer)).toBe(true);
@@ -2076,7 +2094,7 @@ test.describe(() => {
   await input.fill('new tab');
   await expect(ui.locator('.result.tab')).toHaveCount(1);
   await expect(ui.locator('.result.bookmark')).toHaveCount(1);
-  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
+  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:newTab');
   await expect(ui.locator('.result').first()).toHaveAttribute('aria-selected', 'true');
   const created = context.waitForEvent('page');
   await input.press('Enter');
@@ -2099,7 +2117,7 @@ test('search highlights Chinese titles, translated command aliases, URLs and act
   await expect(ui.locator('.result').first()).toHaveAttribute('aria-selected', 'true');
   for (const theme of ['light', 'dark']) {
     await ui.evaluate(async theme => { await chrome.storage.local.set({ preferences: { language: 'zh', theme } }); }, theme);
-    await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', theme);
+    await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', theme);
     await ui.locator('.palette').screenshot({ path: test.info().outputPath(`highlight-${theme}.png`) });
   }
   await input.fill('127.0.0.1');
@@ -2111,8 +2129,8 @@ test('search highlights Chinese titles, translated command aliases, URLs and act
   const action = ui.getByRole('combobox', { name: '搜索操作' });
   await action.fill('关闭');
   await expect(ui.locator('.action-row.danger mark')).toHaveText(['关闭', '关闭', '关闭']);
-  await expect(ui.locator('[id="zing-actions-action:mute"] .action-alias')).toHaveText('关闭声音');
-  await expect(ui.locator('[id="zing-actions-action:mute"] mark')).toHaveText('关闭');
+  await expect(ui.locator('[id="justonehop-actions-action:mute"] .action-alias')).toHaveText('关闭声音');
+  await expect(ui.locator('[id="justonehop-actions-action:mute"] mark')).toHaveText('关闭');
   await action.fill('close right');
   await expect(ui.locator('.action-row').first().locator('.action-alias mark')).toHaveText(['close', 'right']);
   await ui.keyboard.press('Escape');
@@ -2161,9 +2179,9 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   await input.fill('xinjiam');
   await expect(ui.locator('.result.command')).toHaveCount(0);
   await input.fill('xinjian');
-  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
+  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:newTab');
   await input.fill('reloda');
-  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:reload');
+  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:reload');
   if (chinese) {
     await expect(ui.locator('.result').first().locator('.entry-subtitle')).toHaveText('reload');
     await expect(ui.locator('.result').first().locator('.entry-subtitle mark').first()).toBeVisible();
@@ -2171,12 +2189,12 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   await input.fill('cl');
   await expect(ui.locator('.result.danger')).toHaveCount(0);
   await input.pressSequentially('o');
-  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:close');
+  await expect(ui.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:close');
   await expect(ui.locator('.result.danger')).toHaveCount(3);
   await expect(ui.locator('.result').first().locator('mark').first()).toHaveText(chinese ? 'clo' : 'Clo');
   for (const [query, action] of [['tab clo', 'close'], ['clo oth', 'closeOthers'], ['tab clo ri', 'closeRight'], ['guan', 'close'], ['关闭', 'close'], ['reload ext', 'reloadExtension']]) {
     await input.fill(query);
-    await expect(ui.locator('.result').first()).toHaveAttribute('id', `zing-command:${action}`);
+    await expect(ui.locator('.result').first()).toHaveAttribute('id', `justonehop-command:${action}`);
   }
   await input.fill('EchoTech IAM');
   await expect(ui.locator('.result[aria-selected="true"] .entry-title')).toHaveText('EchoTech IAM');
@@ -2275,7 +2293,7 @@ test.describe(() => {
   ui = await context.newPage(); await ui.goto(popupUrl);
   const response = await ui.evaluate(async () => {
     const self = (await chrome.tabs.getCurrent())!;
-    return chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload: { action: 'switch', windowId: self.windowId, tabId: 999999, query: 'iam' } });
+    return chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload: { action: 'switch', windowId: self.windowId, tabId: 999999, query: 'iam' } });
   });
   expect(response.ok).toBe(false);
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage)).toBeUndefined();
@@ -2295,7 +2313,7 @@ test.describe(() => {
   const tabId = await worker.evaluate(async base => (await chrome.tabs.query({})).find(tab => tab.url === `${base}/Usage-fixture`)!.id!, origin);
   await worker.evaluate(async id => {
     await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
+    await chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' });
   }, tabId);
   const cdp = await context.newCDPSession(page);
   const ax = async () => {
@@ -2307,7 +2325,7 @@ test.describe(() => {
   await page.keyboard.type('reload');
   await expect.poll(async () => (await ax()).find(node => node.role?.value === 'combobox')?.value?.value).toBe('reload');
   await Promise.all([page.waitForEvent('load'), page.keyboard.press('Enter')]);
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.target)).toBe('command:reload');
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.query)).toBe('reload');
 });
@@ -2331,8 +2349,8 @@ test.describe(() => {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
     });
-    await expect(page.locator('#zing-command-palette')).toBeAttached();
-    expect(await page.locator('#zing-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
+    await expect(page.locator('#justonehop-command-palette')).toBeAttached();
+    expect(await page.locator('#justonehop-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
     const cdp = await context.newCDPSession(page);
     const ax = async () => {
       const { frameTree } = await cdp.send('Page.getFrameTree');
@@ -2354,7 +2372,7 @@ test.describe(() => {
       await expect.poll(async () => (await ax()).some(node => node.role?.value === 'dialog' && node.name?.value === 'Actions')).toBe(false);
       await expect.poll(async () => (await combo(rootName))?.value?.value).toBe(query);
       await expect.poll(async () => (await combo(rootName))?.properties?.find(property => property.name === 'focused')?.value.value).toBe(true);
-      await expect(page.locator('#zing-command-palette')).toBeAttached();
+      await expect(page.locator('#justonehop-command-palette')).toBeAttached();
       expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.host)).toMatchObject({ active: true, url: `${origin}/Closed-keyboard-host` });
       await page.keyboard.press('Meta+a');
       await page.keyboard.type(target === seeded.first ? 'Closed target Beta' : 'settings');
@@ -2377,33 +2395,33 @@ test.describe(() => {
     // Load the destination's content script before learning, then reuse it after the switch.
     await worker.evaluate(async tabId => {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-      await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+      await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
     }, ids.target);
-    const reopened = targetPage.frameLocator('.zing-frame');
+    const reopened = targetPage.frameLocator('.justonehop-frame');
     await reopened.getByRole('combobox').fill('zed');
     await expect(reopened.locator('.result.tab')).toHaveCount(2);
     await expect(reopened.locator('button.ranking-forget')).toHaveCount(0);
     await reopened.getByRole('combobox').press('Escape');
-    await expect(targetPage.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(targetPage.locator('#justonehop-command-palette')).not.toBeAttached();
     await source.bringToFront();
     await worker.evaluate(async tabId => {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-      await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+      await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
     }, ids.source);
-    const sourceSurface = source.frameLocator('.zing-frame');
+    const sourceSurface = source.frameLocator('.justonehop-frame');
     await sourceSurface.getByRole('combobox').fill('zed');
-    const targetId = `zing-tab:${ids.target}`;
+    const targetId = `justonehop-tab:${ids.target}`;
     const target = sourceSurface.locator(`[id="${targetId}"]`);
     // Exact-title match is already first, so saving must show an icon without claiming promotion.
     await expect(sourceSurface.locator('.result.tab').first()).toHaveAttribute('id', targetId);
     await expect(target.locator('button.ranking-forget')).toHaveCount(0);
     await target.click();
-    await expect(source.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(source.locator('#justonehop-command-palette')).not.toBeAttached();
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, ids.target)).toBe(true);
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage)).toEqual([
       expect.objectContaining({ query: 'zed', target: `tab:${targetPage.url()}`, weight: 1 }),
     ]);
-    await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' }), ids.target);
+    await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' }), ids.target);
     await reopened.getByRole('combobox').fill('zed');
     await expect(reopened.locator('.result.tab').first()).toHaveAttribute('id', targetId);
     const icon = reopened.locator(`[id="${targetId}"] button.ranking-forget`);
@@ -2426,11 +2444,11 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     }, origin);
     await ui.getByRole('combobox').fill('rankfixture');
     await expect(ui.locator('.result.bookmark')).toHaveCount(2);
-    await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
     const baseline = await ui.locator('.result.bookmark').evaluateAll(nodes => nodes.map(node => node.id));
     expect(baseline).toHaveLength(2);
     const chosenId = baseline[1];
-    const bookmarkId = chosenId.replace('zing-bookmark:', '');
+    const bookmarkId = chosenId.replace('justonehop-bookmark:', '');
     const target = `bookmark:${bookmarkId}`;
     const otherTarget = `bookmark:${bookmarkId === fixture.a ? fixture.b : fixture.a}`;
     const preserved = [
@@ -2455,9 +2473,9 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
     await worker.evaluate(async tabId => {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-      await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+      await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
     }, tabId);
-    const surface = page.frameLocator('.zing-frame');
+    const surface = page.frameLocator('.justonehop-frame');
     const searchInput = surface.locator('.search-bar input');
     await searchInput.fill('rankfixture');
     await expect(surface.locator('.result.bookmark').first()).toHaveAttribute('id', chosenId);
@@ -2518,12 +2536,12 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await expect(forget).toHaveAttribute('aria-describedby', await tooltip.getAttribute('id') as string);
     const bounds = await tooltip.boundingBox();
     expect(bounds!.width).toBeLessThan(390);
-    const frameBounds = await page.locator('.zing-frame').boundingBox();
+    const frameBounds = await page.locator('.justonehop-frame').boundingBox();
     expect(bounds!.x).toBeGreaterThanOrEqual(frameBounds!.x);
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(frameBounds!.x + frameBounds!.width);
     await surface.locator('.palette').screenshot({ path: test.info().outputPath(`ranking-${language}-tooltip.png`) });
-    const currentOrder = await surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
-    const currentScroll = await surface.locator('#zing-results').evaluate(node => node.scrollTop);
+    const currentOrder = await surface.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id));
+    const currentScroll = await surface.locator('#justonehop-results').evaluate(node => node.scrollTop);
     await expect(chosen).toHaveAttribute('aria-selected', 'true');
     if (chinese) await forget.click();
     else await page.keyboard.press('Enter');
@@ -2532,15 +2550,15 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await expect(searchInput).toHaveValue('rankfixture');
     expect(await searchInput.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 5]);
     await expect(surface.locator(`[id="${chosenId}"]`)).toHaveAttribute('aria-selected', 'true');
-    expect(await surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
-    expect(await surface.locator('#zing-results').evaluate(node => node.scrollTop)).toBe(currentScroll);
+    expect(await surface.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
+    expect(await surface.locator('#justonehop-results').evaluate(node => node.scrollTop)).toBe(currentScroll);
     // Only the view performing forget holds its order; the other palette syncs normally.
     await expect.poll(() => ui.locator('.result.bookmark').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(baseline);
     await expect(surface.locator('button.ranking-forget')).toHaveCount(0);
     await expect(ui.locator('button.ranking-forget')).toHaveCount(0);
     await expect(surface.getByRole('tooltip')).toHaveCount(0);
     expect(await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => ({ id: tab.id, url: tab.url })))).toEqual(beforeTabs);
-    await expect(page.locator('#zing-command-palette')).toBeAttached();
+    await expect(page.locator('#justonehop-command-palette')).toBeAttached();
     expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(expect.arrayContaining(preserved));
     expect(await worker.evaluate(async () => ((await chrome.storage.local.get('searchUsage')).searchUsage as UsageRecord[]).length)).toBe(preserved.length);
 
@@ -2550,7 +2568,7 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await expect(searchInput).toBeFocused();
     await expect(searchInput).toHaveValue('rankfixture');
     expect(await searchInput.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 5]);
-    expect(await surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
+    expect(await surface.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
     await expect(surface.locator(`[id="${chosenId}"]`)).toHaveAttribute('aria-selected', 'true');
     await expect(surface.locator(`[id="${chosenId}"]`)).toBeInViewport();
 
@@ -2560,7 +2578,7 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await expect.poll(() => surface.locator('.result.bookmark').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(baseline);
     await expect(surface.locator('button.ranking-forget')).toHaveCount(0);
     // An already-first result has a record without claiming a boost.
-    const firstTarget = baseline[0].replace('zing-', '');
+    const firstTarget = baseline[0].replace('justonehop-', '');
     await worker.evaluate(async ({ records, target }) => chrome.storage.local.set({ searchUsage: [
       { query: 'rankfixture', target, weight: 1, lastUsed: Date.now() }, ...records,
     ] }), { records: preserved, target: firstTarget });
@@ -2587,19 +2605,19 @@ test.describe(() => {
     await ui.getByRole('combobox').fill('longrank');
     await expect(ui.locator('.result.bookmark')).toHaveCount(99);
     const baseline = await ui.locator('.result.bookmark').evaluateAll(nodes => nodes.map(node => node.id));
-    const inside = baseline[30].replace('zing-bookmark:', '');
-    const outside = records.find(id => !baseline.includes(`zing-bookmark:${id}`))!;
+    const inside = baseline[30].replace('justonehop-bookmark:', '');
+    const outside = records.find(id => !baseline.includes(`justonehop-bookmark:${id}`))!;
     const beforeTabs = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => ({ id: tab.id, url: tab.url })));
     const input = ui.getByRole('combobox');
     for (const id of [inside, outside]) {
       await worker.evaluate(async id => chrome.storage.local.set({ searchUsage: [{ query: 'longrank', target: `bookmark:${id}`, weight: 5, lastUsed: Date.now() }] }), id);
-      const row = ui.locator(`[id="zing-bookmark:${id}"]`);
-      await expect(ui.locator('.result.bookmark').first()).toHaveAttribute('id', `zing-bookmark:${id}`);
+      const row = ui.locator(`[id="justonehop-bookmark:${id}"]`);
+      await expect(ui.locator('.result.bookmark').first()).toHaveAttribute('id', `justonehop-bookmark:${id}`);
       await expect(row.locator('button.ranking-forget')).toHaveAttribute('data-promoted', 'true');
       await input.press('Meta+ArrowUp');
       await expect(row).toHaveAttribute('aria-selected', 'true');
       await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 5));
-      const list = ui.locator('#zing-results');
+      const list = ui.locator('#justonehop-results');
       if (id === outside) {
         // Keep the selected promoted row offscreen to catch focus restoration scrolling it back.
         await list.evaluate(node => { node.scrollTop = 240; });
@@ -2631,18 +2649,18 @@ test.describe(() => {
   });
   test('Ranking home forget handles storage failure and settings identities stay separate', async () => {
     await ui.getByRole('combobox').fill('language');
-    await expect(ui.locator('[id="zing-command:settings:language"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(ui.locator('[id="justonehop-command:settings:language"]')).toHaveAttribute('aria-selected', 'true');
     await ui.getByRole('combobox').press('Enter');
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.target)).toBe('command:settings:language');
     await ui.keyboard.press('Escape');
     await ui.getByRole('combobox').fill('theme');
-    await expect(ui.locator('[id="zing-command:settings:theme"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(ui.locator('[id="justonehop-command:settings:theme"]')).toHaveAttribute('aria-selected', 'true');
     await ui.getByRole('combobox').press('Enter');
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.target)).toBe('command:settings:theme');
     await ui.keyboard.press('Escape');
     await ui.getByRole('combobox').fill('');
-    await expect(ui.locator('.result.command').first()).toHaveAttribute('id', 'zing-command:settings');
-    const defaultOrder = await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
+    await expect(ui.locator('.result.command').first()).toHaveAttribute('id', 'justonehop-command:settings');
+    const defaultOrder = await ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id));
     await worker.evaluate(async () => {
       const records = (await chrome.storage.local.get<{ searchUsage: UsageRecord[] }>('searchUsage')).searchUsage;
       await chrome.storage.local.set({ searchUsage: [...records,
@@ -2657,8 +2675,8 @@ test.describe(() => {
     });
     // Home scores are captured when this palette mounts, including externally seeded weights.
     await ui.reload();
-    await expect(ui.locator('.result.command').first()).toHaveAttribute('id', 'zing-command:pin');
-    const pin = ui.locator('[id="zing-command:pin"]');
+    await expect(ui.locator('.result.command').first()).toHaveAttribute('id', 'justonehop-command:pin');
+    const pin = ui.locator('[id="justonehop-command:pin"]');
     const forget = pin.locator('button.ranking-forget');
     await expect(forget).toHaveAccessibleName('Forget This Command’s Preferences');
     await expect(forget).toHaveAttribute('data-promoted', 'true');
@@ -2666,13 +2684,13 @@ test.describe(() => {
     const beforeTabs = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => ({ id: tab.id, url: tab.url, pinned: tab.pinned })));
     // Home is one mixed list: Cmd+arrows select its endpoints.
     await ui.getByRole('combobox').press('Meta+ArrowDown');
-    await expect(ui.locator('#zing-results .result').last()).toHaveAttribute('aria-selected', 'true');
+    await expect(ui.locator('#justonehop-results .result').last()).toHaveAttribute('aria-selected', 'true');
     await ui.getByRole('combobox').press('Meta+ArrowUp');
     await expect(pin).toHaveAttribute('aria-selected', 'true');
     await forget.hover();
     await expect(ui.getByRole('tooltip')).toHaveText('Forget This Command’s PreferencesShift+BackspaceMoved up by your preferences.');
-    const currentOrder = await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
-    const currentScroll = await ui.locator('#zing-results').evaluate(node => node.scrollTop);
+    const currentOrder = await ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id));
+    const currentScroll = await ui.locator('#justonehop-results').evaluate(node => node.scrollTop);
     const learned = await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage);
     await forget.click();
     await expect(ui.getByRole('alert')).toContainText('Could not forget');
@@ -2681,9 +2699,9 @@ test.describe(() => {
     await expect(forget).toBeVisible();
     await expect(forget).toBeEnabled();
     await expect(forget).toHaveAttribute('tabindex', '0');
-    await expect(ui.locator('#zing-results')).toBeVisible();
-    expect(await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
-    expect(await ui.locator('#zing-results').evaluate(node => node.scrollTop)).toBe(currentScroll);
+    await expect(ui.locator('#justonehop-results')).toBeVisible();
+    expect(await ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
+    expect(await ui.locator('#justonehop-results').evaluate(node => node.scrollTop)).toBe(currentScroll);
     expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(learned);
     // Retry through the same icon using keyboard activation after mouse failure.
     await ui.getByRole('combobox').focus();
@@ -2694,9 +2712,9 @@ test.describe(() => {
     await expect(forget).toHaveCount(0);
     await expect(ui.getByRole('alert')).toHaveCount(0);
     await expect(ui.getByRole('dialog')).toHaveCount(0);
-    expect(await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
+    expect(await ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
     await expect(pin).toHaveAttribute('aria-selected', 'true');
-    expect(await ui.locator('#zing-results').evaluate(node => node.scrollTop)).toBe(currentScroll);
+    expect(await ui.locator('#justonehop-results').evaluate(node => node.scrollTop)).toBe(currentScroll);
     await expect(ui.getByRole('combobox')).toBeFocused();
     await expect(ui.getByRole('combobox')).toHaveValue('');
     expect(await ui.getByRole('combobox').evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([0, 0]);
@@ -2707,16 +2725,16 @@ test.describe(() => {
     await ui.getByRole('combobox').fill('pin');
     await expect(pin).toBeVisible();
     await ui.getByRole('combobox').fill('');
-    await expect.poll(() => ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
+    await expect.poll(() => ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(currentOrder);
     await expect(forget).toHaveCount(0);
     await ui.reload();
-    await expect.poll(() => ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(defaultOrder);
+    await expect.poll(() => ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(defaultOrder);
     await pin.click({ button: 'right' });
     await expect(ui.getByRole('dialog')).toBeVisible();
     await expect(ui.locator('.action-description')).toHaveCount(0);
     await expect(ui.getByRole('option', { name: 'Forget This Command’s Preferences', exact: false })).toHaveCount(0);
     await ui.keyboard.press('Escape');
-    const newTab = ui.locator('[id="zing-command:newTab"]');
+    const newTab = ui.locator('[id="justonehop-command:newTab"]');
     // The toolbar popup normally has a fixed 750px body; resize this layout fixture explicitly.
     await ui.evaluate(() => { document.body.style.width = '100%'; });
     for (const width of [750, 390]) {
@@ -2763,12 +2781,12 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     }
     const surface = await openStorageOverlay(page);
     const input = surface.getByRole('combobox', { name: chinese ? '搜索命令、标签页、书签和历史' : 'Search commands, tabs, bookmarks, and history' });
-    const ids = () => surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
+    const ids = () => surface.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id));
     const defaults = ['settings', 'help', 'tabSwitcher', 'searchAllHistory', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']
-      .map(action => action === 'searchAllHistory' ? 'zing-search-all-history' : `zing-command:${action}`);
+      .map(action => action === 'searchAllHistory' ? 'justonehop-search-all-history' : `justonehop-command:${action}`);
     await expect.poll(ids).toEqual(defaults);
     await expect(surface.locator('.suggested-label')).toHaveCount(0);
-    await expect(surface.locator('#zing-results')).toHaveAccessibleName(chinese ? '推荐' : 'Suggested');
+    await expect(surface.locator('#justonehop-results')).toHaveAccessibleName(chinese ? '推荐' : 'Suggested');
     await expect(surface.locator('.section-start')).toHaveCount(0);
     await worker.evaluate(async ({ seed, base }) => {
       const lastUsed = Date.now();
@@ -2789,24 +2807,24 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
       ['sessionStorage', ['session storage', '会话存储']], ['tabSwitcher', ['tab switcher', '标签切换器']],
     ] as const) for (const query of queries) {
       await input.fill(query);
-      await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
-      await expect(surface.locator(`[id="zing-command:${action}"]`)).toBeVisible();
+      await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+      await expect(surface.locator(`[id="justonehop-command:${action}"]`)).toBeVisible();
     }
     // Successful search and home actions learn without reordering this mounted homepage.
     await input.fill('settings');
-    await expect(surface.locator('[id="zing-command:settings"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(surface.locator('[id="justonehop-command:settings"]')).toHaveAttribute('aria-selected', 'true');
     await input.press('Enter');
     await expect(surface.getByRole('region', { name: chinese ? '设置' : 'Settings', exact: true })).toBeVisible();
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage: UsageRecord[] }>('searchUsage'))
       .searchUsage.find(record => record.query === 'settings' && record.target === 'command:settings')?.weight)).toBe(1);
     await page.keyboard.press('Escape'); await input.fill('');
     await expect.poll(ids).toEqual(defaults);
-    await surface.locator('[id="zing-command:settings"]').click();
+    await surface.locator('[id="justonehop-command:settings"]').click();
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage: UsageRecord[] }>('searchUsage'))
       .searchUsage.find(record => record.query === '' && record.target === 'command:settings')?.weight)).toBe(1);
     await page.keyboard.press('Escape');
     await input.fill('Home cold');
-    await expect(surface.locator(`[id="zing-tab:${seed.cold}"]`)).toHaveAttribute('aria-selected', 'true');
+    await expect(surface.locator(`[id="justonehop-tab:${seed.cold}"]`)).toHaveAttribute('aria-selected', 'true');
     await input.press('Meta+k');
     const actions = surface.getByRole('combobox', { name: chinese ? '搜索操作' : 'Search actions' });
     await actions.fill('mute'); await actions.press('Enter');
@@ -2816,17 +2834,17 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
       .searchUsage.some(record => record.query === 'home cold'))).toBe(false);
     await input.fill(''); await expect.poll(ids).toEqual(defaults);
     await page.keyboard.press('Escape');
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
-    await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' }), seed.source);
-    await expect(surface.locator('#zing-results .result')).toHaveCount(10);
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
+    await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' }), seed.source);
+    await expect(surface.locator('#justonehop-results .result')).toHaveCount(10);
     const learnedOrder = await ids();
-    expect(learnedOrder.slice(0, 4)).toEqual([`zing-tab:${seed.learned}`, 'zing-command:reload', `zing-bookmark:${seed.saved}`, `zing-bookmark:${seed.another}`]);
-    expect(learnedOrder).toContain('zing-command:settings');
-    for (const id of [seed.source, seed.sameSource, seed.duplicate, seed.cold]) expect(learnedOrder).not.toContain(`zing-tab:${id}`);
-    for (const id of [seed.current, seed.bookmark, seed.duplicateBookmark]) expect(learnedOrder).not.toContain(`zing-bookmark:${id}`);
-    for (const action of ['mute', 'restore', 'sessionStorage']) expect(learnedOrder).not.toContain(`zing-command:${action}`);
+    expect(learnedOrder.slice(0, 4)).toEqual([`justonehop-tab:${seed.learned}`, 'justonehop-command:reload', `justonehop-bookmark:${seed.saved}`, `justonehop-bookmark:${seed.another}`]);
+    expect(learnedOrder).toContain('justonehop-command:settings');
+    for (const id of [seed.source, seed.sameSource, seed.duplicate, seed.cold]) expect(learnedOrder).not.toContain(`justonehop-tab:${id}`);
+    for (const id of [seed.current, seed.bookmark, seed.duplicateBookmark]) expect(learnedOrder).not.toContain(`justonehop-bookmark:${id}`);
+    for (const action of ['mute', 'restore', 'sessionStorage']) expect(learnedOrder).not.toContain(`justonehop-command:${action}`);
     await surface.locator('.palette').screenshot({ path: test.info().outputPath(`home-suggested-${language.toLowerCase()}.png`) });
-    const forget = surface.locator(`[id="zing-tab:${seed.learned}"] button.ranking-forget`);
+    const forget = surface.locator(`[id="justonehop-tab:${seed.learned}"] button.ranking-forget`);
     await expect(forget).toHaveAccessibleName(chinese ? '忘记此页面的偏好' : 'Forget This Page’s Preferences');
     await forget.click();
     await expect(forget).toHaveCount(0);
@@ -2838,7 +2856,7 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).url, seed.learned)).toBe(`${origin}/Home-learned`);
     expect(await worker.evaluate(async id => (await chrome.bookmarks.get(id))[0].url, seed.bookmark)).toBe(`${origin}/Home-learned`);
     await input.fill('help');
-    await expect(surface.locator('[id="zing-command:help"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(surface.locator('[id="justonehop-command:help"]')).toHaveAttribute('aria-selected', 'true');
     await input.press('Enter');
     await expect(surface.locator('.help-view')).toBeVisible();
     await page.keyboard.press('Escape'); await input.fill('');
@@ -2852,13 +2870,13 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await expect(surface.locator('button.ranking-forget')).toHaveCount(0);
     // A real successful selection makes a previously cold page eligible on the next open.
     await input.fill('Home cold');
-    await surface.locator(`[id="zing-tab:${seed.cold}"]`).click();
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await surface.locator(`[id="justonehop-tab:${seed.cold}"]`).click();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage: UsageRecord[] }>('searchUsage'))
       .searchUsage.find(record => record.target.endsWith('/Home-cold'))?.query)).toBe('home cold');
     await page.bringToFront();
-    await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' }), seed.source);
-    await expect.poll(ids).toEqual([`zing-tab:${seed.cold}`, ...defaults].slice(0, 10));
+    await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' }), seed.source);
+    await expect.poll(ids).toEqual([`justonehop-tab:${seed.cold}`, ...defaults].slice(0, 10));
   });
 });
 
@@ -2871,7 +2889,7 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   const input = ui.getByRole('combobox');
   await expect(ui.locator('.result.tab')).toHaveCount(0);
   await expect(ui.locator('.list-heading, .section-heading, .context-hint')).toHaveCount(0);
-  await expect(ui.locator('#zing-results')).toHaveAccessibleName(chinese ? '推荐' : 'Suggested');
+  await expect(ui.locator('#justonehop-results')).toHaveAccessibleName(chinese ? '推荐' : 'Suggested');
   await expect(ui.getByText(chinese ? '推荐' : 'Suggested', { exact: true })).toHaveCount(0);
   await expect(ui.locator('.section-start')).toHaveCount(0);
   await expect(ui.locator('.suggested-label')).toHaveCount(0);
@@ -2924,9 +2942,9 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
     await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-${theme}.png`) });
   }
   await ui.setViewportSize({ width: 390, height: 600 });
-  await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   await expect(ui.locator('.navigation-hint')).toBeHidden();
-  await expect(ui.locator('.palette-footer-title')).toHaveText('zing');
+  await expect(ui.locator('.palette-footer-title')).toHaveText(chinese ? '小范围瞬移' : 'JustOneHop');
   await expect(ui.locator('.footer-navigation')).toHaveAccessibleName(chinese ? '设置' : 'Settings');
   expect(await ui.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   const locationBox = await ui.locator('.palette-footer-location').boundingBox(), actionsBox = await ui.locator('.footer-actions').boundingBox();
@@ -2942,9 +2960,9 @@ async function openStorageOverlay(page: Page) {
   const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
   await worker.evaluate(async tabId => {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+    await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
   }, id);
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   await expect(surface.locator('.result.command')).toHaveCount(9);
   return surface;
 }
@@ -2966,11 +2984,11 @@ test.describe(() => {
     const search = child.getByRole('combobox');
     const active = () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.id, seed.windowId);
     await root.fill('tab switcher');
-    await expect(surface.locator('[id="zing-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
-    const parentOrder = await surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
+    await expect(surface.locator('[id="justonehop-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
+    const parentOrder = await surface.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id));
     for (const route of ['Escape', 'cancel', 'back', 'dismiss'] as const) {
       await root.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 8));
-      if (route === 'cancel') await surface.locator('[id="zing-command:tabSwitcher"]').click();
+      if (route === 'cancel') await surface.locator('[id="justonehop-command:tabSwitcher"]').click();
       else await root.press('Enter');
       await expect(search).toBeEnabled(); await expect(search).toBeFocused();
       await expect(search).toHaveValue('');
@@ -2993,20 +3011,20 @@ test.describe(() => {
       await expect(child).toHaveCount(0);
       await expect(root).toHaveValue('tab switcher'); await expect(root).toBeFocused();
       expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 8]);
-      await expect(surface.locator('[id="zing-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
-      expect(await surface.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(parentOrder);
+      await expect(surface.locator('[id="justonehop-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
+      expect(await surface.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(parentOrder);
       expect(await active()).toBe(seed.source);
     }
     // Mouse row, plain Enter and footer confirmation all use the selected source-window tab.
     for (const confirm of ['mouse', 'keyboard', 'footer'] as const) {
       if (confirm === 'mouse') {
         await root.fill('');
-        await surface.locator('[id="zing-command:tabSwitcher"]').click();
+        await surface.locator('[id="justonehop-command:tabSwitcher"]').click();
       } else {
         await page.bringToFront();
-        await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' }), seed.source);
+        await worker.evaluate(id => chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' }), seed.source);
         await root.fill('切换标签页');
-        await expect(surface.locator('[id="zing-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
+        await expect(surface.locator('[id="justonehop-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
         await root.press('Enter');
       }
       await expect(search).toBeFocused();
@@ -3028,7 +3046,7 @@ test.describe(() => {
         await child.locator('.primary-action').click();
       }
       await expect.poll(active).toBe(seed.target);
-      await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+      await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     }
   });
 });
@@ -3051,7 +3069,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await expect(surface.locator('.result.tab')).toHaveCount(0);
   await root.fill('Layout');
   await expect(surface.locator('.result.tab')).toHaveCount(9);
-  await expect(surface.locator(`[id="zing-tab:${sourceId}"] .current-badge`)).toHaveText(language === 'English' ? 'Current' : '当前');
+  await expect(surface.locator(`[id="justonehop-tab:${sourceId}"] .current-badge`)).toHaveText(language === 'English' ? 'Current' : '当前');
   await expect(surface.locator('.result.tab .current-badge')).toHaveCount(1);
   async function geometry() {
     return surface.locator('.palette').evaluate(panel => {
@@ -3280,7 +3298,7 @@ test.describe(() => {
   await expect(surface.locator('.storage-preview .preview-code')).toHaveValue('source-session');
   await input.press('Enter'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('source-session');
   await input.press('Escape'); await rootInput.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -3294,7 +3312,7 @@ for (const vimium of [false, true]) test.describe(() => {
   const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
   await worker.evaluate(async tabId => {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(tabId, { source: 'zing', type: 'toggle' });
+    await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
   }, id);
   const cdp = await context.newCDPSession(page);
   const ax = async () => {
@@ -3330,7 +3348,7 @@ for (const vimium of [false, true]) test.describe(() => {
   await expect.poll(async () => (await combo())?.name?.value).toBe('Search commands, tabs, bookmarks, and history');
   await expect.poll(async () => (await combo())?.value?.value).toBe('local storage');
   await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -3342,10 +3360,10 @@ test.describe(() => {
     const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
     return { tabId: tab.id!, windowId: tab.windowId, expectedUrl: url };
   }, source.url());
-  const denied = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'read-page-storage', payload: { ...payload, kind: 'cookies', query: 'cookie' } }), target);
+  const denied = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'read-page-storage', payload: { ...payload, kind: 'cookies', query: 'cookie' } }), target);
   expect(denied).toEqual({ ok: false, error: 'Allow access to this website to view its cookies.' });
   const opened = context.waitForEvent('page');
-  await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'open-cookie-access', payload }), target);
+  await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'open-cookie-access', payload }), target);
   const permission = await opened;
   await expect(permission.getByRole('button', { name: 'Continue to Chrome' })).toBeEnabled();
   await expect(permission.locator('.permission-site')).toHaveText('127.0.0.1');
@@ -3363,7 +3381,7 @@ test.describe(() => {
   await permission.close();
   await source.goto(target.expectedUrl);
   const reopened = context.waitForEvent('page');
-  await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'open-cookie-access', payload }), target);
+  await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'open-cookie-access', payload }), target);
   const accepted = await reopened;
   await expect(accepted.getByRole('button', { name: 'Continue to Chrome' })).toBeEnabled();
   await accepted.evaluate(() => { chrome.permissions.request = async args => args.origins?.length === 1 && args.origins[0] === '*://127.0.0.1/*'; });
@@ -3388,7 +3406,7 @@ test.describe(() => {
     await chrome.cookies.set({ url, name: 'foreign-partition', value: 'excluded', secure: true, sameSite: 'no_restriction', path: '/', partitionKey: { topLevelSite: 'https://other.test', hasCrossSiteAncestor: true } });
     return { kind: 'cookies', tabId: tab.id!, windowId: tab.windowId, expectedUrl: url };
   }, site);
-  const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'read-page-storage', payload }), target);
+  const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'read-page-storage', payload }), target);
   expect(reply.ok).toBe(true);
   expect(reply.data.entries.map((entry: { name: string }) => entry.name)).toEqual(['ordinary', 'parent', 'partitioned', 'secure']);
   expect(reply.data.entries.find((entry: { name: string }) => entry.name === 'parent').cookie.httpOnly).toBe(true);
@@ -4008,7 +4026,7 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
     });
     if (host === 'native') await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
     const native = host === 'native' ? context.pages().find(page => page.url().includes('popup.html#window='))! : undefined;
-    const surface = native || source.frameLocator('.zing-frame');
+    const surface = native || source.frameLocator('.justonehop-frame');
     await surface.locator('.settings-button').click();
     await surface.getByRole('button', { name: 'Set Up', exact: true }).click();
     const code = await surface.getByRole('textbox', { name: 'JavaScript code' }).inputValue();
@@ -4031,7 +4049,7 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
       await shortcuts.bringToFront();
       await expect.poll(() => source.evaluate(() => document.hidden)).toBe(true);
       await source.bringToFront();
-      await expect(source.locator('#zing-command-palette')).toHaveCount(0);
+      await expect(source.locator('#justonehop-command-palette')).toHaveCount(0);
     } else {
       await expect.poll(() => context.pages().some(page => page.url().endsWith('popup.html#binding'))).toBe(true);
       const guide = context.pages().find(page => page.url().endsWith('popup.html#binding'))!;
@@ -4053,8 +4071,8 @@ test.describe(() => {
     await expect(ui.locator('.result.command')).toHaveCount(9);
     for (const query of ['scripts', 'script library', 'new script', 'run script', 'userscript', '脚本', 'Legacy helper unique']) {
       await search.fill(query);
-      await expect(ui.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
-      await expect(ui.locator('#zing-results .result:not(#zing-search-all-history)')).toHaveCount(0);
+      await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+      await expect(ui.locator('#justonehop-results .result:not(#justonehop-search-all-history)')).toHaveCount(0);
     }
     const permissions = await worker.evaluate(() => {
       const manifest = chrome.runtime.getManifest();
@@ -4076,10 +4094,10 @@ test.describe(() => {
     await expect(settings).toHaveValue('ctrl tab'); await expect(setup).toBeFocused();
     await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
     await search.fill('Ctrl+Tab');
-    await expect(ui.locator('[id="zing-command:settings:binding"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(ui.locator('[id="justonehop-command:settings:binding"]')).toHaveAttribute('aria-selected', 'true');
     await search.press('Enter'); await expect(setup).toBeFocused();
     await ui.keyboard.press('Escape'); await search.fill('help');
-    await expect(ui.locator('[id="zing-command:help"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(ui.locator('[id="justonehop-command:help"]')).toHaveAttribute('aria-selected', 'true');
     await expect(ui.locator('.palette-footer .primary-action')).toBeEnabled();
     await search.press('Enter');
     const help = ui.getByRole('textbox', { name: 'Search help', exact: true });
@@ -4119,7 +4137,7 @@ test.describe(() => {
   ]);
   expect(await worker.evaluate(() => chrome.commands.getAll())).toEqual(before);
   await ui.setViewportSize({ width: 390, height: 500 });
-  await ui.locator('.zing-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   expect(await ui.locator('.binding-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await expect(ui.locator('.palette-footer .primary-action')).toBeInViewport({ ratio: 1 });
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('binding-guide.png') });
@@ -4155,7 +4173,7 @@ test.describe(() => {
   const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
   await worker.evaluate(async id => {
     await chrome.scripting.executeScript({ target: { tabId: id }, files: ['content.js'] });
-    await chrome.tabs.sendMessage(id, { source: 'zing', type: 'toggle' });
+    await chrome.tabs.sendMessage(id, { source: 'justonehop', type: 'toggle' });
   }, tabId);
   const cdp = await context.newCDPSession(page);
   await expect.poll(async () => {
@@ -4174,7 +4192,7 @@ test.describe(() => {
     const { frameTree } = await cdp.send('Page.getFrameTree');
     const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
     const nodes = (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
-    return nodes.some(node => node.role?.value === 'option' && node.name?.value?.includes('zing Settings: Set Up Ctrl+Tab') && node.properties?.some(prop => prop.name === 'selected' && prop.value.value === true)) &&
+    return nodes.some(node => node.role?.value === 'option' && node.name?.value?.includes('JustOneHop Settings: Set Up Ctrl+Tab') && node.properties?.some(prop => prop.name === 'selected' && prop.value.value === true)) &&
       nodes.some(node => node.role?.value === 'button' && node.name?.value === 'Set Up Ctrl+Tab' && !node.properties?.some(prop => prop.name === 'disabled' && prop.value.value === true));
   }).toBe(true);
   await page.keyboard.press('Enter');
@@ -4187,7 +4205,7 @@ test.describe(() => {
   await page.keyboard.press('Escape'); await expect.poll(() => focused('Set Up')).toBe(true);
   await page.keyboard.press('Escape'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -4213,7 +4231,7 @@ test('Chinese binding guide returns to settings and retains its standalone hando
   await expect(ui.locator('.binding-guide')).toBeVisible();
   // Exercise the transient-host handoff separately from the persistent test tab.
   const guideCreated = context.waitForEvent('page');
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'open-shortcuts', preserveBindingGuide: true }));
+  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'open-shortcuts', preserveBindingGuide: true }));
   const guide = await guideCreated;
   await expect(guide).toHaveURL(/popup\.html#binding$/);
   await guide.bringToFront();
@@ -4222,7 +4240,7 @@ test('Chinese binding guide returns to settings and retains its standalone hando
   await guide.getByRole('button', { name: '复制并打开', exact: true }).click();
   await guide.bringToFront();
   await expect(guide.locator('.binding-guide')).toBeVisible();
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'open-shortcuts', preserveBindingGuide: true }));
+  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'open-shortcuts', preserveBindingGuide: true }));
   expect(context.pages().filter(page => page.url().endsWith('popup.html#binding'))).toHaveLength(1);
 });
 
@@ -4261,16 +4279,16 @@ test.describe(() => {
   // The ordinary page already has the lightweight recent-key listener, but not the palette.
   const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
   await expect.poll(() => worker.evaluate(async tabId => {
-    try { return await chrome.tabs.sendMessage(tabId, { source: 'zing-recent', type: 'arm', session: 'launch-check', modifier: 'Control' }, { frameId: 0 }); }
+    try { return await chrome.tabs.sendMessage(tabId, { source: 'justonehop-recent', type: 'arm', session: 'launch-check', modifier: 'Control' }, { frameId: 0 }); }
     catch { return null; }
   }, id)).not.toBeNull();
   await worker.evaluate(async () => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  await expect(page.locator('#zing-command-palette')).toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).toBeAttached();
   expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), id)).toBe('');
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   await expect(surface.getByRole('combobox')).toBeFocused();
   const bounds = await surface.locator('.palette').boundingBox();
   expect(Math.abs(bounds!.x + bounds!.width / 2 - 550)).toBeLessThan(1);
@@ -4279,14 +4297,14 @@ test.describe(() => {
   const settings = await surface.locator('.palette').boundingBox();
   expect(settings!.x).toBe(bounds!.x); expect(settings!.y).toBe(bounds!.y);
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   // A successful launch must also recover any per-tab popup left by an earlier failure.
   await worker.evaluate(async tabId => {
     await chrome.action.setPopup({ tabId, popup: 'popup.html' });
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   }, id);
-  await expect(page.locator('#zing-command-palette')).toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).toBeAttached();
   expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), id)).toBe('');
 });
 });
@@ -4346,9 +4364,9 @@ test.describe(() => {
   await page.keyboard.press('Escape'); await expect.poll(() => focused('Copy & Open')).toBe(true);
   await page.keyboard.press('Escape'); await expect.poll(() => focused('Set Up')).toBe(true);
   await expect.poll(async () => (await ax()).some(node => node.role?.value === 'region' && node.name?.value === 'Settings')).toBe(true);
-  await expect(page.locator('#zing-command-palette')).toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).toBeAttached();
   await page.keyboard.press('Escape'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await page.keyboard.press('Escape'); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -4360,7 +4378,7 @@ test.describe(() => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   for (const [query, heading] of [['settings', 'Settings'], ['local storage', 'Local Storage'], ['session storage', 'Session Storage']]) {
     await search.fill(query); await page.keyboard.press('Enter');
@@ -4381,7 +4399,7 @@ test.describe(() => {
   await surface.locator('.palette-footer-context').click(); await page.keyboard.press('Escape');
   await expect(search).toBeFocused();
   await search.fill('no-such-command'); await surface.getByText('No results found', { exact: true }).click();
-  await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await page.keyboard.press('Escape'); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -4394,10 +4412,10 @@ test.describe(() => {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
     });
-    const surface = page.frameLocator('.zing-frame');
+    const surface = page.frameLocator('.justonehop-frame');
     const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await search.fill('local storage');
-    await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
     await expect(surface.locator('.primary-action')).toBeEnabled();
     await search.press('Enter');
     const keys = surface.getByRole('combobox', { name: 'Search storage keys' });
@@ -4433,14 +4451,14 @@ test.describe(() => {
     await page.mouse.wheel(-140, 0); await expect(search).toBeFocused();
     await expect(search).toHaveValue('local storage');
     await search.fill('tab switcher');
-    await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
     await expect(surface.locator('.primary-action')).toBeEnabled();
     await search.press('Enter');
     await expect(surface.locator('.recent-switcher')).toBeVisible();
     await page.waitForTimeout(300);
     await surface.locator('.palette-footer-title').hover(); await page.mouse.wheel(-140, 0);
     await expect(search).toBeFocused(); await expect(search).toHaveValue('tab switcher');
-    await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await page.keyboard.press('Escape'); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   });
 });
 
@@ -4477,7 +4495,7 @@ test.describe(() => {
     await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
     await page.waitForTimeout(300);
     await page.mouse.wheel(-140, 0);
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     await expect(page.getByRole('textbox', { name: 'Page input' })).toBeFocused();
     await expect(page).toHaveURL(`${origin}/Wheel-closed`);
     await cdp.detach();
@@ -4536,9 +4554,9 @@ test.describe(() => {
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
   await open();
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   const search = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  const blur = () => surface.locator('.zing-app').evaluate(node => {
+  const blur = () => surface.locator('.justonehop-app').evaluate(node => {
     ((node.getRootNode() as ShadowRoot).activeElement as HTMLElement)?.blur();
   });
   const escape = async () => { await blur(); await page.keyboard.press('Escape'); };
@@ -4558,19 +4576,19 @@ test.describe(() => {
   }
   await search.fill('local storage'); await page.keyboard.press('Enter');
   // Composition owns Escape until committed; repeated keydown must not pop again.
-  await surface.locator('.zing-app').evaluate(node => {
+  await surface.locator('.justonehop-app').evaluate(node => {
     const doc = node.ownerDocument;
     doc.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, isComposing: true }));
     doc.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, repeat: true }));
   });
   await expect(surface.getByRole('combobox', { name: 'Search storage keys' })).toBeVisible();
   await escape(); await expect(search).toBeFocused();
-  await escape(); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await escape(); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   // Reopen to catch stale registrations/listeners left behind by the prior mount.
   await open(); await expect(search).toBeFocused();
   await search.fill('local storage'); await page.keyboard.press('Enter');
   await escape(); await expect(search).toBeFocused();
-  await escape(); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await escape(); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -4644,7 +4662,7 @@ test.describe(() => {
   await page.keyboard.press('Backspace'); await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
   await page.keyboard.press('Meta+a'); await page.keyboard.press('Backspace'); await page.keyboard.press('Backspace');
   await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
-  await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await page.keyboard.press('Escape'); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -4656,12 +4674,12 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     await worker.evaluate(async url => {
       const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
       await chrome.scripting.executeScript({ target: { tabId: tab.id! }, files: ['content.js'] });
-      await chrome.tabs.sendMessage(tab.id!, { source: 'zing', type: 'toggle' });
+      await chrome.tabs.sendMessage(tab.id!, { source: 'justonehop', type: 'toggle' });
     }, page.url());
-    const surface = page.frameLocator('.zing-frame');
+    const surface = page.frameLocator('.justonehop-frame');
     const input = surface.locator('.search-bar input');
     await input.fill(language === 'English' ? 'bookmark tab' : '收藏标签页');
-    const add = surface.locator('[id="zing-command:bookmarkTab"]');
+    const add = surface.locator('[id="justonehop-command:bookmarkTab"]');
     await expect(add.locator('.entry-shortcut kbd')).toHaveText('⌘D');
     await expect(add.locator('.entry-shortcut')).toHaveAttribute('aria-label', 'Command + D');
     await add.click({ button: 'right' });
@@ -4669,12 +4687,12 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     await page.keyboard.press('Meta+d');
     const bookmarks = () => worker.evaluate(url => chrome.bookmarks.search({ url }), page.url());
     await expect.poll(async () => (await bookmarks()).length).toBe(1);
-    const remove = surface.locator('[id="zing-command:unbookmarkTab"]');
+    const remove = surface.locator('[id="justonehop-command:unbookmarkTab"]');
     await expect(remove).toBeVisible();
     await expect(remove.locator('.entry-shortcut')).toHaveCount(0);
     for (const query of ['add bookmark', 'save bookmark', '添加书签']) {
       await input.fill(query);
-      const remembered = surface.locator('#zing-results [aria-disabled="true"]');
+      const remembered = surface.locator('#justonehop-results [aria-disabled="true"]');
       await expect(remembered).toContainText(language === 'English' ? 'Already Bookmarked' : '已收藏');
       await expect(surface.locator('.primary-action')).toBeDisabled();
       await expect(surface.locator('.actions-button')).toBeDisabled();
@@ -4688,7 +4706,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     await remove.click();
     await expect.poll(async () => (await bookmarks()).length).toBe(0);
     await expect(add.locator('.entry-shortcut kbd')).toHaveText('⌘D');
-    await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+    await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
     await input.press('Meta+ArrowUp');
     await expect(add).toHaveAttribute('aria-selected', 'true');
     await input.press('Enter');
@@ -4703,7 +4721,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   test(`${language} categorized candidates show real shortcuts and keep search matching and binding setup`, async () => {
   const en = language === 'English';
   const search = ui.locator('.search-bar input');
-  const switcher = ui.locator('[id="zing-command:tabSwitcher"]');
+  const switcher = ui.locator('[id="justonehop-command:tabSwitcher"]');
   const switcherSubtitle = 'Switch tabs like in VS Code';
   const actualBinding = await worker.evaluate(async () => (await chrome.commands.getAll()).find(command => command.name === 'switch-recent')?.shortcut || '');
   await expect(switcher.locator('.entry-subtitle')).toHaveText(switcherSubtitle);
@@ -4716,7 +4734,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   if (actualBinding) await expect(switcher.locator('.entry-shortcut kbd')).toHaveText(actualBinding);
   else await expect(switcher.locator('.entry-shortcut')).toHaveCount(0);
   await search.fill('storage:local');
-  const first = ui.locator('#zing-results [role="option"]').first();
+  const first = ui.locator('#justonehop-results [role="option"]').first();
   await expect(first.locator('.entry-title')).toHaveText(en ? 'Storage: View Local Storage' : '存储: 查看 Local Storage');
   await expect(first.locator('mark')).not.toHaveCount(0);
   await expect(first.locator('.entry-shortcut')).toHaveCount(0);
@@ -4740,11 +4758,11 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     await worker.evaluate(preferences => chrome.storage.local.set({ preferences }), { language: en ? 'en' : 'zh', theme });
     await search.fill('new tab'); await ui.setViewportSize({ width: 390, height: 516 });
     await ui.evaluate(() => { document.body.style.width = '390px'; });
-    await expect(ui.locator('.zing-app')).toHaveAttribute('data-theme', theme);
-    const row = ui.locator('#zing-command\\:newTab');
+    await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', theme);
+    const row = ui.locator('#justonehop-command\\:newTab');
     await expect(row.locator('.entry-shortcut')).toBeInViewport();
     expect(await ui.locator('.palette').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`zing-categories-${language}-${theme}.png`) });
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath(`justonehop-categories-${language}-${theme}.png`) });
   }
 });
 });
@@ -4770,11 +4788,11 @@ test.describe(() => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  const surface = website.frameLocator('.zing-frame');
+  const surface = website.frameLocator('.justonehop-frame');
   const search = surface.locator('.search-bar input'); await search.fill('Favicon site');
   const icon = surface.locator('.result.tab img.entry-favicon.loaded').first();
   await expect(icon).toBeVisible();
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-favicon-overlay.png') });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-favicon-overlay.png') });
   // A real image failure must leave a type icon, never a broken-image glyph.
   await icon.evaluate((img: HTMLImageElement) => { img.src = img.src.replace('/_favicon/', '/missing-icon.png'); });
   await expect(surface.locator('.result.tab img')).toHaveCount(0);
@@ -4862,7 +4880,7 @@ test.describe(() => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   const start = performance.now(); await launch();
   await expect(surface.locator('.result.command')).toHaveCount(9);
   const coldMs = Math.round(performance.now() - start);
@@ -4871,11 +4889,11 @@ test.describe(() => {
   for (const query of ['ref', 'refer', 'reference', 'reference 42', 'new tab', 'iam']) {
     const start = performance.now(); await input.fill(query);
     if (query === 'iam') await expect(surface.locator('.result')).toHaveCount(0);
-    else if (query === 'new tab') await expect(surface.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
+    else if (query === 'new tab') await expect(surface.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:newTab');
     else await expect(surface.locator('.result.bookmark').first().locator('.entry-title mark').first()).toHaveText(query.split(' ')[0], { ignoreCase: true });
     searchMs.push(Math.round(performance.now() - start));
   }
-  await page.keyboard.press('Escape'); await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await page.keyboard.press('Escape'); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   const warm = performance.now(); await launch();
   await expect(surface.locator('.result.command')).toHaveCount(9);
   const warmMs = Math.round(performance.now() - warm);
@@ -4960,14 +4978,14 @@ for (const scenario of ['fast', 'slow', 'failure and retry']) {
       await expect(ui.locator('.results .spinner')).toBeVisible();
       await expect(ui.locator('.result-status')).not.toHaveText('');
       await release();
-      await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
+      await expect(ui.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:newTab');
       await expect(input).toHaveValue('new tab');
       await expect(input).toBeFocused();
       await expect(ui.locator('.results .spinner')).toHaveCount(0);
       // Refreshes keep the existing list, with no new loading indicator.
       await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
       await ui.clock.runFor(200);
-      await expect(ui.locator('.result').first()).toHaveAttribute('id', 'zing-command:newTab');
+      await expect(ui.locator('.result').first()).toHaveAttribute('id', 'justonehop-command:newTab');
       await expect(ui.locator('.results .spinner')).toHaveCount(0);
       await release();
     } else {
@@ -5184,7 +5202,7 @@ test.describe(() => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  const surface = f.a.frameLocator('.zing-frame');
+  const surface = f.a.frameLocator('.justonehop-frame');
   await expect(surface.getByRole('combobox')).toBeFocused();
   const paletteBounds = await surface.locator('.palette').boundingBox();
   const paletteFooter = await surface.locator('.palette-footer').boundingBox();
@@ -5202,7 +5220,7 @@ test.describe(() => {
   const mainSearch = await searchGeometry();
   await f.a.keyboard.press('Escape');
   await f.a.keyboard.down('Control'); await f.open();
-  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).toBeAttached();
   await expect(surface.getByRole('listbox')).toBeFocused();
   await expect(surface.getByRole('combobox')).toBeDisabled();
   expect(await f.windows()).toBe(0);
@@ -5223,7 +5241,7 @@ test.describe(() => {
   await expect(surface.locator('.secondary-action')).toHaveText('Cancelesc');
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-shared-footer.png') });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-switcher-shared-footer.png') });
   const initial = await surface.locator('[aria-selected=true]').getAttribute('id');
   await f.a.keyboard.press('n');
   expect(await surface.locator('[aria-selected=true]').getAttribute('id')).not.toBe(initial);
@@ -5234,13 +5252,13 @@ test.describe(() => {
   await expect(surface.getByRole('combobox')).toBeEnabled();
   await expect(surface.getByRole('combobox')).toBeFocused();
   await expect.poll(searchGeometry).toEqual(mainSearch);
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-activated.png') });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-switcher-activated.png') });
   await f.a.keyboard.up('Control');
   await expect(surface.getByRole('combobox')).toBeFocused();
   expect(await f.active()).toBe(f.ids.source);
   await surface.locator('.primary-action').click();
   await expect.poll(f.active).toBe(Number(initial!.replace('recent-', '')));
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -5251,7 +5269,7 @@ test.describe(() => {
   const extra = await context.newPage(); await extra.goto(`${origin}/Bridge-C`);
   await f.a.bringToFront();
   await f.a.keyboard.down('Control'); await f.open();
-  const surface = f.a.frameLocator('.zing-frame');
+  const surface = f.a.frameLocator('.justonehop-frame');
   const input = surface.getByRole('combobox');
   await expect(surface.getByRole('listbox')).toBeFocused(); await expect(input).toBeDisabled();
   await f.a.keyboard.press('f');
@@ -5269,15 +5287,15 @@ test.describe(() => {
   await expect(surface.getByRole('option')).toHaveCount(1);
   await expect(surface.locator('.entry-title mark')).toHaveText(['Bridge', 'C']);
   await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-filtered.png') });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-switcher-filtered.png') });
   const target = Number((await input.getAttribute('aria-activedescendant'))!.replace('recent-', ''));
   await f.a.keyboard.up('Control');
   await expect(input).toBeFocused(); await expect(input).toHaveValue('Bridge C');
-  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).toBeAttached();
   expect(await f.active()).toBe(f.ids.source);
   await f.a.keyboard.press('Enter');
   await expect.poll(f.active).toBe(target);
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -5286,7 +5304,7 @@ for (const method of ['wrapper', 'icon', 'keyboard'] as const) test.describe(() 
   test(`English recent bridge storage overlay search accepts typing after ${method} and release`, async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
-  const surface = f.a.frameLocator('.zing-frame');
+  const surface = f.a.frameLocator('.justonehop-frame');
   const input = surface.getByRole('combobox');
   await expect(surface.getByRole('listbox')).toBeFocused(); await expect(input).toBeDisabled();
   if (method === 'wrapper') await surface.locator('.recent-search-field').click();
@@ -5305,10 +5323,10 @@ for (const method of ['wrapper', 'icon', 'keyboard'] as const) test.describe(() 
   await expect(input).toBeFocused();
   await input.pressSequentially('Bridge-B');
   await expect(surface.getByRole('option')).toHaveCount(1);
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`zing-switcher-search-${method}.png`) });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`justonehop-switcher-search-${method}.png`) });
   await f.a.keyboard.press('Enter');
   await expect.poll(f.active).toBe(f.ids.previous);
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -5317,7 +5335,7 @@ test.describe(() => {
   test('English recent bridge storage overlay search with no matches stays open until a visible choice', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
-  const surface = f.a.frameLocator('.zing-frame');
+  const surface = f.a.frameLocator('.justonehop-frame');
   const input = surface.getByRole('combobox');
   await expect(surface.getByRole('listbox')).toBeFocused(); await expect(input).toBeDisabled();
   await surface.locator('button.search-icon').click();
@@ -5349,7 +5367,7 @@ test.describe(() => {
     await page.keyboard.down('Control'); await page.keyboard.up('Control'); await f.open();
     await expect.poll(f.active).toBe(attempt % 2 ? f.ids.source : f.ids.previous);
     expect(await f.windows()).toBe(0);
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
   }
 });
 });
@@ -5385,7 +5403,7 @@ test.describe(() => {
   await f.a.keyboard.up('Control');
   await resumeRecentOverlay(); await opening;
   await expect.poll(f.active).toBe(order[3 % order.length]);
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
   expect(await f.windows()).toBe(0);
 });
 });
@@ -5406,14 +5424,14 @@ for (const reason of ['Escape', 'outside click', 'another window', 'another tab'
       expect(await worker.evaluate(async () => (await chrome.windows.getLastFocused()).id)).toBe(other!.id);
     } else {
       await opening;
-      const surface = f.a.frameLocator('.zing-frame');
+      const surface = f.a.frameLocator('.justonehop-frame');
       await expect(surface.getByRole('listbox')).toBeFocused();
       if (reason === 'Escape') await f.a.keyboard.press('Escape');
       if (reason === 'outside click') await surface.locator('.recent-overlay').click({ position: { x: 5, y: 5 } });
       if (reason === 'another window') await worker.evaluate(() => chrome.windows.create({ url: 'about:blank', focused: true }));
       if (reason === 'another tab') await worker.evaluate(id => chrome.tabs.update(id, { active: true }), f.ids.previous);
     }
-    await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
     expect(await f.active()).toBe(reason === 'another tab' ? f.ids.previous : f.ids.source);
     expect(await f.windows()).toBe(0);
     await expect(f.a.getByRole('textbox')).toHaveValue('keep my text');
@@ -5431,12 +5449,12 @@ test.describe(() => {
   test('English recent bridge storage overlay keeps source selected when a candidate closes', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
-  const surface = f.a.frameLocator('.zing-frame');
+  const surface = f.a.frameLocator('.justonehop-frame');
   await expect(surface.getByRole('listbox')).toBeFocused();
   await worker.evaluate(id => chrome.tabs.remove(id), f.ids.previous);
   await expect(surface.locator('[aria-selected=true]')).toHaveAttribute('id', `recent-${f.ids.source}`);
   await f.a.keyboard.up('Control');
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
   expect(await f.active()).toBe(f.ids.source);
 });
 });
@@ -5451,7 +5469,7 @@ test.describe(() => {
   const created = context.waitForEvent('page', page => page.url().includes('switcher.html'));
   await f.open(); const popup = await created;
   await expect(popup.getByRole('listbox')).toBeFocused();
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
   expect(await f.active()).toBe(f.ids.source);
   await popup.keyboard.press('Escape').catch(error => { if (!popup.isClosed()) throw error; });
   await expect.poll(() => popup.isClosed()).toBe(true);
@@ -5463,7 +5481,7 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   test(`${language} recent bridge storage overlay mouse selection and narrow geometry match palette`, async () => {
   const f = await bridgeFixture(); await f.a.setViewportSize({ width: 390, height: 440 });
   await f.open();
-  const surface = f.a.frameLocator('.zing-frame');
+  const surface = f.a.frameLocator('.justonehop-frame');
   await expect(surface.getByRole('listbox')).toBeFocused();
   await expect(surface.getByRole('combobox')).toBeDisabled();
   const before = await surface.locator('.palette').boundingBox();
@@ -5486,10 +5504,10 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await expect(surface.locator('.secondary-action')).toBeInViewport({ ratio: 1 });
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await expect.poll(() => surface.locator('.recent-overlay').evaluate(node => getComputedStyle(node).opacity)).toBe('1');
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`zing-switcher-shared-footer-narrow-${language}.png`) });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`justonehop-switcher-shared-footer-narrow-${language}.png`) });
   await surface.getByRole('option').filter({ hasText: 'Bridge B' }).click();
   await expect.poll(f.active).toBe(f.ids.previous);
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -5497,10 +5515,10 @@ test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
   test('English recent bridge storage overlay closes safely when its worker stops', async () => {
   const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
-  await expect(f.a.frameLocator('.zing-frame').getByRole('listbox')).toBeFocused();
+  await expect(f.a.frameLocator('.justonehop-frame').getByRole('listbox')).toBeFocused();
   const monitor = await context.newCDPSession(f.a);
   await monitor.send('ServiceWorker.enable'); await monitor.send('ServiceWorker.stopAllWorkers');
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -5508,7 +5526,7 @@ for (const action of ['header cancel', 'footer cancel', 'search', 'switch'] as c
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
   test(`English recent bridge closed storage overlay Enter belongs to focused ${action} button`, async () => {
   const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
-  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).toBeAttached();
   const cdp = await context.newCDPSession(f.a);
   const name = action.includes('cancel') ? 'Cancel' : action === 'search' ? 'Search recent tabs…' : 'Switch';
   const frameId = await focusClosedButton(cdp, name, action === 'footer cancel' ? 1 : 0, action.includes('cancel') ? 2 : 1);
@@ -5521,7 +5539,7 @@ for (const action of ['header cancel', 'footer cancel', 'search', 'switch'] as c
     expect(await f.active()).toBe(f.ids.source);
     await f.a.keyboard.press('Escape');
   }
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
   expect(await f.active()).toBe(action === 'switch' ? f.ids.previous : f.ids.source);
 });
 });
@@ -5530,7 +5548,7 @@ for (const vimium of [false, true]) test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true, vimium } });
   test(`English recent bridge closed storage overlay preserves ${vimium ? 'Vimium' : 'production'} navigation and release`, async () => {
   const f = await bridgeFixture(); await f.a.keyboard.down('Control'); await f.open();
-  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).toBeAttached();
   const cdp = await context.newCDPSession(f.a);
   const selectedName = async () => {
     const { frameTree } = await cdp.send('Page.getFrameTree');
@@ -5546,7 +5564,7 @@ for (const vimium of [false, true]) test.describe(() => {
   expect(await f.active()).toBe(f.ids.source);
   await f.a.keyboard.up('Control');
   await expect.poll(f.active).toBe(f.ids.previous);
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
   expect(await f.windows()).toBe(0);
 });
 });
@@ -5566,7 +5584,7 @@ for (const acceptDelay of [0, 250]) test.describe(() => {
     const samples: number[] = [];
     (window as any).__switcherPaint = samples;
     const sample = () => {
-      const dialog = document.querySelector('#zing-command-palette')?.shadowRoot?.querySelector('dialog');
+      const dialog = document.querySelector('#justonehop-command-palette')?.shadowRoot?.querySelector('dialog');
       if (dialog) {
         const surface = dialog.querySelector('iframe')?.contentDocument?.body.shadowRoot?.querySelector('.recent-overlay');
         if (surface) {
@@ -5595,7 +5613,7 @@ test.describe(() => {
   test('English recent bridge storage overlay held shortcut reveals and navigates normally', async () => {
   const f = await bridgeFixture();
   await f.a.keyboard.down('Control'); await f.open();
-  const surface = f.a.frameLocator('.zing-frame');
+  const surface = f.a.frameLocator('.justonehop-frame');
   await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
   const list = surface.getByRole('listbox');
   const input = surface.getByRole('combobox');
@@ -5612,10 +5630,10 @@ test.describe(() => {
     const style = getComputedStyle(node, '::before');
     return { border: style.borderColor, shadow: style.boxShadow };
   })).toEqual({ border: 'rgba(0, 0, 0, 0)', shadow: 'none' });
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-switcher-disabled.png') });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-switcher-disabled.png') });
   await f.a.keyboard.up('Control');
   await expect.poll(f.active).toBe(f.ids.previous);
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
   await f.a.bringToFront();
   await f.a.keyboard.down('Control'); await f.open();
   await expect(surface.locator('.current-badge')).toHaveText('Current');
@@ -5623,10 +5641,10 @@ test.describe(() => {
   await surface.getByRole('button', { name: 'Search recent tabs…' }).click();
   await expect(surface.getByRole('combobox')).toBeEnabled();
   await f.a.keyboard.up('Control');
-  await expect(f.a.locator('#zing-command-palette')).toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).toBeAttached();
   expect(await f.active()).toBe(f.ids.source);
   await surface.locator('.search-dismiss').click();
-  await expect(f.a.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
   expect(await f.active()).toBe(f.ids.source);
 });
 });
@@ -5695,7 +5713,7 @@ test.describe(() => {
 for (const method of ['mouse', 'keyboard'] as const) {
   test.describe(() => {
     test.use({ environment: { ...defaults, locale: 'en-US', commands: true, pageAccess: true, shadow: method === 'mouse' ? 'open' : 'closed' } });
-    test(`English reload zing extension via ${method} preserves pages and reopens the palette`, async () => {
+    test(`English reload justonehop extension via ${method} preserves pages and reopens the palette`, async () => {
       const page = await context.newPage();
       await page.goto('chrome://extensions');
       const developerMode = page.getByRole('button', { name: 'Developer mode', exact: true });
@@ -5709,23 +5727,23 @@ for (const method of ['mouse', 'keyboard'] as const) {
           const scope = globalThis as typeof globalThis & { __recentCommands: ((command: string) => Promise<void>)[] };
           for (const callback of scope.__recentCommands) await callback('toggle-palette');
         });
-        await expect(page.locator('#zing-command-palette')).toBeAttached();
+        await expect(page.locator('#justonehop-command-palette')).toBeAttached();
       };
       await launch();
-      await page.keyboard.type(method === 'mouse' ? 'Zing: Reload' : 'Zing：重新加载');
+      await page.keyboard.type(method === 'mouse' ? 'JustOneHop: Reload' : 'JustOneHop：重新加载');
       const nextWorker = context.waitForEvent('serviceworker', candidate => candidate.url() === worker.url());
       const oldWorker = worker;
       const stopped = oldWorker.waitForEvent('close');
       if (method === 'mouse') {
-        const frame = page.frameLocator('.zing-frame');
-        await expect(frame.getByRole('option').first().locator('.entry-title')).toHaveText('Zing: Reload');
+        const frame = page.frameLocator('.justonehop-frame');
+        await expect(frame.getByRole('option').first().locator('.entry-title')).toHaveText('JustOneHop: Reload');
         await frame.getByRole('option').first().click();
       } else {
         await page.keyboard.press('Shift+Enter');
-        await expect(page.locator('#zing-command-palette')).toBeAttached();
+        await expect(page.locator('#justonehop-command-palette')).toBeAttached();
         await page.keyboard.press('Enter');
       }
-      await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+      await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
       await stopped;
       worker = await nextWorker;
       await expect(page.getByRole('textbox', { name: 'Page input' })).toHaveValue('keep this text');
@@ -5735,10 +5753,10 @@ for (const method of ['mouse', 'keyboard'] as const) {
       await launch();
       await page.keyboard.type('settings');
       await page.keyboard.press('Enter');
-      if (method === 'mouse') await expect(page.frameLocator('.zing-frame').getByRole('textbox', { name: 'Search settings' })).toBeFocused();
+      if (method === 'mouse') await expect(page.frameLocator('.justonehop-frame').getByRole('textbox', { name: 'Search settings' })).toBeFocused();
       await page.keyboard.press('Escape');
       await page.keyboard.press('Escape');
-      await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+      await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     });
   });
 }
@@ -5756,13 +5774,13 @@ test.describe(() => {
   await client.send('ServiceWorker.enable');
   for (let round = 0; round < 100; round++) {
     await client.send('ServiceWorker.stopAllWorkers');
-    const reply = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' }));
+    const reply = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
     expect(reply.ok, `wake ${round}: ${JSON.stringify(errors)}`).toBe(true);
     if (round % 5 === 4) {
       await ui.evaluate(() => chrome.runtime.reload()).catch(() => {});
       ui = await context.newPage();
       await expect.poll(async () => {
-        try { await ui.goto(popupUrl); return await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' })).then(reply => reply.ok); }
+        try { await ui.goto(popupUrl); return await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' })).then(reply => reply.ok); }
         catch { return false; }
       }, { message: JSON.stringify(errors) }).toBe(true);
     }
@@ -5786,8 +5804,8 @@ test.describe(() => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  const surface = page.frameLocator('.zing-frame');
-  await expect(page.locator('#zing-command-palette')).toBeAttached();
+  const surface = page.frameLocator('.justonehop-frame');
+  await expect(page.locator('#justonehop-command-palette')).toBeAttached();
   await expect(surface.locator('.search-focus-hint')).toHaveText('Click the search field to type');
   expect(context.pages().some(candidate => candidate.url().includes('popup.html#window='))).toBe(false);
   expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), id)).toBe('');
@@ -5802,7 +5820,7 @@ test.describe(() => {
   await page.keyboard.type('settings');
   await expect(search).toHaveValue('settings');
   await page.keyboard.press('Escape');
-  await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 
@@ -5827,7 +5845,7 @@ test.describe(() => {
     await expect(search).toBeFocused();
     expect(await worker.evaluate(tabId => chrome.action.getPopup({ tabId }), source.id)).toBe('');
     const bound = await palette.evaluate(async () => {
-      const reply = await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' });
+      const reply = await chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' });
       return { source: reply.data.currentTabId, window: reply.data.windowId, host: (await chrome.tabs.getCurrent())!.windowId };
     });
     expect(bound).toMatchObject({ source: source.id, window: source.windowId });
@@ -5837,7 +5855,7 @@ test.describe(() => {
     await palette.keyboard.press('Escape');
     await expect(search).toBeFocused();
     await search.fill('pin');
-    await expect(palette.locator('[id="zing-command:pin"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(palette.locator('[id="justonehop-command:pin"]')).toHaveAttribute('aria-selected', 'true');
     await expect(palette.locator('.palette-footer .primary-action')).toBeEnabled();
     await search.press('Enter');
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).pinned, source.id)).toBe(true);
@@ -5860,11 +5878,11 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
     });
     if (host === 'native') await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
     const page = host === 'native' ? context.pages().find(page => page.url().includes('popup.html#window='))! : source;
-    const surface = host === 'native' ? page : page.frameLocator('.zing-frame');
+    const surface = host === 'native' ? page : page.frameLocator('.justonehop-frame');
     const input = surface.locator('.search-bar input');
     await expect(input).toBeFocused();
     await input.fill('new tab');
-    await expect(surface.locator('[id="zing-command:newTab"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(surface.locator('[id="justonehop-command:newTab"]')).toHaveAttribute('aria-selected', 'true');
     await input.evaluate((node: HTMLInputElement) => {
       node.setSelectionRange(1, 4);
       node.ownerDocument.body.tabIndex = -1; node.ownerDocument.body.focus();
@@ -5942,7 +5960,7 @@ test.describe(() => {
     }, page.url());
     let surface = await openStorageOverlay(page);
     let input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    const rows = () => surface.locator('#zing-results .result');
+    const rows = () => surface.locator('#justonehop-results .result');
     await expect(rows().filter({ hasText: 'Search Google for' })).toHaveCount(0);
     await input.fill('LocalSearchMatch');
     await expect(rows().first()).toHaveClass(/bookmark/);
@@ -5994,7 +6012,7 @@ test.describe(() => {
         await expect(surface.locator('.action-row')).toHaveCount(1);
         await menuInput.press('Enter');
       }
-      await expect(page.locator('.zing-frame')).toHaveCount(0);
+      await expect(page.locator('.justonehop-frame')).toHaveCount(0);
       await expect.poll(async () => (await requests()).length).toBe(before + 1);
       const destination = new URL((await requests()).at(-1)!);
       expect(destination.origin + destination.pathname).toBe('https://www.google.com/search');
@@ -6023,11 +6041,11 @@ test.describe(() => {
     }, urls);
     const surface = await openStorageOverlay(page);
     const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    const address = surface.locator('#zing-results .result').filter({ hasText: 'Go to URL' });
+    const address = surface.locator('#justonehop-results .result').filter({ hasText: 'Go to URL' });
     for (const kind of ['tab', 'bookmark', 'history'] as const) {
       await input.fill(urls[kind]);
-      await expect(surface.locator(`#zing-results .result.${kind}`)).toHaveCount(1);
-      await expect(surface.locator('#zing-results')).toHaveAttribute('aria-busy', 'false');
+      await expect(surface.locator(`#justonehop-results .result.${kind}`)).toHaveCount(1);
+      await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
       await expect(address).toHaveCount(0);
     }
     for (const suffix of ['/different', '?q=1', '#part']) {
@@ -6040,10 +6058,10 @@ test.describe(() => {
     await expect(address).toHaveCount(1);
     await expect(address).toHaveAttribute('aria-selected', 'true');
     await input.fill(urls.tab);
-    await expect(surface.locator('#zing-results .result.tab')).toHaveAttribute('aria-selected', 'true');
+    await expect(surface.locator('#justonehop-results .result.tab')).toHaveAttribute('aria-selected', 'true');
     await expect(address).toHaveCount(0);
     await input.press('Enter');
-    await expect(page.locator('.zing-frame')).toHaveCount(0);
+    await expect(page.locator('.justonehop-frame')).toHaveCount(0);
     await expect.poll(async () => worker.evaluate(async url => (await chrome.tabs.query({ active: true })).some(tab => tab.url === url), urls.tab)).toBe(true);
     await expect(page).toHaveURL(`${origin}/Address-dedup-source`);
   });
@@ -6061,7 +6079,7 @@ test.describe(() => {
       const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
       const target = `${origin}/Address-${method}?Q=A%2Bb#Part`;
       await input.fill(target.replace('http://', ''));
-      const row = surface.locator('#zing-results .result').first();
+      const row = surface.locator('#justonehop-results .result').first();
       await expect(row).toHaveText(/Go to URL/);
       await expect(row).toContainText(target);
       await expect(row).toHaveAttribute('aria-selected', 'true');
@@ -6087,7 +6105,7 @@ test.describe(() => {
         await expect(surface.locator('.action-row')).toHaveCount(1);
         await menuInput.press('Enter');
       }
-      await expect(page.locator('.zing-frame')).toHaveCount(0);
+      await expect(page.locator('.justonehop-frame')).toHaveCount(0);
       if (method === 'click' || method === 'enter') {
         await expect(page).toHaveURL(target);
         expect(await worker.evaluate(async () => (await chrome.tabs.query({})).length)).toBe(initialCount);
@@ -6131,7 +6149,7 @@ test.describe(() => {
       const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
       const terms = `NativeSearch ${newTab} 中文 & C++`;
       await input.fill(`google ${terms}`);
-      await expect(palette.locator('#zing-results .result').first()).toContainText(`Search Google for “${terms}”`);
+      await expect(palette.locator('#justonehop-results .result').first()).toContainText(`Search Google for “${terms}”`);
       const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
       await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
       await expect.poll(() => palette.isClosed()).toBe(true);
@@ -6150,7 +6168,7 @@ test.describe(() => {
       const target = `${origin}/Address-native-${newTab ? 'new' : 'current'}?Q=A%2Bb#Part`;
       const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), source.windowId);
       await input.fill(target);
-      await expect(palette.locator('#zing-results .result').first()).toHaveAttribute('aria-selected', 'true');
+      await expect(palette.locator('#justonehop-results .result').first()).toHaveAttribute('aria-selected', 'true');
       const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
       await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
       await expect.poll(() => palette.isClosed()).toBe(true);
@@ -6174,7 +6192,7 @@ test.describe(() => {
     const child = palette.locator('.recent-switcher');
     const search = child.getByRole('combobox');
     await root.fill('tab switcher');
-    await expect(palette.locator('[id="zing-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(palette.locator('[id="justonehop-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
     await root.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 7));
     await root.press('Enter');
     await expect(search).toBeEnabled(); await expect(search).toBeFocused();
@@ -6187,7 +6205,7 @@ test.describe(() => {
     await child.getByRole('button', { name: 'Back · Tab Switcher', exact: true }).click();
     await expect(root).toHaveValue('tab switcher'); await expect(root).toBeFocused();
     expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 7]);
-    await expect(palette.locator('[id="zing-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
+    await expect(palette.locator('[id="justonehop-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
     await palette.locator('.palette-footer .primary-action').click();
     await search.fill('Embedded native target');
     await expect(child.locator(`#recent-${target.id}`)).toHaveAttribute('aria-selected', 'true');
@@ -6222,7 +6240,7 @@ for (const mode of ['create', 'reuse'] as const) test.describe(() => {
     const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner);
     const search = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await search.fill('extensions');
-    await expect(palette.locator('#zing-results [role="option"]').first()).toHaveAttribute('id', 'zing-command:openExtensions');
+    await expect(palette.locator('#justonehop-results [role="option"]').first()).toHaveAttribute('id', 'justonehop-command:openExtensions');
     await search.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
     await expect.poll(() => palette.isClosed()).toBe(true);
     await expect.poll(() => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, owner)).toBe('chrome://extensions/');
@@ -6257,7 +6275,7 @@ test.describe(() => {
   const bounds = await palette.evaluate(async sourceId => {
     const current = await chrome.windows.getCurrent();
     const owner = await chrome.windows.get(sourceId);
-    const reply = await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' });
+    const reply = await chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' });
     const tab = await chrome.tabs.get(reply.data.currentTabId);
     return { current, owner, tab, snapshot: reply.data, screenX, screenY, outerWidth, outerHeight, innerWidth, innerHeight };
   }, source.windowId);
@@ -6282,7 +6300,7 @@ test.describe(() => {
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).pinned, source.tabId)).toBe(true);
   await expect(input).toHaveValue('pin tab');
   await expect(input).toBeFocused();
-  await expect(palette.locator('[id="zing-command:pin"] .entry-title')).toContainText('Unpin Tab');
+  await expect(palette.locator('[id="justonehop-command:pin"] .entry-title')).toContainText('Unpin Tab');
   expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
 });
 });
@@ -6311,7 +6329,7 @@ for (const layer of ['root', 'group'] as const) test.describe(() => {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
     });
-    const surface = sourcePage.frameLocator('.zing-frame');
+    const surface = sourcePage.frameLocator('.justonehop-frame');
     const root = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(root).toBeFocused();
     await worker.evaluate(() => {
@@ -6327,17 +6345,17 @@ for (const layer of ['root', 'group'] as const) test.describe(() => {
     const query = layer === 'root' ? 'SourceClose member' : 'member';
     await input.fill(query);
     await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-    await surface.locator(`[id="${layer === 'root' ? 'zing' : 'group'}-tab:${seeded.another}"]`).click({ button: 'right' });
-    await surface.locator(layer === 'root' ? '[id="zing-actions-action:close"]' : '#group-actions-close').click();
+    await surface.locator(`[id="${layer === 'root' ? 'justonehop' : 'group'}-tab:${seeded.another}"]`).click({ button: 'right' });
+    await surface.locator(layer === 'root' ? '[id="justonehop-actions-action:close"]' : '#group-actions-close').click();
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), seeded.another)).toBe(false);
     await expect(input).toHaveValue(query); await expect(input).toBeFocused();
     expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
     await expect(surface.locator('.action-menu')).toHaveCount(0);
-    await expect(sourcePage.locator('#zing-command-palette')).toBeAttached();
+    await expect(sourcePage.locator('#justonehop-command-palette')).toBeAttached();
     expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.source)).toMatchObject({ active: true });
     if (layer === 'root') {
       await input.fill('close tab');
-      await expect(surface.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', 'zing-command:close');
+      await expect(surface.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', 'justonehop-command:close');
       await surface.locator('.palette-footer .primary-action').click().catch(error => { if (!sourcePage.isClosed()) throw error; });
     } else {
       await surface.locator(`[id="group-tab:${seeded.source}"]`).click({ button: 'right' });
@@ -6349,7 +6367,7 @@ for (const layer of ['root', 'group'] as const) test.describe(() => {
     expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.last)).toMatchObject({ windowId: seeded.windowId });
     expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toHaveLength(0);
     expect(await worker.evaluate(() => (globalThis as unknown as { __sourceCloseWindows: number[] }).__sourceCloseWindows)).toEqual([]);
-    expect(await worker.evaluate(() => chrome.storage.session.get('zingPaletteWindow'))).toEqual({});
+    expect(await worker.evaluate(() => chrome.storage.session.get('justonehopPaletteWindow'))).toEqual({});
   });
 });
 
@@ -6364,7 +6382,7 @@ test.describe(() => {
     const { source, palette } = await openNativePalette();
     const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     const bound = await palette.evaluate(async () => {
-      const reply = await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' });
+      const reply = await chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' });
       return { currentTabId: reply.data.currentTabId, panelTabId: (await chrome.tabs.getCurrent())!.id };
     });
     expect(bound.currentTabId).toBe(source.tabId);
@@ -6375,12 +6393,12 @@ test.describe(() => {
       chrome.windows.onCreated.addListener(window => created.push(window.id!));
     });
     await input.fill('close tab');
-    await expect(palette.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', 'zing-command:close');
+    await expect(palette.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', 'justonehop-command:close');
     await input.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), source.tabId)).toBe(false);
     await expect.poll(() => palette.isClosed()).toBe(true);
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, successor)).toBe(true);
-    await expect.poll(() => worker.evaluate(() => chrome.storage.session.get('zingPaletteWindow'))).toEqual({});
+    await expect.poll(() => worker.evaluate(() => chrome.storage.session.get('justonehopPaletteWindow'))).toEqual({});
     expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toHaveLength(0);
     expect(await worker.evaluate(() => (globalThis as unknown as { __sourceCloseWindows: number[] }).__sourceCloseWindows)).toEqual([]);
     expect(ui.isClosed()).toBe(false);
@@ -6393,17 +6411,17 @@ test.describe(() => {
     const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('chrome://downloads');
     await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 7));
-    await palette.locator(`[id="zing-tab:${other}"]`).click({ button: 'right' });
-    await palette.locator('[id="zing-actions-action:close"]').click();
+    await palette.locator(`[id="justonehop-tab:${other}"]`).click({ button: 'right' });
+    await palette.locator('[id="justonehop-actions-action:close"]').click();
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), other)).toBe(false);
     await expect(input).toHaveValue('chrome://downloads'); await expect(input).toBeFocused();
     expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);
     expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toEqual([palette]);
-    expect(await palette.evaluate(async () => (await chrome.runtime.sendMessage({ source: 'zing', type: 'snapshot' })).data.currentTabId)).toBe(source.tabId);
+    expect(await palette.evaluate(async () => (await chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' })).data.currentTabId)).toBe(source.tabId);
     expect(await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).toMatchObject({ active: true, pinned: false });
     for (const action of ['pin', 'mute'] as const) {
       await input.fill(action);
-      const row = palette.locator(`[id="zing-command:${action}"]`);
+      const row = palette.locator(`[id="justonehop-command:${action}"]`);
       await row.click();
       const state = () => worker.evaluate(async ({ id, action }) => {
         const tab = await chrome.tabs.get(id); return action === 'pin' ? tab.pinned : tab.mutedInfo?.muted;
@@ -6463,11 +6481,11 @@ test.describe(() => {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback('toggle-palette')));
     }, seeded.source);
-    const input = page.frameLocator('.zing-frame').getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const input = page.frameLocator('.justonehop-frame').getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await expect(input).toBeFocused(); await input.fill('close tab'); await input.press('Enter');
     await expect.poll(() => worker.evaluate(() => typeof (globalThis as unknown as { __cancelledClose: { release?: () => void } }).__cancelledClose.release)).toBe('function');
     await page.keyboard.press('Escape');
-    await expect(page.locator('#zing-command-palette')).not.toBeAttached();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
     expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, seeded.source)).toBe(true);
     await worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { release: () => void } }).__cancelledClose.release());
     await expect.poll(() => page.isClosed()).toBe(true);
@@ -6475,7 +6493,7 @@ test.describe(() => {
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, seeded.successor)).toBe(true);
     expect(context.pages().filter(page => page.url().includes('popup.html#window='))).toHaveLength(0);
     expect(await worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { popups: number[] } }).__cancelledClose.popups)).toEqual([]);
-    expect(await worker.evaluate(() => chrome.storage.session.get('zingPaletteWindow'))).toEqual({});
+    expect(await worker.evaluate(() => chrome.storage.session.get('justonehopPaletteWindow'))).toEqual({});
     // Only an explicit new command may open a panel on the successor.
     await worker.evaluate(async () => {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
@@ -6486,7 +6504,7 @@ test.describe(() => {
     await expect(reopened.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toHaveValue('');
     await expect(reopened.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeFocused();
     expect(await worker.evaluate(() => (globalThis as unknown as { __cancelledClose: { popups: number[] } }).__cancelledClose.popups)).toHaveLength(1);
-    expect(await worker.evaluate(async () => (await chrome.storage.session.get<{ zingPaletteWindow: { sourceTabId: number } }>('zingPaletteWindow')).zingPaletteWindow.sourceTabId)).toBe(seeded.successor);
+    expect(await worker.evaluate(async () => (await chrome.storage.session.get<{ justonehopPaletteWindow: { sourceTabId: number } }>('justonehopPaletteWindow')).justonehopPaletteWindow.sourceTabId)).toBe(seeded.successor);
   });
 });
 
@@ -6502,7 +6520,7 @@ async function launchStandaloneForGeometry(tabId: number, command = 'toggle-pale
     Object.defineProperty(chrome.tabs, 'query', { configurable: true, value: async (options: chrome.tabs.QueryInfo) =>
       (await query(options)).map(tab => tab.id === tabId ? { ...tab, url: 'chrome://version/', pendingUrl: undefined } : tab) });
     Object.defineProperty(chrome.tabs, 'sendMessage', { configurable: true, value: (id: number, message: { source?: string; type?: string }, options?: chrome.tabs.MessageSendOptions) =>
-      id === tabId && message.source === 'zing-recent' && message.type === 'arm' ? Promise.resolve({ held: true }) : send(id, message, options) });
+      id === tabId && message.source === 'justonehop-recent' && message.type === 'arm' ? Promise.resolve({ held: true }) : send(id, message, options) });
     try {
       const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
       await Promise.all(callbacks.map(callback => callback(command)));
@@ -6542,7 +6560,7 @@ for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   await expect(surface.getByRole('combobox')).toBeFocused();
   // Read CSS geometry from the actual rendered overlay, then convert to screen
   // DIPs. Playwright's cross-frame boundingBox already includes browser zoom.
@@ -6652,7 +6670,7 @@ for (const zoom of [1, 1.25, .8]) test.describe(() => {
   const capture = await context.newCDPSession(switcher);
   const screenshot = await capture.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
     clip: { x: 0, y: 0, width: rendered.tabWidth, height: rendered.tabHeight, scale: 1 } });
-  await writeFile(test.info().outputPath(`zing-switcher-polish-${zoom * 100}.png`), Buffer.from(screenshot.data, 'base64'));
+  await writeFile(test.info().outputPath(`justonehop-switcher-polish-${zoom * 100}.png`), Buffer.from(screenshot.data, 'base64'));
   await capture.detach();
   await switcher.evaluate(async () => chrome.tabs.setZoom((await chrome.tabs.getCurrent())!.id!, 1));
   await switcher.setViewportSize({ width: 390, height: 440 });
@@ -6705,7 +6723,7 @@ test.describe(() => {
   await search.press('Meta+ArrowDown');
   const lowerRow = ui.locator('.group-view .result[aria-selected=true]');
   const lowerId = await lowerRow.getAttribute('id');
-  expect(await ui.locator('#zing-group-tabs').evaluate(node => node.scrollTop)).toBeGreaterThan(0);
+  expect(await ui.locator('#justonehop-group-tabs').evaluate(node => node.scrollTop)).toBeGreaterThan(0);
   await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 3));
   async function action(text: string) {
     await ui.keyboard.press('Meta+k');
@@ -6739,7 +6757,7 @@ test.describe(() => {
   await ui.getByLabel('Change Group Color', { exact: true }).selectOption('purple');
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
   expect(await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).toMatchObject({ title: 'Reading', color: 'purple' });
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-tab-group-en.png') });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-tab-group-en.png') });
   await action('Expand Group');
   expect((await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).collapsed).toBe(false);
   await search.fill('Beta');
@@ -6793,10 +6811,10 @@ test('Chinese Tab Group labels and compact footer stay usable', async () => {
   await ui.getByLabel('标签组名称').fill('阅读资料');
   await ui.getByRole('button', { name: '保存', exact: true }).click();
   await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('标签组: 阅读资料');
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('zing-tab-group-zh.png') });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-tab-group-zh.png') });
   await worker.evaluate(id => chrome.tabGroups.update(id, { title: '外部改名' }), group);
   // This headless Chrome does not reliably emit tabGroups.onUpdated for API edits.
-  // Exercise the existing refresh-on-focus path used when returning to zing.
+  // Exercise the existing refresh-on-focus path used when returning to justonehop.
   await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('标签组: 外部改名');
   await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
@@ -6814,13 +6832,13 @@ test.describe(() => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   }, origin);
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   await surface.getByRole('combobox').fill('Narrow');
   await surface.getByRole('option').filter({ hasText: 'Tab Group: Narrow' }).click();
   const primary = surface.locator('.palette-footer .primary-action');
   await expect(primary).toBeInViewport();
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await surface.locator('.palette').screenshot({ path: test.info().outputPath('zing-tab-group-narrow.png') });
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-tab-group-narrow.png') });
   await page.keyboard.press('Meta+k'); await page.keyboard.press('Escape');
   await expect(surface.getByRole('combobox', { name: 'Search tabs in this group…' })).toBeFocused();
   await page.keyboard.press('Escape'); await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeFocused();
@@ -6834,7 +6852,7 @@ test.describe(() => {
     const tab = await chrome.tabs.create({ url: `${origin}/Undo-focus`, active: false });
     return { tabId: tab.id!, windowId: tab.windowId };
   }, origin);
-  expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
+  expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
   const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await input.fill('undo tuck');
   await expect(ui.getByRole('option').first()).toContainText('Undo');
@@ -6859,10 +6877,10 @@ test.describe(() => {
     const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
     await Promise.all(callbacks.map(callback => callback('toggle-palette')));
   });
-  const surface = page.frameLocator('.zing-frame');
+  const surface = page.frameLocator('.justonehop-frame');
   const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   for (const menu of [false, true]) {
-    expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'zing', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
+    expect(await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }), { action: 'tuck', ...target })).toMatchObject({ ok: true });
     await input.fill('undo tuck');
     await expect(surface.getByRole('option').first()).toContainText('Undo');
     if (menu) { await input.press('Meta+k'); await page.keyboard.press('Enter'); }
@@ -6902,8 +6920,8 @@ test.describe(() => {
       const original = chrome.runtime.sendMessage.bind(chrome.runtime);
       const state = { calls: 0, changes: 0, release: undefined as (() => void) | undefined };
       (globalThis as unknown as { __heldExecution: typeof state }).__heldExecution = state;
-      const port = chrome.runtime.connect({ name: 'zing' });
-      port.onMessage.addListener(message => { if (message.source === 'zing' && message.type === 'changed') state.changes++; });
+      const port = chrome.runtime.connect({ name: 'justonehop' });
+      port.onMessage.addListener(message => { if (message.source === 'justonehop' && message.type === 'changed') state.changes++; });
       chrome.runtime.sendMessage = (async (request: { type?: string }) => {
         if (request.type === 'execute') {
           state.calls++;
@@ -6923,7 +6941,7 @@ test.describe(() => {
     await seedManagementTabs();
     const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('Batch fixture');
-    const rows = ui.locator('#zing-results .result');
+    const rows = ui.locator('#justonehop-results .result');
     await expect(rows).toHaveCount(4);
     const order = await rows.evaluateAll(nodes => nodes.map(node => node.id));
     const target = Number(order[1].split(':')[1]);
@@ -6931,7 +6949,7 @@ test.describe(() => {
     await ui.clock.install(); await ui.clock.pauseAt(new Date());
     await holdExecution();
     await ui.locator(`[id="${order[1]}"]`).click({ button: 'right' });
-    await ui.locator('[id="zing-actions-action:close"]').click();
+    await ui.locator('[id="justonehop-actions-action:close"]').click();
     await expect.poll(heldExecution).toMatchObject({ calls: 1, held: true });
     const changes = (await heldExecution()).changes;
     await worker.evaluate(id => chrome.tabs.remove(id), target);
@@ -6942,7 +6960,7 @@ test.describe(() => {
     await expect(rows).toHaveCount(3);
     await expect(ui.locator(`[id="${order[1]}"]`)).toHaveCount(0);
     await expect(ui.getByRole('dialog')).toHaveCount(0);
-    await expect(ui.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', order[2]);
+    await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', order[2]);
     await expect(input).toHaveValue('Batch fixture');
     await expect(input).toBeFocused();
     expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);
@@ -6974,13 +6992,13 @@ test.describe(() => {
     await worker.evaluate(id => chrome.tabs.remove(id), target);
     const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('Batch fixture');
-    await expect(ui.locator('#zing-results .result')).toHaveCount(3);
-    await expect(ui.locator(`[id="zing-tab:${target}"]`)).toHaveCount(0);
+    await expect(ui.locator('#justonehop-results .result')).toHaveCount(3);
+    await expect(ui.locator(`[id="justonehop-tab:${target}"]`)).toHaveCount(0);
     await ui.evaluate(() => (globalThis as unknown as { __retrySnapshot: { release: () => void } }).__retrySnapshot.release());
     // Flush promise continuations and React's next paint before checking stale delivery.
     await ui.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-    await expect(ui.locator('#zing-results .result')).toHaveCount(3);
-    await expect(ui.locator(`[id="zing-tab:${target}"]`)).toHaveCount(0);
+    await expect(ui.locator('#justonehop-results .result')).toHaveCount(3);
+    await expect(ui.locator(`[id="justonehop-tab:${target}"]`)).toHaveCount(0);
     await expect(input).toHaveValue('Batch fixture');
     await expect(input).toBeFocused();
     expect(await worker.evaluate(async ids => (await chrome.tabs.query({})).filter(tab => ids.includes(tab.id!)).length, ids)).toBe(3);
@@ -7002,7 +7020,7 @@ test.describe(() => {
     await expect(ui.locator('.palette-footer .primary-action')).toBeDisabled();
     await expect(ui.getByRole('button', { name: 'Open action menu' })).toBeDisabled();
     await ui.keyboard.press('Enter');
-    await ui.locator(`[id="zing-tab:${ids[2]}"]`).click();
+    await ui.locator(`[id="justonehop-tab:${ids[2]}"]`).click();
     expect((await heldExecution()).calls).toBe(1);
     expect(await worker.evaluate(async ids => (await chrome.tabs.query({})).filter(tab => ids.includes(tab.id!)).length, ids)).toBe(4);
     await releaseExecution();
@@ -7017,7 +7035,7 @@ test.describe(() => {
   test('English keep-open root mouse close preserves query and selects next then previous neighbor through empty results', async () => {
     const { ids } = await seedManagementTabs();
     const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    const rows = ui.locator('#zing-results .result');
+    const rows = ui.locator('#justonehop-results .result');
     await input.fill('Batch fixture');
     await expect(rows).toHaveCount(4);
     const order = await rows.evaluateAll(nodes => nodes.map(node => node.id));
@@ -7028,7 +7046,7 @@ test.describe(() => {
     for (const index of [1, 2, 1, 0]) {
       const target = remaining[index];
       await ui.locator(`[id="${target}"]`).click({ button: 'right' });
-      await ui.locator('[id="zing-actions-action:close"]').click();
+      await ui.locator('[id="justonehop-actions-action:close"]').click();
       remaining.splice(index, 1);
       await expect(rows).toHaveCount(remaining.length);
       await expect(ui.getByRole('dialog')).toHaveCount(0);
@@ -7037,7 +7055,7 @@ test.describe(() => {
       expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);
       await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), Number(target.split(':')[1]))).toBe(false);
       if (remaining.length) {
-        await expect(ui.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', remaining[Math.min(index, remaining.length - 1)]);
+        await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', remaining[Math.min(index, remaining.length - 1)]);
       } else {
         await expect(ui.getByText('No results found', { exact: true })).toBeVisible();
         await expect(ui.locator('.palette-footer .primary-action')).toBeDisabled();
@@ -7053,10 +7071,10 @@ test.describe(() => {
     await seedManagementTabs();
     const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
     await input.fill('Batch fixture');
-    await expect(ui.locator('#zing-results .result')).toHaveCount(4);
-    const order = await ui.locator('#zing-results .result').evaluateAll(nodes => nodes.map(node => node.id));
+    await expect(ui.locator('#justonehop-results .result')).toHaveCount(4);
+    const order = await ui.locator('#justonehop-results .result').evaluateAll(nodes => nodes.map(node => node.id));
     await input.press('ArrowDown');
-    await expect(ui.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', order[1]);
+    await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', order[1]);
     await input.press('ArrowLeft');
     await input.press('Shift+ArrowLeft');
     await input.press('Shift+ArrowLeft');
@@ -7065,11 +7083,11 @@ test.describe(() => {
     await input.press('Meta+k');
     await expect(ui.getByRole('combobox', { name: 'Search actions' })).toBeFocused();
     await ui.keyboard.type('close tab');
-    await expect(ui.locator('#zing-actions [aria-selected="true"]')).toHaveAttribute('id', 'zing-actions-action:close');
+    await expect(ui.locator('#justonehop-actions [aria-selected="true"]')).toHaveAttribute('id', 'justonehop-actions-action:close');
     await ui.keyboard.press('Enter');
     await expect(ui.getByRole('dialog')).toHaveCount(0);
-    await expect(ui.locator('#zing-results .result')).toHaveCount(3);
-    await expect(ui.locator('#zing-results [aria-selected="true"]')).toHaveAttribute('id', order[2]);
+    await expect(ui.locator('#justonehop-results .result')).toHaveCount(3);
+    await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', order[2]);
     await expect(input).toHaveValue('Batch fixture');
     await expect(input).toBeFocused();
     expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual(caret);
@@ -7082,9 +7100,9 @@ test.describe(() => {
     const { ids } = await seedManagementTabs();
     const target = ids[1];
     const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    const row = ui.locator(`[id="zing-tab:${target}"]`);
+    const row = ui.locator(`[id="justonehop-tab:${target}"]`);
     await input.fill('Batch fixture');
-    await expect(ui.locator('#zing-results .result')).toHaveCount(4);
+    await expect(ui.locator('#justonehop-results .result')).toHaveCount(4);
     for (const operation of [
       { action: 'pin', title: 'Pin Tab', inverse: 'Unpin Tab', badge: 'Pinned', value: true },
       { action: 'pin', title: 'Unpin Tab', inverse: 'Pin Tab', badge: 'Pinned', value: false },
@@ -7092,7 +7110,7 @@ test.describe(() => {
       { action: 'mute', title: 'Unmute Tab', inverse: 'Mute Tab', badge: 'Muted', value: false },
     ]) {
       await row.click({ button: 'right' });
-      const action = ui.locator(`[id="zing-actions-action:${operation.action}"]`);
+      const action = ui.locator(`[id="justonehop-actions-action:${operation.action}"]`);
       await expect(action).toContainText(operation.title);
       await action.click();
       await expect.poll(() => worker.evaluate(async ({ id, action }) => {
@@ -7117,26 +7135,26 @@ test.describe(() => {
     await ui.getByRole('option').filter({ hasText: 'Tab Group: Batch Research' }).click();
     const input = ui.getByRole('combobox', { name: 'Search tabs in this group…' });
     await input.fill('Batch fixture');
-    const rows = ui.locator('#zing-group-tabs .result');
+    const rows = ui.locator('#justonehop-group-tabs .result');
     await expect(rows).toHaveCount(4);
     const order = await rows.evaluateAll(nodes => nodes.map(node => node.id));
     await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(2, 7));
     await ui.locator(`[id="${order[1]}"]`).click({ button: 'right' });
     await ui.locator('#group-actions-close').click();
     await expect(rows).toHaveCount(3);
-    await expect(ui.locator('#zing-group-tabs [aria-selected="true"]')).toHaveAttribute('id', order[2]);
+    await expect(ui.locator('#justonehop-group-tabs [aria-selected="true"]')).toHaveAttribute('id', order[2]);
     await expect(input).toHaveValue('Batch fixture');
     await expect(input).toBeFocused();
     expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.query({})).some(tab => tab.id === id), Number(order[1].split(':')[1]))).toBe(false);
     await input.press('ArrowDown');
-    await expect(ui.locator('#zing-group-tabs [aria-selected="true"]')).toHaveAttribute('id', order[3]);
+    await expect(ui.locator('#justonehop-group-tabs [aria-selected="true"]')).toHaveAttribute('id', order[3]);
     await input.press('Meta+k');
     await ui.keyboard.type('remove tab from group');
     await ui.keyboard.press('Enter');
     await expect(rows).toHaveCount(2);
     await expect(ui.getByRole('dialog')).toHaveCount(0);
-    await expect(ui.locator('#zing-group-tabs [aria-selected="true"]')).toHaveAttribute('id', order[2]);
+    await expect(ui.locator('#justonehop-group-tabs [aria-selected="true"]')).toHaveAttribute('id', order[2]);
     await expect(input).toHaveValue('Batch fixture');
     await expect(input).toBeFocused();
     expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 7]);

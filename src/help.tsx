@@ -14,7 +14,7 @@ function HelpPage() {
     const refresh = () => {
       void chrome.commands.getAll().then(commands => {
         setShortcut(commands.find(command => command.name === 'toggle-palette')?.shortcut || '');
-      }).catch(error => { console.warn('zing: unable to read shortcut.', error); });
+      }).catch(error => { console.warn('justonehop: unable to read shortcut.', error); });
     };
     refresh();
     window.addEventListener('focus', refresh);
@@ -22,18 +22,18 @@ function HelpPage() {
   }, []);
   useEffect(() => {
     document.documentElement.lang = t('languageTag');
-    document.title = `${t('help')} · zing`;
+    document.title = `${t('help')} · ${t('extensionName')}`;
     document.documentElement.style.colorScheme = preferences.theme === 'system' ? 'light dark' : preferences.theme;
   }, [preferences]);
   const close = () => window.close();
   return <NavigationRoot><BackLayer onBack={close}>
-    <main className="zing-app help-page settled" data-theme={preferences.theme} lang={t('languageTag')}>
+    <main className="justonehop-app help-page settled" data-theme={preferences.theme} lang={t('languageTag')}>
       <HelpView standalone shortcut={shortcut} onBack={close} />
     </main>
   </BackLayer></NavigationRoot>;
 }
 
 void preferencesReady.then(() => {
-  document.body.className = 'zing-help';
+  document.body.className = 'justonehop-help';
   createRoot(document.getElementById('root')!).render(<HelpPage />);
 });
