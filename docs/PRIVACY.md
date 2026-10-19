@@ -2,12 +2,10 @@
 
 简体中文 · [English](PRIVACY.en.md)
 
-> 发布前草稿：开发者与联系邮箱已确认，生效日期将在公开发布时填写。[政策网页地址](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.md)已确定，但仓库目前为私有。上架前需公开仓库、填写生效日期并移除此草稿提示，确认政策无需登录即可访问。
-
 - 产品：小范围瞬移（JustOneHop）Chrome 扩展
 - 开发者：lyyourc
 - 隐私联系邮箱：[liangyida42@gmail.com](mailto:liangyida42@gmail.com)
-- 生效日期：**[待填写：正式政策生效日期]**
+- 生效日期：2026-10-19
 
 ## 1. 适用范围
 

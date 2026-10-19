@@ -7,7 +7,7 @@
 ## 发布前待填写
 
 - 已确认开发者：`lyyourc`；隐私咨询与支持邮箱：`liangyida42@gmail.com`。已同步到[中文隐私政策](PRIVACY.md)和[英文隐私政策](PRIVACY.en.md)。这不代表商店开发者账户已注册或邮箱已验证。
-- 政策生效日期：在实际公开发布时填写，并移除两份政策的草稿提示。
+- 政策生效日期：`2026-10-19`，中英文政策已填写并移除草稿提示；生效日期不代表政策链接已公开可访问。
 - 隐私政策 URL 已确定：[英文政策](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md)。仓库目前为私有；正式提交商店审核前，将仓库设为公开并确认无需登录即可访问。
 - 支持页面 URL 已确定：[使用指南](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md)。同样需要仓库公开；隐私咨询与使用反馈可发送到上述邮箱。
 - 完成后台数据使用勾选、单一用途／权限声明、分类、语言、分发地区和可见性设置；建议分类为 Productivity，按实际目标地区填写分发范围。本文提供事实依据，不代替已完成申报或审核通过的证明。
@@ -52,7 +52,7 @@ test ! -e releases/justonehop-0.1.0.zip && (cd dist && zip -qr ../releases/justo
 unzip -t releases/justonehop-0.1.0.zip
 ```
 
-ZIP 包含 `dist/` 的文件内容（含构建生成的 source map），不额外嵌套 `dist/` 目录。`releases/` 为本地忽略目录，不提交 Git；版本变化时同步修改文件名。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需确定政策生效日期、公开仓库并检查上述链接，以及完成后台字段。
+ZIP 包含 `dist/` 的文件内容（含构建生成的 source map），不额外嵌套 `dist/` 目录。`releases/` 为本地忽略目录，不提交 Git；版本变化时同步修改文件名。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需公开仓库并检查上述链接，以及完成后台字段。
 
 ---
 
@@ -73,14 +73,14 @@ ZIP 包含 `dist/` 的文件内容（含构建生成的 source map），不额�
 核心功能：
 • 统一搜索标签页、书签与历史记录：同时检索当前窗口已打开的标签页、收藏夹书签与最近 7 天浏览历史，也可一键展开搜索全部历史。
 • 像 Alt+Tab 一样切换最近标签页：内置最近标签切换器（Tab Switcher），按最近访问顺序（MRU）排列标签页。支持按住快捷键松手即切，或直接打字按标题、域名筛选。
-• 右键或按 ⌘K 连续整理标签页：在任意结果上直接复制链接、固定／取消固定、静音、刷新、添加或移除书签、关闭标签页；执行后面板保持打开并自动选中下一项，方便一次清理多个标签页。
+• 右键或按 ⌘K 连续整理标签页：在标签页结果上打开操作菜单，即可复制链接、固定／取消固定、静音、刷新、添加或移除书签、关闭标签页。多数整理操作后面板保持打开并保留当前选中项；结果移除后选择邻近项，方便继续整理。关闭或刷新面板来源页时，面板可能随之关闭。
 • 日常中英文口语直达命令：直接输入“新建标签页”“恢复关闭的标签页”“历史记录”“下载”“扩展”“深色模式”或“new tab”“downloads”“settings”即可执行，无需输入模式前缀。
 • Chrome 原生深浅色外观：界面遵循 Chrome CR2023 设计语言，浅色与深色模式自动跟随系统或手动切换。
 • 只读网站存储查看器：输入“local storage”“session storage”或“cookie”，可在分栏视图中查看并复制当前网页的存储键值；读取 Cookie 时仅按当前站点申请权限。
 
 隐私与本地运行：
 • 标签页、书签和历史检索在本地完成，无需注册账号，无开发者后端或遥测，不向开发者上传浏览数据。主动执行 Google 搜索或打开网址时，浏览器会访问相应网站。
-• 偏好设置与本机搜索排序记录仅保存在你的设备本地（可能包含搜索词与完整网址，不通过云端同步），随时可在设置中一键重置。
+• 偏好设置与搜索排序记录仅保存在本机，不通过云端同步。搜索排序记录可能包含搜索词与完整网址，可在设置中使用“重置搜索排序”清除；该操作不会重置语言、主题或其他扩展状态。
 • 网站存储查看器中的内容仅在当前面板内存中只读展示，不写入持久存储；你主动复制的内容会进入系统剪贴板。完整说明请参阅隐私政策链接。
 
 使用说明
@@ -105,14 +105,14 @@ Click the toolbar icon or press Command+Shift+P on macOS (Ctrl+Shift+P on Window
 Key features:
 • Search tabs, bookmarks & history together: Find open tabs, saved bookmarks, and recent 7-day history from a single search bar, or expand to Search All History with one click.
 • Switch recent tabs like Alt+Tab: Open the built-in Tab Switcher to cycle through open tabs in most-recently-used (MRU) order. Hold and release the shortcut to jump, or type anytime to filter by title or domain.
-• Tidy tabs without losing your place: Right-click any result or press Command+K to copy the URL, pin, mute, reload, bookmark, or close a tab. The panel stays open and selects the next item so you can clean up several tabs in a row.
+• Tidy tabs without losing your place: Right-click a tab result or press Command+K to copy its URL, pin or unpin, mute, reload, add or remove a bookmark, or close the tab. Most organizing actions keep the panel open and preserve the selected item; when a result is removed, a nearby item is selected. Closing or reloading the page that opened the panel may also close the panel.
 • Everyday commands in plain words: Type “new tab”, “reopen closed tab”, “downloads”, “extensions”, “passwords”, or “dark mode” to run browser actions directly—no special prefix required.
 • Chrome-native Light & Dark themes: Built around Chrome's CR2023 Omnibox and Tab Search look, automatically matching your system appearance.
 • Read-only site storage viewer: Search “local storage”, “session storage”, or “cookies” to inspect and copy keys and formatted JSON for the current page, requesting host permission only for the site you choose to inspect.
 
 Local & private by design:
 • Tab, bookmark, and history searches run locally—no account, developer server, telemetry, or tracking. When you choose Google Search or open a URL, your browser connects to the corresponding website.
-• Preferences and local ranking records stay on your device (never synced to the cloud) and can be reset anytime in Settings.
+• Preferences and search ranking records stay on your device and are never synced to the cloud. Ranking records may include search terms and full URLs; use Reset search ranking in Settings to clear them. This does not reset the language, theme, or other extension state.
 • Site storage values are read only in memory while viewing; copied values are placed on your system clipboard. See the linked Privacy Policy for full details.
 
 Usage notes
