@@ -1,5 +1,25 @@
 # JustOneHop · 小范围瞬移 0.1.0 验收记录
 
+## 2026-10-20 提交 Chrome Web Store 审核
+
+发布者完成联系邮箱验证后，后台显示 `liangyida42@gmail.com Verified email address`，发布者名称为 `lyyourc`。回读商店资料确认英文通用截图三张、简体中文介绍及本地化截图三张已保存。点击 Submit for review，保留“审核通过后自动发布”选项；后台提示 Broad Host Permissions 可能需要深入审查，继续提交现有 0.1.0 包。
+
+后台随后显示 **Pending review**，弹窗明确确认项目已提交并正在合规审核。扩展 ID：`mbofggnjaoneioopfbpheapgphmkclbo`。此状态表示等待审核，尚未证明审核通过或公开上架；审核通过后将按提交设置自动发布。没有修改产品、重新打包或运行测试。
+
+## 2026-10-20 商店草稿与申报填写
+
+发布者开启两步验证后，成功上传现有 0.1.0 ZIP（SHA-256 与下文打包记录一致），创建商店草稿 `mbofggnjaoneioopfbpheapgphmkclbo`。填写并保存英文与简体中文介绍、项目首页、支持链接和 Productivity / Tools 分类；上传 128px 图标、英文通用截图三张、简体中文本地化截图三张及两张共用英文宣传图。英文没有单独的本地化截图，使用通用截图。没有新增 zh-TW 商店介绍。
+
+保存单一用途、十四项权限用途、主机权限说明、无远程代码声明与英文隐私政策链接。按实际本地处理勾选个人身份信息、认证信息、浏览历史、用户活动、网站内容，勾选三项用途限制声明。审核说明字段上限为 500 字符，保存 478 字符的精简步骤及完整材料链接，无需测试账号。分发页当前为免费、Public、All regions。后台提交前检查仅报告发布者联系邮箱缺失及未验证，尚未提交审核。
+
+发布者显示名填写为已确认的 `lyyourc`，联系邮箱填写 `liangyida42@gmail.com`；后台确认验证邮件已发送，链接有效期一小时，邮箱状态为 Unverified，等待发布者点击邮件中的验证链接。本轮未改动产品、重新构建或运行测试；文档 diff 检查通过。
+
+## 2026-10-20 商店上传被账号两步验证阻断
+
+开发者后台已登录，项目列表为空（0/2）。通过 New item 选择现有 `releases/justonehop-0.1.0.zip`（812,074 字节，Manifest 版本 0.1.0）并尝试上传。后台返回 “There was a problem uploading your file. Please try again.”，具体原因是 “Enabling 2 step verification on your account is required for security purposes.”。
+
+已打开后台提供的 Google 两步验证入口，等待发布者亲自完成账号安全设置。此次未成功创建商店项目，未填写后台字段或提交审核；发布包与产品代码未改动，未重新运行测试。
+
 ## 2026-10-19 公开仓库与政策访问验证
 
 经发布者明确确认，将 `lyyourc/JustOneHop` 从 Private 改为 Public；GitHub API 回读确认 PUBLIC。使用不携带 GitHub 登录凭据的 HTTP 请求访问 main 上的中英文政策及使用指南，三者均返回 200，政策响应包含已确认邮箱及生效日期。发布清单同步公开状态。已在本机打开商店开发者后台及上传文件目录，但本会话没有可操作浏览器页面的工具或商店 API 凭据，尚未上传 ZIP、填写商店后台或提交审核，不将仓库公开视作扩展已上架。

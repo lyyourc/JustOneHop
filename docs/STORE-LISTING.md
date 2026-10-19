@@ -2,6 +2,8 @@
 
 适用版本：0.1.0。中文与英文商店介绍对应相同功能。简介与语言包的 `extensionDescription` 严格保持一致；下面各个“可直接粘贴”区块只包含对应字段的正文。
 
+当前发布状态（2026-10-20）：0.1.0 已提交 Chrome Web Store，后台确认 **Pending review**，勾选审核通过后自动发布。扩展 ID：`mbofggnjaoneioopfbpheapgphmkclbo`。发布者 `lyyourc`，联系邮箱已验证；中英文介绍、截图、宣传图、权限及隐私申报已保存，分发为免费、Public、All regions。主机权限触发深入审查提示，审核结果尚未确定。实际操作记录见 [验收记录](ACCEPTANCE.md)。以下清单保留作为后续版本发布参考。
+
 配套素材：[中英文截图与宣传图](store/README.md) · [整套图片预览](store/contact-sheet.png)。
 
 ## 发布前待填写
