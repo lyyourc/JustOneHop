@@ -2,7 +2,7 @@
 
 简体中文 · [English](PRIVACY.en.md)
 
-> 发布前草稿：开发者与联系邮箱已确认，生效日期将在公开发布时填写。此文件尚未发布为公开政策网页；上架时需在商店后台填写无需登录即可访问的政策 URL。
+> 发布前草稿：开发者与联系邮箱已确认，生效日期将在公开发布时填写。[政策网页地址](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.md)已确定，但仓库目前为私有。上架前需公开仓库、填写生效日期并移除此草稿提示，确认政策无需登录即可访问。
 
 - 产品：小范围瞬移（JustOneHop）Chrome 扩展
 - 开发者：lyyourc

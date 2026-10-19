@@ -2,7 +2,7 @@
 
 [简体中文](PRIVACY.md) · English
 
-> Pre-publication draft: the developer and contact email are confirmed; the effective date will be filled in when the policy is published. This file is not yet a public policy page. Supply a policy URL that is accessible without signing in in the store dashboard.
+> Pre-publication draft: the developer and contact email are confirmed; the effective date will be filled in when the policy is published. The [policy URL](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md) is established, but the repository is currently private. Before store submission, make the repository public, fill in the effective date, remove this draft notice, and verify that the policy is accessible without signing in.
 
 - Product: JustOneHop (小范围瞬移), a Chrome extension
 - Developer: lyyourc

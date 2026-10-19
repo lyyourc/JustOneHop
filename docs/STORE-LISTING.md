@@ -8,31 +8,32 @@
 
 - 已确认开发者：`lyyourc`；隐私咨询与支持邮箱：`liangyida42@gmail.com`。已同步到[中文隐私政策](PRIVACY.md)和[英文隐私政策](PRIVACY.en.md)。这不代表商店开发者账户已注册或邮箱已验证。
 - 政策生效日期：在实际公开发布时填写，并移除两份政策的草稿提示。
-- 公开隐私政策 URL：公开政策后填写，必须无需登录即可访问；本地 Markdown 路径不能作为后台 URL。可直接使用公开 GitHub 仓库中政策 Markdown 的网页链接，无需额外搭建 GitHub Pages，也可使用其他公开网站。
-- 支持页面 URL：后台若要求网页地址，使用公开仓库的使用指南或已启用的 Issues 页面；不要把邮箱或 `mailto:` 当成 HTTPS 页面地址。当前没有已确认的仓库／网站地址，先保留待填。
+- 隐私政策 URL 已确定：[英文政策](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md)。仓库目前为私有；正式提交商店审核前，将仓库设为公开并确认无需登录即可访问。
+- 支持页面 URL 已确定：[使用指南](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md)。同样需要仓库公开；隐私咨询与使用反馈可发送到上述邮箱。
 - 完成后台数据使用勾选、单一用途／权限声明、分类、语言、分发地区和可见性设置；建议分类为 Productivity，按实际目标地区填写分发范围。本文提供事实依据，不代替已完成申报或审核通过的证明。
 - 截图按语言上传；小宣传图与大宣传图不支持本地化，所有语言共用英文 `promo-*`，见[图片上传清单](store/README.md)。
 - 提交前重新构建并核对 ZIP：版本、各语言简介、Manifest 引用文件与所测构建一致，`manifest.json` 必须位于 ZIP 根目录。商店图片与政策文档单独发布，不打入扩展包。
 
 ### 公开链接与后台填写
 
-如果使用公开 GitHub 仓库，在文件页面复制实际地址；以下仅是地址结构示例，不是已经发布的链接，也不假定开发者名称就是 GitHub 账户名：
+仓库已创建为 `lyyourc/JustOneHop`，默认分支为 `main`。以下是可复制到商店后台的实际地址；仓库目前为私有，设为公开后地址保持不变，无需另建 GitHub Pages。
 
 ```text
-隐私政策：https://github.com/<owner>/<repo>/blob/<branch>/docs/PRIVACY.en.md
-中文政策：https://github.com/<owner>/<repo>/blob/<branch>/docs/PRIVACY.md
-项目首页：https://github.com/<owner>/<repo>
-使用帮助：https://github.com/<owner>/<repo>/blob/<branch>/docs/USAGE.md
+隐私政策：https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md
+中文政策：https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.md
+项目首页：https://github.com/lyyourc/JustOneHop
+使用帮助：https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md
 ```
 
-商店隐私政策字段可填写英文版，其顶部已有中文互链。发布后在退出登录或无痕窗口中检查：链接正常显示完整正文、两种语言互链可用、联系邮箱和生效日期正确、没有草稿占位符。若不公开产品源码，可以只公开政策文件；商店需要可访问的政策网页，不要求公开扩展源码。仓库变为私有、重命名或移动文件时，需要同步维护这些链接。
+商店隐私政策字段填写英文版，其顶部已有中文互链。公开仓库后，在退出登录或无痕窗口中检查：链接正常显示完整正文、两种语言互链可用、联系邮箱和生效日期正确、没有草稿占位符。完成这些检查后再提交商店审核；已登录的仓库所有者能够访问，不代表审核人员能够匿名访问。仓库重新变为私有、重命名或移动文件时，需要同步维护这些链接。
 
 | 后台项目 | 本项目填写依据／剩余操作 |
 | --- | --- |
 | 开发者联系 | `lyyourc` / `liangyida42@gmail.com`；在后台完成其要求的联系验证 |
 | 名称、简介、详细介绍 | 使用下方对应语言区块；默认语言为英文，中文填写到对应语言项 |
 | 分类 | 建议选择后台的 Productivity 相关分类 |
-| 隐私政策 | 待实际公开后填写网页 URL，不能填写本地路径或占位链接 |
+| 隐私政策 | `https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md`；提交审核前确认仓库公开且可匿名访问 |
+| 项目首页／支持页面 | 分别使用上方项目首页与使用帮助地址；提交审核前确认可匿名访问 |
 | 单一用途、权限与远程代码 | 使用本文对应段落；无远程托管执行代码 |
 | 数据使用 | 结合本文事实依据与后台当时的字段定义填写；不因无开发者上传就一律勾选“不处理数据” |
 | 测试账号 | 无需账号、登录、订阅、许可证密钥或测试凭据 |
@@ -51,7 +52,7 @@ test ! -e releases/justonehop-0.1.0.zip && (cd dist && zip -qr ../releases/justo
 unzip -t releases/justonehop-0.1.0.zip
 ```
 
-ZIP 包含 `dist/` 的文件内容（含构建生成的 source map），不额外嵌套 `dist/` 目录。`releases/` 为本地忽略目录，不提交 Git；版本变化时同步修改文件名。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需确定政策生效日期、填写公开政策地址和后台字段。
+ZIP 包含 `dist/` 的文件内容（含构建生成的 source map），不额外嵌套 `dist/` 目录。`releases/` 为本地忽略目录，不提交 Git；版本变化时同步修改文件名。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需确定政策生效日期、公开仓库并检查上述链接，以及完成后台字段。
 
 ---
 
