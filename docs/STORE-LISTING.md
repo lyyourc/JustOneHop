@@ -43,16 +43,13 @@
 
 ### 本地生成发布 ZIP
 
-在仓库根目录运行；如果同名 ZIP 已存在，先另选文件名，避免向旧包追加文件：
+在仓库根目录运行（需要系统提供 `zip` 和 `unzip`）：
 
 ```sh
-npm run build
-mkdir -p releases
-test ! -e releases/justonehop-0.1.0.zip && (cd dist && zip -qr ../releases/justonehop-0.1.0.zip . -x '*.map')
-unzip -t releases/justonehop-0.1.0.zip
+npm run package:store
 ```
 
-ZIP 包含 `dist/` 中除 `*.map` 外的文件，不额外嵌套 `dist/` 目录。本地构建仍生成 source map 供调试使用，商店包不携带。不要直接更新旧 ZIP：`zip -x` 不会移除旧包里已有的 map 文件，应使用新的文件名或移除旧包后重新打包。`releases/` 为本地忽略目录，不提交 Git；版本变化时同步修改文件名。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需公开仓库并检查上述链接，以及完成后台字段。
+命令先构建，再按 Manifest 版本生成 `releases/justonehop-<version>.zip`。打包脚本在临时目录复制 `dist/`，排除 `*.map`，并移除 JS/CSS 文件末尾由 esbuild 生成的 `sourceMappingURL` 注释；不额外嵌套 `dist/` 目录，也不改动本地调试文件。全新 ZIP 完成完整性检查后替换同版本旧包，避免旧条目残留；失败时保留原包。`releases/` 为本地忽略目录，不提交 Git。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需公开仓库并检查上述链接，以及完成后台字段。
 
 ---
 

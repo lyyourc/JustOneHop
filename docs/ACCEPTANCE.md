@@ -1,5 +1,13 @@
 # JustOneHop · 小范围瞬移 0.1.0 验收记录
 
+## 2026-10-19 发布打包清理 sourceMappingURL
+
+新增 `npm run package:store`：构建后在临时副本中排除 map 并移除 JS/CSS 末尾由 esbuild 生成的 sourceMappingURL 注释，ZIP 完整性检查通过后替换同版本旧包。本地 dist 保留 map 和引用注释。同步发布说明，后续统一通过该命令生成商店包。
+
+单轮类型检查、定向打包测试 2/2（约 0.23 秒，0 失败／跳过）、实际 `npm run package:store` 构建与 CLI 冒烟通过，无失败重跑。测试覆盖 JS/CSS 注释清理、保留字符串和非末尾注释、旧 ZIP 条目不残留、本地调试文件不变以及失败保留原 ZIP。独立检查包内 34 个文件、无 map、12 个引用注释已移除；除尾部注释外，执行文件及其他文件与 dist 字节一致，Manifest 和 HTML 资源引用完整，本地 12 个 map 保留。diff 空白检查通过；未运行浏览器 E2E 或全量单测。
+
+最新 `releases/justonehop-0.1.0.zip` 为 812,074 字节，SHA-256：`0803b5d18f149be07fc21e70a4fd07e876c8de7f7970d4bee08d083e4ea050b7`。此包替代下文历史 ZIP，仍不提交 Git。
+
 ## 2026-10-19 商店包排除 source map
 
 按发布者要求，打包命令增加 `-x '*.map'`，本地 dist 保留调试 map；说明禁止向已有 ZIP 追加以免旧 map 残留。使用文档中的 zip 排除参数在临时目录生成全新包，检查通过后替换本地 `releases/justonehop-0.1.0.zip`。本次复用已有构建，没有修改产品或构建脚本。

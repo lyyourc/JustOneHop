@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
+    "package:store": "npm run build && tsx scripts/package-store.ts",
     "dev": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
