@@ -11,6 +11,13 @@ test('Chinese catalog covers every English key with matching substitutions', () 
     assert.deepEqual(chinese[key].message.match(/\$\d/g) || [], english[key].message.match(/\$\d/g) || [], key);
   }
 });
+test('localized extension descriptions fit the Chrome manifest limit', () => {
+  for (const catalog of [english, chinese]) {
+    const description = catalog.extensionDescription.message;
+    assert.ok(description.trim().length > 0);
+    assert.ok(description.length <= 132, `Description has ${description.length} characters; Chrome allows 132`);
+  }
+});
 test('fallback English handles singular, plural and missing browser APIs', () => {
   assert.equal(t('newTab'), 'New Tab');
   assert.equal(countMessage('resultOne', 'resultMany', 0), '0 results');

@@ -90,7 +90,8 @@ For detailed feature behavior, gesture rules, and `Ctrl+Tab` setup instructions,
 ## Boundaries & Privacy
 
 - **Hosting modes**: Uses a centered in-page overlay on regular webpages. On restricted pages where Chrome blocks content scripts (such as `chrome://` pages or the Chrome Web Store), it automatically falls back to a standalone popup window aligned with the active tab.
-- **Local-only data**: Settings, search ranking habits, and Auto Tuck state are stored strictly in local browser storage. Inspected Storage and Cookie values remain in panel memory only while viewing.
+- **Local data**: Preferences, search ranking, and group recovery records stay on your device and may include search terms and full URLs. Inspected Storage and Cookie values are not persisted by the extension; values you copy enter the system clipboard. Executing a Google search sends the query to Google through normal browser navigation.
+- **Full details**: The [Privacy Policy](docs/PRIVACY.en.md) explains access, website permissions, retention, and data controls. Developer contact details and the effective date will be completed before public release.
 
 ---
 

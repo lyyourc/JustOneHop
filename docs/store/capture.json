@@ -1,0 +1,39 @@
+{
+  "generatedAt": "2026-10-19T14:43:45.206Z",
+  "version": "0.1.0",
+  "source": "Packaged extension files loaded without modification into temporary profiles. Demonstration titles, URLs, and recreated site icons served locally through Playwright routing without external network requests. Before capture, the action menu DOM is reduced to seven core actions and the switcher DOM excludes the extension page. Browser chrome and webpage backgrounds are composed for presentation; the small promotional tile uses an illustrative search card.",
+  "screenshots": [
+    {
+      "language": "en",
+      "scene": "search",
+      "text": "Up Arrow selects the previous item; Down Arrow selects the next. Alternatively, press Control + P (Ctrl+P) or Control + N (Ctrl+N), or click an item.\nesc\n8 results\nClaude · Debugging MCP Server tool calls & streaming\nclaude.ai/chat/mcp-server-guide\nTab\nClaude Model Context Protocol (MCP) · Official Quickstart\nmodelcontextprotocol.io/quickstart\nBookmark\nanthropics/claude-code · Agentic coding tool in your terminal\ngithub.com/anthropics/claude-code\nTab\nAndrej Karpathy on X: \"Claude Code and local dev workflows...\"\nx.com/karpathy/status/18940129\nTab\nShow HN: Building local-first browser tools with Claude\nnews.ycombinator.com/item\nHistory · just now\nYouTube · Claude Code & Browser Workflow in 10 Minutes\nwww.youtube.com/watch\nHistory · just now\nSearch All History\nSearch across all time\nSearch Google for “claude”\nhttps://www.google.com/search?q=claude\nJustOneHop\nCtrl+P\nPrevious\n·\nCtrl+N\nNext\nSwitch to Tab\n↵\nActions\n⌘K"
+    },
+    {
+      "language": "en",
+      "scene": "actions",
+      "text": "Up Arrow selects the previous item; Down Arrow selects the next. Alternatively, press Control + P (Ctrl+P) or Control + N (Ctrl+N), or click an item.\nesc\n8 results\nClaude · Debugging MCP Server tool calls & streaming\nclaude.ai/chat/mcp-server-guide\nTab\nClaude Model Context Protocol (MCP) · Official Quickstart\nmodelcontextprotocol.io/quickstart\nBookmark\nanthropics/claude-code · Agentic coding tool in your terminal\ngithub.com/anthropics/claude-code\nTab\nAndrej Karpathy on X: \"Claude Code and local dev workflows...\"\nx.com/karpathy/status/18940129\nTab\nShow HN: Building local-first browser tools with Claude\nnews.ycombinator.com/item\nHistory · just now\nYouTube · Claude Code & Browser Workflow in 10 Minutes\nwww.youtube.com/watch\nHistory · just now\nSearch All History\nSearch across all time\nSearch Google for “claude”\nhttps://www.google.com/search?q=claude\nanthropics/claude-code · Agentic coding tool in your terminal\nSwitch to Tab\n↵\nCopy URL\nReload Tab\nPin Tab\nMute Tab\nBookmark Tab\nClose Tab\nesc\nJustOneHop\nCtrl+P\nPrevious\n·\nCtrl+N\nNext\nSwitch to Tab\n↵\nActions\n⌘K"
+    },
+    {
+      "language": "en",
+      "scene": "switcher",
+      "text": "esc\nUp Arrow selects the previous item; Down Arrow selects the next. Alternatively, press Control + P (Ctrl+P) or Control + N (Ctrl+N), or click an item.\njustonehop-web · Production Deployment Ready\nhttps://vercel.com/team/justonehop/deployments\nChatGPT · TypeScript fuzzy search ranking benchmark\nhttps://chatgpt.com/c/typescript-fuzzy-search\nENG-204 · Optimize command palette keyboard latency\nhttps://linear.app/team/issue/ENG-204\nFigma · Chrome CR2023 UI Kit & Color Tokens\nhttps://www.figma.com/design/chrome-cr2023-ui\nAndrej Karpathy on X: \"Claude Code and local dev workflows...\"\nhttps://x.com/karpathy/status/18940129\nanthropics/claude-code · Agentic coding tool in your terminal\nhttps://github.com/anthropics/claude-code\nClaude · Debugging MCP Server tool calls & streaming\nhttps://claude.ai/chat/mcp-server-guide\nTab Switcher\nCtrl+P\nPrevious\n·\nCtrl+N\nNext\nSwitch\n↵\nCancel\nesc"
+    },
+    {
+      "language": "zh",
+      "scene": "search",
+      "text": "上方向键选择上一项，下方向键选择下一项。也可按 Control + P（Ctrl+P）选择上一项、Control + N（Ctrl+N）选择下一项，或直接点击。\nesc\n8 个结果\nClaude · 调试 MCP Server 工具调用与流式响应\nclaude.ai/chat/mcp-server-guide\n标签页\nClaude MCP 协议官方文档 · 快速上手与配置指南\nmodelcontextprotocol.io/quickstart\n书签\nanthropics/claude-code · 终端 AI 编程工具与 PR 列表\ngithub.com/anthropics/claude-code\n标签页\nAndrej Karpathy on X: \"Claude Code 与本地开发工作流...\"\nx.com/karpathy/status/18940129\n标签页\nHacker News · 讨论：用 Claude 构建本地优先的浏览器工具\nnews.ycombinator.com/item\n历史 · 刚刚\nYouTube · 10 分钟上手 Claude Code 与浏览器工作流\nwww.youtube.com/watch\n历史 · 刚刚\n搜索全部历史\n扩大到全部时间\n在 Google 搜索『claude』\nhttps://www.google.com/search?q=claude\n小范围瞬移\nCtrl+P\n上一个\n·\nCtrl+N\n下一个\n切换标签页\n↵\n操作\n⌘K"
+    },
+    {
+      "language": "zh",
+      "scene": "actions",
+      "text": "上方向键选择上一项，下方向键选择下一项。也可按 Control + P（Ctrl+P）选择上一项、Control + N（Ctrl+N）选择下一项，或直接点击。\nesc\n8 个结果\nClaude · 调试 MCP Server 工具调用与流式响应\nclaude.ai/chat/mcp-server-guide\n标签页\nClaude MCP 协议官方文档 · 快速上手与配置指南\nmodelcontextprotocol.io/quickstart\n书签\nanthropics/claude-code · 终端 AI 编程工具与 PR 列表\ngithub.com/anthropics/claude-code\n标签页\nAndrej Karpathy on X: \"Claude Code 与本地开发工作流...\"\nx.com/karpathy/status/18940129\n标签页\nHacker News · 讨论：用 Claude 构建本地优先的浏览器工具\nnews.ycombinator.com/item\n历史 · 刚刚\nYouTube · 10 分钟上手 Claude Code 与浏览器工作流\nwww.youtube.com/watch\n历史 · 刚刚\n搜索全部历史\n扩大到全部时间\n在 Google 搜索『claude』\nhttps://www.google.com/search?q=claude\nanthropics/claude-code · 终端 AI 编程工具与 PR 列表\n切换到标签页\n↵\n复制 URL\n刷新标签页\n固定标签页\n静音标签页\n收藏标签页\n关闭标签页\nesc\n小范围瞬移\nCtrl+P\n上一个\n·\nCtrl+N\n下一个\n切换标签页\n↵\n操作\n⌘K"
+    },
+    {
+      "language": "zh",
+      "scene": "switcher",
+      "text": "esc\n上方向键选择上一项，下方向键选择下一项。也可按 Control + P（Ctrl+P）选择上一项、Control + N（Ctrl+N）选择下一项，或直接点击。\njustonehop-web · 生产环境部署状态与日志\nhttps://vercel.com/team/justonehop/deployments\nChatGPT · TypeScript 模糊搜索与排序权重对比\nhttps://chatgpt.com/c/typescript-fuzzy-search\nENG-204 · 优化命令面板键盘上下切换响应速度\nhttps://linear.app/team/issue/ENG-204\nFigma · Chrome CR2023 组件库与色板规范\nhttps://www.figma.com/design/chrome-cr2023-ui\nAndrej Karpathy on X: \"Claude Code 与本地开发工作流...\"\nhttps://x.com/karpathy/status/18940129\nanthropics/claude-code · 终端 AI 编程工具与 PR 列表\nhttps://github.com/anthropics/claude-code\nClaude · 调试 MCP Server 工具调用与流式响应\nhttps://claude.ai/chat/mcp-server-guide\nTab Switcher\nCtrl+P\n上一个\n·\nCtrl+N\n下一个\n切换\n↵\n取消\nesc"
+    }
+  ],
+  "errors": [],
+  "browser": "145.0.7632.6"
+}

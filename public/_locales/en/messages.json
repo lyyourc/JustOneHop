@@ -3,7 +3,7 @@
     "message": "JustOneHop"
   },
   "extensionDescription": {
-    "message": "A human-first browser command palette. Search tabs, bookmarks, and history with ease, and run commands naturally with keyboard or mouse."
+    "message": "A human-first command palette for Chrome. Search tabs, bookmarks, and history, and run actions naturally with keyboard or mouse."
   },
   "openPalette": {
     "message": "Open JustOneHop Command Palette"

@@ -1,0 +1,82 @@
+{
+  "generatedAt": "2026-10-19T15:13:19.765Z",
+  "files": [
+    {
+      "filename": "zh-1-search.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 234519,
+      "sha256": "375cec3c165f5fc098253c85d88cedfbdf7f14d6fe446a821760ec472b789a6c"
+    },
+    {
+      "filename": "zh-2-switcher.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 231456,
+      "sha256": "4836aca122ca2b279acd5cdadf0f028a7dca55a7abbff209f867a34ce0957079"
+    },
+    {
+      "filename": "zh-3-actions.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 248821,
+      "sha256": "a8e3a8d152c511fa2fe4fcc683ebf14af70377b4da5a6de863be2f06c0f24a65"
+    },
+    {
+      "filename": "en-1-search.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 225599,
+      "sha256": "f5951fe211aaea2f8e6602953f0ea1054e994489f4e52cdd50d7dadc5900f931"
+    },
+    {
+      "filename": "en-2-switcher.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 219016,
+      "sha256": "a707c29ec05e284cb1eea6b111c75926d29c61e8274b4b1ec58f466870cf8e36"
+    },
+    {
+      "filename": "en-3-actions.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 230487,
+      "sha256": "798f231fa6c6c6d9bc62ec6c1c2e6607baea67ba7e82be0cc5dc69d1c910b5d3"
+    },
+    {
+      "filename": "en-promo-440x280.png",
+      "width": 440,
+      "height": 280,
+      "bytes": 43187,
+      "sha256": "3b82836ca94b196ed818d5cbd70a722cf647765a5c797f66258360ab3ca47783"
+    },
+    {
+      "filename": "en-promo-1400x560.png",
+      "width": 1400,
+      "height": 560,
+      "bytes": 285069,
+      "sha256": "078690dd99799b97615dbf4893b6f5d0a8c3aab6dc125ff0ca90a909aa411064"
+    },
+    {
+      "filename": "promo-440x280.png",
+      "width": 440,
+      "height": 280,
+      "bytes": 43187,
+      "sha256": "3b82836ca94b196ed818d5cbd70a722cf647765a5c797f66258360ab3ca47783"
+    },
+    {
+      "filename": "promo-1400x560.png",
+      "width": 1400,
+      "height": 560,
+      "bytes": 285069,
+      "sha256": "078690dd99799b97615dbf4893b6f5d0a8c3aab6dc125ff0ca90a909aa411064"
+    },
+    {
+      "filename": "store-icon-128.png",
+      "width": 128,
+      "height": 128,
+      "bytes": 2959,
+      "sha256": "e7f40ce15e9646cc1f19ce15f2b591a6a2ae33538e4d3244b50878daafd759a9"
+    }
+  ]
+}
