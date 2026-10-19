@@ -2,11 +2,11 @@
 
 [简体中文](PRIVACY.md) · English
 
-> Pre-publication draft: fill in the developer name, contact email, and effective date below before publishing. This file has not been deployed as a public policy page. Supply a policy URL that is accessible without signing in in the store dashboard.
+> Pre-publication draft: the developer and contact email are confirmed; the effective date will be filled in when the policy is published. This file is not yet a public policy page. Supply a policy URL that is accessible without signing in in the store dashboard.
 
 - Product: JustOneHop (小范围瞬移), a Chrome extension
-- Developer: **[TO COMPLETE: developer or publisher name]**
-- Privacy contact: **[TO COMPLETE: email address for privacy inquiries]**
+- Developer: lyyourc
+- Privacy contact: [liangyida42@gmail.com](mailto:liangyida42@gmail.com)
 - Effective date: **[TO COMPLETE: effective date of the published policy]**
 
 ## 1. Scope

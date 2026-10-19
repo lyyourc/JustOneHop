@@ -6,12 +6,39 @@
 
 ## 发布前待填写
 
-- 开发者／发布主体名称、隐私联系邮箱、政策生效日期：填写到[中文隐私政策](PRIVACY.md)和[英文隐私政策](PRIVACY.en.md)。
-- 公开隐私政策 URL：部署政策后填写，必须无需登录即可访问；本地 Markdown 路径不能作为后台 URL。
-- 支持邮箱或支持页面 URL：使用实际可接收反馈的地址。
+- 已确认开发者：`lyyourc`；隐私咨询与支持邮箱：`liangyida42@gmail.com`。已同步到[中文隐私政策](PRIVACY.md)和[英文隐私政策](PRIVACY.en.md)。这不代表商店开发者账户已注册或邮箱已验证。
+- 政策生效日期：在实际公开发布时填写，并移除两份政策的草稿提示。
+- 公开隐私政策 URL：公开政策后填写，必须无需登录即可访问；本地 Markdown 路径不能作为后台 URL。可直接使用公开 GitHub 仓库中政策 Markdown 的网页链接，无需额外搭建 GitHub Pages，也可使用其他公开网站。
+- 支持页面 URL：后台若要求网页地址，使用公开仓库的使用指南或已启用的 Issues 页面；不要把邮箱或 `mailto:` 当成 HTTPS 页面地址。当前没有已确认的仓库／网站地址，先保留待填。
 - 完成后台数据使用勾选、单一用途／权限声明、分类、语言、分发地区和可见性设置；建议分类为 Productivity，按实际目标地区填写分发范围。本文提供事实依据，不代替已完成申报或审核通过的证明。
 - 截图按语言上传；小宣传图与大宣传图不支持本地化，所有语言共用英文 `promo-*`，见[图片上传清单](store/README.md)。
 - 提交前重新构建并核对 ZIP：版本、各语言简介、Manifest 引用文件与所测构建一致，`manifest.json` 必须位于 ZIP 根目录。商店图片与政策文档单独发布，不打入扩展包。
+
+### 公开链接与后台填写
+
+如果使用公开 GitHub 仓库，在文件页面复制实际地址；以下仅是地址结构示例，不是已经发布的链接，也不假定开发者名称就是 GitHub 账户名：
+
+```text
+隐私政策：https://github.com/<owner>/<repo>/blob/<branch>/docs/PRIVACY.en.md
+中文政策：https://github.com/<owner>/<repo>/blob/<branch>/docs/PRIVACY.md
+项目首页：https://github.com/<owner>/<repo>
+使用帮助：https://github.com/<owner>/<repo>/blob/<branch>/docs/USAGE.md
+```
+
+商店隐私政策字段可填写英文版，其顶部已有中文互链。发布后在退出登录或无痕窗口中检查：链接正常显示完整正文、两种语言互链可用、联系邮箱和生效日期正确、没有草稿占位符。若不公开产品源码，可以只公开政策文件；商店需要可访问的政策网页，不要求公开扩展源码。仓库变为私有、重命名或移动文件时，需要同步维护这些链接。
+
+| 后台项目 | 本项目填写依据／剩余操作 |
+| --- | --- |
+| 开发者联系 | `lyyourc` / `liangyida42@gmail.com`；在后台完成其要求的联系验证 |
+| 名称、简介、详细介绍 | 使用下方对应语言区块；默认语言为英文，中文填写到对应语言项 |
+| 分类 | 建议选择后台的 Productivity 相关分类 |
+| 隐私政策 | 待实际公开后填写网页 URL，不能填写本地路径或占位链接 |
+| 单一用途、权限与远程代码 | 使用本文对应段落；无远程托管执行代码 |
+| 数据使用 | 结合本文事实依据与后台当时的字段定义填写；不因无开发者上传就一律勾选“不处理数据” |
+| 测试账号 | 无需账号、登录、订阅、许可证密钥或测试凭据 |
+| 审核操作说明 | 使用下方英文操作步骤 |
+| 分发地区、可见性与发布时机 | 由发布者在后台选择；本文不预设全球发布或自动上线 |
+| 图片 | 中英文截图分别填写，英文大小宣传图共用，见素材清单 |
 
 ### 本地生成发布 ZIP
 
@@ -24,7 +51,7 @@ test ! -e releases/justonehop-0.1.0.zip && (cd dist && zip -qr ../releases/justo
 unzip -t releases/justonehop-0.1.0.zip
 ```
 
-ZIP 包含 `dist/` 的文件内容（含构建生成的 source map），不额外嵌套 `dist/` 目录。`releases/` 为本地忽略目录，不提交 Git；版本变化时同步修改文件名。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需填写本节的联系信息、公开政策地址和后台字段。
+ZIP 包含 `dist/` 的文件内容（含构建生成的 source map），不额外嵌套 `dist/` 目录。`releases/` 为本地忽略目录，不提交 Git；版本变化时同步修改文件名。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需确定政策生效日期、填写公开政策地址和后台字段。
 
 ---
 
@@ -144,6 +171,23 @@ The extension does not load or execute remotely hosted code. JavaScript and depe
 - 用户主动执行 Google 搜索时，查询通过导航发送给 Google；没有输入时的在线联想请求。
 - 无数据出售、广告用途、信用评估、开发者遥测或与所述功能无关的数据使用。
 - 联系邮箱、隐私政策 URL、后台申报及实际包行为必须一致；阅读后台认证声明后再勾选。
+
+## 审核后台：操作说明（英文，可直接粘贴）
+
+No account, sign-in, subscription, license key, or test credentials are required. Use Chrome 127 or later. All extension features are available locally; websites opened by the reviewer may have their own access requirements.
+
+1. Open a few ordinary HTTPS pages in one Chrome window. Click the extension toolbar icon to open the command palette. You can also use Command+Shift+P on macOS or Ctrl+Shift+P on Windows/Linux. If a shortcut is already assigned elsewhere, use the toolbar icon or configure it at chrome://extensions/shortcuts.
+2. Search for part of an open tab's title or domain and click a result to switch to it. Bookmark one of the test pages using Chrome, then search again to see bookmark results. History results depend on the browsing history in the test profile; the main search covers the last seven days and offers Search All History. An empty profile may have no bookmark or history matches.
+3. Right-click a tab result to open its action menu. Try copying its URL, pinning/unpinning it, or adding/removing its bookmark. Available actions depend on the selected result. Use disposable test tabs for close actions; pinned tabs are protected.
+4. Search for "tab switcher" in the main palette and open it. Type a title or domain to filter recent tabs, then click a result or press Enter to switch. This path does not require holding a modifier key or changing system keyboard settings.
+5. Search for "settings" to change language or appearance and inspect the search-ranking reset control. Search selections can create local ranking records; resetting them does not revoke website permissions or clear all other extension data.
+6. On an ordinary HTTPS page, search for "local storage", "session storage", or "cookie" and open the matching viewer. An empty list is expected when the page has no applicable values. Local Storage and Session Storage are limited to the top-level page. If cookie access is missing, follow the explicit website-access button and Chrome permission prompt. The requested hosts can include the current host and necessary parent hosts. Values are read-only; copying a value places it on the system clipboard. Please use a test page/profile without personal credentials when inspecting storage.
+7. To inspect native tab-group management, search for "tuck tab" on a disposable, unpinned tab. The tab moves into a collapsed native group; it is not closed or discarded. Search for "undo tuck" to undo the latest batch. Auto Tuck is optional, off by default, and uses a seven-day inactivity threshold plus idle checks; it is not expected to run immediately during a short review.
+8. On restricted pages such as chrome:// pages or the Chrome Web Store, the palette opens in a standalone extension window. If the browser address bar retains focus, click the palette's search field. macOS has received the primary hands-on coverage; equivalent Windows/Linux hardware coverage has not been completed.
+
+The extension has no developer backend or telemetry. Searches of tabs, bookmarks, and history run locally. Executing Google Search or opening a website explicitly navigates the browser to that external destination. Website storage values are not persisted by the extension or uploaded to the developer. See the supplied privacy policy for local ranking and group-recovery retention details.
+
+Support and review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ## 文案边界与参考
 
