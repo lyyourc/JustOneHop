@@ -8,15 +8,15 @@
 
 - 已确认开发者：`lyyourc`；隐私咨询与支持邮箱：`liangyida42@gmail.com`。已同步到[中文隐私政策](PRIVACY.md)和[英文隐私政策](PRIVACY.en.md)。这不代表商店开发者账户已注册或邮箱已验证。
 - 政策生效日期：`2026-10-19`，中英文政策已填写并移除草稿提示；生效日期不代表政策链接已公开可访问。
-- 隐私政策 URL 已确定：[英文政策](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md)。仓库目前为私有；正式提交商店审核前，将仓库设为公开并确认无需登录即可访问。
-- 支持页面 URL 已确定：[使用指南](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md)。同样需要仓库公开；隐私咨询与使用反馈可发送到上述邮箱。
+- 隐私政策 URL 已确定：[英文政策](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md)。仓库已公开；2026-10-19 已确认中英文政策无需登录即可访问（HTTP 200）。
+- 支持页面 URL 已确定：[使用指南](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md)。2026-10-19 已确认无需登录即可访问（HTTP 200）；隐私咨询与使用反馈可发送到上述邮箱。
 - 完成后台数据使用勾选、单一用途／权限声明、分类、语言、分发地区和可见性设置；建议分类为 Productivity，按实际目标地区填写分发范围。本文提供事实依据，不代替已完成申报或审核通过的证明。
 - 截图按语言上传；小宣传图与大宣传图不支持本地化，所有语言共用英文 `promo-*`，见[图片上传清单](store/README.md)。
 - 提交前重新构建并核对 ZIP：版本、各语言简介、Manifest 引用文件与所测构建一致，`manifest.json` 必须位于 ZIP 根目录。商店图片与政策文档单独发布，不打入扩展包。
 
 ### 公开链接与后台填写
 
-仓库已创建为 `lyyourc/JustOneHop`，默认分支为 `main`。以下是可复制到商店后台的实际地址；仓库目前为私有，设为公开后地址保持不变，无需另建 GitHub Pages。
+仓库已创建为 `lyyourc/JustOneHop`，默认分支为 `main`。仓库已设为公开，以下地址可直接复制到商店后台，无需另建 GitHub Pages。
 
 ```text
 隐私政策：https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md
@@ -49,7 +49,7 @@
 npm run package:store
 ```
 
-命令先构建，再按 Manifest 版本生成 `releases/justonehop-<version>.zip`。打包脚本在临时目录复制 `dist/`，排除 `*.map`，并移除 JS/CSS 文件末尾由 esbuild 生成的 `sourceMappingURL` 注释；不额外嵌套 `dist/` 目录，也不改动本地调试文件。全新 ZIP 完成完整性检查后替换同版本旧包，避免旧条目残留；失败时保留原包。`releases/` 为本地忽略目录，不提交 Git。结构检查通过不代表商店审核通过或完整浏览器功能验收。最终提交前仍需公开仓库并检查上述链接，以及完成后台字段。
+命令先构建，再按 Manifest 版本生成 `releases/justonehop-<version>.zip`。打包脚本在临时目录复制 `dist/`，排除 `*.map`，并移除 JS/CSS 文件末尾由 esbuild 生成的 `sourceMappingURL` 注释；不额外嵌套 `dist/` 目录，也不改动本地调试文件。全新 ZIP 完成完整性检查后替换同版本旧包，避免旧条目残留；失败时保留原包。`releases/` 为本地忽略目录，不提交 Git。结构检查通过不代表商店审核通过或完整浏览器功能验收。仓库已公开且上述政策与帮助链接已验证匿名访问；最终提交前仍需完成后台字段和上传，并确认链接保持有效。
 
 ---
 

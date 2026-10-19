@@ -1,5 +1,9 @@
 # JustOneHop · 小范围瞬移 0.1.0 验收记录
 
+## 2026-10-19 公开仓库与政策访问验证
+
+经发布者明确确认，将 `lyyourc/JustOneHop` 从 Private 改为 Public；GitHub API 回读确认 PUBLIC。使用不携带 GitHub 登录凭据的 HTTP 请求访问 main 上的中英文政策及使用指南，三者均返回 200，政策响应包含已确认邮箱及生效日期。发布清单同步公开状态。已在本机打开商店开发者后台及上传文件目录，但本会话没有可操作浏览器页面的工具或商店 API 凭据，尚未上传 ZIP、填写商店后台或提交审核，不将仓库公开视作扩展已上架。
+
 ## 2026-10-19 发布打包清理 sourceMappingURL
 
 新增 `npm run package:store`：构建后在临时副本中排除 map 并移除 JS/CSS 末尾由 esbuild 生成的 sourceMappingURL 注释，ZIP 完整性检查通过后替换同版本旧包。本地 dist 保留 map 和引用注释。同步发布说明，后续统一通过该命令生成商店包。
