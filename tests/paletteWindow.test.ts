@@ -396,7 +396,7 @@ test('close validation rejects cross-window source/target and stale group before
   chrome.tabs.query = (async () => { throw new Error('Affected tabs queried before validation'); }) as typeof chrome.tabs.query;
   try {
     await assert.rejects(execute('closeOthers', 4), /another window/);
-    for (const action of ['close', 'closeOthers', 'closeRight'] as const) {
+    for (const action of ['close', 'closeOthers', 'closeRight', 'closeGroup'] as const) {
       for (const paletteState of [undefined, state]) {
         await assert.rejects(performPaletteAction({ action, windowId: 20, tabId: 4, paletteState }, sourceSender(), () => {}), /another window/);
       }

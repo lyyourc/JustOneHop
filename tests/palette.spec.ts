@@ -6744,6 +6744,76 @@ for (const zoom of [1, 1.25, .8]) test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test('English group result actions preserve context and confirm whole-group deletion', async () => {
+    const setup = await worker.evaluate(async origin => {
+      const a = await chrome.tabs.create({ url: `${origin}/Direct-Alpha`, active: false });
+      const b = await chrome.tabs.create({ url: `${origin}/Direct-Beta`, active: false });
+      const id = await chrome.tabs.group({ tabIds: [a.id!, b.id!] });
+      await chrome.tabGroups.update(id, { title: 'DirectGroup', color: 'blue', collapsed: true });
+      return { id, ids: [a.id!, b.id!] };
+    }, origin);
+    const root = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const actionSearch = ui.getByRole('combobox', { name: 'Search actions' });
+    const groupRow = () => ui.getByRole('option').filter({ hasText: 'Tab Group: DirectGroup' });
+    await root.fill('DirectGroup');
+    await root.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+    await groupRow().click({ button: 'right' });
+    await expect(ui.locator('.action-menu [role="option"]')).toHaveCount(4);
+    await expect(ui.locator('.palette-footer .primary-action')).toHaveText(/Expand Group/);
+    for (const title of ['Expand Group', 'Rename Group', 'Ungroup (Keep All Tabs)', 'Close Entire Group']) {
+      await expect(ui.getByRole('option', { name: title })).toBeVisible();
+    }
+    await ui.getByRole('option', { name: 'Expand Group' }).click();
+    await expect(root).toBeFocused();
+    await expect(ui.getByRole('button', { name: 'View Group Tabs', exact: true })).toBeVisible();
+    expect(await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).toMatchObject({ collapsed: false });
+    expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    await ui.getByRole('button', { name: 'Open action menu' }).click();
+    await ui.getByRole('option', { name: 'Rename Group', exact: true }).click();
+    await ui.getByLabel('Group Name', { exact: true }).fill('DirectGroup Renamed');
+    await ui.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(root).toBeFocused(); await expect(root).toHaveValue('DirectGroup');
+    expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    expect(await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).toMatchObject({ title: 'DirectGroup Renamed', color: 'blue' });
+    await root.press('Meta+k'); await actionSearch.fill('close'); await actionSearch.press('Enter');
+    const confirmation = ui.getByRole('alertdialog');
+    await expect(confirmation).toContainText('DirectGroup Renamed'); await expect(confirmation).toContainText('2 tabs');
+    await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+    await ui.keyboard.press('Escape'); await expect(actionSearch).toBeFocused();
+    await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
+    expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    // A new member after confirmation was shown must never be swept into deletion.
+    await root.press('Meta+k'); await actionSearch.fill('close'); await actionSearch.press('Enter');
+    const extra = await worker.evaluate(async ({ origin, id }) => {
+      const tab = await chrome.tabs.create({ url: `${origin}/Direct-Gamma`, active: false });
+      await chrome.tabs.group({ groupId: id, tabIds: [tab.id!] }); return tab.id!;
+    }, { origin, id: setup.id });
+    await confirmation.getByRole('button', { name: 'Close Entire Group', exact: true }).click();
+    await expect(ui.getByRole('alert')).toContainText('Group membership changed');
+    expect(await worker.evaluate(async ids => Promise.all(ids.map(id => chrome.tabs.get(id))), [...setup.ids, extra])).toHaveLength(3);
+    await ui.keyboard.press('Escape');
+    await root.press('Enter');
+    const members = ui.getByRole('combobox', { name: 'Search tabs in this group…' });
+    await expect(members).toBeFocused();
+    await ui.getByRole('button', { name: 'Open action menu' }).click();
+    await ui.getByRole('option', { name: 'Ungroup (Keep All Tabs)', exact: true }).click();
+    await expect(root).toBeFocused(); await expect(root).toHaveValue('DirectGroup');
+    expect(await worker.evaluate(async ids => Promise.all(ids.map(async id => (await chrome.tabs.get(id)).groupId)), [...setup.ids, extra])).toEqual([-1, -1, -1]);
+    await worker.evaluate(async ids => {
+      const id = await chrome.tabs.group({ tabIds: ids as [number, ...number[]] });
+      await chrome.tabGroups.update(id, { title: 'DirectGroup' });
+    }, setup.ids);
+    await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await groupRow().click(); await expect(members).toBeFocused();
+    await members.fill('Alpha');
+    await members.press('Meta+k'); await actionSearch.fill('close entire'); await actionSearch.press('Enter');
+    await expect(confirmation).toContainText('2 tabs');
+    await ui.keyboard.press('Tab'); await ui.keyboard.press('Enter');
+    await expect(root).toBeFocused(); await expect(root).toHaveValue('DirectGroup');
+    expect(await worker.evaluate(async ids => Promise.all(ids.map(id => chrome.tabs.get(id).then(() => true, () => false))), setup.ids)).toEqual([false, false]);
+    expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).groupId, extra)).toBe(-1);
+  });
+
   test('English Tab Group search management and nested keyboard navigation', async () => {
   const setup = await worker.evaluate(async origin => {
     const a = await chrome.tabs.create({ url: `${origin}/Group-Alpha`, active: false });
@@ -6810,10 +6880,7 @@ test.describe(() => {
   await worker.evaluate(ids => chrome.tabs.remove(ids), extraTabs);
   await ui.evaluate(() => window.dispatchEvent(new Event('focus')));
   await search.fill(''); await expect(ui.locator('.group-view .result')).toHaveCount(2);
-  await action('Change Group Color');
-  await ui.getByLabel('Change Group Color', { exact: true }).selectOption('purple');
-  await ui.getByRole('button', { name: 'Save', exact: true }).click();
-  expect(await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).toMatchObject({ title: 'Reading', color: 'purple' });
+  expect(await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).toMatchObject({ title: 'Reading', color: 'blue' });
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('justonehop-tab-group-en.png') });
   await action('Expand Group');
   expect((await worker.evaluate(id => chrome.tabGroups.get(id), setup.id)).collapsed).toBe(false);

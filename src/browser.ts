@@ -120,6 +120,31 @@ async function performAction(payload: Execution): Promise<string> {
         (changes.color !== undefined && !['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'].includes(changes.color))) throw new Error(t('errorGroup'));
     await updateManagedGroup(windowId, payload.groupId!, changes); return '';
   }
+  if (action === 'ungroupGroup' || action === 'closeGroup') {
+    if (!Number.isInteger(payload.groupId) || payload.groupId! < 0) throw new Error(t('errorGroup'));
+    const group = await chrome.tabGroups.get(payload.groupId!);
+    if (group.windowId !== windowId) throw new Error(t('errorGroup'));
+    const members = (await chrome.tabs.query({ windowId })).filter(tab => tab.groupId === group.id);
+    if (!members.length) throw new Error(t('errorGroup'));
+    if (action === 'ungroupGroup') {
+      await chrome.tabs.ungroup(members.map(tab => tab.id!) as [number, ...number[]]); return '';
+    }
+    const expected = payload.groupTabIds;
+    if (!Array.isArray(expected) || !expected.length || expected.some(id => !Number.isInteger(id)) || new Set(expected).size !== expected.length) {
+      throw new Error(t('errorInvalidRequest'));
+    }
+    if (expected.length !== members.length || members.some(tab => !expected.includes(tab.id!))) throw new Error(t('errorGroupMembersChanged'));
+    let closed = 0;
+    try {
+      for (const member of members) {
+        const tab = await chrome.tabs.get(member.id!);
+        if (tab.windowId !== windowId || tab.groupId !== group.id) throw new Error(t('errorGroupMembersChanged'));
+        if (tab.pinned) continue;
+        await chrome.tabs.remove(tab.id!); closed++;
+      }
+    } catch (reason) { throw closed ? new Error(t('errorGroupPartial')) : reason; }
+    return '';
+  }
   if (action === 'ungroupTab') {
     if (!Number.isInteger(tabId) || !Number.isInteger(payload.groupId) || payload.groupId! < 0) throw new Error(t('errorGroup'));
     const tab = await chrome.tabs.get(tabId!);

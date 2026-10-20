@@ -671,12 +671,15 @@
   "groupCollapse": {
     "message": "折叠标签组"
   },
+  "groupViewTabs": { "message": "查看组内标签页" },
   "groupRename": {
     "message": "重命名标签组"
   },
-  "groupColor": {
-    "message": "修改标签组颜色"
-  },
+  "groupUngroup": { "message": "解散分组（保留所有标签页）" },
+  "groupClose": { "message": "关闭整个组" },
+  "groupClosePrompt": { "message": "关闭「$1」及其中的 $2 个标签页？固定标签页会保留；成员发生变化时需重新核对确认。" },
+  "errorGroupMembersChanged": { "message": "组内成员已变化，请重新核对并确认。" },
+  "errorGroupPartial": { "message": "操作中断前已关闭部分组内标签页，请核对剩余标签页后重试。" },
   "groupRemoveTab": {
     "message": "将标签页移出组"
   },
@@ -691,33 +694,6 @@
   },
   "errorGroup": {
     "message": "标签组已更新或不再可用，请返回刷新。"
-  },
-  "colorGrey": {
-    "message": "灰色"
-  },
-  "colorBlue": {
-    "message": "蓝色"
-  },
-  "colorRed": {
-    "message": "红色"
-  },
-  "colorYellow": {
-    "message": "黄色"
-  },
-  "colorGreen": {
-    "message": "绿色"
-  },
-  "colorPink": {
-    "message": "粉色"
-  },
-  "colorPurple": {
-    "message": "紫色"
-  },
-  "colorCyan": {
-    "message": "青色"
-  },
-  "colorOrange": {
-    "message": "橙色"
   },
   "groupTabCount": {
     "message": "$1 个标签页"

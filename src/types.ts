@@ -1,5 +1,5 @@
 export type ChromePageAction = 'openExtensions' | 'openPasswords' | 'openDownloads' | 'openHistory' | 'openBookmarks' | 'openChromeSettings' | 'openExtensionShortcuts';
-export type ActionId = ChromePageAction | 'switch' | 'bookmarkTab' | 'unbookmarkTab' | 'removeBookmark' | 'openBookmark' | 'openHistoryPage' | 'newTab' | 'navigateAddress' | 'openAddressNewTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab';
+export type ActionId = ChromePageAction | 'switch' | 'bookmarkTab' | 'unbookmarkTab' | 'removeBookmark' | 'openBookmark' | 'openHistoryPage' | 'newTab' | 'navigateAddress' | 'openAddressNewTab' | 'reload' | 'reloadExtension' | 'close' | 'closeOthers' | 'closeRight' | 'restore' | 'pin' | 'mute' | 'tuck' | 'undoTuck' | 'resumeTuck' | 'forgetTuckRecovery' | 'updateGroup' | 'ungroupTab' | 'ungroupGroup' | 'closeGroup';
 
 export interface TabItem {
   id: number;
@@ -57,6 +57,7 @@ export interface Execution {
   groupId?: number;
   fingerprint?: string;
   groupChanges?: { title?: string; color?: chrome.tabGroups.TabGroup['color']; collapsed?: boolean };
+  groupTabIds?: number[];
 }
 export type StorageKind = 'local' | 'session' | 'cookies';
 export type StorageAction = 'localStorage' | 'sessionStorage' | 'cookies';
@@ -95,12 +96,14 @@ export interface Entry {
   subtitle: string;
   keywords: string;
   icon: IconName;
-  action: ActionId | 'copyUrl' | 'settings' | 'help' | 'tabSwitcher' | 'searchAllHistory' | StorageAction | 'reviewTuck' | 'manageGroup';
+  action: ActionId | 'copyUrl' | 'settings' | 'help' | 'tabSwitcher' | 'searchAllHistory' | StorageAction | 'reviewTuck' | 'manageGroup' | 'renameGroup';
   settingsSection?: SettingsSection;
   recoveryId?: string;
   groupId?: number;
   groupTitle?: string;
   groupCount?: number;
+  groupChanges?: Execution['groupChanges'];
+  groupTabIds?: number[];
   groupColor?: chrome.tabGroups.TabGroup['color'];
   aliases?: string[];
   searchOnly?: boolean;

@@ -671,12 +671,15 @@
   "groupCollapse": {
     "message": "Collapse Group"
   },
+  "groupViewTabs": { "message": "View Group Tabs" },
   "groupRename": {
     "message": "Rename Group"
   },
-  "groupColor": {
-    "message": "Change Group Color"
-  },
+  "groupUngroup": { "message": "Ungroup (Keep All Tabs)" },
+  "groupClose": { "message": "Close Entire Group" },
+  "groupClosePrompt": { "message": "Close “$1” and its $2 tabs? Pinned tabs will be kept. If membership has changed, review the group again." },
+  "errorGroupMembersChanged": { "message": "Group membership changed. Review the group and confirm again." },
+  "errorGroupPartial": { "message": "Some group tabs were closed before the operation stopped. Review the remaining tabs before trying again." },
   "groupRemoveTab": {
     "message": "Remove Tab from Group"
   },
@@ -691,33 +694,6 @@
   },
   "errorGroup": {
     "message": "The tab group changed or is no longer available."
-  },
-  "colorGrey": {
-    "message": "Grey"
-  },
-  "colorBlue": {
-    "message": "Blue"
-  },
-  "colorRed": {
-    "message": "Red"
-  },
-  "colorYellow": {
-    "message": "Yellow"
-  },
-  "colorGreen": {
-    "message": "Green"
-  },
-  "colorPink": {
-    "message": "Pink"
-  },
-  "colorPurple": {
-    "message": "Purple"
-  },
-  "colorCyan": {
-    "message": "Cyan"
-  },
-  "colorOrange": {
-    "message": "Orange"
   },
   "groupTabCount": {
     "message": "$1 tabs"

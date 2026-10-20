@@ -1,5 +1,6 @@
 import { brandAliases, categoryTerms, entrySearchQuery, entryTitle } from './entryPresentation';
 import { t } from './i18n';
+import { groupActions } from './groupActions';
 import { chromePages } from './chromePages';
 import Fuse, { type Expression } from 'fuse.js';
 import { termMatches } from './searchMatch';
@@ -309,7 +310,8 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
   return matches.filter(({ item }) => (item.action !== 'reloadExtension' || explicitExtensionReload) &&
     (item.action !== 'bookmarkTab' || !explicitUnbookmark) &&
     (!item.danger || (['unbookmarkTab', 'removeBookmark'].includes(item.action) ? explicitUnbookmark || explicitBookmarkState :
-      ['close', 'closeOthers', 'closeRight'].includes(item.action) && explicitClose)) && terms.every(term =>
+      item.action === 'ungroupGroup' ? /ungroup|dissolve|delete|解散|删除|取消分组/.test(normalized) :
+      ['close', 'closeOthers', 'closeRight', 'closeGroup'].includes(item.action) && explicitClose)) && terms.every(term =>
     // Metadata is searchable, but must not manufacture typo matches. Only
     // visible names and natural-language command aliases receive typo tolerance.
     item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||
@@ -342,6 +344,10 @@ export function copyUrlAction(entry: Entry): Entry | undefined {
 }
 
 export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
+  if (entry.action === 'manageGroup') {
+    const group = snapshot.groups?.find(group => group.id === entry.groupId);
+    return group ? groupActions(group) : [];
+  }
   if (entry.kind === 'command') return [entry];
   const copy = copyUrlAction(entry);
   const copyActions = copy ? [copy] : [];

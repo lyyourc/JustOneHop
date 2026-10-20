@@ -39,6 +39,47 @@ beforeEach(() => {
     sessions: { getRecentlyClosed: async () => [{ tab: { sessionId: 'session' } }], restore: record('restore') },
   } as unknown as typeof chrome;
 });
+test('ungroupGroup removes the group and keeps every tab without learning', async () => {
+  tabs[1].groupId = tabs[2].groupId = 7;
+  chrome.tabs.ungroup = record('ungroup');
+  await perform({ action: 'ungroupGroup', windowId: 10, groupId: 7, query: 'Research' });
+  assert.deepEqual(calls, [['ungroup', [2, 3]]]);
+  assert.deepEqual(usage, []);
+});
+
+test('closeGroup closes only confirmed members and protects pinned tabs without learning', async () => {
+  for (const tab of tabs.slice(0, 3)) tab.groupId = 7;
+  await perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds: [3, 1, 2], query: 'Research' });
+  assert.deepEqual(calls, [['remove', 2], ['remove', 3]]);
+  assert.deepEqual(usage, []);
+});
+
+test('closeGroup rejects changed membership, invalid confirmation and foreign groups before deleting', async () => {
+  tabs[1].groupId = tabs[2].groupId = 7;
+  for (const groupTabIds of [undefined, [], [2], [2, 3, 99], [2, 2], [2, NaN]]) {
+    await assert.rejects(perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds }));
+  }
+  for (const action of ['closeGroup', 'ungroupGroup'] as const) {
+    await assert.rejects(perform({ action, windowId: 20, groupId: 7, groupTabIds: [2, 3] }), { message: t('errorGroup') });
+  }
+  assert.deepEqual(calls, []);
+});
+
+test('closeGroup rechecks each member and reports partial completion if a later tab moves', async () => {
+  tabs[1].groupId = tabs[2].groupId = 7;
+  chrome.tabs.remove = async ids => { calls.push(['remove', ids]); tabs[2].groupId = 8; };
+  await assert.rejects(perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds: [2, 3] }), { message: t('errorGroupPartial') });
+  assert.deepEqual(calls, [['remove', 2]]);
+});
+
+test('closeGroup protects a member pinned after the initial membership check', async () => {
+  tabs[1].groupId = tabs[2].groupId = 7;
+  const get = chrome.tabs.get;
+  chrome.tabs.get = async id => ({ ...await get(id), pinned: id === 3 });
+  await perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds: [2, 3] });
+  assert.deepEqual(calls, [['remove', 2]]);
+});
+
 const historySender = (): chrome.runtime.MessageSender => ({ id: 'justonehop', url: 'chrome-extension://justonehop/popup.html' });
 
 function bookmarkStore(initial: Partial<chrome.bookmarks.BookmarkTreeNode>[] = []) {
