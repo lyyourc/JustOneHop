@@ -18,6 +18,13 @@ export interface TabItem {
 export interface BookmarkItem { id: string; title: string; url: string; folder: string; unmodifiable?: 'managed' }
 export interface HistoryPage { id: string; url: string; title: string; lastVisitTime: number }
 export interface HistorySearchResult { items: HistoryPage[]; limited: boolean }
+export interface TuckStatus {
+  enabled: boolean;
+  eligibleCount: number;
+  blockedCount: number;
+  checkedAt: number;
+  lastScanAt?: number;
+}
 export interface TuckRecoveryItem {
   id: string; title: string; urls: string[];
   candidates: { id: number; windowId: number; title: string; fingerprint: string;
@@ -73,6 +80,7 @@ export interface StorageEntry {
 export interface PageStorage { kind: StorageKind; url: string; entries: StorageEntry[] }
 export type Request =
   | { source: 'justonehop'; type: 'snapshot' }
+  | { source: 'justonehop'; type: 'tuck-status'; afterHours?: number }
   | { source: 'justonehop'; type: 'search-history'; payload: { query: string; scope: 'week' | 'all' } }
   | { source: 'justonehop'; type: 'palette-state' }
   | { source: 'justonehop'; type: 'cancel-palette-continuation' }

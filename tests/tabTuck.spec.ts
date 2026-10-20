@@ -227,6 +227,155 @@ test('English automatic tuck makes one reversible batch and undo respects closed
   expect(await groupId(retained)).toBe(-1);
 });
 
+test('English configurable auto tuck previews without moving tabs and a native alarm applies the saved duration', async () => {
+  const [old] = await seed('Configurable-Idle');
+  await enableAutomaticTucking();
+  expect(await worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toMatchObject({ periodInMinutes: 5 });
+  await worker.evaluate(() => {
+    (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 2 * 60 * 60 * 1000;
+    chrome.idle.queryState = async () => 'active' as const;
+  });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+  await search.fill('auto tuck'); await search.press('Enter');
+  const duration = ui.getByRole('combobox', { name: 'Tuck after inactivity' });
+  await duration.click();
+  await ui.getByRole('option', { name: '1 h', exact: true }).click();
+  await expect(ui.getByText('1 tabs currently qualify with this duration.', { exact: false })).toBeVisible();
+  expect(await groupId(old)).toBe(-1);
+  const before = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
+  await ui.getByRole('button', { name: 'Save duration', exact: true }).click();
+  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
+  await expect(ui.getByText('1 tabs will be tucked at the next idle check', { exact: true })).toBeVisible();
+  expect(await groupId(old)).toBe(-1);
+  const after = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
+  expect(after.clocks[`${origin}/Configurable-Idle`]).toBe(before.clocks[`${origin}/Configurable-Idle`]);
+  // Chrome delivers this alarm itself; only age and idle state are simulated.
+  await worker.evaluate(async () => {
+    chrome.idle.queryState = async () => 'idle' as const;
+    const offset = (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset;
+    await chrome.alarms.create('justonehop-auto-tuck', { when: Date.now() - offset + 100, periodInMinutes: 5 });
+  });
+  await expect.poll(() => groupId(old)).not.toBe(-1);
+  await ui.getByRole('button', { name: 'Refresh status' }).click();
+  await expect(ui.getByText('No tabs currently qualify', { exact: true })).toBeVisible();
+  await expect(ui.getByText('Last automatic check:', { exact: false })).toBeVisible();
+  expect((await liveTabs()).some(tab => tab.id === old)).toBe(true);
+  await ui.getByRole('textbox', { name: 'Search settings' }).fill('auto tuck');
+  const rules = ui.getByRole('button', { name: 'How it works' });
+  await expect(ui.locator('.tuck-description')).toContainText('How it works');
+  await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
+  await rules.click();
+  await expect(ui.locator('.tuck-rules-copy')).toContainText('including manually tucked tabs');
+  const ruleParagraphs = ui.locator('.tuck-rules-copy p');
+  await expect(ruleParagraphs).toHaveText([
+    'Checks every 5 minutes and when your computer becomes idle.',
+    'Enabling starts a new inactivity period; changing the duration keeps existing timers.',
+    'Turning off returns all managed tabs, including manually tucked tabs.',
+  ]);
+  const scheduleBox = await ruleParagraphs.nth(0).boundingBox();
+  const timingBox = await ruleParagraphs.nth(1).boundingBox();
+  expect(timingBox!.y).toBeGreaterThanOrEqual(scheduleBox!.y + scheduleBox!.height);
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('auto-tuck-rules-en.png') });
+  await rules.click();
+  await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
+  const labelBox = await ui.locator('.tuck-duration-label label').boundingBox();
+  const refreshBox = await ui.getByRole('button', { name: 'Refresh status' }).boundingBox();
+  expect(Math.abs(labelBox!.y + labelBox!.height / 2 - refreshBox!.y - refreshBox!.height / 2)).toBeLessThan(2);
+  expect(refreshBox!.x - labelBox!.x - labelBox!.width).toBeLessThanOrEqual(6);
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('auto-tuck-en.png') });
+  await ui.getByRole('textbox', { name: 'Search settings' }).fill('');
+  const copyGap = (selector: string) => ui.locator(selector).evaluate(node => {
+    const title = node.querySelector('label')!.getBoundingClientRect();
+    const description = node.querySelector('.tuck-status-copy, p')!.getBoundingClientRect();
+    return { gap: description.top - title.bottom, height: description.height };
+  });
+  const tuckCopy = await copyGap('.tuck-heading .setting-copy');
+  const helpCopy = await copyGap('[data-setting="help"] .setting-copy');
+  expect(Math.abs(tuckCopy.gap - helpCopy.gap)).toBeLessThan(1);
+  expect(Math.abs(tuckCopy.height - helpCopy.height)).toBeLessThan(1);
+  const durationCopy = await copyGap('.tuck-settings .setting-copy');
+  expect(Math.abs(durationCopy.gap - helpCopy.gap)).toBeLessThan(1);
+  const languageBox = await ui.getByRole('combobox', { name: 'Language', exact: true }).boundingBox();
+  const durationBox = await duration.boundingBox();
+  expect(Math.abs(languageBox!.x - durationBox!.x)).toBeLessThan(1);
+  expect(durationBox!.height).toBe(languageBox!.height);
+  await ui.locator('.settings-body').evaluate(node => { node.scrollTop = 0; });
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-overview-en.png') });
+});
+
+test('Chinese preset auto tuck duration supports keyboard saving and narrow settings', async () => {
+  await worker.evaluate(() => chrome.storage.local.set({ preferences: { language: 'zh', theme: 'light', autoTuck: false, autoTuckAfterHours: 168 } }));
+  await ui.reload();
+  await ui.getByRole('combobox').fill('自动收起');
+  await expect(ui.getByRole('option').first()).toContainText('自动收起');
+  await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+  await ui.getByRole('combobox').press('Enter');
+  await ui.setViewportSize({ width: 390, height: 516 });
+  // The standalone extension test page defaults to 750px; use the same
+  // narrow overlay layout fixture as the existing settings visual tests.
+  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  const filter = ui.getByRole('textbox', { name: '搜索设置' });
+  await filter.fill('自动收起');
+  await filter.press('Tab'); // Clear filter
+  await ui.keyboard.press('Tab'); // Search Escape
+  await ui.keyboard.press('Tab'); // Rules in description
+  const rules = ui.getByRole('button', { name: '了解规则' });
+  await expect(rules).toBeFocused();
+  await rules.press('Space');
+  await expect(ui.locator('.tuck-rules-copy')).toContainText('含手动收起页');
+  await rules.press('Space');
+  await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
+  await ui.keyboard.press('Tab'); // Auto tuck switch
+  const toggle = ui.getByRole('switch', { name: '自动收起标签页' });
+  await expect(toggle).toBeFocused();
+  await expect(ui.locator('.tuck-settings')).toHaveCount(0);
+  await toggle.press('Space');
+  await expect(toggle).toBeChecked();
+  const duration = ui.getByRole('combobox', { name: '闲置时长' });
+  await expect(duration).toBeEnabled();
+  await expect(toggle).toBeFocused();
+  await toggle.press('Tab');
+  await expect(ui.getByRole('button', { name: '刷新状态' })).toBeFocused();
+  await ui.keyboard.press('Tab');
+  await expect(duration).toBeFocused();
+  await duration.press('Enter');
+  await expect(ui.getByRole('listbox').getByRole('option')).toHaveText(['1 小时', '3 小时', '12 小时', '1 天', '3 天', '7 天']);
+  await duration.press('Home'); await duration.press('Enter');
+  await expect(ui.getByRole('spinbutton')).toHaveCount(0);
+  await expect(ui.getByRole('button', { name: '保存时长', exact: true })).toBeEnabled();
+  await duration.press('Tab'); // Back
+  await ui.keyboard.press('Tab'); // Save duration
+  const save = ui.getByRole('button', { name: '保存时长', exact: true });
+  await expect(save).toBeFocused(); await expect(save).toBeEnabled(); await save.press('Enter');
+  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
+  await expect(duration).toHaveText('1 小时');
+  await expect(duration).toBeEnabled();
+  await expect(ui.locator('.tuck-status-copy')).toContainText('目前没有符合条件');
+  expect(await ui.locator('.settings-view').evaluate(node => {
+    const box = node.getBoundingClientRect();
+    return box.left >= 0 && box.right <= innerWidth && node.scrollWidth <= node.clientWidth;
+  })).toBe(true);
+  await ui.screenshot({ path: test.info().outputPath('auto-tuck-presets-zh-narrow.png') });
+  await ui.reload();
+  await ui.getByRole('combobox').fill('自动收起');
+  await expect(ui.getByRole('option').first()).toContainText('自动收起');
+  await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+  await ui.getByRole('combobox').press('Enter');
+  await expect(ui.getByRole('combobox', { name: '闲置时长' })).toHaveText('1 小时');
+  // Older saved durations remain honest until replaced by a preset.
+  await worker.evaluate(() => chrome.storage.local.set({ preferences: { language: 'zh', theme: 'light', autoTuck: true, autoTuckAfterHours: 48 } }));
+  await expect(duration).toHaveText('2 天');
+  await duration.click();
+  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(7);
+  await ui.getByRole('option', { name: '3 天', exact: true }).click();
+  await ui.getByRole('button', { name: '保存时长', exact: true }).click();
+  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(72);
+  await expect(duration).toBeEnabled();
+  await duration.click();
+  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(6);
+  await expect(ui.getByRole('option', { name: '2 天', exact: true })).toHaveCount(0);
+});
+
 test('English disabling automatic tuck releases its own tabs and keeps a same-name user group', async () => {
   const [alpha, beta, personal] = await seed('Settings-Alpha', 'Settings-Beta', 'Settings-Personal');
   await enableAutomaticTucking();

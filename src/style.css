@@ -69,9 +69,10 @@
 .search-focus { justify-content: center; flex-shrink: 0; height: 28px; border-radius: 6px; }
 .search-focus:hover { background: var(--hover); }
 .search-focus:disabled { opacity: .5; cursor: default; }
-.search-focus-hint { position: absolute; right: 58px; bottom: 5px; max-width: calc(100% - 104px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 12px; color: var(--muted); background: var(--bar); pointer-events: none; }
+.search-focus-hint { position: absolute; right: 58px; top: 50%; transform: translateY(-50%); max-width: calc(100% - 104px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 12px; color: var(--muted); background: var(--bar); pointer-events: none; }
 .action-search { position: relative; }
-.action-search .search-focus-hint { bottom: 1px; }
+.search-bar .search-focus-hint, .storage-search .search-focus-hint { top: calc(50% + 1px); }
+.search-bar:has(.settings-clear) .search-focus-hint { right: 95px; max-width: calc(100% - 141px); }
 .search-bar input, .storage-search input { flex: 1; font-size: 14.5px; font-weight: 400; height: 100%; caret-color: var(--accent); }
 .icon-button { display: flex; align-items: center; justify-content: center; border-radius: 6px; }
 .search-dismiss { flex-shrink: 0; min-width: 30px; min-height: 28px; }
@@ -228,6 +229,23 @@ body.justonehop-popup { margin: 0; width: 750px; height: 516px; overflow: hidden
 .settings-group > div { padding: 10px 0; }
 .settings-group > div + div { border-top: 1px solid var(--line); }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.tuck-duration-label { display: flex; align-items: center; gap: 4px; }
+.tuck-settings { min-width: 0; border: 0; margin: 0; padding: 8px 0 0; }
+.tuck-status-copy { min-width: 0; }
+.setting-copy .tuck-status-copy p { margin: 0; }
+.tuck-status-summary { display: flex; flex-wrap: wrap; gap: 2px 8px; }
+.tuck-last-check { color: var(--muted); }
+.tuck-last-check::before { content: '·'; margin-right: 8px; }
+.tuck-refresh { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; margin: -5px 0; border-radius: 50%; color: var(--muted) !important; }
+.tuck-refresh:hover { background: var(--hover) !important; color: var(--text) !important; }
+.tuck-refresh:active { background: var(--key-border) !important; }
+.tuck-rules { display: inline; padding: 0 !important; color: var(--accent) !important; border-radius: 4px; font-size: inherit !important; line-height: inherit; white-space: nowrap; }
+.tuck-rules svg { display: inline; vertical-align: -2px; margin-left: 3px; }
+.tuck-rules:hover { background: var(--key) !important; }
+.tuck-rules:active { background: var(--key-border) !important; }
+.tuck-rules[aria-expanded="true"] svg { transform: rotate(180deg); }
+.tuck-rules-copy { margin-top: 8px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.tuck-rules-copy p { margin: 2px 0 0; }
 .setting-toggle { position: relative; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; }
 .setting-toggle::before { content: ''; position: absolute; inset: 8px 3px; border: 1px solid var(--muted); border-radius: 50px; background: var(--bar); transition: background-color .15s, border-color .15s, box-shadow .15s; }
 .setting-toggle span { position: absolute; left: 7px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: left .15s, top .15s, width .15s, height .15s, background-color .15s; }
@@ -238,7 +256,7 @@ body.justonehop-popup { margin: 0; width: 750px; height: 516px; overflow: hidden
 .setting-copy { min-width: 120px; flex: 1; }
 .setting-copy label { display: block; font-size: 13px; font-weight: 500; line-height: 1.35; cursor: default; }
 .setting-copy label[for] { cursor: pointer; }
-.setting-copy p, .setting-note { color: var(--muted); font-size: 11.5px; margin: 2px 0 0; line-height: 1.45; }
+.setting-copy p, .tuck-status-copy, .setting-note { color: var(--muted); font-size: 11.5px; margin: 2px 0 0; line-height: 1.45; }
 .setting-note { font-size: 11px; color: var(--faint); margin-top: 3px; }
 .setting-note[role="status"] { color: var(--accent); font-weight: 500; }
 .ranking-reset, .hotkey-change { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 30px; padding: 0 11px !important; border: 1px solid var(--border) !important; border-radius: 8px; background: light-dark(#f8f9fa, #202124) !important; color: var(--text); font-size: 12px !important; font-weight: 500; white-space: nowrap; transition: background-color 70ms ease; }
@@ -270,6 +288,8 @@ body.justonehop-popup { margin: 0; width: 750px; height: 516px; overflow: hidden
 .settings-page .choice-option { min-height: 32px; padding: 6px; font-size: 13px; line-height: 20px; font-weight: 400; }
 .settings-page .choice-option[aria-selected="true"] { font-weight: 500; }
 @media (max-width: 520px) {
+  .tuck-status-summary { flex-direction: column; }
+  .tuck-last-check::before { content: none; }
   .settings-body, .settings-page > .settings-body { padding: 8px 16px 14px; }
   .settings-group { padding: 2px 12px; }
   .setting-row { flex-wrap: wrap; gap: 8px 12px; }

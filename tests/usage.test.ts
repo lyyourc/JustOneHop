@@ -104,10 +104,10 @@ test('home learns mixed page and command order while retaining safe defaults and
 });
 
 test('history is bounded and repeated targets do not create duplicate records', () => {
-  let history = Array.from({ length: 500 }, (_, i) => ({ query: 'x', target: `tab:${i}`, weight: 1, lastUsed: now - i }));
+  let history = Array.from({ length: 2000 }, (_, i) => ({ query: 'x', target: `tab:${i}`, weight: 1, lastUsed: now - i }));
   history = addUsage(history, 'x', 'tab:new', now);
-  assert.equal(history.length, 500);
-  assert.equal(history.some(record => record.target === 'tab:499'), false);
+  assert.equal(history.length, 2000);
+  assert.equal(history.some(record => record.target === 'tab:1999'), false);
   history = addUsage(history, 'x', 'tab:new', now);
   assert.equal(history.filter(record => record.target === 'tab:new').length, 1);
   assert.equal(history[0].weight, 2);

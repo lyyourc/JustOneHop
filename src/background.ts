@@ -1,6 +1,6 @@
 import { paletteSender, getPaletteWindowState, performPaletteAction, cancelPaletteContinuation } from './paletteWindow';
 import { launchPalette } from './paletteLaunch';
-import { startTabTucking } from './tabTuck';
+import { startTabTucking, getTuckStatus } from './tabTuck';
 import { openRecentSwitcher } from './recentTabs';
 import { readPageStorage, openCookieAccess } from './pageStorage';
 import { preferencesReady } from './preferences';
@@ -10,7 +10,7 @@ import { historyWindow, searchHistory, snapshot } from './browser';
 import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
 import { startToolbarIcon } from './toolbarIcon';
 import { forgetUsage, resetUsage } from './usageStorage';
-import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult } from './types';
+import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult, TuckStatus } from './types';
 
 chrome.action.onClicked.addListener(tab => launchPalette(tab).catch(error => console.warn('justonehop: unable to open palette.', error)));
 chrome.commands.onCommand.addListener(async command => {
@@ -24,16 +24,17 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 });
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'justonehop') return;
-  if (!['snapshot', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
+  if (!['snapshot', 'tuck-status', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
   let responded = false;
-  const success = (data?: void | Snapshot | PageStorage | PaletteState | HistorySearchResult) => {
+  const success = (data?: void | Snapshot | PageStorage | PaletteState | HistorySearchResult | TuckStatus) => {
     if (responded) return;
     responded = true;
     // Switching/closing a tab can remove the caller before the reply. That
     // must not interrupt the successful action's queued usage write.
     try { respond({ ok: true, data }); } catch { /* Caller already gone. */ }
   };
-  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | PaletteState | HistorySearchResult> => {
+  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | PaletteState | HistorySearchResult | TuckStatus> => {
+    if (request.type === 'tuck-status') return getTuckStatus(request.afterHours);
     if (request.type === 'palette-state') return getPaletteWindowState(sender);
     sender = await paletteSender(sender);
     if (request.type === 'open-cookie-access') return openCookieAccess(request.payload, sender);

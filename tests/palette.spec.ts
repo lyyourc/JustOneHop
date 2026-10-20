@@ -1842,9 +1842,10 @@ test.describe(() => {
   expect(themeBox!.x).toBe(languageBox!.x);
   expect(themeBox!.width).toBe(languageBox!.width);
   const experiments = ui.locator('.settings-experiments');
-  await expect(ui.locator('[data-setting="tabs"] p')).toContainText('including manually tucked tabs');
+  await expect(ui.locator('[data-setting="tabs"] > .setting-row p')).toContainText('Pages stay open.');
+  await expect(ui.locator('.tuck-settings')).toHaveCount(0);
   await expect(experiments.getByRole('switch')).toHaveCount(1);
-  await expect(experiments.getByRole('button')).toHaveText(['Reset Ranking']);
+  await expect(experiments.getByRole('button')).toHaveText(['How it works', 'Reset Ranking']);
   const changeButton = ui.getByRole('button', { name: 'Change in Chrome' });
   await expect(changeButton).toHaveCSS('height', '32px');
   await expect(changeButton).toHaveCSS('border-radius', '100px');
@@ -1860,12 +1861,15 @@ test.describe(() => {
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-light.png') });
   // Tab follows visible controls and wraps through the footer back to search.
   const controls = [header.locator('.search-dismiss'), language, theme, ui.getByRole('button', { name: 'Read Help' }), ui.getByRole('button', { name: 'Change in Chrome' }),
-    ui.getByRole('button', { name: 'Set Up', exact: true }), experiments.getByRole('switch'),
+    ui.getByRole('button', { name: 'Set Up', exact: true }), experiments.getByRole('button', { name: 'How it works' }), experiments.getByRole('switch'),
     experiments.getByRole('button', { name: 'Reset Ranking' }),
-    ui.locator('.footer-back'), settingsSearch];
+    ui.locator('.footer-back'), header.locator('.search-focus'), settingsSearch];
   for (const control of controls) { await ui.keyboard.press('Tab'); await expect(control).toBeFocused(); }
   await ui.keyboard.press('Shift+Tab');
+  await expect(header.locator('.search-focus')).toBeFocused();
+  await ui.keyboard.press('Shift+Tab');
   await expect(ui.locator('.footer-back')).toBeFocused();
+  await ui.keyboard.press('Tab');
   await ui.keyboard.press('Tab');
   await settingsSearch.fill('lang');
   await expect(ui.locator('.settings-body h2')).toHaveText(['General']);
@@ -1993,8 +1997,10 @@ test.describe(() => {
   await expect.poll(async () => (await ax()).find(n => n.role?.value === 'textbox')?.value?.value).toBe('them');
   await page.keyboard.press('Meta+a');
   await page.keyboard.press('Backspace');
-  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Shift+Tab'); // Search focus logo
+  await page.keyboard.press('Shift+Tab'); // Footer back
   await expect.poll(async () => (await ax()).some(n => n.role?.value === 'button' && n.name?.value === '返回' && n.properties?.some(p => p.name === 'focused' && p.value.value === true))).toBe(true);
+  await page.keyboard.press('Tab'); // Search focus logo
   await page.keyboard.press('Tab'); // Search
   await page.keyboard.press('Tab'); // Search Escape button
   await page.keyboard.press('Tab'); // Language
@@ -2006,7 +2012,7 @@ test.describe(() => {
   await page.keyboard.press('Enter');
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
-  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences)).toEqual({ language: 'en', theme: 'dark', autoTuck: false });
+  await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences)).toEqual({ language: 'en', theme: 'dark', autoTuck: false, autoTuckAfterHours: 168 });
   await page.screenshot({ path: test.info().outputPath('settings-overlay.png') });
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await ax()).find(n => n.role?.value === 'combobox')?.value?.value).toBe('reload');
@@ -3128,7 +3134,9 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     await surface.locator('.palette-footer').screenshot({ path: test.info().outputPath(`footer-main-${language}-${size.width}x${size.height}.png`) });
     expect(main.footer.height).toBe(44);
     expect(main.search.height).toBe(56);
+    expect(main.row.y - main.search.y - main.search.height).toBe(4);
     expect(main.row.height).toBe(40);
+    await surface.locator('.palette').screenshot({ path: test.info().outputPath(`search-content-spacing-${language}-${size.width}x${size.height}.png`) });
     expect(main.panel.height).toBeLessThanOrEqual(516);
     await root.press('Enter');
     await expect(surface.locator('.storage-row')).toHaveCount(1);
@@ -3160,6 +3168,12 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
     await expect(surface.locator('.group-view .search-dismiss')).toHaveText('esc');
     await surface.locator('.group-view .search-dismiss').click(); await expect(root).toBeFocused();
   }
+  await page.setViewportSize({ width: 750, height: 760 });
+  await surface.locator('.settings-button').click();
+  const settingsInput = surface.locator('.settings-search input');
+  await expect(settingsInput).toBeFocused();
+  expect((await surface.locator('.settings-search').boundingBox())!.height).toBe(56);
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath(`compact-search-settings-${language}.png`) });
 });
 });
 
@@ -5973,6 +5987,17 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
     });
     await expect(input).not.toBeFocused();
     await expect(surface.locator('.search-focus-hint')).toHaveText('Press Tab to focus search');
+    const expectCenteredHint = async () => {
+      const geometry = await surface.locator('.search-focus-hint').evaluate(node => {
+        const hint = node.getBoundingClientRect();
+        const input = node.parentElement!.querySelector('input')!.getBoundingClientRect();
+        const clear = node.parentElement!.querySelector('.settings-clear')?.getBoundingClientRect();
+        return { offset: Math.abs(hint.top + hint.height / 2 - input.top - input.height / 2), clearGap: clear ? clear.left - hint.right : null };
+      });
+      expect(geometry.offset).toBeLessThan(2);
+      if (geometry.clearGap !== null) expect(geometry.clearGap).toBeGreaterThanOrEqual(4);
+    };
+    await expectCenteredHint();
     expect(await input.evaluate(node => ['Meta', 'Control'].map(modifier => {
       const view = node.ownerDocument.defaultView!;
       const event = new view.KeyboardEvent('keydown', { key: 'f', metaKey: modifier === 'Meta', ctrlKey: modifier === 'Control', bubbles: true, cancelable: true });
@@ -5995,6 +6020,7 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
     await expect(menu).toBeFocused();
     await menu.evaluate(node => node.ownerDocument.body.focus());
     await expect(surface.locator('.action-menu .search-focus-hint')).toBeVisible();
+    await expectCenteredHint();
     await page.keyboard.press('Tab');
     await expect(menu).toBeFocused();
     await expect(surface.locator('.action-menu')).toBeVisible();
@@ -6006,6 +6032,8 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
     await settingsInput.fill('theme');
     await settingsInput.evaluate(node => node.ownerDocument.body.focus());
     await expect(surface.locator('.search-focus-hint')).toBeVisible();
+    await expectCenteredHint();
+    await page.screenshot({ path: test.info().outputPath(`search-focus-hint-${host}.png`) });
     await page.keyboard.press('Tab');
     await expect(settingsInput).toBeFocused(); await expect(settingsInput).toHaveValue('theme');
     await page.keyboard.press('Shift+Tab');

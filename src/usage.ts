@@ -5,7 +5,7 @@ export interface UsageRecord { query: string; target: string; weight: number; la
 export const USAGE_STORAGE_KEY = 'searchUsage';
 const HALF_LIFE = 14 * 24 * 60 * 60 * 1000;
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
-const MAX_RECORDS = 500;
+const MAX_RECORDS = 2000;
 
 export const usageQuery = (query: string) => query.trim().toLowerCase().replace(/\s+/g, ' ');
 

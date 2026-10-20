@@ -55,6 +55,7 @@ Clean up a crowded tab strip without losing your place.
 
 - **Continuous tab housekeeping**: Right-click any tab result or press **`⌘K`** to copy its URL, pin, mute, reload, bookmark, or close tabs. The palette stays open and selects the next item so you can tidy several tabs in a row.
 - **Manage tab groups directly**: Click, press Enter, or use the “View Group Tabs” footer action to browse a group’s tabs; the Actions menu contains only group management operations. Right-click, use Actions, or press Cmd/Ctrl+K to expand/collapse, rename, ungroup while keeping all tabs, or close the entire group. Closing shows the group name and tab count for confirmation, rechecks membership, and protects pinned tabs. The member view offers the same group actions; search context is restored afterward unless the palette’s source tab was closed.
+- **Auto tuck without closing pages**: Enable it in Settings and choose 1/3/12 hours or 1/3/7 days of inactivity (off by default; 7 days selected). Eligible tabs move into native collapsed groups while your computer is idle, keeping pages open. Preview candidates and check the last automatic run in Settings. Changing the duration preserves timers; turning it off returns all managed tabs, including manually tucked ones.
 - **Quick Chrome pages**: Type `extensions`, `passwords`, `downloads`, or `chrome settings` to jump straight to Chrome's built-in pages (switching to an existing tab if one is already open).
 - **Read-only Site Storage**: Search `local storage`, `session storage`, or `cookie` to inspect formatted JSON and copy values side by side (cookie access is requested per site).
 
@@ -105,7 +106,7 @@ For full gesture rules, ranking details, and `Ctrl+Tab` setup, see the **[Usage 
 ## Privacy & Boundaries
 
 - **Where it runs**: Opens as a centered overlay on regular webpages, and automatically falls back to a standalone popup window on restricted pages (such as `chrome://` or the Chrome Web Store).
-- **Your data stays local**: Preferences, search ranking, and group recovery records are stored only in local extension storage. Inspected Storage/Cookie values are read in memory and never persisted; copied values go to your clipboard.
+- **Your data stays local**: Preferences, search ranking, and group recovery records are stored only in local extension storage. Search ranking keeps up to 2,000 query–target records; records unused for 90 days expire. Inspected Storage/Cookie values are read in memory and never persisted; copied values go to your clipboard.
 - **Privacy Policy**: Read the full [Privacy Policy](docs/PRIVACY.en.md) ([中文版](docs/PRIVACY.md)). Effective October 19, 2026. Developer: `lyyourc` · Contact: [liangyida42@gmail.com](mailto:liangyida42@gmail.com).
 
 ---

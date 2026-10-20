@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import type { Reply, Request, Snapshot, PaletteState, Execution, StorageRead, PageStorage, CookieAccessRequest, HistorySearchResult } from './types';
+import type { Reply, Request, Snapshot, PaletteState, Execution, StorageRead, PageStorage, CookieAccessRequest, HistorySearchResult, TuckStatus } from './types';
 
 async function send<T>(request: Request): Promise<T> {
   const reply = await chrome.runtime.sendMessage<Request, Reply<T>>(request);
@@ -7,6 +7,7 @@ async function send<T>(request: Request): Promise<T> {
   return reply.data;
 }
 export const getSnapshot = () => send<Snapshot>({ source: 'justonehop', type: 'snapshot' });
+export const getTuckStatus = (afterHours?: number): Promise<TuckStatus> => send<TuckStatus>({ source: 'justonehop', type: 'tuck-status', afterHours });
 export const searchHistory = (query: string, scope: 'week' | 'all') => send<HistorySearchResult>({ source: 'justonehop', type: 'search-history', payload: { query, scope } });
 export const getPaletteState = () => send<PaletteState | undefined>({ source: 'justonehop', type: 'palette-state' });
 export const cancelPaletteContinuation = () => send<void>({ source: 'justonehop', type: 'cancel-palette-continuation' });

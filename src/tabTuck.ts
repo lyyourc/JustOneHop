@@ -1,6 +1,6 @@
 import { groupFingerprint, matchRecovery, readTuckRecords, recoveryCandidates, type TuckRecord, type RecoveryGroup } from './tuckRecovery';
-import type { TuckRecoveryItem } from './types';
-import { getPreferences, preferencesReady, subscribePreferences } from './preferences';
+import type { TuckRecoveryItem, TuckStatus } from './types';
+import { getPreferences, isAutoTuckAfterHours, preferencesReady, subscribePreferences } from './preferences';
 import { t } from './i18n';
 
 export const TUCK_AFTER = 7 * 24 * 60 * 60 * 1000;
@@ -11,7 +11,7 @@ const CLOCK_KEY = 'justonehopTabTuckClocks';
 type Clock = { url: string; usedAt: number };
 type Group = { key?: string; id: number; windowId: number; title: string; color?: chrome.tabGroups.TabGroup['color']; customTitle?: boolean; members: number[] };
 type Batch = { groupId: number; ids: number[] };
-type State = { version: 1; enabled: boolean; clocks: Record<number, Clock>; groups: Group[]; undo: Record<number, Batch>; active?: Record<number, number> };
+type State = { version: 1; enabled: boolean; clocks: Record<number, Clock>; groups: Group[]; undo: Record<number, Batch>; active?: Record<number, number>; lastScanAt?: number };
 let state: State = { version: 1, enabled: false, clocks: {}, groups: [], undo: {} };
 let ready = Promise.resolve();
 let queue = Promise.resolve();
@@ -146,9 +146,34 @@ function usedAt(tab: chrome.tabs.Tab, now: number) {
   const accessed = tab.lastAccessed;
   return Math.max(recorded, typeof accessed === 'number' && Number.isFinite(accessed) ? Math.min(accessed, now) : 0);
 }
-export function idleTabEligible(tab: chrome.tabs.Tab, lastUsed: number, now: number): boolean {
+export function idleTabEligible(tab: chrome.tabs.Tab, lastUsed: number, now: number, thresholdMs = TUCK_AFTER): boolean {
   return tab.id !== undefined && plain(tab) && !tab.active && !tab.highlighted && !tab.audible && tab.status !== 'loading' &&
-    Number.isFinite(lastUsed) && lastUsed > 0 && now - lastUsed >= TUCK_AFTER;
+    Number.isFinite(lastUsed) && lastUsed > 0 && now - lastUsed >= thresholdMs;
+}
+const thresholdMs = () => getPreferences().autoTuckAfterHours * 60 * 60 * 1000;
+function recoveryBlocks(windowId: number) {
+  return pendingRecovery.length > 0 && (!state.groups.some(group => group.windowId === windowId) ||
+    pendingRecovery.some(item => item.candidates.some(group => group.windowId === windowId)));
+}
+export async function getTuckStatus(afterHours?: number): Promise<TuckStatus> {
+  if (afterHours !== undefined && !isAutoTuckAfterHours(afterHours)) throw new Error('Invalid automatic tuck duration');
+  await ready;
+  return serial(async () => {
+    // A settings read can arrive before the storage listener's queued transition.
+    if (state.enabled !== getPreferences().autoTuck) await preferencesChanged();
+    const tabs = await normalTabs();
+    await recover(tabs);
+    const checkedAt = Date.now();
+    const threshold = afterHours === undefined ? thresholdMs() : afterHours * 60 * 60 * 1000;
+    let eligibleCount = 0;
+    let blockedCount = 0;
+    for (const tab of tabs) if (idleTabEligible(tab, usedAt(tab, checkedAt), checkedAt, threshold)) {
+      if (recoveryBlocks(tab.windowId)) blockedCount++;
+      else eligibleCount++;
+    }
+    return { enabled: getPreferences().autoTuck, eligibleCount, blockedCount, checkedAt,
+      ...(state.lastScanAt === undefined ? {} : { lastScanAt: state.lastScanAt }) };
+  });
 }
 async function normalTabs() { return chrome.tabs.query({ windowType: 'normal' }); }
 function prune(tabs: chrome.tabs.Tab[]) {
@@ -192,7 +217,7 @@ async function persist(tabs?: chrome.tabs.Tab[]) {
   }
   state.active = Object.fromEntries(activeTabs);
   await chrome.storage.session.set({ [SESSION_KEY]: state });
-  await chrome.storage.local.set({ [CLOCK_KEY]: { version: 1, enabled: state.enabled, clocks },
+  await chrome.storage.local.set({ [CLOCK_KEY]: { version: 1, enabled: state.enabled, clocks, lastScanAt: state.lastScanAt },
     [RECOVERY_KEY]: { version: 1, records } });
   notify();
 }
@@ -239,9 +264,7 @@ async function releaseTab(tab: chrome.tabs.Tab) {
 }
 async function tuckBatch(windowId: number, ids: number[], automatic: boolean) {
   await recover();
-  const unresolved = pendingRecovery.length > 0;
-  if (unresolved && (!state.groups.some(group => group.windowId === windowId) ||
-    pendingRecovery.some(item => item.candidates.some(group => group.windowId === windowId)))) {
+  if (recoveryBlocks(windowId)) {
     if (automatic) return 0;
     throw new Error(t('errorTuckRecoveryPending'));
   }
@@ -254,7 +277,7 @@ async function tuckBatch(windowId: number, ids: number[], automatic: boolean) {
       if (group && !(await validGroup(group))) break;
       const tab = await chrome.tabs.get(id).catch(() => null);
       if (!tab || tab.windowId !== windowId || !plain(tab)) continue;
-      if (automatic && !idleTabEligible(tab, usedAt(tab, Date.now()), Date.now())) continue;
+      if (automatic && !idleTabEligible(tab, usedAt(tab, Date.now()), Date.now(), thresholdMs())) continue;
       if (tab.active) {
         const other = (await chrome.tabs.query({ windowId })).filter(item => item.id !== id && !tuckFlags(item).tucked)
           .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
@@ -316,25 +339,34 @@ export async function undoTuck(windowId: number) {
   });
 }
 async function scan() {
+  if (state.enabled !== getPreferences().autoTuck) await preferencesChanged();
   if (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active') return;
   const tabs = (await normalTabs()).sort((a, b) => a.index - b.index);
   const now = Date.now();
   const windows = new Map<number, number[]>();
-  for (const tab of tabs) if (idleTabEligible(tab, usedAt(tab, now), now)) {
+  for (const tab of tabs) if (idleTabEligible(tab, usedAt(tab, now), now, thresholdMs())) {
     const ids = windows.get(tab.windowId) || []; ids.push(tab.id!); windows.set(tab.windowId, ids);
   }
   for (const [windowId, ids] of windows) {
-    if (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active') break;
+    if (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active') return;
     await tuckBatch(windowId, ids, true);
   }
+  if (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active') return;
+  state.lastScanAt = Date.now();
+  await persist();
+}
+async function ensureAlarm() {
+  const alarm = await chrome.alarms.get(ALARM);
+  if (alarm?.periodInMinutes !== 5) await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: 5 });
 }
 async function preferencesChanged() {
   const enabled = getPreferences().autoTuck;
   if (enabled !== state.enabled) {
+    delete state.lastScanAt;
     if (enabled) {
       const tabs = await normalTabs();
       for (const tab of tabs) touch(tab);
-      await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: 30 });
+      await ensureAlarm();
     } else {
       // Keep the previous enabled state until release succeeds. If Chrome is
       // temporarily editing/closing a tab, the next alarm retries the remainder.
@@ -373,17 +405,20 @@ export function startTabTucking(changed: () => void) {
     ]);
     records = readTuckRecords(local[RECOVERY_KEY]);
     const saved = session[SESSION_KEY] as State | undefined;
+    const stored = local[CLOCK_KEY] as { version?: number; enabled?: boolean; clocks?: Record<string, number>; lastScanAt?: number } | undefined;
     if (saved?.version === 1 && saved.clocks && Array.isArray(saved.groups) && saved.undo) state = saved;
     else {
       // New Chrome sessions are reconciled against persisted evidence below,
       // never against old numeric group/tab IDs.
-      const stored = local[CLOCK_KEY] as { version?: number; enabled?: boolean; clocks?: Record<string, number> } | undefined;
       state.enabled = stored?.enabled === true;
       for (const tab of tabs) {
         const timestamp = stored?.version === 1 ? stored.clocks?.[tab.url || ''] : undefined;
         touch(tab, typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0 ? Math.min(timestamp, Date.now()) : Date.now());
       }
     }
+    const lastScanAt = state.lastScanAt ?? (stored?.version === 1 ? stored.lastScanAt : undefined);
+    state.lastScanAt = state.enabled && typeof lastScanAt === 'number' && Number.isFinite(lastScanAt) && lastScanAt > 0
+      ? lastScanAt : undefined;
     // Migrate groups from the earlier session-only release with explicit review.
     // Their title is a discovery hint, never evidence for automatic ownership.
     if (!local[RECOVERY_KEY]) {
@@ -402,7 +437,7 @@ export function startTabTucking(changed: () => void) {
     for (const tab of tabs) if (tab.active && tab.id !== undefined && !activeTabs.has(tab.windowId)) activeTabs.set(tab.windowId, tab.id);
     for (const group of [...state.groups]) await validGroup(group);
     await preferencesChanged();
-    if (getPreferences().autoTuck && !await chrome.alarms.get(ALARM)) await chrome.alarms.create(ALARM, { delayInMinutes: 1, periodInMinutes: 30 });
+    if (getPreferences().autoTuck) await ensureAlarm();
   })();
   void ready.catch(error => console.warn('justonehop: initialize tab tuck', error));
   subscribePreferences(() => background(preferencesChanged));
