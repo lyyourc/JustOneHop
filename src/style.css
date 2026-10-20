@@ -72,11 +72,13 @@
 .search-focus-hint { position: absolute; right: 58px; top: 50%; transform: translateY(-50%); max-width: calc(100% - 104px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 12px; color: var(--muted); background: var(--bar); pointer-events: none; }
 .action-search { position: relative; }
 .search-bar .search-focus-hint, .storage-search .search-focus-hint { top: calc(50% + 1px); }
-.search-bar:has(.settings-clear) .search-focus-hint { right: 95px; max-width: calc(100% - 141px); }
 .search-bar input, .storage-search input { flex: 1; font-size: 14.5px; font-weight: 400; height: 100%; caret-color: var(--accent); }
 .icon-button { display: flex; align-items: center; justify-content: center; border-radius: 6px; }
-.search-dismiss { flex-shrink: 0; min-width: 30px; min-height: 28px; }
-.search-dismiss:hover { background: var(--hover); }
+.search-dismiss { position: relative; flex-shrink: 0; min-width: 30px; min-height: 28px; }
+.search-dismiss:hover, .search-dismiss:focus-visible { background: var(--hover); }
+.search-dismiss .search-dismiss-icon { position: absolute; visibility: hidden; }
+.search-clear:hover kbd, .search-clear:focus-visible kbd { visibility: hidden; }
+.search-clear:hover .search-dismiss-icon, .search-clear:focus-visible .search-dismiss-icon { visibility: visible; }
 
 .results, .storage-results { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 8px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .result { position: relative; display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; cursor: pointer; transition: background-color 70ms ease; }
@@ -233,8 +235,6 @@ body.justonehop-popup { margin: 0; width: 750px; height: 516px; overflow: hidden
 .settings-body h2 { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; line-height: 1.4; color: var(--muted); margin: 16px 0 6px; padding-left: 2px; }
 .settings-body h2:first-child { margin-top: 0; }
 .settings-body h2 svg { color: var(--muted); }
-.settings-clear { display: grid; place-items: center; width: 26px; height: 26px; flex-shrink: 0; border-radius: 6px; color: var(--muted) !important; transition: background-color 70ms ease, color 70ms ease; }
-.settings-clear:hover { background: var(--hover) !important; color: var(--text) !important; }
 .settings-group { border: 1px solid var(--border); border-radius: 12px; background: var(--bg); padding: 2px 14px; }
 .settings-group > div { padding: 10px 0; }
 .settings-group > div + div { border-top: 1px solid var(--line); }

@@ -33,7 +33,7 @@ export function NavigationRoot({ children }: { children: ReactNode }) {
     const palette = surface.current?.querySelector('.palette, .recent-switcher');
     const dismiss = palette?.querySelector('.search-dismiss');
     return { identity: top, defer: top.closes, back: () => flushSync(top.back),
-      label: top.depth === 1 ? dismiss?.getAttribute('aria-label') || t('closePalette') : t('back') };
+      label: top.depth === 1 ? dismiss?.getAttribute('data-dismiss-label') || t('closePalette') : t('back') };
   });
   useLayoutEffect(() => {
     // Overlay React code runs in the content-script realm, but its DOM lives in

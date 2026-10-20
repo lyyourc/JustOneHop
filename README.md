@@ -97,6 +97,8 @@ npm run build
 | Open Settings | Click gear icon in footer | `⌘,` |
 | Go back one level | Click back arrow, `esc`, or swipe right with two fingers | `Esc` (or `Backspace` when search is empty) |
 
+When a search field contains text, its trailing `esc` button turns into `×` on hover or keyboard focus. Clicking clears the search and returns focus to the input, keeping the current view open. With an empty search, the button stays `esc` and exits the current layer. The Escape key continues to exit one layer at a time.
+
 The single-line footer keeps actions aligned to the right. Page actions use **Open Here** and **New Tab**, with full descriptions in tooltips and the Actions menu. Navigation hints hide together when space is tight; status feedback remains visible. On narrow screens, the new-tab action becomes an icon button.
 
 Settings, copying, and tab management report their results in the footer. Language and theme changes confirm the saved option; success messages remain briefly when you type or return to the parent view. Longer operations show progress, and failures stay visible until dismissed or retried.

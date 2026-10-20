@@ -69,7 +69,7 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
       <div className="action-search"><SearchFocusButton input={input} size={15} /><input data-back-on-empty ref={input} value={query} onChange={event => onQueryChange(event.target.value)}
         placeholder={t('searchActionsPlaceholder')} aria-label={t('searchActions')} role="combobox" aria-expanded="true" aria-controls={id}
         aria-activedescendant={selected ? `${id}-${selected.id}` : undefined} autoComplete="off" spellCheck={false} />
-        <SearchDismissButton label={t('back')} /></div>
+        <SearchDismissButton label={t('back')} query={query} input={input} onClear={() => onQueryChange('')} /></div>
     </div>
   </BackLayer>;
 }

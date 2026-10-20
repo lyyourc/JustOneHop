@@ -416,7 +416,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
             aria-describedby="justonehop-navigation"
             aria-activedescendant={!history.pending && selected ? `justonehop-${selected.id}` : undefined}
             autoComplete="off" autoCorrect="off" spellCheck={false} disabled={busy} />
-          <SearchDismissButton label={t('closePalette')} />
+          <SearchDismissButton label={t('closePalette')} query={query} input={input} disabled={busy} onClear={() => { setQuery(''); setSelection(''); setError(''); }} />
         </header>
         <span className="sr-only result-status" role="status">{data && !history.pending ? countMessage('resultOne', 'resultMany', visible.length) : loading && showLoading ? t('loading') : ''}</span>
         <div className="results" ref={list} id="justonehop-results" role="listbox" aria-label={t(grouped ? 'suggested' : 'resultsLabel')} aria-busy={history.pending}>

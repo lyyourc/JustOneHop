@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { t } from './i18n';
 import { BackLayer, useNavigateBack } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
@@ -33,9 +33,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
       <input ref={input} data-back-on-empty value={query} onChange={event => setQuery(event.target.value)}
         aria-label={t('searchHelp')} placeholder={t('searchHelpPlaceholder')} aria-controls="justonehop-help-content"
         autoComplete="off" spellCheck={false} />
-      {query ? <button className="settings-clear" aria-label={t('clearSettingsSearch')} title={t('clearSettingsSearch')}
-        onClick={clearSearch}><X size={16} /></button> : null}
-      <SearchDismissButton label={backLabel} />
+      <SearchDismissButton label={backLabel} query={query} input={input} onClear={clearSearch} />
     </header>
     <article ref={article} id="justonehop-help-content" className={`help-body ${query.trim() ? 'filtered' : ''}`} tabIndex={0} aria-label={t('help')} onKeyDown={event => {
       if (event.nativeEvent.isComposing || event.keyCode === 229 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.target !== event.currentTarget) return;

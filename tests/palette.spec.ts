@@ -1641,7 +1641,7 @@ test.describe(() => {
     await search.fill('cookies');
     await expect(article.getByRole('heading')).toHaveText('View website storage');
     await search.press('Backspace'); await expect(search).toHaveValue('cookie');
-    await page.locator('.settings-clear').click();
+    await page.locator('.search-clear').click();
     await search.press('Tab'); await page.keyboard.press('Tab'); await expect(article).toBeFocused();
     await article.press('PageDown'); await expect.poll(() => article.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
     await article.press('Tab'); await expect(page.locator('.primary-action')).toBeFocused();
@@ -1769,9 +1769,11 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     await ui.locator('.action-row').first().click();
     await expect(helpSearch).toBeFocused();
     await helpSearch.fill('cookie');
-    await ui.locator('.help-search .settings-clear').click();
+    await ui.locator('.help-search .search-clear').click();
     await expect(helpSearch).toBeFocused(); await expect(helpSearch).toHaveValue('');
     await helpSearch.fill('cookie');
+    await ui.locator('.help-search .search-dismiss').click();
+    await expect(helpSearch).toHaveValue(''); await expect(helpSearch).toBeFocused();
     await ui.locator('.help-search .search-dismiss').click(); await expect(input).toBeFocused();
     await expect(ui.locator('.action-menu')).toHaveCount(0);
   });
@@ -3075,7 +3077,11 @@ test.describe(() => {
       if (route === 'Escape') await search.press('Escape');
       else if (route === 'cancel') await child.locator('.secondary-action').click();
       else if (route === 'back') await child.getByRole('button', { name: 'Back · Tab Switcher', exact: true }).click();
-      else await child.locator('.search-dismiss').click();
+      else {
+        await child.locator('.search-dismiss').click();
+        await expect(search).toHaveValue(''); await expect(search).toBeFocused();
+        await child.locator('.search-dismiss').click();
+      }
       await expect(child).toHaveCount(0);
       await expect(root).toHaveValue('tab switcher'); await expect(root).toBeFocused();
       expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([2, 8]);
@@ -5093,7 +5099,29 @@ for (const scenario of ['fast', 'slow', 'failure and retry']) {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English interaction polish settings choices accept Control navigation without accidental confirmation', async () => {
-  await ui.locator('.search-bar input').fill('theme'); await ui.keyboard.press('Enter');
+  const mainInput = ui.locator('.search-bar input');
+  const clear = ui.locator('.search-dismiss');
+  await mainInput.fill('query to clear');
+  const bounds = await clear.boundingBox();
+  await clear.hover();
+  await expect(clear.locator('kbd')).toBeHidden();
+  await expect(clear.locator('svg')).toBeVisible();
+  await expect(clear).toHaveAccessibleName('Clear search');
+  expect(await clear.boundingBox()).toEqual(bounds);
+  await clear.click();
+  await expect(mainInput).toHaveValue(''); await expect(mainInput).toBeFocused();
+  await expect(clear.locator('kbd')).toBeVisible();
+  await expect(clear.locator('svg')).toBeHidden();
+  await mainInput.fill('keyboard clear');
+  await mainInput.hover();
+  await mainInput.press('Tab');
+  await expect(clear).toBeFocused();
+  await expect(clear.locator('svg')).toBeVisible();
+  await clear.press('Space');
+  await expect(mainInput).toHaveValue(''); await expect(mainInput).toBeFocused();
+  await mainInput.fill('theme');
+  await expect(ui.getByRole('option', { name: 'JustOneHop Settings: Theme', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await mainInput.press('Enter');
   const theme = ui.getByRole('combobox', { name: 'Theme', exact: true });
   await expect(theme).toBeFocused();
   await theme.press('Control+n'); await expect(theme).toHaveAttribute('aria-expanded', 'true');
@@ -5116,6 +5144,16 @@ test.describe(() => {
   const dismiss = ui.locator('.settings-search .search-dismiss');
   await expect(dismiss).toHaveText('esc');
   await expect(dismiss).toHaveAttribute('title', 'Escape — Back');
+  await expect(dismiss.locator('kbd')).toBeVisible();
+  await expect(dismiss.locator('svg')).toBeHidden();
+  const dismissBounds = await dismiss.boundingBox();
+  await dismiss.hover();
+  await expect(dismiss.locator('kbd')).toBeVisible();
+  await expect(dismiss.locator('svg')).toBeHidden();
+  expect(await dismiss.boundingBox()).toEqual(dismissBounds);
+  await theme.hover();
+  await expect(dismiss.locator('kbd')).toBeVisible();
+  await expect(dismiss.locator('svg')).toBeHidden();
   await dismiss.click();
   await expect(theme).toHaveAttribute('aria-expanded', 'false');
   await expect(theme).toBeFocused();
@@ -5126,6 +5164,8 @@ test.describe(() => {
   await expect(ui.locator('.action-search .search-dismiss')).toHaveText('esc');
   await ui.locator('.action-search input').press('Tab');
   await expect(ui.locator('.action-search .search-dismiss')).toBeFocused();
+  await expect(ui.locator('.action-search .search-dismiss kbd')).toBeVisible();
+  await expect(ui.locator('.action-search .search-dismiss svg')).toBeHidden();
   await ui.keyboard.press('Enter');
   await expect(ui.locator('.action-menu')).toHaveCount(0);
   await expect(ui.locator('.search-bar input')).toBeFocused();
@@ -6067,7 +6107,7 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
       const geometry = await surface.locator('.search-focus-hint').evaluate(node => {
         const hint = node.getBoundingClientRect();
         const input = node.parentElement!.querySelector('input')!.getBoundingClientRect();
-        const clear = node.parentElement!.querySelector('.settings-clear')?.getBoundingClientRect();
+        const clear = node.parentElement!.querySelector('.search-clear')?.getBoundingClientRect();
         return { offset: Math.abs(hint.top + hint.height / 2 - input.top - input.height / 2), clearGap: clear ? clear.left - hint.right : null };
       });
       expect(geometry.offset).toBeLessThan(2);

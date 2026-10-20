@@ -140,7 +140,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
       </div> : <>
         <div className="search-bar"><SearchFocusButton input={input} disabled={busy} /><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('groupSearch')} aria-label={t('groupSearch')} role="combobox" aria-expanded="true" aria-controls="justonehop-group-tabs" aria-activedescendant={selected ? `group-${selected.id}` : undefined} disabled={busy} />
-          <SearchDismissButton label={t('back')} /></div>
+          <SearchDismissButton label={t('back')} query={query} input={input} disabled={busy} onClear={() => { setQuery(''); setSelection(''); }} /></div>
         <div ref={list} className="results" id="justonehop-group-tabs" role="listbox" aria-label={t('resultsLabel')}>
           {results.map(entry => <div key={entry.id} id={`group-${entry.id}`} role="option" aria-selected={entry.id === selected?.id} className="result tab"
             onMouseMove={event => {

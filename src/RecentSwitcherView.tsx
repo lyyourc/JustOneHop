@@ -45,7 +45,7 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
           aria-activedescendant={searching && tabs[index] ? `recent-${tabs[index].id}` : undefined} aria-describedby="recent-navigation"
           autoComplete="off" spellCheck={false} />
       </span>
-      <SearchDismissButton label={t('recentCancel')} />
+      <SearchDismissButton label={t('recentCancel')} query={query} input={input} onClear={() => onQueryChange('')} />
     </header>
     <span className="sr-only" id="recent-navigation">{t('navigationHelp')}</span>
     <div className="results recent-list" id="recent-results" ref={listRef} tabIndex={searching ? -1 : 0} role="listbox" aria-label={t('recentSwitcher')}

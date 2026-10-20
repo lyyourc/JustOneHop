@@ -2,7 +2,7 @@ import { BackLayer, useNavigateBack } from './Navigation';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, RotateCw, Search, SlidersHorizontal, X } from 'lucide-react';
+import { Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, RotateCw, Search, SlidersHorizontal } from 'lucide-react';
 import { HighlightedText } from './HighlightedText';
 import { matchingSettings, type SettingRow } from './settingsSearch';
 import { PaletteFooter } from './PaletteFooter';
@@ -185,9 +185,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
       <input ref={input} data-back-on-empty aria-label={t('searchSettings')} placeholder={t('searchSettingsPlaceholder')}
         value={query} onChange={event => { setQuery(event.target.value); if (body.current) body.current.scrollTop = 0; }}
         onKeyDown={event => { if (event.key === 'Enter') event.stopPropagation(); }} autoComplete="off" spellCheck={false} />
-      {query ? <button className="settings-clear" title={t('clearSettingsSearch')} aria-label={t('clearSettingsSearch')}
-        onClick={clearSearch}><X size={16} /></button> : null}
-      <SearchDismissButton label={t('back')} />
+      <SearchDismissButton label={t('back')} query={query} input={input} onClear={clearSearch} />
     </header>
     <div className="settings-body" ref={body}>
       {matches.has('language') || matches.has('theme') || matches.has('help') ? <>

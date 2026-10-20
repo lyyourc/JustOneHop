@@ -167,7 +167,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
         <div className="storage-search"><SearchFocusButton input={input} /><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('storageSearch')} aria-label={t('storageSearchLabel')} role="combobox" aria-expanded="true" aria-controls="storage-results" aria-autocomplete="list"
           aria-activedescendant={selected ? `storage-row-${rows.indexOf(selected)}` : undefined} aria-describedby="storage-navigation" autoComplete="off" spellCheck={false} />
-          <SearchDismissButton label={t('back')} /></div>
+          <SearchDismissButton label={t('back')} query={query} input={input} onClear={() => { setQuery(''); setSelection(''); }} /></div>
         <div className={`storage-list-content ${selected ? 'with-detail' : ''}`}>
         <div className="storage-results" id="storage-results" role="listbox" aria-label={t('storageEntries')} ref={list}>
           {busy && !data && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void act('refresh'); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>

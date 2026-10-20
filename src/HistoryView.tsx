@@ -143,7 +143,7 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
         <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('historySearchLabel')} aria-label={t('historySearchLabel')} role="combobox" aria-autocomplete="list" aria-expanded="true"
           aria-controls="justonehop-history-results" aria-activedescendant={selected ? `justonehop-${selected.id}` : undefined} autoComplete="off" spellCheck={false} disabled={busy} />
-        <SearchDismissButton label={t('back')} />
+        <SearchDismissButton label={t('back')} query={query} input={input} disabled={busy} onClear={() => { setQuery(''); setSelection(''); }} />
       </header>
       <div className="results" ref={list} id="justonehop-history-results" role="listbox" aria-label={t('historySearchLabel')} aria-busy={pending}>
         {pending && showLoading ? <div className="empty" role="status"><LoaderCircle className="spinner" size={25} /><p>{t('historySearching')}</p></div> : null}
