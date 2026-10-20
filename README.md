@@ -104,7 +104,7 @@ The single-line footer keeps actions aligned to the right. Page actions use **Op
 
 Settings, copying, and tab management report their results in the footer. Language and theme changes confirm the saved option; success messages remain briefly when you type or return to the parent view. Longer operations show progress, and failures stay visible until dismissed or retried.
 
-For full gesture rules, ranking details, and `Ctrl+Tab` setup, see the **[Usage Guide (Chinese)](docs/USAGE.md)**.
+For step-by-step guides, gesture details, and `Ctrl+Tab` setup, see the **[Usage Guide](docs/USAGE.md)** ([中文版](docs/USAGE.zh-CN.md)).
 
 ---
 
@@ -126,5 +126,5 @@ npm run check   # Run typecheck, unit tests, build, and E2E tests
 
 After building local changes, search `Reload` inside the palette to reload the extension in place.
 
-- [Usage Guide](docs/USAGE.md) · [Interaction Architecture](docs/INTERACTION-ARCHITECTURE.md) · [ADR Index](docs/adr/README.md)
+- [Usage Guide](docs/USAGE.md) ([中文版](docs/USAGE.zh-CN.md)) · [Interaction Architecture](docs/INTERACTION-ARCHITECTURE.md) · [ADR Index](docs/adr/README.md)
 - [Recent Tabs](docs/RECENT-TABS.md) · [Site Storage](docs/PAGE-STORAGE.md) · [Testing Guide](docs/TESTING.md) · [Brand & Logo](docs/brand/LOGO.md)

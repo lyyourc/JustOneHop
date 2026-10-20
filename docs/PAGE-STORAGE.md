@@ -1,10 +1,14 @@
-# 页面存储实现参考
+# 页面存储实现参考 · Page Storage Technical Reference
 
-使用方法见 [使用指南](USAGE.md#页面存储)，逐网站 Cookie 授权的动机与取舍见 [ADR 0004](adr/0004-page-storage-permissions.md)。本功能已实现，本文描述当前接口与读取边界。
+用户使用指引见 [使用指南 (中文)](USAGE.zh-CN.md#6-开发者利器免开-devtools-查看-storage--cookies) · [User Guide (English)](USAGE.md#6-developer-inspection-localstorage-sessionstorage--cookies)。逐网站 Cookie 授权的动机与架构取舍见 [ADR 0004](adr/0004-page-storage-permissions.md)。
 
-## 接口入口
+本文档记录小范围瞬移的只读页面存储查看器（Local Storage、Session Storage、Cookies）的内部接口契约、权限作用域与安全读取边界。
 
-当前只读请求如下，完整类型以 [src/types.ts](../src/types.ts) 为准：
+---
+
+## 1. 消息接口与请求契约
+
+页面存储采用单一内部只读请求，由前台视图向后台发出。TypeScript 完整类型以 [`src/types.ts`](../src/types.ts) 为准：
 
 ```ts
 {
@@ -20,24 +24,50 @@
 }
 ```
 
-返回沿用 Reply<T>：成功数据包含实际读取的 `url`、`kind` 与 `entries`。每条记录包含稳定 `id`、`name`、原始 `value`；Cookie 另附 `domain`、`path`、`secure`、`httpOnly`、`sameSite`、`session`、可选 `expirationDate` 与 `partitionKey`。
+### 响应数据契约 (`Reply<T>`)
 
-前台 Entry 包含三个打开存储页面的命令标识；存储内容使用独立的列表状态。复制在用户触发时写入剪贴板，不增加存储写入接口。
+成功返回时包含实际读取的 `url`、`kind` 与条目列表 `entries`：
+- **Local / Session Storage**：每条记录包含稳定 `id`、`name`（键名）与原始字符串 `value`。
+- **Cookies**：除 `name` 与 `value` 外，额外提供 `domain`、`path`、`secure`、`httpOnly`、`sameSite`、`session`、可选的 `expirationDate`，以及 Chrome 132+ 支持的 `partitionKey`。
 
-后台验证发送者、目标窗口/标签页与预期 URL；覆盖层请求只能读取其所在标签页。页面变化或关闭时明确提示刷新或重新打开，避免混用不同页面的数据。读取成功后仅学习三个命令的使用频率，不记录 key、值或存储列表搜索词。
+前台接收后在双栏视图中展示：左侧键名列表支持关键词筛选，右侧进行 JSON 格式化高亮与元数据呈现。按下 Enter 或点击底栏直接向系统剪贴板写入原始字符串，不提供存储修改或删除接口。
 
-## 权限与读取边界
+后台严格校验 `sender`、目标 `windowId`/`tabId` 与 `expectedUrl`；网页覆盖层仅能读取自身所在的活动标签页。页面若发生导航或关闭，请求立即拒绝并提示刷新，防止串读不同页面的敏感数据。
 
-- Local/Session Storage 读取当前标签页顶层页面的 origin，使用 scripting 与 activeTab 临时授权。
-- Cookies 使用当前标签页所属 cookie store，按当前 URL 匹配，包含 HttpOnly；支持时额外读取当前顶层 frame 的分区 Cookie，区分同名、不同路径和分区的记录。
-- Cookie API 使用 `cookies` 与具体网站的 host permission。缺少授权时，通过 `open-cookie-access` 请求打开授权页；payload 复用 tabId/windowId/expectedUrl，不含存储内容。
-- 授权页重新验证当前网站，在用户点击后请求 Chrome 原生授权；请求当前主机与必要父域的 HTTP/HTTPS 权限，tldts 确定公共后缀和私有域边界。拒绝可重试，授权可由用户在 Chrome 设置撤销。
-- Manifest 的 `*://*/*` 仅为 optional_host_permissions 声明，实际请求使用具体主机模式。Local/Session Storage 不要求此额外授权。
-- 授权页关闭后，原列表所在 iframe 恢复焦点并重新读取。页面导航、关闭或移走时校验目标并给出错误提示。
-- 存储查看器只读，不提供编辑、删除或跨 iframe 浏览。名称和值仅存在当前面板内存，不写入扩展存储、日志或远端服务；成功打开命令可参与使用排序，条目与列表内查询不参与。
+---
 
-## 实现与验证入口
+## 2. 权限模型与读取边界
 
-- [页面读取](../src/pageStorage.ts)、[授权范围](../src/cookieAccess.ts)、[授权页](../src/cookie-access.tsx)、[列表与详情](../src/StorageView.tsx)。
-- [读取测试](../tests/pageStorage.test.ts)、[浏览器测试](../tests/palette.spec.ts)覆盖原始字符串、空值、JSON、同名 Cookie、权限拒绝和页面变化；验证剪贴板真实值，不仅检查提示。
-- `node tests/storage-manual.mjs` 启动隔离的本地验收站点。历史验证结果保留在 [验收记录](ACCEPTANCE.md)。
+| 存储类型 | 依赖权限 | 作用域与读取边界 |
+| --- | --- | --- |
+| **Local Storage** | `activeTab`, `scripting` | 仅读取当前标签页顶层 Frame 的 `origin`。使用临时脚本注入提取，无需声明全网 Host 权限。 |
+| **Session Storage** | `activeTab`, `scripting` | 仅读取当前标签页顶层 Frame 的 `sessionStorage`。不跨 Tab、不跨 Frame。 |
+| **Cookies** | `cookies`, 可选网站主机权限 | 匹配当前标签页 URL 的所属 Cookie Store（包含 `HttpOnly` 及顶层 Frame 的分区 Cookie）。区分同名、不同路径与分区的记录。 |
+
+### Cookie 逐站授权机制
+
+- Manifest 中仅声明 `optional_host_permissions: ["*://*/*"]`，绝不在安装时申请全网权限。
+- 当目标站点的 Cookie 需要访问权限时，扩展通过 `open-cookie-access` 打开本地独立授权引导页（[`src/cookie-access.tsx`](../src/cookie-access.tsx)）。
+- 授权页利用 `tldts` 库严格计算当前域名及其可注册父域（Registrable Domain），仅向 Chrome 原生权限系统申请该站点及必要父域的 HTTP/HTTPS 权限，绝不申请同级兄弟子域的通配符。
+- 用户授权后，授权页自动关闭，面板无缝重新读取 Cookie；用户拒绝可重试，用户可随时在 Chrome 设置中撤销该站点的授权。
+
+### 内存隔离与零持久化
+
+- **只读保证**：存储查看器不提供编辑、修改、删除或注入功能。
+- **内存生命周期**：读取到的 Key 和 Value 仅在当前面板渲染进程的 React State 中暂存，关闭面板即从内存中彻底销毁。
+- **零日志、不上云**：不写入任何持久存储（如 `chrome.storage.local`），不记录任何网络日志，绝无远程上报。仅命令入口（如 `local storage`）参与搜索频率学习，条目本身与键名绝不参与。
+
+---
+
+## 3. 源码实现与验证入口
+
+- **核心实现**：
+  - [页面读取与注入](../src/pageStorage.ts)
+  - [Cookie 授权范围计算](../src/cookieAccess.ts)
+  - [Cookie 授权引导页](../src/cookie-access.tsx)
+  - [存储双栏视图组件](../src/StorageView.tsx)
+- **自动化测试**：
+  - [页面存储单元测试](../tests/pageStorage.test.ts)
+  - [端到端浏览器测试](../tests/palette.spec.ts)（覆盖原始字符串、空值、超大 JSON、同名 Cookie、权限拒绝与页面跳转防护，验证系统剪贴板真实拷贝值）。
+- **本地手工测试**：
+  - 运行 `node tests/storage-manual.mjs` 启动本地隔离测试环境。

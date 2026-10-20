@@ -1,70 +1,81 @@
-# Chrome Web Store 发布文案
+# Chrome Web Store 发布与审核指南
 
-适用版本：0.1.0。中文与英文商店介绍对应相同功能。简介与语言包的 `extensionDescription` 严格保持一致；下面各个“可直接粘贴”区块只包含对应字段的正文。
+[English Listing](#1-english-store-listing) · [中文发布文案](#2-中文商店文案) · [权限与用途申明](#3-审核后台权限与单一用途声明) · [审核员指引](#4-审核员测试指引-reviewer-instructions) · [打包与检查清单](#5-本地打包与发布检查清单)
 
-当前发布状态（2026-10-20）：0.1.0 已提交 Chrome Web Store，后台确认 **Pending review**，勾选审核通过后自动发布。扩展 ID：`mbofggnjaoneioopfbpheapgphmkclbo`。发布者 `lyyourc`，联系邮箱已验证；中英文介绍、截图、宣传图、权限及隐私申报已保存，分发为免费、Public、All regions。主机权限触发深入审查提示，审核结果尚未确定。实际操作记录见 [验收记录](ACCEPTANCE.md)。以下清单保留作为后续版本发布参考。
-
-配套素材：[中英文截图与宣传图](store/README.md) · [整套图片预览](store/contact-sheet.png)。
-
-## 发布前待填写
-
-- 已确认开发者：`lyyourc`；隐私咨询与支持邮箱：`liangyida42@gmail.com`。已同步到[中文隐私政策](PRIVACY.md)和[英文隐私政策](PRIVACY.en.md)。这不代表商店开发者账户已注册或邮箱已验证。
-- 政策生效日期：`2026-10-19`，中英文政策已填写并移除草稿提示；生效日期不代表政策链接已公开可访问。
-- 隐私政策 URL 已确定：[英文政策](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md)。仓库已公开；2026-10-19 已确认中英文政策无需登录即可访问（HTTP 200）。
-- 支持页面 URL 已确定：[使用指南](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md)。2026-10-19 已确认无需登录即可访问（HTTP 200）；隐私咨询与使用反馈可发送到上述邮箱。
-- 完成后台数据使用勾选、单一用途／权限声明、分类、语言、分发地区和可见性设置；建议分类为 Productivity，按实际目标地区填写分发范围。本文提供事实依据，不代替已完成申报或审核通过的证明。
-- 截图按语言上传；小宣传图与大宣传图不支持本地化，所有语言共用英文 `promo-*`，见[图片上传清单](store/README.md)。
-- 提交前重新构建并核对 ZIP：版本、各语言简介、Manifest 引用文件与所测构建一致，`manifest.json` 必须位于 ZIP 根目录。商店图片与政策文档单独发布，不打入扩展包。
-
-### 公开链接与后台填写
-
-仓库已创建为 `lyyourc/JustOneHop`，默认分支为 `main`。仓库已设为公开，以下地址可直接复制到商店后台，无需另建 GitHub Pages。
-
-```text
-隐私政策：https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md
-中文政策：https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.md
-项目首页：https://github.com/lyyourc/JustOneHop
-使用帮助：https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md
-```
-
-商店隐私政策字段填写英文版，其顶部已有中文互链。公开仓库后，在退出登录或无痕窗口中检查：链接正常显示完整正文、两种语言互链可用、联系邮箱和生效日期正确、没有草稿占位符。完成这些检查后再提交商店审核；已登录的仓库所有者能够访问，不代表审核人员能够匿名访问。仓库重新变为私有、重命名或移动文件时，需要同步维护这些链接。
-
-| 后台项目 | 本项目填写依据／剩余操作 |
-| --- | --- |
-| 开发者联系 | `lyyourc` / `liangyida42@gmail.com`；在后台完成其要求的联系验证 |
-| 名称、简介、详细介绍 | 使用下方对应语言区块；默认语言为英文，中文填写到对应语言项 |
-| 分类 | 建议选择后台的 Productivity 相关分类 |
-| 隐私政策 | `https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md`；提交审核前确认仓库公开且可匿名访问 |
-| 项目首页／支持页面 | 分别使用上方项目首页与使用帮助地址；提交审核前确认可匿名访问 |
-| 单一用途、权限与远程代码 | 使用本文对应段落；无远程托管执行代码 |
-| 数据使用 | 结合本文事实依据与后台当时的字段定义填写；不因无开发者上传就一律勾选“不处理数据” |
-| 测试账号 | 无需账号、登录、订阅、许可证密钥或测试凭据 |
-| 审核操作说明 | 使用下方英文操作步骤 |
-| 分发地区、可见性与发布时机 | 由发布者在后台选择；本文不预设全球发布或自动上线 |
-| 图片 | 中英文截图分别填写，英文大小宣传图共用，见素材清单 |
-
-### 本地生成发布 ZIP
-
-在仓库根目录运行（需要系统提供 `zip` 和 `unzip`）：
-
-```sh
-npm run package:store
-```
-
-命令先构建，再按 Manifest 版本生成 `releases/justonehop-<version>.zip`。打包脚本在临时目录复制 `dist/`，排除 `*.map`，并移除 JS/CSS 文件末尾由 esbuild 生成的 `sourceMappingURL` 注释；不额外嵌套 `dist/` 目录，也不改动本地调试文件。全新 ZIP 完成完整性检查后替换同版本旧包，避免旧条目残留；失败时保留原包。`releases/` 为本地忽略目录，不提交 Git。结构检查通过不代表商店审核通过或完整浏览器功能验收。仓库已公开且上述政策与帮助链接已验证匿名访问；最终提交前仍需完成后台字段和上传，并确认链接保持有效。
+本文档是 **小范围瞬移 · JustOneHop** 在 Chrome Web Store 上架与版本审核的官方权威参考，整理了中英文商店文案、后台权限与单一用途声明、数据使用申报依据、审核员操作指引（Reviewer Instructions）及发布清单。
 
 ---
 
-## 中文商店信息
+## 基本信息一览
 
-名称：小范围瞬移
+| 字段 | 填写内容 | 说明 |
+| --- | --- | --- |
+| **扩展名称 (Name)** | `JustOneHop`（默认语言） / `小范围瞬移`（中文） | 英文首字母大写；中文名统一 |
+| **适用版本** | `0.1.0` | 对应 `manifest.json` |
+| **扩展 ID** | `mbofggnjaoneioopfbpheapgphmkclbo` | 商店官方分配唯一标识 |
+| **开发者账号** | `lyyourc` | 个人开发者 |
+| **支持与隐私邮箱** | `liangyida42@gmail.com` | 已验证联系邮箱 |
+| **商店分类** | `Productivity`（效率工具） | 建议分类 |
+| **分发范围** | `Public` / `All regions` / `Free` | 公开、全区免费分发 |
+| **隐私政策 URL** | `https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md` | 英文为主，页面顶部有中文互链 |
+| **项目主页 URL** | `https://github.com/lyyourc/JustOneHop` | GitHub 仓库公开主页 |
+| **支持页面 URL** | `https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md` | 使用指南（默认英文，提供中文链接） |
 
-### 简介（可直接粘贴，49 字符）
+---
 
+## 1. English Store Listing
+
+### Name (Paste-ready)
+```text
+JustOneHop
+```
+
+### Short Description (Paste-ready, 128 characters)
+```text
+A human-first command palette for Chrome. Search tabs, bookmarks, and history, and run actions naturally with keyboard or mouse.
+```
+
+### Detailed Description (Paste-ready)
+```text
+When you have dozens of tabs open, finding the page you were just looking at shouldn't mean squinting at tiny tab titles. JustOneHop adds a clean, Chrome-native command palette that lets you search open tabs, bookmarks, browsing history, and browser actions in one place.
+
+Click the toolbar icon or press Command+Shift+P on macOS (Ctrl+Shift+P on Windows/Linux). Everything works naturally with your mouse, keyboard shortcuts, or both—without memorizing cryptic prefixes or command modes.
+
+Key features:
+• Search tabs, bookmarks & history together: Find open tabs, saved bookmarks, and recent 7-day history from a single search bar, or expand to Search All History with one click.
+• Switch recent tabs like Alt+Tab: Open the built-in Tab Switcher to cycle through open tabs in most-recently-used (MRU) order. Hold and release the shortcut to jump, or type anytime to filter by title or domain.
+• Tidy tabs without losing your place: Right-click a tab result or press Command+K to copy its URL, pin or unpin, mute, reload, add or remove a bookmark, or close the tab. Most organizing actions keep the panel open and preserve the selected item; when a result is removed, an adjacent item is smoothly selected.
+• Manage Chrome Tab Groups: Search, inspect, expand/collapse, rename, ungroup, or close entire native tab groups with clear confirmation dialogs.
+• Tab Tucking (Declutter without closing): Slide idle tabs into a neat, native collapsed group (Tucked · N) without closing them or losing form states. Easily untuck individual tabs or undo the whole batch.
+• Everyday commands in plain words: Type “new tab”, “reopen closed tab”, “downloads”, “extensions”, “passwords”, or “dark mode” to run browser actions directly—no special syntax required.
+• Chrome-native Light & Dark themes: Built around Chrome's CR2023 design language, automatically matching your system appearance.
+• Read-only site storage viewer: Search “local storage”, “session storage”, or “cookies” to inspect keys and formatted JSON for the current page without opening heavy DevTools. Cookie inspection requests host access strictly per site.
+
+Local & private by design:
+• Tab, bookmark, and history searches run locally on your device—no account, developer server, telemetry, or tracking. When you explicitly choose Google Search or open a URL, your browser connects to that website directly.
+• Preferences and search ranking records stay on your device and are never synced to the cloud. Ranking records may include search terms and full URLs; you can click the × icon on any result or use “Reset search ranking” in Settings to clear them at any time.
+• Site storage values are read only in memory while viewing; copied values are placed on your system clipboard. See the linked Privacy Policy for full details.
+
+Usage notes:
+Regular webpages use a centered in-page overlay; restricted pages where Chrome blocks content scripts (such as chrome:// pages or the Chrome Web Store) automatically open in a lightweight companion window. Shortcuts can be customized in chrome://extensions/shortcuts; setting up Ctrl+Tab takes just 10 seconds via our built-in guided helper.
+```
+
+---
+
+## 2. 中文商店文案
+
+### 名称（可直接复制）
+```text
+小范围瞬移
+```
+
+### 简介（可直接复制，49 字符）
+```text
 一个让日常浏览器操作更顺手的命令面板。轻松搜索标签页、书签与历史，随时用快捷键或鼠标执行常用操作。
+```
 
-### 详细介绍（可直接粘贴）
-
+### 详细介绍（可直接复制）
+```text
 网页开多了，想切回刚才看的页面总要在标签栏里找半天？「小范围瞬移」为 Chrome 提供一个贴合原生视觉与手感的命令面板，让你在一个搜索框里查找标签页、书签、浏览历史和常用操作。
 
 点击工具栏图标，或按 ⌘Shift+P（Windows/Linux 为 Ctrl+Shift+P）即可打开。无论是直接用鼠标点选、习惯键盘快捷键，还是两者混用都很顺手，不需要背诵任何搜索前缀或命令语法。
@@ -72,128 +83,142 @@ npm run package:store
 核心功能：
 • 统一搜索标签页、书签与历史记录：同时检索当前窗口已打开的标签页、收藏夹书签与最近 7 天浏览历史，也可一键展开搜索全部历史。
 • 像 Alt+Tab 一样切换最近标签页：内置最近标签切换器（Tab Switcher），按最近访问顺序（MRU）排列标签页。支持按住快捷键松手即切，或直接打字按标题、域名筛选。
-• 右键或按 ⌘K 连续整理标签页：在标签页结果上打开操作菜单，即可复制链接、固定／取消固定、静音、刷新、添加或移除书签、关闭标签页。多数整理操作后面板保持打开并保留当前选中项；结果移除后选择邻近项，方便继续整理。关闭或刷新面板来源页时，面板可能随之关闭。
+• 右键或按 ⌘K 连续整理标签页：在标签页结果上打开操作菜单，即可复制链接、固定／取消固定、静音、刷新、添加或移除书签、关闭标签页。整理操作后面板保持打开并自动选中相邻项，方便连续整理多个页面。
+• 原生标签组管理：直接搜索组名进入成员列表，支持展开／折叠、重命名、解散分组（保留所有页面）或安全关闭整个分组。
+• 智能标签收起 (Tab Tucking)：把暂时不看的页面移入 Chrome 原生折叠组（如“已收起 · 4”），不关闭页面也不丢表单，随时一键搜出恢复或撤销整批收起。
 • 日常中英文口语直达命令：直接输入“新建标签页”“恢复关闭的标签页”“历史记录”“下载”“扩展”“深色模式”或“new tab”“downloads”“settings”即可执行，无需输入模式前缀。
 • Chrome 原生深浅色外观：界面遵循 Chrome CR2023 设计语言，浅色与深色模式自动跟随系统或手动切换。
-• 只读网站存储查看器：输入“local storage”“session storage”或“cookie”，可在分栏视图中查看并复制当前网页的存储键值；读取 Cookie 时仅按当前站点申请权限。
+• 只读网站存储查看器：输入“local storage”“session storage”或“cookie”，免开 F12 DevTools，直接在双栏视图中格式化查看并复制当前网页的存储键值；读取 Cookie 时仅按当前站点申请授权。
 
 隐私与本地运行：
-• 标签页、书签和历史检索在本地完成，无需注册账号，无开发者后端或遥测，不向开发者上传浏览数据。主动执行 Google 搜索或打开网址时，浏览器会访问相应网站。
-• 偏好设置与搜索排序记录仅保存在本机，不通过云端同步。搜索排序记录可能包含搜索词与完整网址，可在设置中使用“重置搜索排序”清除；该操作不会重置语言、主题或其他扩展状态。
+• 标签页、书签和历史检索全部在本机完成，无需注册账号，无开发者后端或遥测，绝不向开发者上传浏览数据。主动执行 Google 搜索或打开网址时，浏览器会直接访问相应网站。
+• 偏好设置与搜索排序记录仅保存在本机，不通过云端同步。受到本地学习前移的结果会展示小钟表图标，点击 × 或按 Shift+Backspace 即可随时遗忘；也可在设置中使用“重置搜索排序”一键清除。
 • 网站存储查看器中的内容仅在当前面板内存中只读展示，不写入持久存储；你主动复制的内容会进入系统剪贴板。完整说明请参阅隐私政策链接。
 
-使用说明
-普通网页以居中浮层展示；在 Chrome 内置页、应用商店等限制脚本注入的页面会自动切换为独立窗口。地址栏持有焦点时，可能需要点击搜索框开始输入。快捷键可在 Chrome 扩展快捷键设置中修改；Ctrl+Tab 切换需按内置说明配置。当前实机测试主要在 macOS 完成，Windows/Linux 尚未完成同等真机覆盖。
+使用说明：
+普通网页以居中浮层展示；在 Chrome 内置页、应用商店等限制脚本注入的页面会自动切换为独立窗口。地址栏持有焦点时，点击搜索框即可开始输入。快捷键可在 Chrome 扩展快捷键设置中修改；Ctrl+Tab 切换可通过内置引导 10 秒快速配置。
+```
 
 ---
 
-## English store information
+## 3. 审核后台：权限与单一用途声明
 
-Name: JustOneHop
+### 单一用途说明 (Single Purpose)
 
-### Short description (paste-ready, 128 characters)
-
-A human-first command palette for Chrome. Search tabs, bookmarks, and history, and run actions naturally with keyboard or mouse.
-
-### Detailed description (paste-ready)
-
-When you have dozens of tabs open, finding the page you were just looking at shouldn't mean squinting at tiny tab titles. JustOneHop adds a clean, Chrome-native command palette that lets you search open tabs, bookmarks, browsing history, and browser actions in one place.
-
-Click the toolbar icon or press Command+Shift+P on macOS (Ctrl+Shift+P on Windows/Linux). Everything works naturally with the mouse, keyboard shortcuts, or both—without memorizing cryptic prefixes or command modes.
-
-Key features:
-• Search tabs, bookmarks & history together: Find open tabs, saved bookmarks, and recent 7-day history from a single search bar, or expand to Search All History with one click.
-• Switch recent tabs like Alt+Tab: Open the built-in Tab Switcher to cycle through open tabs in most-recently-used (MRU) order. Hold and release the shortcut to jump, or type anytime to filter by title or domain.
-• Tidy tabs without losing your place: Right-click a tab result or press Command+K to copy its URL, pin or unpin, mute, reload, add or remove a bookmark, or close the tab. Most organizing actions keep the panel open and preserve the selected item; when a result is removed, a nearby item is selected. Closing or reloading the page that opened the panel may also close the panel.
-• Everyday commands in plain words: Type “new tab”, “reopen closed tab”, “downloads”, “extensions”, “passwords”, or “dark mode” to run browser actions directly—no special prefix required.
-• Chrome-native Light & Dark themes: Built around Chrome's CR2023 Omnibox and Tab Search look, automatically matching your system appearance.
-• Read-only site storage viewer: Search “local storage”, “session storage”, or “cookies” to inspect and copy keys and formatted JSON for the current page, requesting host permission only for the site you choose to inspect.
-
-Local & private by design:
-• Tab, bookmark, and history searches run locally—no account, developer server, telemetry, or tracking. When you choose Google Search or open a URL, your browser connects to the corresponding website.
-• Preferences and search ranking records stay on your device and are never synced to the cloud. Ranking records may include search terms and full URLs; use Reset search ranking in Settings to clear them. This does not reset the language, theme, or other extension state.
-• Site storage values are read only in memory while viewing; copied values are placed on your system clipboard. See the linked Privacy Policy for full details.
-
-Usage notes
-Regular webpages use a centered in-page overlay; restricted pages where Chrome blocks content scripts (such as chrome:// pages or the Chrome Web Store) automatically open in a standalone window. If the browser address bar holds focus, you may need to click the search input to start typing. Shortcuts can be customized in Chrome's extension shortcut settings; binding Ctrl+Tab uses the built-in setup guide. Current hands-on testing is primarily on macOS; Windows and Linux have not yet received equivalent hardware coverage.
-
----
-
-## 审核后台：单一用途说明
-
-中文：
-
-通过一个本地命令面板查找和操作浏览器中的内容：搜索与切换标签页、书签和历史，整理原生标签组，执行当前页面及浏览器操作；当前页面工具还提供用户主动触发的只读网站存储查看。
-
-English (paste-ready):
-
+#### English (Paste-ready)
+```text
 Provide a local command palette for finding and acting on browser content: search and switch between tabs, bookmarks, and history; organize native tab groups; and run current-page and browser actions. Current-page tools also include a read-only website storage viewer opened explicitly by the user.
+```
 
-审核注意：网站存储查看器与导航／标签管理的用途关联仍需审核方判断。此说明完整披露现有功能，不表示单一用途审核已通过，也不能用共用界面替代对功能关联的解释。
+#### 中文对照
+```text
+通过一个本地命令面板查找和操作浏览器中的内容：搜索与切换标签页、书签和历史，整理原生标签组，执行当前页面及浏览器操作；当前页面工具还提供用户主动触发的只读网站存储查看。
+```
 
-## 审核后台：权限用途（英文，可按字段复制）
+### 权限正当性声明 (Permission Justifications)
 
-| Manifest 权限 | Justification |
+| Manifest 权限 | Justification (Paste-ready in CWS Console) |
 | --- | --- |
 | `activeTab` | Temporarily access the active page after the user invokes the extension, to open the command palette and inspect that page's top-level Local Storage or Session Storage on request. |
 | `contextMenus` | Provide Help and keyboard shortcut settings from the extension toolbar icon's context menu. |
-| `cookies` | Read cookies matching the current page URL when the user opens the read-only cookie viewer. Reading also requires applicable website access. Cookie values are not persisted by the extension or uploaded to the developer. |
+| `cookies` | Read cookies matching the current page URL when the user explicitly opens the read-only cookie viewer. Reading also requires applicable website access. Cookie values are never persisted by the extension or uploaded to the developer. |
 | `scripting` | Inject the packaged command palette into the user-selected page and run packaged functions to read its top-level Local Storage or Session Storage when requested. No remote scripts are executed. |
 | `tabs` | Read tab titles, URLs, and state to search and switch tabs, and carry out requested tab actions such as pinning, muting, closing, and tucking. |
 | `bookmarks` | Search the user's bookmark titles, URLs, and folders, and create or remove native bookmarks when the user requests those actions. |
 | `history` | Query recent history and user-requested full-history searches to find pages. The extension does not persist a copy of the entire history database or modify it. Successful selections may contribute a search term and URL to local ranking records. |
 | `sessions` | Restore the most recently closed tab or window when requested by the user. |
 | `storage` | Store preferences, search ranking records, and tuck timing/recovery records locally, and keep temporary panel and tuck state in session storage. No chrome.storage.sync is used. |
-| `favicon` | Display site icons using Chrome's favicon interface without a third-party icon service. |
+| `favicon` | Display site icons using Chrome's native favicon interface without any third-party icon service. |
 | `tabGroups` | Display and manage native Chrome tab groups and move tabs into or out of collapsed groups for manual tucking and optional Auto Tuck. |
 | `alarms` | Schedule Auto Tuck scans and cleanup retries, and periodically synchronize the toolbar icon with the system color scheme. |
 | `idle` | Check whether the computer is idle before running automatic tab tucking, avoiding automatic changes while the user is active. |
 | `offscreen` | Run a packaged local page that reads the system light/dark preference through matchMedia so the toolbar icon can follow system appearance even when the palette is closed. |
 
-### 广泛网页匹配与可选网站权限说明（英文，可直接粘贴）
+### 广泛网页匹配与可选网站权限声明 (Broad Host & Optional Permissions)
 
+#### English (Paste-ready)
+```text
 The packaged recent-keys.js content script runs at document_start in HTTP/HTTPS pages and their subframes where Chrome allows access. It tracks Control/Meta/Alt modifier state and reports modifier release during recent-tab switching. Subframe coverage allows release detection when focus is inside a frame. It does not record typed text, input field contents, or page contents, and does not persist or upload keyboard events.
 
 The optional host permission declaration allows the user to grant specific website access needed by the cookie viewer. The extension does not request the entire wildcard range for cookie viewing. When required access is missing, a user click requests exact current and ancestor hosts up to the registrable domain, covering HTTP/HTTPS and all paths, without wildcard sibling subdomains. This is website access, not a cookie-only permission. Existing applicable grants may mean no additional prompt is needed. Users can revoke website access in Chrome settings.
+```
 
-### 远程代码说明（英文，可直接粘贴）
+### 远程代码合规声明 (Remote Code Policy)
 
+#### English (Paste-ready)
+```text
 The extension does not load or execute remotely hosted code. JavaScript and dependencies are bundled in the extension package. Google search and other URL actions navigate browser tabs to websites at the user's request; they do not load remote code into the extension.
+```
 
-### 数据使用申报事实依据
+### 数据安全申报准则 (Data Safety Questionnaire)
 
-按后台届时对“收集”“使用”和数据类别的定义逐项填写，不因“本地处理”直接推导为所有选项均为否。
+在 Chrome Web Store 后台「Data usage / 数据使用」问卷中，务必按照以下事实勾选：
 
-- 访问并处理浏览活动：标签标题、网址、书签和历史搜索结果。
-- 本地持久记录包含搜索词、目标网址／标识、选择时间，以及收起恢复所需的完整网址。
-- 网站存储查看器可能读到个人信息、Cookie、会话标识及认证令牌；不能声明“不接触认证信息”。这些值不持久写入扩展存储，不上传给开发者。
-- 快捷键桥接处理修饰键状态，不记录用户普通打字内容。
-- 用户主动执行 Google 搜索时，查询通过导航发送给 Google；没有输入时的在线联想请求。
-- 无数据出售、广告用途、信用评估、开发者遥测或与所述功能无关的数据使用。
-- 联系邮箱、隐私政策 URL、后台申报及实际包行为必须一致；阅读后台认证声明后再勾选。
+1. **Web History / 网页历史记录**：勾选“处理”，用途说明选择 `App functionality`。声明数据仅在用户本机处理，不传输至任何外部服务器。
+2. **User Activity / 用户活动**：勾选“处理”（标签页管理、书签与搜索习惯），用途为 `App functionality`。
+3. **Authentication Info / 认证信息**：只读存储查看器（Cookie / SessionStorage）可能展示当前站点的认证 Token，因此按合规要求勾选为“功能需要读取”，并明确说明：*Values are displayed read-only in memory upon explicit user request and never persisted or transferred off-device.*
+4. **Data Selling / 数据出售**：勾选 **No**（绝不出售数据）。
+5. **Targeted Advertising / 针对性广告**：勾选 **No**（无广告目的）。
+6. **Credit Assessment / 信用评估**：勾选 **No**。
 
-## 审核后台：操作说明（英文，可直接粘贴）
+---
 
-No account, sign-in, subscription, license key, or test credentials are required. Use Chrome 127 or later. All extension features are available locally; websites opened by the reviewer may have their own access requirements.
+## 4. 审核员测试指引 (Reviewer Instructions)
 
-1. Open a few ordinary HTTPS pages in one Chrome window. Click the extension toolbar icon to open the command palette. You can also use Command+Shift+P on macOS or Ctrl+Shift+P on Windows/Linux. If a shortcut is already assigned elsewhere, use the toolbar icon or configure it at chrome://extensions/shortcuts.
-2. Search for part of an open tab's title or domain and click a result to switch to it. Bookmark one of the test pages using Chrome, then search again to see bookmark results. History results depend on the browsing history in the test profile; the main search covers the last seven days and offers Search All History. An empty profile may have no bookmark or history matches.
-3. Right-click a tab result to open its action menu. Try copying its URL, pinning/unpinning it, or adding/removing its bookmark. Available actions depend on the selected result. Use disposable test tabs for close actions; pinned tabs are protected.
-4. Search for "tab switcher" in the main palette and open it. Type a title or domain to filter recent tabs, then click a result or press Enter to switch. This path does not require holding a modifier key or changing system keyboard settings.
-5. Search for "settings" to change language or appearance and inspect the search-ranking reset control. Search selections can create local ranking records; resetting them does not revoke website permissions or clear all other extension data.
-6. On an ordinary HTTPS page, search for "local storage", "session storage", or "cookie" and open the matching viewer. An empty list is expected when the page has no applicable values. Local Storage and Session Storage are limited to the top-level page. If cookie access is missing, follow the explicit website-access button and Chrome permission prompt. The requested hosts can include the current host and necessary parent hosts. Values are read-only; copying a value places it on the system clipboard. Please use a test page/profile without personal credentials when inspecting storage.
-7. To inspect native tab-group management, search for "tuck tab" on a disposable, unpinned tab. The tab moves into a collapsed native group; it is not closed or discarded. Search for "undo tuck" to undo the latest batch. Auto Tuck is optional, off by default, and uses a seven-day inactivity threshold plus idle checks; it is not expected to run immediately during a short review.
-8. On restricted pages such as chrome:// pages or the Chrome Web Store, the palette opens in a standalone extension window. If the browser address bar retains focus, click the palette's search field. macOS has received the primary hands-on coverage; equivalent Windows/Linux hardware coverage has not been completed.
+在 CWS 后台的 **Instructions for the reviewer** 中直接粘贴以下英文测试指引：
 
-The extension has no developer backend or telemetry. Searches of tabs, bookmarks, and history run locally. Executing Google Search or opening a website explicitly navigates the browser to that external destination. Website storage values are not persisted by the extension or uploaded to the developer. See the supplied privacy policy for local ranking and group-recovery retention details.
+```text
+No account, sign-in, subscription, license key, or test credentials are required. Use Chrome 127 or later. All extension features run locally on the client.
 
-Support and review contact: liangyida42@gmail.com (developer: lyyourc).
+1. Quick Navigation:
+Open 3-4 ordinary HTTPS websites in a Chrome window. Click the JustOneHop toolbar icon (or press Command+Shift+P on macOS / Ctrl+Shift+P on Windows/Linux). Type a word from an open tab's title and press Enter to switch to it immediately.
 
-## 文案边界与参考
+2. Bookmark & History Search:
+Bookmark one of your test pages. Summon the palette again and search for it to see the native bookmark result. Type "history" to test the 7-day and full-history search capabilities.
 
-不使用“完全不保存浏览数据”“所有权限都按需申请”“90 天后彻底自动删除”“收起释放内存”或“所有平台已全面验证”等表述。图片、公开政策部署和后台实际填写仍是独立发布步骤。
+3. Continuous Tab Actions:
+In the search results, right-click any tab or press Command+K (Ctrl+K) to open the action menu. Try pinning/unpinning, muting, or copying the clean URL. Notice that the palette remains open and automatically selects the adjacent tab so multiple tabs can be organized consecutively.
 
-- [简介长度上限](https://developer.chrome.com/docs/extensions/reference/manifest/description)：132 字符。
-- [隐私政策 FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq)：本地处理用户数据也需要政策。
-- [隐私字段说明](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy)。
-- [单一用途说明](https://developer.chrome.com/docs/webstore/program-policies/quality-guidelines-faq)。
+4. Tab Switcher (Alt+Tab style):
+Search for "tab switcher" in the palette, or use the default shortcut (Control+J on macOS / Ctrl+, on Windows/Linux). Hold the modifier key, tap through recent tabs, and release the modifier to switch. Alternatively, click the search bar or press Command+F to filter tabs on the fly.
+
+5. Tab Tucking:
+With an unpinned tab active, summon the palette and search for "tuck tab". The tab will be safely moved into a collapsed native Chrome Tab Group ("Tucked · 1") without closing the page. Type "undo tuck" to restore it.
+
+6. Site Storage & Cookie Inspector:
+On an ordinary HTTPS website, summon the palette and search for "local storage", "session storage", or "cookie". The viewer renders keys on the left and formatted JSON values on the right. Press Enter to copy the raw value. If cookie access is missing, click the explicit grant button to trigger Chrome's host permission dialog. All data is read-only and processed solely in memory.
+
+7. Standalone Window Fallback:
+Navigate to a restricted page such as chrome://extensions or chrome://settings and summon the palette. JustOneHop automatically opens in a lightweight companion window centered in the viewport, ensuring uninterrupted service.
+
+Support & review contact: liangyida42@gmail.com (developer: lyyourc).
+```
+
+---
+
+## 5. 本地打包与发布检查清单
+
+### 生成发布 ZIP
+
+在仓库根目录执行：
+
+```sh
+npm run package:store
+```
+
+该命令会自动：
+1. 运行完整构建（`npm run build`）；
+2. 提取 `dist/` 中的发布文件，严格剔除 `*.map` 源映射文件与代码末尾的 `sourceMappingURL` 注释；
+3. 将 `manifest.json` 放置于 ZIP 根目录，在 `releases/` 目录下生成 `justonehop-<version>.zip`；
+4. 执行 ZIP 包完整性校验。
+
+### 提交前最终检查清单
+
+- [ ] `manifest.json` 中的 `version` 与发布目标版本一致（如 `0.1.0`）。
+- [ ] 运行 `npm run check`，确保类型检查、单元测试与构建全部通过（0 errors）。
+- [ ] 确认公开仓库的政策与支持链接在隐私窗口下匿名可访问：
+  - [x] [Privacy Policy](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md) (HTTP 200)
+  - [x] [Usage Guide](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md) (HTTP 200)
+- [ ] 按照 [图片清单](store/README.md) 在 CWS 后台分别上传截图（中英文各 3 张 1280×800 截图，以及共用的小宣传图与大宣传图）。
+- [ ] 检查并粘贴本文档中的对应文案与英文审核指引。
+- [ ] 点击「Submit for review」提交审核。

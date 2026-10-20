@@ -1,285 +1,345 @@
-# 使用指南
+# JustOneHop User Guide
 
-[返回 README](../README.md) · [架构决策](adr/README.md)
+English · [简体中文](USAGE.zh-CN.md) · [Back to README](../README.md)
 
-本文说明小范围瞬移的核心操作、搜索规则与使用边界。快捷键以 macOS 为例（Windows/Linux 使用 Ctrl 代替 Command，Alt 代替 Option；最近标签页切换的系统差异见[最近标签页切换](#最近标签页切换)）。
+Welcome to the **JustOneHop** (小范围瞬移) User Guide! JustOneHop is a human-first, Chrome-native command palette designed to make tab navigation, switching, decluttering, and site inspection fast and pleasant.
 
-文中「主搜索」指小范围瞬移的主搜索层，「来源页」（source）指唤起面板时的标签页（包括 Chrome 内置页），「承载页」指显示网页浮层所依附的标签页。独立面板同样绑定其来源页；来源删除后不重绑。
+Whether you prefer the speed of keyboard shortcuts, the comfort of your trackpad/mouse, or switching fluidly between both, JustOneHop meets you right where you are.
 
-## 使用帮助
+---
 
-可在空搜索首页的推荐列表选择「小范围瞬移：使用帮助 /小范围瞬移：Help」，或在主搜索中输入 `help`、「帮助」或「使用说明」，或从「设置 → 通用 → 使用帮助」在面板内打开帮助；也可右键点击工具栏的小范围瞬移图标选择「使用帮助」，在当前窗口新建独立帮助标签页（每次均新建，不复用已有帮助页）。
+## Table of Contents
 
-内置帮助说明关闭操作的会话边界：关闭非来源页可继续整理；来源页一旦被直接、批量连带或外部关闭，当前小范围瞬移会话结束，即使面板正停留在帮助子页也不例外。
+- [1. Quick Start](#1-quick-start)
+- [2. Unified Search: Find Anything in One Hop](#2-unified-search-find-anything-in-one-hop)
+  - [Search Tabs, Bookmarks & History](#search-tabs-bookmarks--history)
+  - [Real-World Query Examples](#real-world-query-examples)
+  - [Smart Aliases & Typo Tolerance](#smart-aliases--typo-tolerance)
+  - [Instant URL Navigation & Google Search](#instant-url-navigation--google-search)
+- [3. Tab Switcher: Recent Tabs like VS Code](#3-tab-switcher-recent-tabs-like-vs-code)
+  - [Hold, Cycle, and Release](#hold-cycle-and-release)
+  - [Setting Up Ctrl+Tab in 10 Seconds](#setting-up-ctrltab-in-10-seconds)
+  - [Filter Tabs on the Fly](#filter-tabs-on-the-fly)
+- [4. Tab Housekeeping & Quick Actions (`⌘K`)](#4-tab-housekeeping--quick-actions-k)
+  - [Continuous Multi-Tab Tidy](#continuous-multi-tab-tidy)
+  - [Manage Native Tab Groups](#manage-native-tab-groups)
+  - [Instant Bookmarking (`⌘D`)](#instant-bookmarking-d)
+- [5. Tab Tucking: Declutter without Closing](#5-tab-tucking-declutter-without-closing)
+  - [Manual Tucking](#manual-tucking)
+  - [Automatic Idle Tucking](#automatic-idle-tucking)
+  - [Restoring & Undoing](#restoring--undoing)
+- [6. Developer Inspection: LocalStorage, SessionStorage & Cookies](#6-developer-inspection-localstorage-sessionstorage--cookies)
+  - [Two-Pane Side-by-Side Preview](#two-pane-side-by-side-preview)
+  - [Permissions & Privacy](#permissions--privacy)
+- [7. Navigation, Gestures & Panel Placement](#7-navigation-gestures--panel-placement)
+  - [The 44px Footer & Breadcrumbs](#the-44px-footer--breadcrumbs)
+  - [Multi-Level Back & Trackpad Swiping](#multi-level-back--trackpad-swiping)
+  - [In-Page Overlay vs. Dedicated Window](#in-page-overlay-vs-dedicated-window)
+- [8. Local Learning & Habit Memory](#8-local-learning--habit-memory)
+- [9. Complete Keyboard & Mouse Shortcuts](#9-complete-keyboard--mouse-shortcuts)
 
-内置帮助随扩展打包，无需联网或网站访问权限，并跟随已保存的主题与语言偏好。各章节按功能要点结构化排版，支持通过顶部胶囊搜索快速筛选，并在默认视图顶部提供前往 GitHub 查看完整图文使用指南（`docs/USAGE.md`）的快捷引导卡片。在面板内按 Esc、点击返回或在空搜索框中按 Backspace 返回上一层并恢复上下文；在独立帮助页则直接关闭该标签页。
+---
 
-工具栏 logo 自动跟随系统浅色／深色，面板关闭时也会更新。系统变化事件之外，每 30 秒检查一次作为兜底，窗口重新聚焦时同步；Chrome 休眠或调度可能延后更新。`offscreen` 权限仅用于在本机监听系统配色，不读取网站或发起网络请求。Chrome 自定义主题、浏览器单独指定的工具栏颜色与无痕背景不能据此精确识别。搜索框左侧 logo 则跟随面板主题设置，点击仍聚焦搜索；Tab Switcher 中点击会启用搜索。
+## 1. Quick Start
 
-**工具栏图标右键菜单**
+<a id="使用帮助"></a>
 
-右键工具栏的小范围瞬移图标提供两个扩展菜单项（仅使用 `contextMenus` 权限，不向网页右键菜单添加入口）：
+### Summon the Palette
 
-| 菜单项 | 说明 |
-| --- | --- |
-| 打开小范围瞬移：实际快捷键 · 修改快捷键 | 显示 Chrome 当前实际绑定（未绑定时明确说明）；点击在当前窗口打开或切换到 `chrome://extensions/shortcuts` |
-| 使用帮助 | 在当前窗口新建内置帮助标签页 |
+Press **`⌘Shift+P`** on macOS or **`Ctrl+Shift+P`** on Windows/Linux anywhere in your browser (or simply click the JustOneHop icon in your Chrome toolbar).
 
-若在快捷键设置页改键后立即于同一标签页右键，菜单可能仍显示旧绑定；切换标签页或打开一次小范围瞬移后再打开菜单即可刷新。
+```
+macOS:         ⌘ + Shift + P
+Windows/Linux: Ctrl + Shift + P
+```
 
-## 搜索与导航
+<picture>
+  <img alt="Unified Search" src="store/en-1-search.png" width="100%">
+</picture>
 
-### 基本操作
+### What You See When Opened
 
-| 操作 | 说明 |
-| --- | --- |
-| `Cmd+Shift+P` | 打开或关闭面板（默认绑定） |
-| 直接输入关键词 | 用中文、英文或常用拼音统一搜索当前窗口标签页、书签、最近一周浏览历史、命令和设置，无需模式前缀 |
-| `↑` / `↓` 或 `Ctrl+P` / `Ctrl+N` | 上下循环选择结果 |
-| `Option+↑` / `Option+↓` 或 `PageUp` / `PageDown` | 按可见列表高度翻页 |
-| `Cmd+↑` / `Cmd+↓` | 跳到结果首尾，空搜索首页同样适用，不按分组跳转 |
-| `Enter` | 执行选中项 |
-| `Cmd+K` 或右键候选项 | 打开选中结果的操作菜单 |
-| `Cmd+,` | 打开设置 |
-| `Esc` / 空搜索框 `Backspace` | 逐层退出菜单或二级页；在主搜索层按 `Esc` 关闭面板 |
+When you open JustOneHop without typing anything, you are greeted by the **Home View**—a curated list of useful entry points and recent favorites:
 
-搜索框尾部默认显示可点击的 `esc` 键帽。有搜索内容时，鼠标悬停按钮或键盘聚焦显示 `×`，点击只清空本层搜索并恢复输入焦点，不退出当前视图。搜索为空时保留 `esc`，点击退出最深的一层，在主搜索层关闭面板。按钮位置与尺寸保持不变，悬浮说明提示当前动作；键盘 Esc 始终逐层退出。
+- **Tab Switcher**: Jump straight to your most recently used tabs.
+- **Search All History**: Search beyond the past 7 days across your full browsing history.
+- **Quick Controls**: Access Settings, built-in Help, New Tab, Reload, or Pin/Mute.
+- **Storage Viewers**: Instant access to Local Storage, Session Storage, and Cookies.
 
-普通单击搜索结果仍执行主操作；主搜索与历史搜索支持拖选结果文字，松开鼠标不会打开页面。这两处搜索中的标签页、历史、书签等带 URL 的候选在右键、底栏「操作」或 `Cmd+K` 菜单提供「复制 URL / Copy URL」：复制完整地址（含查询参数与片段），不导航、不记录排序偏好。成功后面板保持打开，保留搜索词与选中项，并恢复输入焦点、光标／文字选区。
+> [!TIP]
+> **Need help or want to rebind shortcuts?**
+> Right-click the JustOneHop icon in the Chrome toolbar at any time to check your active keyboard shortcut or open the built-in Help page.
 
-**手动聚焦**：如果打开后焦点落在面板空白处，搜索栏会提示「按 Tab 聚焦搜索框」；按一次 Tab 或点击左侧小范围瞬移 logo即可恢复输入，提示随之隐藏。保留搜索词与输入选区，不执行结果或清空内容。焦点已在底栏等控件上时，Tab／Shift+Tab 沿正常顺序移动，不强行拉回搜索，也不显示失焦提示。设置、历史、Storage、标签组、帮助与操作菜单沿用同一入口；菜单打开时只恢复菜单搜索，确认弹窗不跳到背景。不新增 Cmd/Ctrl+F 聚焦绑定。若焦点仍在 Chrome 地址栏或其他应用，页面收不到按键，需要鼠标点击搜索框或小范围瞬移 logo。
+---
 
-### 命令别名白名单
+## 2. Unified Search: Find Anything in One Hop
 
-内置命令在现有搜索规则上补充固定别名：`prefs / setings` 找设置，`pwd / passowrd` 找密码管理，`plugins / addons / extention / 插件管理` 找扩展管理，`favorites / favourites / 收藏夹` 找书签管理，`donwload` 找下载，`histroy` 找历史，`refesh / relaod` 找刷新，`恢复误关页面 / 撤销关闭` 找恢复标签页，`langauge` 找语言设置，`keybindings / 热键 / shorcut` 找快捷键设置，`local stroage / session stroage / cokies` 找相应存储入口。别名沿用现有排序、说明和高亮，不新增通用纠错算法；关闭、删除仍要求明确意图。
+<a id="搜索与导航"></a>
 
-品牌名支持 `justonehop`、`just one hop`、`just-one-hop`、`joh`、`小范围瞬移`、`瞬移`，英文不区分大小写。可搜 `joh settings`、`joh: help`、`瞬移：语言`、`reload joh`、`重载瞬移`；品牌别名同时用于产品命令和设置分类。仅搜 `reload / refesh / relaod` 仍指向页面刷新，不能解锁扩展重载。
+Stop memorizing special prefix symbols like `>`, `@`, or `%`. JustOneHop indexes everything automatically:
 
-英文错拼摘选自 [Codespell 词典](https://github.com/codespell-project/codespell/blob/master/codespell_lib/data/dictionary.txt)，缩写参考 [prefs](https://en.wiktionary.org/wiki/prefs) 与 [PWD](https://www.abbreviations.com/term/172103/password)，收藏夹叫法参考 [Microsoft 的收藏夹／书签说明](https://support.microsoft.com/zh-cn/edge/organize-favorites-in-microsoft-edge)。这些来源证明词形或叫法存在，不代表本产品输入频率；品牌简称是本项目约定。候选经现有搜索回归筛选，例如 `sesion storage` 会引入 `design` 的无关匹配，因此未加入白名单。
+![Unified Search Demo](demo/en-search.gif)
 
-### 访问网址
+### Search Tabs, Bookmarks & History
 
-输入 `example.com/docs`、`https://example.com/Docs?q=A#Part` 或 `localhost:3000`，首项显示「访问网址」及实际目标地址；匹配结果中的标签页、书签或历史已有相同完整 URL 时，不再重复显示地址候选。协议、路径、查询参数及片段不同仍保留访问入口，主机名大小写、默认端口和根路径末尾斜线按 URL 标准规范化后比较。域名默认补 HTTPS；localhost、127.x.x.x 与 `[::1]` 回环地址默认 HTTP；明确输入的 HTTP(S) 协议优先，保留路径、查询参数及片段。仅接受 HTTP(S)，其他协议、带凭据或包含空白的输入不会生成地址候选。普通关键词继续搜索本地结果，同时提供下述 Google 搜索候选；输入本身不会发起网页搜索，没有在线联想。
+- **Open Tabs**: Type a word from the title or domain, press `Enter`, and hop straight there.
+- **Bookmarks**: Matched seamlessly alongside open tabs. Press `Enter` to navigate in the current tab, or press **`⌘Enter`** (`Alt+Enter` on Windows/Linux) to open in a new active tab.
+- **Browsing History**: Automatically searches the past 7 days. Need older pages? Select **Search All History** (always available at row #7 or by typing `history`).
+- **Chrome Built-in Pages**: Type `extensions`, `passwords`, `downloads`, `bookmarks`, or `chrome settings` to jump directly to Chrome's native management pages.
 
-- 点击地址候选、普通 Enter、底栏「当前页打开」：在唤起小范围瞬移的来源标签页跳转。
-- macOS **⌘Enter**、Windows/Linux **Alt+Enter**，或底栏「在新标签页打开」：在来源窗口新开并切过去；这里的 Windows/Linux 绑定不是 Ctrl+Enter。
-- 右键、底栏「操作」或 Cmd/Ctrl+K 菜单提供同样的两个动作，菜单支持中英文检索。窄屏底栏的新开按钮显示图标，保留可访问名称与完整悬浮说明。
-- 固定来源页禁用原地跳转并提示使用新标签页，菜单和新开快捷键仍可用。输入法组合、长按和额外修饰键不执行；聚焦按钮后 Enter／Space 只执行该按钮。
+### Real-World Query Examples
 
-没有相同 URL 匹配结果时，地址候选固定首位，不受习惯排序影响，也不写选择学习。地址查询沿用最多 100ms 的历史提交预算；输入变化期间旧候选不可执行。书签与历史候选（含全部历史子页）同样以单击／Enter／底栏主动作在来源页打开，⌘Enter（Windows/Linux Alt+Enter）或底栏／菜单的新开动作在来源窗口新建并激活标签页；不会改为切换已有同 URL 页。固定来源页只允许新开。已有标签页结果仍执行切换。后台重新核对来源身份、窗口、URL 及待导航状态，失效请求不会覆盖别的页；成功发起导航后结束面板，提交失败保留输入并反馈，不保证目标站点加载成功。不新增权限。
-
-### 在 Google 搜索
-
-非空主搜索提供「在 Google 搜索『词』 / Search Google for “…”」，支持中英文查询，无需记住前缀；空搜索首页不显示。普通查询在本地匹配之后显示 Google；没有本地匹配时，Google 为首项，位于「搜索全部历史」之前。地址查询优先访问网址，Google 后置，原有地址去重规则不变。
-
-输入 `google <词>`、`search google <词>`、`search in google <词>`、`谷歌搜索 <词>` 或 `在 Google 搜索 <词>` 明确表达 Google 搜索意图时，候选置顶，标题和实际查询去掉前缀，仅使用剩余搜索词。
-
-点击候选、普通 Enter 或底栏主操作在来源页搜索；macOS **⌘Enter**、Windows/Linux **Alt+Enter**，或底栏／右键操作菜单的「在新标签页打开」，在来源窗口新开并切过去。固定来源页只允许新开；菜单同样提供当前页和新开动作，沿用访问网址的禁用、键盘保护、成功关闭与失败保留输入规则。这项新开快捷键同样适用于书签与历史候选；已有标签页结果与其他命令仍沿用各自的默认动作。
-
-目标为 `https://www.google.com/search?q=` 加编码后的查询，仅执行时才向 Google 发起网络导航。输入和生成候选均在本地完成，没有在线联想、新增权限或选择学习。本地结果之间的排序不变，截断时为 Google 保留位置，主列表合计仍最多 100 行；沿用最多 100ms 的历史查询批次，等待期间旧候选不可执行。
-
-### 搜索词与排序
-
-支持用日常说法或部分前缀检索命令，也可任意组合页面标题、域名、标签组名称或书签目录（词序不限，所有分词均需命中）：
-
-| 搜索示例 | 匹配结果 |
-| --- | --- |
-| `新标签页`、`open tab` | 新建标签页 |
-| `refresh page`、`刷新页面` | 刷新当前标签页 |
-| `reopen last tab`、`恢复标签` | 恢复最近关闭的标签页或窗口 |
-| `clo`、`clo oth`、`tab clo ri`、`关闭`、`guan` | 关闭当前、其他或右侧标签页（`cl`、`cloud` 或单独 `tab` 不会误触关闭命令） |
-| `dark mode`、`深色`、`English`、`重置排序` | 打开并聚焦对应设置项（仅定位控件，不会直接改值或清除记录） |
-| `github pull`、`notion 路线`、`前端 react` | 组合标题、域名、标签组或书签目录筛选结果 |
-
-**相关性与使用习惯**
-
-搜索相关性依次为：精确命令 → 完整标题 → 页面名称精确匹配 → 名称前缀 → 词首匹配 → 名称包含 → 辅助字段（如 URL） → 有限英文错字匹配。同等相关时，依次优先展示固定标签页、已打开标签页、书签。跨语言命中命令时会一并显示匹配的内置别名。命中词仅加粗提示，保留原文字颜色与间距。
-
-在同一搜索词下，支持学习且成功执行过的结果可在**同一相关性等级内**根据频次与最近使用时间前移，但不会跨越相关性等级（例如仅在祖先路径或查询参数命中，不会压过名称前缀匹配）。页面名称精确匹配要求 HTTP(S) URL 最后一个非空路径段与完整搜索词相等、且标题包含该词，忽略大小写和末尾斜线；搜 `justonehop` 优先显示仓库首页，搜 `justonehop testing` 仍需匹配全部词。学习范围为普通标签页、浏览历史、书签、浏览器命令、设置与页面存储入口；帮助、标签组导航、Tab Switcher 入口和扩展重载不参与学习。首页直接选择页面并成功打开也会学习；切换器切换不记录。查询搜索中，历史与相同完整 URL 的标签页共用偏好，打开后变为标签页或收起后仍沿用；URL 的查询参数与片段差异保留，书签按书签 ID 独立记录，各设置子项分别记录，首页的页面聚合不改变这些身份。记录仅存本机，最多 2000 条，90 天未使用的记录不再参与排序并在下次记录时清理，权重每 14 天减半；无痕窗口不记录选择。
-
-主搜索与「搜索全部历史」子页沿用同词、同相关性等级的学习排序，有适用学习记录的结果右侧、快捷键键帽左侧显示历史小图标。悬停或聚焦图标时，tooltip 只用一句短文说明实际前移或已有记录但本次未前移，再显示对应的删除动作标题；图标变为 X，点击即可忘记。
-
-用键盘选中行后，可按 `Tab` 聚焦该行图标，再按 `Enter` / `Space` 忘记；也可在主搜索或全部历史列表直接按 `Shift+Backspace` 忘记当前选中项的适用记录。输入法组合、长按重复或额外按住 Ctrl、Alt、Meta 时不触发该快捷键；无适用记录时不显示图标，也不执行忘记。图标与快捷键遵守同一删除范围：
-
-- **有搜索词**：「忘记此搜索词的偏好 / Forget Preference for This Query」只清除此结果在当前词下的记录；大小写、首尾空格及连续空白的差异视为同词。历史与相同完整 URL 的标签页共用该记录，从任一展示忘记均对两者生效。
-- **空搜索首页命令**：「忘记此命令的偏好 / Forget This Command’s Preferences」清除此命令在所有搜索词下的记录，含空查询。
-- **空搜索首页页面**：「忘记此页面的偏好 / Forget This Page's Preferences」一次性清除该完整 URL 及同 URL 已学习书签在所有查询下的记录，含空查询；从标签页或书签代表行操作范围相同。
-
-忘记不会删除页面或书签，不提供隐藏或「不再推荐」功能，之后成功选择仍会重新学习。删除成功后对应图标消失，保留搜索词、当前列表顺序、选中项和滚动位置，并恢复输入焦点和文字选区；有词搜索的保序只在查询变化或本面板显式重置排序后解除，进入设置、帮助等子页再返回仍恢复原顺序、选择和滚动位置。首页即使输入后清空或从子页返回也保持当次顺序，直到下次打开，显式重置除外。其他已打开面板同步更新记录与对应图标。页面关闭、新历史结果等真实数据变化仍正常更新列表。失败时保留学习记录并显示错误，可重试。本面板「设置 → 实验性功能 → 搜索排序」的重置清空全部记录，并立即恢复默认排序及首页入口。
-
-**空搜索与动态状态别名**
-
-- **空搜索**：直接显示一组推荐列表，不显示「推荐 / Suggested」标题，读屏仍保留该列表名称；页面与命令混排，最多 10 项。冷启动默认依次显示设置、帮助、Tab Switcher、搜索全部历史、新建标签页、刷新当前页、固定／取消固定、Local Storage、Cookies（无痕窗口隐藏搜索全部历史）；状态允许时还可显示撤销收起与恢复收起组入口。只有通过小范围瞬移成功选择过、且目前可作为当前窗口标签页或书签召回的页面参与推荐，不以 MRU 补位。首页跨查询汇总频次与 14 天半衰期权重，沿用 90 天失效、最多 2000 条记录；完整 URL 去重并排除当前页 URL，优先以当前窗口已打开标签页代表，仅在首页合并同 URL 的标签页／历史与书签偏好。
-- **首页稳定性**：推荐分数在面板打开／来源会话开始时固定；查询往返、子页返回、新增学习及忘记偏好不重排首页，下次打开才更新。页面移除等真实数据变化仍刷新；本面板设置的全量重置立即恢复默认入口。直接按 Enter 执行第一条推荐，不保证回到上一标签页；最近使用顺序切换请用 Tab Switcher。无痕首页仅显示默认入口，不读取普通窗口习惯。首页不预加载历史、不新增权限，也不提供独立收藏页、隐藏或推荐管理页；收藏操作从搜索或标签页菜单进入。
-- **首页命令边界**：有关键词时正常按相关性排序。关闭类等危险命令不出现在空搜索首页。静音／取消静音、恢复关闭的标签页和查看 Session Storage 也仅在搜索时显示，已有使用记录不会使它们重新进入首页；可搜索 `mute / 静音`、`reopen / 恢复标签`、`session storage / 会话存储`，标签页操作菜单仍提供静音切换。
-- **静音与固定**：反义词随目标状态变化——目标未静音时搜索 `unmute / 取消静音` 不会推荐静音；目标未固定时搜索 `unpin / 取消固定` 不会推荐固定。搜索 `sound / 静音 / 固定` 等通用词则始终匹配当前可用的切换动作。
-- **结果上限与安全限制**：搜索最多展示前 100 条结果；书签搜索不执行 `javascript:` 脚本书签。
-
-### 浏览历史搜索
-
-标签页、书签、历史与命令共用结果行展示：左侧图标，中间标题与说明，右侧状态、来源、快捷键或时间。主搜索的「当前 / Current」位于分类右侧，使用与历史时间一致的弱化纯文本，不带胶囊背景；标签组成员与最近标签切换器的当前标记沿用同一样式。历史最近访问时间在一分钟内显示「刚刚」、一小时内显示分钟前，今天／昨天显示时分，较早显示月日，往年带年份；悬停显示完整本地时间。同一 URL 使用最后访问时间，缺失或无效时间不显示。窄屏隐藏历史来源文字并保留时间；历史子页始终省略重复来源。
-
-历史数据来自 Chrome，包含通过地址栏、链接等其他入口访问的页面。主搜索用当前关键词搜索最近一周，历史接口最多返回 100 个匹配 URL，主列表最多 100 行（包含地址、Google 与全量历史搜索入口）。历史召回由 Chrome 的标题／网址搜索规则决定，不保证与标签页的拼音或错字匹配完全一致。
-
-- 每轮最多等待历史查询 100ms，然后一次性提交结果；等待期间保留上一轮列表但不可执行，输入和返回仍然可用。超时后迟到结果不会插入列表。
-- 输入 `history / search history / search all history / 历史 / 历史记录 / 搜索历史` 时，「搜索全部历史」置顶，进入后搜索框为空，返回恢复原命令词；普通页面关键词进入时仍携带关键词。
-- 普通关键词下「搜索全部历史」固定在第 7 条；不足 6 条结果则放末尾，无本地匹配时跟随 Google 搜索候选。最近一周无匹配、读取超时和读取失败使用不同说明；失败可通过该入口重试。空输入不提供入口或历史结果。
-- 点击入口或按 Enter 后进入历史搜索页，保留关键词，范围扩大到全部时间；不是按日期浏览的管理页。慢请求显示加载状态，15 秒未完成则提供重试。Esc、空搜索时的尾部 esc 和底栏返回恢复原主搜索的关键词、选择及输入位置。
-- 全部时间查询仍最多返回 100 个匹配 URL；达到上限时提示缩小关键词，不声称已展示全部记录。
-- 普通单击历史结果、Enter 或底栏「当前页打开」在来源标签页原地跳转；⌘Enter（Windows/Linux Alt+Enter）、底栏或菜单「在新标签页打开」在来源窗口新开并激活，固定来源页仅允许新开。成功关闭面板；拖选结果文字后松开鼠标不打开。右键、底栏「操作」和 Cmd/Ctrl+K 共用两种打开动作与「复制 URL」；复制成功保留搜索与选择，不关闭面板、不记录排序偏好。
-- 仅新增历史候选去重：与已匹配标签页或书签 URL 相同的历史不重复展示，路径、查询参数及片段保持区别。同词同相关性等级内先比较学习权重，再优先标签页与书签，历史之间再比较最近访问；主搜索与全部历史子页共用右侧历史图标、排序与删除范围 tooltip，以及图标点击、Tab 聚焦后 Enter / Space 和 Shift+Backspace 的忘记入口，详见上文「相关性与使用习惯」。
-- `history` 是安装时声明的必需权限，Chrome 的系统提示涵盖读写，但小范围瞬移只读取 HTTP(S) 页面历史，不删除或修改历史，也不持久复制整个历史库。只有显式选择并成功打开后才在本机保存搜索词、完整 URL 及衰减权重／时间；历史 API 读取本身和打开失败均不记录。无痕窗口不查询普通浏览历史，也不记录选择。
-
-### 收藏与取消收藏标签页
-
-主搜索输入 `bookmark tab / 收藏标签页`，收藏唤起面板的**来源页**。要操作另一页，在主列表或标签组成员列表中右键该标签页，或选中后通过底栏「操作」／`Cmd+K` 执行；菜单始终作用于**所选标签页**，无需先切换。标签行的普通点击、Enter 和底栏默认动作仍为切换。
-
-- **快捷键提示**：收藏搜索结果右侧显示 `⌘D`（Windows/Linux 为 `Ctrl+D`），沿用 Chrome 收藏当前页的快捷键。主搜索的当前页操作菜单同样显示并支持该按键；其他标签页的菜单不显示此键帽。取消收藏不标注 `Cmd/Ctrl+D`，因为 Chrome 的此按键不会直接删除书签。
-- **收藏**：使用页面标题与完整 URL 创建 Chrome 原生书签，默认放入「其他书签 / Other bookmarks」；已有同 URL 书签时不重复创建。路径、查询参数与片段均参与精确比较。
-- **按意图与当前状态查找**：中性查询 `bookmark / bookmark tab / 收藏 / 收藏标签页` 显示当前可用的收藏或「取消收藏 / Unbookmark」；收藏后这些查询直接显示取消动作。`book` 至 `bookmark` 的单词前缀也优先显示当前状态命令。明确添加的 `add bookmark / save bookmark / 添加书签` 仅用于添加，已收藏时显示「已收藏」，不会删除；`unbook` 至 `unbookmark` 只查取消，未收藏时不提供添加。支持 `Tab:`／`标签页：` 前缀。`book guide` 等页面查询不提升。取消仍为危险操作，单独 `书签 / tab / close` 或错字不放行；明确的 `unbookmark / remove bookmark / 取消收藏 / 删除书签` 不会反向添加。菜单空查询可直接看到取消动作；两种动作均不进入首页推荐。
-- **重复书签**：一个匹配项直接删除；多个匹配项先显示完整 URL、数量和目录，默认聚焦「取消」，确认才删除全部同 URL 书签。Esc 或取消返回，保留原上下文。
-- **变化与失败**：任一匹配项受组织管理时整批拒绝，不先删可写项。执行前重新核对标签页和书签集合；目标导航、移窗或集合变化时拒绝旧操作，刷新后核对重试。Chrome 不提供批量删除事务，中途失败可能已删除部分项，面板会明确提示，需按刷新后的剩余项继续处理。
-- **范围与数据**：支持 HTTP(S)、file、FTP 与 Chrome 内置页地址；不支持的地址不提供收藏动作。复用已有 `bookmarks` 权限，创建和删除影响原生书签，是否同步由 Chrome 的同步设置决定；小范围瞬移没有额外同步服务。两种操作完成后面板保持打开，刷新状态并恢复搜索词与输入位置。主搜索收藏成功后清空选择，避免第二次 Enter 直接删除，需用方向键主动选择或点击结果；菜单收藏保留原标签页选中。
-
-书签搜索结果也提供「取消收藏 / Unbookmark」：右键该书签，或选中后从底栏「操作」／`Cmd+K` 执行，只删除**所选书签 ID**，无需先打开该 URL 或存在对应标签页。同 URL 的其他书签保留，不进入全部同 URL 的批量确认。只有所选条目或其祖先受组织管理时拒绝，其他同 URL 的受管理书签不影响此次删除；所选书签的 URL 在执行前变化时拒绝旧请求，需刷新核对后重试。成功保留面板、搜索词及输入光标／选区，移除结果后选择相邻项。上面的标签页取消收藏规则仍覆盖全部同 URL 书签。
-
-### 整理标签页与继续操作
-
-在搜索结果上打开操作菜单（右键、底栏「操作」或 `Cmd+K`），固定、静音、关闭、移出组等操作直接作用于**选中的标签页**，无需先切换过去。批量关闭仅作用于当前窗口并自动保留固定标签页（底栏会提示预计关闭数量）。
-
-- **保留面板**：收藏/取消收藏、删除所选书签、关闭**非来源页**（单个或批量）、固定/取消固定、静音/取消静音、移出或编辑标签组、刷新或收起**其他**标签页、撤销收起后，小范围瞬移保持打开并保留搜索词与输入位置；若原选中项被移除，会自动选中相邻结果以便连续整理；主搜索收藏成功则清空选择，需主动选择后继续。
-- **关闭面板**：切换标签页、打开书签或 Chrome 内置页、新建或恢复标签页，以及刷新或收起**来源页**后，小范围瞬移自动关闭。
-- **来源页删除即结束**：来源页只要实际被删除，当前小范围瞬移会话就结束。直接关闭来源页、对其他目标执行「关闭其他／右侧」等批量操作时连带删除来源页，以及在 Chrome 中外部关闭来源页，遵循同一规则；不能只按命令目标判断。即使同一窗口仍有其他标签页，也不新建独立面板或将已有独立面板重绑到另一页。关闭整个来源窗口或最后一页同样结束。结束当前页后回到 Chrome 自然选中的相邻页，不弹出额外窗口抢焦点，需要时可重新唤起小范围瞬移。窗口承载与定位不变。
-
-### 设置
-
-从首页「小范围瞬移 设置 /小范围瞬移Settings」、底栏齿轮、`Cmd+,` 或主搜索关键词（如「语言」「主题」「快捷键」「自动收起」「搜索排序」）均可进入设置。具体设置项显示为「小范围瞬移 设置：主题 /小范围瞬移Settings: Theme」「小范围瞬移 设置：语言 /小范围瞬移Settings: Language」等名称，明确属于小范围瞬移；原有中英文关键词仍可直接检索，无需输入品牌名。打开后直接聚焦对应控件，不会立即改变设置值。
-
-- **通用**：切换界面语言（跟随系统 / 简体中文 / English）与外观主题（跟随系统 / 浅色 / 深色），或打开使用帮助。
-- **键盘**：查看当前面板快捷键并前往 Chrome 扩展快捷键页修改，或通过「Tab Switcher」查看 VSCode 风格 `Ctrl+Tab` 最近标签页切换的配置说明。
-- **实验性功能**：管理自动收起标签页、重置搜索排序记录。「自动收起标签页」描述旁的「了解规则」展开后说明，关闭会将所有仍受管理的成员移回普通标签栏，包括手动收起的页面。「搜索排序」说明提示通过结果右侧历史图标查看排序原因与删除范围，并点击变为 X 的图标忘记偏好；此处的重置会清空全部排序记录。
-
-语言、主题、自动收起开关和时长在保存完成后，由底栏确认具体选项；语言切换提示使用新语言，跟随系统时也明确标注。保存失败保留原值并提示重试。
-
-### 操作反馈
-
-设置、复制、书签与标签整理、标签组管理、恢复记录操作共用底栏结果提示。成功提示显示约 4 秒，继续输入、关闭菜单或返回上层不会立即清掉；执行超过 150ms 显示「正在执行」。失败提示保留至点击关闭、重试或后续操作解决，不抢焦点，读屏可感知。窄屏显示结果时临时隐藏位置标题，为提示让出空间，返回按钮与操作入口仍保留。批量操作说明实际完成数量；复制配置命令成功但打开快捷键页失败时，明确说明已复制及手动打开的下一步。
-
-搜索、选中、返回和跳转以可见内容或目标变化反馈，不逐次弹出成功提示；跳转或关闭来源页仍按原规则结束面板。工具栏图标菜单打开页面失败时，图标显示 `!`，悬浮说明包含错误与重试提示，菜单成功打开页面后清除。
-
-### 重新加载小范围瞬移
-
-开发调试时，构建完成后可在主搜索中输入 `小范围瞬移：Reload`、`reload JustOneHop` 或「重新加载扩展」直接重载本机已安装的构建（普通网页与已保存设置均保留）。单独搜索 `reload` 或「刷新」仍只刷新当前网页。
-
-### 面板位置、底栏与返回
-
-小范围瞬移只使用页面浮层和独立面板窗口两种承载。普通网页显示居中偏上的浮层，即使地址栏仍持有焦点也保留浮层，提示「点击搜索框开始输入」；Chrome 内置页、Chrome Web Store、未开启文件访问的本地文件页等无法承载浮层的页面，使用绑定来源页的独立窗口（按来源内容区与缩放比例估算位置），不再先打开工具栏弹窗。点击扩展图标与启动快捷键使用同一路径；切换到其他应用或窗口被遮挡时，命令面板保留搜索词、选择与当前视图，返回后可继续操作，不主动抢焦点。切走来源标签页、来源页导航或关闭时结束会话。独立窗口仍在主层 Esc、重复启动或 Chrome 内主动转向其他浏览器窗口时关闭；从其他应用返回来源窗口的焦点交接保留面板。快捷键启动的 Tab Switcher 仍在失焦时取消。尺寸与定位细节见[交互架构](INTERACTION-ARCHITECTURE.md#位置与浏览器承载方式)。
-
-主搜索与各二级页共用 44px 单行底栏：左侧显示返回（或设置）按钮、当前位置名称与上下文信息，右侧操作固定靠右排列。主次操作相邻，分隔线位于「操作」菜单前；左右分区至少保留 16px 间距。页面操作显示「当前页打开 / Open Here」「新标签页打开 / New Tab」，悬浮说明、无障碍名称与菜单保留完整描述。空间不足时导航等辅助信息整组隐藏，扩大空间后恢复；不缩小字号或换行。成功／失败等状态仍替换辅助信息，Tab Switcher 的松键提示仍保留在位置名称中。窄屏新开操作沿用图标按钮。Tab 聚焦底栏按钮后，普通 Enter／Space 只执行该按钮的动作；输入法组合、长按重复或额外修饰键不会激活按钮。按 `Esc`、在搜索为空时点击尾部 `esc`、点击底栏返回箭头，或在二级页空搜索框中按 `Backspace`，每次只退出最深的一层并恢复上一层的搜索词、选中项与滚动位置。
-
-面板内向返回方向横滑也走同一返回路径（常见 macOS 自然滚动为双指右滑）。达到距离阈值后出现蓝色箭头，菜单、确认层或二级页立即返回一层，并恢复搜索词、选中项、滚动位置与光标／选区；内嵌 Tab Switcher 立即返回原主搜索。同一手势的惯性继续拦截，不会再退出父层；滚动停下 140ms 后才可开始下一次手势。主搜索关闭面板、快捷键启动的 Tab Switcher 取消关闭，以及独立帮助关闭，均等滚动停下 140ms 才执行，避免残余滚动传到来源网页；切换器不会确认切换。
-
-未达到阈值时，可反向、按键或点击取消；已执行的返回不会撤销。键盘、点击或导航层变化也会取消尚未执行的关闭，残余惯性不会重新触发。短滑、纵滑或缩放不触发；可横向滚动的文本／输入区域整段避让，即使已到边界。140ms 静默只是判断手势结束的启发式，实机原生手势尚未验证。此功能不增加权限或持久状态，也不改变现有定位方案。
-
-## Chrome 内置页面
-
-在主搜索中输入以下关键词（或输入 `Chrome Pages` / 「Chrome 内置页面」查看整组），可直接打开或切换到对应页面：
-
-| 入口 | 搜索词示例 | 目标地址 |
+| What you want to do | What to type | What happens |
 | --- | --- | --- |
-| 扩展管理 | `extension`、`extensions`、扩展、插件 | `chrome://extensions/` |
-| 密码管理器 | `password`、`passwords`、密码 | `chrome://password-manager/passwords` |
-| 下载内容 | `download`、`downloads`、下载 | `chrome://downloads/` |
-| 历史记录 | `history`、历史、浏览记录 | `chrome://history/` |
-| 书签管理器 | `bookmark manager`、管理书签 | `chrome://bookmarks/` |
-| Chrome 设置 | `chrome settings`、浏览器设置 | `chrome://settings/` |
-| 扩展快捷键 | `extension shortcuts`、扩展快捷键 | `chrome://extensions/shortcuts` |
+| Jump to a pull request | `github pull` or `pr review` | Matches open GitHub tabs and recent history |
+| Find a Notion page | `notion roadmap` | Combines domain and page title |
+| Open a bookmark | `react docs` | Matches folder or bookmark title |
+| Switch themes | `dark mode` or `theme` | Navigates directly into Settings → Appearance |
+| Recover an accidentally closed tab | `reopen` or `undo close` | Restores the most recently closed tab or window |
+| Tidy open tabs | `close tabs to the right` | Safely closes eligible tabs to the right |
 
-当前窗口已有完全相同地址（含子路径、查询参数与片段）的标签页时会直接激活，否则在当前窗口新建标签页。`settings / 设置` 与 `shortcut / 快捷键` 仍优先打开小范围瞬移自身的设置项。这些命令仅负责页面跳转，不读取密码、历史或下载数据。
+#### Exact Project Matching
 
-## Ctrl+Tab 配置
+When you type a project name like `justonehop`, JustOneHop recognizes when the word matches the final path segment of a URL. It prioritizes the repository root over deeper subpages. When you want a specific document, simply add another keyword like `justonehop testing`.
 
-受 Chrome 扩展接口限制，`Ctrl+Tab` 无法在扩展设置页直接绑定。从「设置 → 键盘 → Tab Switcher」进入独立配置说明；也可在主搜索输入 `ctrl tab` 定位该设置项。点击底栏「复制并打开」（或按 Enter），复制已填入当前扩展 ID 的一行命令，并打开 `chrome://extensions/shortcuts`。配置说明保留在原页面，可多次切走、切回查看；返回设置或关闭说明后，才恢复普通浮层随来源标签切换关闭的行为；独立面板在打开快捷键页前先保留一份 JustOneHop 配置说明标签页（`popup.html#binding`），重复操作复用该标签页。菜单里的单独「打开 Chrome 快捷键页」同样保留说明。在该页按 macOS `⌘⌥J` / Windows、Linux `Ctrl+Shift+J` 打开 DevTools Console，粘贴并回车，一次设置 `Ctrl+Tab` 和 `Ctrl+Shift+Tab`。
+### Smart Aliases & Typo Tolerance
 
-这是 Chrome 控制台命令，不是终端命令；首次粘贴若被 Chrome 阻止，请查看命令后按控制台提示确认，再重新粘贴。复制失败时留在配置页，不打开快捷键页；操作菜单仍提供单独「复制代码」和「打开 Chrome 快捷键页」。扩展不会自动执行命令，重新打开 JustOneHop 可读取实际绑定。
+People type fast, and typos happen. JustOneHop includes a built-in alias dictionary for common browser actions:
 
-脚本收藏与已保存 UserScript 的创建、编辑、复制和运行功能已移除；Ctrl+Tab 指南独立保留，不需要开启「允许用户脚本」。旧版 `saved-script:*` 数据原样留在本机，当前版本不读取或使用，也不迁移或自动删除。
+- **Settings**: `prefs`, `setings`, `options`
+- **Passwords**: `pwd`, `passowrd`
+- **Extensions**: `plugins`, `addons`, `extention`
+- **Bookmarks**: `favorites`, `favourites`
+- **History**: `histroy`, `recent`
+- **Reload**: `refesh`, `relaod`
+- **Brand Names**: `joh`, `justonehop`, `小范围瞬移`
 
-## 最近标签页切换
+> [!NOTE]
+> Typo tolerance is strictly curated for browser commands and aliases. Dangerous destructive commands (such as closing tabs) always require explicit intent so you never trigger them accidentally.
 
-### 从面板进入
+### Instant URL Navigation & Google Search
 
-「小范围瞬移：Tab Switcher」附有「Switch tabs like in VS Code」说明，右侧显示 Chrome 实际绑定的启动快捷键，未绑定时不显示键帽；设置页同步显示实际绑定或「未绑定」。默认 macOS 使用 Control+J，Windows/Linux 使用 Ctrl+,，反向均加 Shift；Ctrl+Tab 是可选配置，无需先配置它才能使用切换器。重新打开面板会读取最新绑定。在首页推荐中选择该命令，或用 `VSCode / tab switcher / 最近标签页 / 切换标签页` 搜索该入口，点击、Enter 或底栏主操作即可在当前面板内打开切换子页。搜索框初始可用，按当前窗口最近使用顺序浏览，也可直接输入标题或网址；点击候选、普通 Enter 或底栏「切换」明确确认，松开按键不会确认。取消、Esc、空搜索时的尾部 esc 或底栏返回均恢复主搜索的原查询、选中项和光标／选区。入口与切换均不记录搜索使用习惯。子页沿用当前承载方式，不另开切换器窗口。
+Type a full or partial web address (such as `github.com/trending` or `localhost:3000`), and JustOneHop turns it into a direct navigation card at the top of the list:
 
-### 快速切换
+- Press **`Enter`** (or click **Open Here** in the footer) to navigate the current tab.
+- Press **`⌘Enter`** on macOS or **`Alt+Enter`** on Windows/Linux to open in a **new background/active tab**.
 
-默认快捷键在 macOS 为 `Control+J`，Windows/Linux 为 `Ctrl+,`；反向切换均加 `Shift`（若已配置 `Ctrl+Tab` 则使用该绑定）。已有安装可能保留原绑定，以设置页显示的 Chrome 实际绑定为准，可在 `chrome://extensions/shortcuts` 修改：
+If your query doesn't match local items, JustOneHop offers **Search Google for "…"**:
+- Press **`Enter`** to search in place.
+- Press **`⌘Enter`** / **`Alt+Enter`** to search in a new tab.
 
-1. 按住修饰键（默认 `Control`）并按触发键打开切换器，此时默认选中上一个标签页。
-2. 保持按住修饰键，继续按触发键、`N`/`P` 或方向键移动选择。
-3. 松开修饰键即可切换到目标标签页（按 `Esc` 或失焦则取消）。
+---
 
-普通 HTTP(S) 网页预加载了轻量修饰键监听，支持极速点按直接切回上一页（扩展安装或更新前已打开的网页需刷新一次以生效）。在 Chrome 内置页、受限页面或地址栏聚焦时，切换器以独立窗口打开，极短点按可能需要按 `Enter` 确认。详见[切换器实现说明](RECENT-TABS.md)。
+## 3. Tab Switcher: Recent Tabs like VS Code
 
-### 搜索最近标签页
+<a id="最近标签页切换"></a>
 
-通过快捷键打开切换器后，若点击顶部搜索框或按 `Cmd/Ctrl+F`，本次会话会暂停「松开修饰键即切换」，允许松开按键正常输入标题或网址筛选当前窗口的标签页，随后通过 `Enter` 或点击结果确认切换。
+If you love the `Ctrl+Tab` or `Alt+Tab` workflow in code editors like VS Code, you'll feel right at home with the **Tab Switcher**.
 
-### 导航、底栏与系统限制
+<picture>
+  <img alt="Tab Switcher Dark Mode" src="store/en-2-switcher.png" width="100%">
+</picture>
 
-切换器内支持 `↑`/`↓`、`Ctrl+P`/`Ctrl+N`、`Tab`/`Shift+Tab` 循环选择，支持 `PageUp`/`PageDown`（或 `Option/Alt+↑`/`↓`）翻页及 `Cmd/Ctrl+↑`/`↓` 跳到首尾。鼠标悬停仅提示可点击行，不会改变松开修饰键时的键盘选中目标。
+### Hold, Cycle, and Release
 
-## 收起标签页
+1. **Press and hold the modifier key** (default: `Control` on macOS, `Ctrl` on Windows/Linux).
+2. **Tap the trigger key** (`J` on macOS, `,` on Windows/Linux; or configured to `Tab`) to open the switcher. The previous tab is selected immediately.
+3. Keep holding the modifier and tap the trigger key (or use `↑`/`↓`, `P`/`N`) to cycle through recent tabs in **MRU (Most Recently Used)** order.
+4. **Release the modifier key** to switch!
 
-「收起」将标签页移入当前窗口末尾的 Chrome 原生折叠组（如「已收起 · 3」），不关闭或主动卸载（discard）页面。
+![Tab Switcher Demo](demo/en-switcher.gif)
 
-### 开启或停止自动收起
+### Setting Up Ctrl+Tab in 10 Seconds
 
-自动收起默认关闭，可在「设置 → 实验性功能」中开启「自动收起标签页」（或直接搜索「自动收起」）。开启后从当下开始计时，默认在电脑空闲时将 **7 天未使用**的普通标签页移入折叠组；当前活动页、固定页、已有分组中的页面、正在播放声音或加载中的页面、分屏页及无痕窗口均会跳过。关闭开关后停止自动检查，并将所有仍确认受管理的成员移回普通标签栏，**包括手动收起的页面**；设置中的说明明确提示此范围。待恢复、尚未确认归属的候选组不因此被改动。
+<a id="ctrltab-配置"></a>
 
-开启开关后展开配置，可选择 **1 小时、3 小时、12 小时、1 天、3 天、7 天**六档时长；关闭时仅保留简短设置行。鼠标点击选项或键盘 Enter 确认选项后立即保存，无需另点保存按钮；返回再打开仍保留所选时长。保存失败会显示错误并保留原值，可重新选择重试。已保存的非预设时长继续生效，选择预设后替换。修改时长不重置已有计时；设置显示已保存时长下的候选数量，状态读取失败不阻止保存。保存后等待下次空闲检查，不立即移动页面。
+Chrome reserves `Ctrl+Tab` by default and does not allow extensions to bind it directly in the normal extension shortcut UI. JustOneHop provides a clever 1-step setup helper:
 
-后台每 **5 分钟**及电脑进入空闲／锁屏时检查，首次开启约 1 分钟后开始定时检查；实际收起前要求电脑至少 60 秒没有用户活动，用户恢复活动便停止继续收起。Chrome 可延后闹钟调度，关闭浏览器或电脑休眠期间不保证按时执行。打开主面板不触发自动收起。设置中可查看状态，点击「闲置时长」旁的刷新图标重新读取；点击「了解规则」可查看检查频率、计时规则与关闭影响，键盘可用 Tab 聚焦后 Enter／Space 展开。这些查看操作都不移动页面。状态显示可收起数量、等待恢复核对的数量和上次自动检查时间；尚未自动检查时明确显示等待，不把状态刷新记作自动执行。
+1. Open JustOneHop, type `ctrl tab`, and press `Enter` (or go to **Settings → Keyboard → Tab Switcher**).
+2. Click **Copy & Open** in the footer. JustOneHop automatically copies the one-line configuration script tailored to your extension ID and opens `chrome://extensions/shortcuts`.
+3. Press **`⌘⌥J`** on macOS (or **`Ctrl+Shift+J`** on Windows/Linux) to reveal Chrome's DevTools Console.
+4. Paste and press `Enter`. Both `Ctrl+Tab` and `Ctrl+Shift+Tab` are configured instantly!
 
-### 手动收起
+> [!TIP]
+> The setup guide remains open on the original tab, so you can switch back and forth while setting it up without losing your place.
 
-即使未开启自动收起，也可随时在主搜索中执行「收起标签页 / tuck tab」收起当前页（会先切到相邻标签页），或在主搜索中选中其他标签页后通过 `Cmd+K` 操作菜单将其收起。
+### Filter Tabs on the Fly
 
-### 找回与撤销
+Need to jump to a tab from 20 steps ago? While holding the shortcut, simply click into the top search box or press **`⌘F`** (`Ctrl+F`). 
 
-- **找回单页**：在主搜索或 Tab Switcher 中切换到已收起的页面（或在标签栏展开折叠组点击该页），该页即移回普通标签栏，其余页面继续保持收起。
-- **撤销最近一批**：执行「撤销收起 / undo tuck」可将当前窗口最近一批收起的标签页移回标签栏。
-- **管理权移交**：若在 Chrome 标签栏中直接修改了收起组的名称、颜色或手动拖入新页面，小范围瞬移会将该组视作用户自定义组，不再自动接管；通过小范围瞬移的标签组管理页改名则保留自动管理关系。
+This immediately pauses "release-to-switch", letting you release the modifier and type freely to filter tabs by title or URL. When found, press `Enter` to switch.
 
-### 浏览器重启与扩展重新加载
+---
 
-重启后，仅当组名、灰色标记、完整成员网址及同窗口其他网页均唯一匹配本机记录时，小范围瞬移才会自动恢复管理。若成员有变动或无法唯一确认，可搜索「恢复收起组 / recover tucked tabs」核对候选组卡片。点击卡片、在卡片或列表上按 Enter 都只选择候选，不接管；键盘选择后按 Tab 聚焦底栏「继续管理这组」，再用 Enter／Space 明确确认，也可从操作菜单确认。接管保留候选组当前名称与颜色。菜单中的「停止恢复这条记录」仅移除记录，不影响页面或分组。待确认期间不会在该窗口新建收起组。
+## 4. Tab Housekeeping & Quick Actions (`⌘K`)
 
-### 本机记录与权限
+<a id="整理标签页与继续操作"></a>
 
-闲置计时记录（仅在开启自动收起期间保留）与分组恢复记录均只保存在本机，不记录页面正文、表单内容或无痕页面，也不上传任何数据。
+Most command palettes disappear the moment you perform an action. JustOneHop is built for **continuous tab housekeeping**:
 
-## 页面存储
+![Tab Actions Demo](demo/en-actions.gif)
 
-### 查看与复制
+### Continuous Multi-Tab Tidy
 
-在目标 HTTP(S) 网页打开小范围瞬移，搜索 `local storage`、`session storage` 或 `cookie`（也支持「本地存储」「会话存储」）。左侧为 key 列表，右侧上方即时预览选中项的完整 value，下方显示 key、内容类型和 Cookie 属性；单击只选择，悬停不改变预览，方向键或 Ctrl+N/P 同样切换选择。`Enter` 或底栏「复制值」复制原始字符串，JSON 仅在预览中格式化。窄屏时列表在上、预览在下，独立滚动。双击或从操作菜单选择「查看详情」仍可单独阅读；菜单还支持复制名称与刷新列表。菜单打开时，背景列表与预览不能改变菜单目标，也不处理列表导航或复制按键；关闭菜单恢复原选中项与搜索光标／选区。
+Right-click any item in the search list, click **Actions** in the bottom bar, or press **`⌘K`** (`Ctrl+K` on Windows/Linux) to open the contextual action menu:
 
-### 读取范围
+<picture>
+  <img alt="Actions Menu" src="store/en-3-actions.png" width="100%">
+</picture>
 
-Local Storage 与 Session Storage 读取当前顶层页面；Cookie 列表读取与当前页面 URL 匹配的记录（含 `HttpOnly` 及 Chrome 132+ 的分区 Cookie），展示域名、路径、到期时间与分区状态。所有存储命令均为只读。
+From here, you can:
+- **Pin / Unpin**
+- **Mute / Unmute**
+- **Reload Tab**
+- **Copy URL** (copies clean URL without closing the palette)
+- **Close Tab** (or Close Other Tabs / Close Tabs to the Right)
+- **Add / Remove from Tab Group**
 
-### 网站授权与隐私
+> [!IMPORTANT]
+> **Why it's called Continuous Housekeeping:**
+> When you close, pin, or mute a tab that isn't your current active tab, **JustOneHop stays open** and smoothly selects the adjacent item. You can close or pin 5 tabs in a row without reopening the palette!
 
-Local Storage 和 Session Storage 复用 `activeTab` 临时授权。`cookies` API 权限在安装时声明；读取 Cookie 缺少所需网站权限时，按提示点击「允许访问此网站」申请当前主机及必要父域的访问权限，覆盖 HTTP／HTTPS 和全部路径，不申请兄弟子域通配符。已有适用权限时可能无需再次弹窗，可在 Chrome 扩展设置中撤销。快捷键桥接脚本会自动运行在 Chrome 允许访问的 HTTP／HTTPS 页面及子框架中，不依赖 Cookie 查看器的逐站授权，也不记录页面打字内容。
+### Manage Native Tab Groups
 
-读取的存储值仅在查看面板内存中处理，不写入扩展持久存储或上传给开发者。主动复制后，内容进入系统剪贴板，关闭面板不会清空剪贴板。设置中的「重置搜索排序」仅清除排序学习，不清除设置、全部收起恢复记录或网站授权。完整的数据保留和控制方式见[隐私政策](PRIVACY.md)；发布文案与后台权限说明见[商店发布文案](STORE-LISTING.md)。
+JustOneHop integrates seamlessly with Chrome's native Tab Groups:
 
-### Tab Group 搜索与管理
+- Search any group by its name.
+- Press `Enter` or click **View Group Tabs** in the footer to inspect and search only members of that group.
+- In the Actions menu (`⌘K`), you can:
+  - **Expand / Collapse** the group.
+  - **Rename** the group with live feedback.
+  - **Ungroup (Keep Tabs)**: Dissolves the group while keeping all tabs intact.
+  - **Close Group**: Closes the entire group with a protective confirmation dialog displaying the exact number of tabs to be closed (pinned tabs are always protected).
 
-在主搜索中输入标签组名称，单击／Enter 或底栏「查看组内标签页」进入 `标签组: 名称` 查看与筛选成员；操作菜单不重复提供查看组入口，首项为展开／折叠。直接右键组结果、点击底栏「操作」或按 `Cmd/Ctrl+K`，即可展开／折叠、改名及选择两种删除：
+### Instant Bookmarking (`⌘D`)
 
-- **解散分组（保留所有标签页）**：移除原生分组，所有页面保持打开。
-- **关闭整个组**：确认弹窗显示组名与全组标签页数量（不受成员搜索筛选影响），默认聚焦取消。执行前重新核对确认时的成员集合；成员变化则拒绝并要求重新确认。逐页执行前核对所属窗口、组与固定状态，保护固定标签页；中途失败会提示已关闭部分页面，不宣称回滚。
+<a id="收藏与取消收藏标签页"></a>
 
-详情页保留相同组级操作，同时提供切换、关闭单个标签页与移出组。主搜索直接改名后回到原搜索，详情页编辑后恢复成员查询与选择；解散或关闭整组成功后返回主搜索，保留原搜索词和输入选区，消失的结果按相邻项规则选择。取消确认先回操作菜单，再返回原列表。若整组关闭包含面板来源页，本次面板立即结束，不迁移到其他页。
+- In the search bar, type `bookmark tab` or `bookmark` to bookmark the current tab into Chrome's native bookmarks.
+- In any tab result's Action menu (`⌘K`), press **`⌘D`** (`Ctrl+D`) to bookmark that specific tab without having to switch to it first.
+- Search `unbookmark` to safely remove existing bookmarks.
+
+---
+
+## 5. Tab Tucking: Declutter without Closing
+
+<a id="收起标签页"></a>
+
+We all hoard tabs because we "might need them later", slowing down Chrome and cluttering the tab strip. **Tab Tucking** solves this by sliding tabs into a neat, native collapsed tab group (e.g. `Tucked · 5`) without closing them or losing form states.
+
+### Manual Tucking
+
+- Type `tuck tab` in the search box to tuck away your current tab.
+- Or select any tab in the list, press `⌘K`, and choose **Tuck Tab**.
+
+### Automatic Idle Tucking
+
+Go to **Settings → Experimental Features → Auto-tuck tabs**:
+
+- Choose an idle duration threshold: **1 hour, 3 hours, 12 hours, 1 day, 3 days, or 7 days** (default: 7 days).
+- Runs gently in the background **only when your computer is idle** (at least 60 seconds of zero user activity).
+- **Safety first**: Never touches pinned tabs, playing audio, active tabs, split screens, or incognito tabs.
+- Turning the switch off immediately moves all tucked tabs back to your normal tab strip.
+
+### Restoring & Undoing
+
+- **Pick a single tab**: Simply search for the page in JustOneHop or the Tab Switcher and hop to it. It automatically untucks itself back to your active tab strip!
+- **Undo the entire batch**: Type `undo tuck` to immediately restore the last tucked batch.
+
+---
+
+## 6. Developer Inspection: LocalStorage, SessionStorage & Cookies
+
+<a id="页面存储"></a>
+
+Front-end developers and power users often open the heavy Chrome DevTools just to check a cookie value or copy a JWT token from LocalStorage. JustOneHop provides a lightning-fast, read-only viewer right from the palette:
+
+```
+Search: local storage
+Search: session storage
+Search: cookie
+```
+
+### Two-Pane Side-by-Side Preview
+
+- **Left Pane**: Clean, searchable list of storage keys or cookie names.
+- **Right Pane**: Instant preview of the formatted JSON, raw string, and cookie metadata (domain, path, expiration, HttpOnly, partition status).
+- Press **`Enter`** or click **Copy Value** in the footer to copy the clean raw value directly to your clipboard.
+
+### Permissions & Privacy
+
+- `localStorage` and `sessionStorage` use Chrome's temporary `activeTab` permission.
+- Cookie reading requests access **strictly on a per-site basis** when you choose to open the cookie viewer for that domain.
+- Values are read purely in memory for your inspection—nothing is ever stored or uploaded.
+
+---
+
+## 7. Navigation, Gestures & Panel Placement
+
+<a id="面板位置底栏与返回"></a>
+
+JustOneHop is crafted with obsessive attention to UI ergonomics.
+
+### The 44px Footer & Breadcrumbs
+
+At the bottom of every view sits an elegant 44px footer:
+- **Left**: Clear breadcrumbs showing where you are (`Home > Settings > Appearance`), along with a clickable Back arrow.
+- **Right**: Contextual actions matching your current selection (e.g. `Open Here`, `New Tab`, `Actions (⌘K)`).
+
+### Multi-Level Back & Trackpad Swiping
+
+Navigating deep menus shouldn't feel like a trap:
+- Press **`Esc`** or click the back arrow to retreat exactly one level, perfectly restoring your previous query, cursor position, and scroll offset.
+- When the search box is empty, pressing **`Backspace`** also navigates back one level.
+- **Two-Finger Trackpad Swipe (macOS)**: Swipe right with two fingers on your trackpad to smoothly slide back to the previous screen.
+
+### In-Page Overlay vs. Dedicated Window
+
+JustOneHop automatically chooses the best display mode based on the current page:
+1. **In-Page Overlay**: On standard web pages, it appears as a clean, floating modal centered slightly above the viewport.
+2. **Dedicated Window**: On pages where Chrome forbids script injection (such as `chrome://` settings, the Chrome Web Store, or blank tabs), JustOneHop opens as a lightweight, floating companion window in the exact same screen position.
+
+---
+
+## 8. Local Learning & Habit Memory
+
+The more you use JustOneHop, the more attuned it becomes to your habits:
+
+- When you search for a term and select an item, JustOneHop remembers your preference.
+- Next time you type that term, that item gently moves up **within its relevance tier** (relevance always comes first—a loose URL match will never jump ahead of an exact title match).
+- **Clear & Transparent**: Any item promoted by local learning displays a subtle clock icon on the right. Hover over it to see why it ranked higher, click the `×`, or press **`Shift+Backspace`** to forget that preference instantly.
+- **100% On-Device**: Learning weights decay over 14 days and expire after 90 days. No usage data ever leaves your computer.
+
+---
+
+## 9. Complete Keyboard & Mouse Shortcuts
+
+### Global & Palette Navigation
+
+| Action | Mouse | macOS Shortcut | Windows / Linux |
+| --- | --- | --- | --- |
+| **Open / Close Palette** | Click toolbar icon | `⌘ + Shift + P` | `Ctrl + Shift + P` |
+| **Close or Step Back** | Click Back arrow / `esc` badge | `Esc` (or `Backspace` if search empty) | `Esc` (or `Backspace`) |
+| **Select Next / Previous** | Scroll or click row | `↓` / `↑` (or `Ctrl+N` / `Ctrl+P`) | `↓` / `↑` (or `Ctrl+N` / `Ctrl+P`) |
+| **Jump to Top / Bottom** | Click top/bottom | `⌘ + ↑` / `⌘ + ↓` | `Ctrl + Home` / `Ctrl + End` |
+| **Page Up / Page Down** | Scroll wheel | `⌥ + ↑` / `⌥ + ↓` (or `PageUp`/`Down`) | `Alt + ↑` / `Alt + ↓` |
+| **Execute Selected Item** | Click row | `Enter` | `Enter` |
+| **Open in New Tab** | Click "New Tab" in footer | `⌘ + Enter` | `Alt + Enter` |
+| **Open Actions Menu** | Right-click row / Click "Actions" | `⌘ + K` | `Ctrl + K` |
+| **Open Settings** | Click gear icon in footer | `⌘ + ,` | `Ctrl + ,` |
+| **Forget Search Preference** | Click `×` on history badge | `Shift + Backspace` | `Shift + Backspace` |
+| **Swipe Back (Trackpad)** | Two-finger swipe right | — | — |
+
+### Tab Switcher
+
+| Action | Mouse | macOS Shortcut | Windows / Linux |
+| --- | --- | --- | --- |
+| **Trigger Switcher** | Click "Tab Switcher" on Home | Hold `Control` + press `J` | Hold `Ctrl` + press `,` |
+| **Cycle Recent Tabs** | Click candidate | Tap trigger key / `↓` / `↑` / `N` / `P` | Tap trigger key / `↓` / `↑` / `N` / `P` |
+| **Confirm & Switch** | Click candidate | Release modifier key | Release modifier key |
+| **Cancel Switch** | Click outside or `esc` | `Esc` | `Esc` |
+| **Search / Filter Tabs** | Click search bar | `⌘ + F` | `Ctrl + F` |
+
+---
+
+*Thank you for using JustOneHop! If you encounter any issues or have ideas for improvement, feel free to open an issue on [GitHub](https://github.com/lyyourc/JustOneHop).*

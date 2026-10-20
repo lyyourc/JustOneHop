@@ -104,7 +104,7 @@ npm run build
 
 设置、复制与标签整理会在底栏提示实际结果。语言和主题切换明确确认已保存的选项；继续输入或返回上层时，成功提示仍短暂保留。耗时操作显示执行中，失败提示保留至关闭或重试。
 
-更多手势说明、排序细节与 `Ctrl+Tab` 配置方式，请查看 **[使用指南](docs/USAGE.md)**。
+更多手势说明、排序细节与 `Ctrl+Tab` 配置方式，请查看 **[使用指南](docs/USAGE.zh-CN.md)**（[English](docs/USAGE.md)）。
 
 ---
 
@@ -126,5 +126,5 @@ npm run check   # 运行类型检查、单元测试、构建与端到端测试
 
 本地修改并构建后，可在面板中直接搜索 `Reload` 或 `重新加载扩展` 原地重载。
 
-- [使用指南](docs/USAGE.md) · [交互架构](docs/INTERACTION-ARCHITECTURE.md) · [ADR 架构决策](docs/adr/README.md)
+- [使用指南](docs/USAGE.zh-CN.md)（[English](docs/USAGE.md)） · [交互架构](docs/INTERACTION-ARCHITECTURE.md) · [ADR 架构决策](docs/adr/README.md)
 - [最近标签切换](docs/RECENT-TABS.md) · [页面存储查看](docs/PAGE-STORAGE.md) · [测试指南](docs/TESTING.md) · [Logo 规范](docs/brand/LOGO.md)

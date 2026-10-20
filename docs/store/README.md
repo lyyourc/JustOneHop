@@ -51,4 +51,4 @@ node scripts/store-assets.mjs --render-only
 
 成品 PNG、`raw/`、总览、JSON 清单与生成脚本一起提交，保留所用素材及重排版输入。仅在正式更新素材时提交新图，临时试稿无需留进历史。这组素材只有数 MB，无需 Git LFS。
 
-商店图片通过商店后台单独上传，不放进扩展 ZIP。通过 `npm run package:store` 生成发布包：排除 `*.map` 并清理 JS/CSS 末尾的 `sourceMappingURL` 注释，本地 `dist/` 保留调试信息，打包方法和剩余待办见[商店文案的发布清单](../STORE-LISTING.md#发布前待填写)。
+商店图片通过商店后台单独上传，不放进扩展 ZIP。通过 `npm run package:store` 生成发布包：排除 `*.map` 并清理 JS/CSS 末尾的 `sourceMappingURL` 注释，本地 `dist/` 保留调试信息，打包方法和提交检查见[Chrome Web Store 发布指南](../STORE-LISTING.md#5-本地打包与发布检查清单)。
