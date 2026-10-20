@@ -184,6 +184,16 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
   }
 }
 
+for (const action of ['openBookmark', 'openHistoryPage'] as const) {
+  test(`${action} rejects a different source before resolving its destination`, async () => {
+    Object.assign(tabs[2], { active: true, url: 'https://source.example' });
+    await assert.rejects(performPaletteAction({ action, windowId: 10, tabId: 3, expectedUrl: tabs[2].url,
+      bookmarkId: 'b', url: 'https://destination.example/' }, sourceSender(), () => assert.fail('wrong source acknowledged')));
+    assert.deepEqual(calls, []);
+    assert.deepEqual(usage, []);
+  });
+}
+
 test('toolbar navigation follows the current active tab and rejects the old payload after activation changes', async () => {
   const sender = { url: 'chrome-extension://justonehop/popup.html' };
   tabs[1].active = false;

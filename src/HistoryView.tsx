@@ -3,7 +3,10 @@ import { copyText } from './clipboard';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getUsage, subscribeUsage } from './usageState';
 import { queryUsage, rankingInfo, usageTarget } from './usage';
-import { History, LoaderCircle } from 'lucide-react';
+import { ExternalLink, LoaderCircle } from 'lucide-react';
+import { addressActions, pageNavigationEntry } from './addressPresentation';
+import { addressNewTabShortcut } from './address';
+import { matchesShortcut, shortcutKeys } from './Shortcut';
 import { BackLayer } from './Navigation';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
@@ -12,13 +15,13 @@ import { ActionMenu } from './ActionMenu';
 import { useResultSelection } from './useResultSelection';
 import { useHistoryQuery } from './useHistoryQuery';
 import { historyEntries } from './historySearch';
-import { copyUrlAction, search } from './model';
+import { actionsFor, search } from './model';
 import { execute, forgetSearchRanking } from './api';
 import { errorMessage, t } from './i18n';
-import type { Entry } from './types';
+import type { Entry, Snapshot } from './types';
 
-export function HistoryView({ initialQuery, windowId, isMac, onBack, onClose }: {
-  initialQuery: string; windowId: number; isMac: boolean; onBack: () => void; onClose: () => void;
+export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
+  initialQuery: string; data: Snapshot; isMac: boolean; onBack: () => void; onClose: () => void;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
@@ -40,19 +43,17 @@ export function HistoryView({ initialQuery, windowId, isMac, onBack, onClose }: 
   // Keep the displayed order after forget without freezing asynchronous history results.
   const scores = frozenRanking?.query === query ? frozenRanking.scores : liveScores;
   const { results, baseline } = useMemo(() => {
-    const items = pending || !query.trim() ? [] : historyEntries(outcome.items);
+    const items = pending || !query.trim() ? [] : historyEntries(outcome.items).map(entry => pageNavigationEntry(entry, data));
     const baseline = search(items, query);
     const results = scores.size ? search(items, query, scores) : baseline;
     return { results, baseline };
-  }, [outcome, pending, query, scores]);
+  }, [outcome, pending, query, scores, data]);
   const ranking = useMemo(() => rankingInfo(results, baseline, liveScores), [results, baseline, liveScores]);
   const { selected, setSelection } = useResultSelection(results, query);
   const unavailable = pending || busy;
-  const copyAction = selected && copyUrlAction(selected);
-  const actions = selected ? [
-    { id: 'open', title: t('openHistoryPage'), keywords: 'open page 打开页面', icon: <History size={16} /> },
-    ...(copyAction ? [{ id: 'copyUrl', title: copyAction.title, keywords: copyAction.keywords, icon: <EntryGlyph name={copyAction.icon} size={16} /> }] : []),
-  ].filter(action => actionQuery.trim().toLowerCase().split(/\s+/).every(term => `${action.title} ${action.keywords}`.toLowerCase().includes(term))) : [];
+  const actions = selected ? actionsFor(selected, data, isMac)
+    .filter(action => actionQuery.trim().toLowerCase().split(/\s+/).every(term => `${action.title} ${action.keywords}`.toLowerCase().includes(term))) : [];
+  const newTabAction = selected && addressActions(selected, isMac)[1];
   const chosen = actions.find(action => action.id === actionId) || actions[0];
   useEffect(() => {
     setShowLoading(false);
@@ -78,15 +79,17 @@ export function HistoryView({ initialQuery, windowId, isMac, onBack, onClose }: 
     rememberCaret(); setMenu(!menu); setActionQuery(''); setActionId('');
   }
   async function open(entry: Entry | undefined = selected) {
-    if (!entry || unavailable || executing.current) return;
+    if (!entry || entry.disabled || unavailable || executing.current) return;
     executing.current = true; rememberCaret(); setBusy(true); setError('');
-    try { await execute({ action: 'openHistoryPage', windowId, url: entry.url, query }); onClose(); }
+    try { await execute({ action: 'openHistoryPage', windowId: data.windowId, tabId: entry.tabId, expectedUrl: entry.expectedUrl, newTab: entry.newTab, url: entry.url, query }); onClose(); }
     catch (reason) { setError(errorMessage(reason)); }
     finally { executing.current = false; setBusy(false); }
   }
   async function runAction(id?: string) {
-    if (id === 'open') { await open(); return; }
-    if (id !== 'copyUrl' || !selected?.url || unavailable || executing.current) return;
+    const action = actions.find(item => item.id === id);
+    if (!action || action.disabled) return;
+    if (action.action === 'openHistoryPage') { await open(action); return; }
+    if (action.action !== 'copyUrl' || !selected?.url || unavailable || executing.current) return;
     const anchor = input.current?.closest('.palette')?.querySelector<HTMLInputElement>('.action-search input') ?? input.current;
     if (!anchor) return;
     executing.current = true; rememberCaret(); setBusy(true); setError(''); setNotice('');
@@ -132,7 +135,8 @@ export function HistoryView({ initialQuery, windowId, isMac, onBack, onClose }: 
       if ((event.target as HTMLElement).closest('.ranking-forget')) input.current?.focus();
     } else if (event.key === 'Enter' && (event.target as HTMLElement).tagName !== 'BUTTON') {
       event.preventDefault();
-      if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) void open();
+      if (!event.repeat && matchesShortcut(event, addressNewTabShortcut(isMac), isMac)) void open(newTabAction);
+      else if (!event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) void open();
     }
   }}>
     <div className="main-surface" inert={menu ? true : undefined}>
@@ -154,11 +158,12 @@ export function HistoryView({ initialQuery, windowId, isMac, onBack, onClose }: 
     </div>
     {error ? <div className="error-banner" role="alert">{error}</div> : null}
     <PaletteFooter isMac={isMac} navigation={{ kind: 'back', label: `${t('back')} · ${t('historyKind')}`, tooltip: `${t('back')} (Esc)`, onAction: () => menu ? setMenu(false) : onBack() }}
-      title={t('historyKind')} context={t('historyAllTime')} status={notice ? <span role="status">{notice}</span> : undefined}
-      primary={{ label: menu ? chosen?.title || t('openHistoryPage') : t('openHistoryPage'), keys: ['↵'], disabled: unavailable || !selected || (menu && !chosen), onAction: () => void runAction(menu ? chosen?.id : 'open') }}
+      title={t('historyKind')} context={t('historyAllTime')} status={notice ? <span role="status">{notice}</span> : !menu && selected?.disabled ? <span role="status">{t('addressPinned')}</span> : undefined}
+      primary={{ label: menu ? chosen?.title || t('openCurrentTab') : t('openCurrentTab'), keys: ['↵'], disabled: unavailable || !selected || (menu ? !chosen || chosen.disabled : selected.disabled), onAction: () => menu ? void runAction(chosen?.id) : void open() }}
+      secondary={!menu && newTabAction ? { label: t('openNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: unavailable, onAction: () => void open(newTabAction) } : undefined}
       actions={{ open: menu, disabled: unavailable || !selected, onToggle: toggleMenu }} />
     {menu ? <ActionMenu id="history-actions" title={selected?.title}
-      actions={actions} query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionId(''); }}
+      actions={actions.map(action => ({ ...action, icon: <EntryGlyph name={action.icon} size={16} /> }))} query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionId(''); }}
       selectedId={chosen?.id} onSelectionChange={setActionId} onAction={id => void runAction(id)} onClose={() => setMenu(false)} isMac={isMac} /> : null}
   </section></BackLayer>;
 }

@@ -1,6 +1,7 @@
 import { brandAliases, categoryTerms, entrySearchQuery, entryTitle } from './entryPresentation';
 import { t } from './i18n';
 import { groupActions } from './groupActions';
+import { addressActions, pageNavigationEntry } from './addressPresentation';
 import { chromePages } from './chromePages';
 import Fuse, { type Expression } from 'fuse.js';
 import { termMatches } from './searchMatch';
@@ -348,7 +349,7 @@ export function copyUrlAction(entry: Entry): Entry | undefined {
   };
 }
 
-export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
+export function actionsFor(entry: Entry, snapshot: Snapshot, isMac = false): Entry[] {
   if (entry.action === 'manageGroup') {
     const group = snapshot.groups?.find(group => group.id === entry.groupId);
     return group ? groupActions(group) : [];
@@ -356,9 +357,9 @@ export function actionsFor(entry: Entry, snapshot: Snapshot): Entry[] {
   if (entry.kind === 'command') return [entry];
   const copy = copyUrlAction(entry);
   const copyActions = copy ? [copy] : [];
-  if (entry.kind === 'history') return [{ ...entry, title: t('openHistoryPage'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` }, ...copyActions];
+  if (entry.kind === 'history') return [...addressActions(pageNavigationEntry(entry, snapshot), isMac), ...copyActions];
   if (entry.kind === 'bookmark') return [
-    { ...entry, title: t('openNewTab'), subtitle: entry.title, keywords: `${entry.keywords} open new tab 在新标签页打开` },
+    ...addressActions(pageNavigationEntry(entry, snapshot), isMac),
     ...copyActions,
     { id: `${entry.id}:removeBookmark`, kind: 'command', action: 'removeBookmark', icon: 'bookmark',
       title: t('removeBookmark'), subtitle: entry.title, keywords: 'bookmark remove delete 书签 删除 取消 收藏',

@@ -786,9 +786,8 @@ test.describe(() => {
     await surface.locator('.palette').screenshot({ path: test.info().outputPath('url-copy-history-chinese-narrow.png') });
     // A selection left in the search input is unrelated to a fresh click on text.
     await fullSearch.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-    const opened = context.waitForEvent('page');
     await history.locator('.entry-title').click();
-    await expect(await opened).toHaveURL(historyUrl);
+    await expect(page).toHaveURL(historyUrl);
     await expect(page.locator('.justonehop-frame')).toHaveCount(0);
   });
 });
@@ -1328,19 +1327,18 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
   });
 });
 
-test('bookmark opens a new tab in the same window', async () => {
-  const sourceWindow = await ui.evaluate(async base => {
-    await chrome.bookmarks.create({ title: 'BookmarkAcceptance', url: `${base}/Bookmarked` });
-    return (await chrome.tabs.getCurrent())!.windowId;
-  }, origin);
-  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
-  await input.fill('BookmarkAcceptance');
-  await expect(ui.getByRole('option')).toHaveCount(1);
-  await input.press('Enter');
-  await expect.poll(() => worker.evaluate(async args => {
-    const found = await chrome.tabs.query({ windowId: args.id });
-    return found.some(t => t.url === `${args.origin}/Bookmarked`);
-  }, { id: sourceWindow, origin })).toBe(true);
+test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+  test('bookmark Enter navigates the source tab from a native panel', async () => {
+    await worker.evaluate(async base => { await chrome.bookmarks.create({ title: 'BookmarkAcceptance', url: `${base}/Bookmarked` }); }, origin);
+    const { source, palette } = await openNativePalette();
+    const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await input.fill('BookmarkAcceptance');
+    await expect(palette.locator('#justonehop-results [aria-selected="true"]')).toHaveClass(/bookmark/);
+    await input.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
+    await expect.poll(() => worker.evaluate(id => chrome.tabs.get(id).then(tab => tab.url), source.tabId)).toBe(`${origin}/Bookmarked`);
+    await expect.poll(() => palette.isClosed()).toBe(true);
+  });
 });
 
 test('close others preserves pinned tabs and another window; restore is functional', async () => {
@@ -5993,6 +5991,63 @@ for (const host of ['overlay', 'native'] as const) test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('Saved pages use current tab by default and new tab through shortcut footer and menu', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Saved-source`);
+    const source = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!, page.url());
+    const shortcut = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter');
+    for (const kind of ['bookmark', 'history', 'allHistory'] as const) {
+      const term = `SavedDestination${kind}`;
+      const url = `${origin}/${term}?q=one#two`;
+      await worker.evaluate(async ({ kind, term, url }) => {
+        if (kind === 'bookmark') await chrome.bookmarks.create({ title: term, url });
+        else await chrome.history.addUrl({ url });
+      }, { kind, term, url });
+      for (const method of ['enter', 'click', 'shortcut', 'footer', 'menu'] as const) {
+        await worker.evaluate(id => chrome.tabs.update(id, { pinned: false, active: true }), source.id!);
+        await page.goto(`${origin}/Saved-source`);
+        if (method === 'menu') await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), source.id!);
+        const surface = await openStorageOverlay(page);
+        let input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+        await input.fill(term);
+        if (kind === 'allHistory') {
+          await surface.locator('#justonehop-search-all-history').click();
+          input = surface.getByRole('combobox', { name: 'Search browsing history', exact: true });
+        }
+        const row = surface.locator(`.result.${kind === 'bookmark' ? 'bookmark' : 'history'}`).filter({ hasText: term });
+        await expect(row).toHaveCount(1);
+        await expect(row).toHaveAttribute('aria-selected', 'true');
+        const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), source.windowId);
+        for (const init of [{ key: 'Enter', isComposing: true }, { key: 'Enter', repeat: true }, { key: 'Enter', metaKey: true, shiftKey: true }]) await input.dispatchEvent('keydown', init);
+        if (method === 'enter') await input.press('Enter');
+        else if (method === 'click') await row.locator('.entry-title').click();
+        else if (method === 'shortcut') await input.press(shortcut);
+        else if (method === 'footer') {
+          await page.setViewportSize({ width: 390, height: 640 });
+          await surface.getByRole('button', { name: 'Open in New Tab', exact: true }).click();
+        } else {
+          await expect(surface.getByRole('button', { name: 'Open in Current Tab', exact: true })).toBeDisabled();
+          await input.press('Enter');
+          expect((await worker.evaluate(id => chrome.tabs.get(id), source.id!)).url).toBe(`${origin}/Saved-source`);
+          const bounds = (await row.boundingBox())!;
+          await page.mouse.click(bounds.x + 30, bounds.y + bounds.height / 2, { button: 'right' });
+          const actions = surface.getByRole('combobox', { name: 'Search actions' });
+          await actions.fill('新标签页'); await actions.press('Enter');
+        }
+        await expect.poll(() => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toBe(url);
+        const active = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0], source.windowId);
+        const after = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), source.windowId);
+        if (method === 'enter' || method === 'click') {
+          expect(active.id).toBe(source.id); expect(after).toEqual(before);
+        } else {
+          expect(active.id).not.toBe(source.id); expect(after.length).toBe(before.length + 1);
+          expect((await worker.evaluate(id => chrome.tabs.get(id), source.id!)).url).toBe(`${origin}/Saved-source`);
+          await worker.evaluate(id => chrome.tabs.remove(id), active.id!);
+        }
+        await page.setViewportSize({ width: 1100, height: 760 });
+      }
+    }
+  });
+
   test('Google search: local priority and mouse keyboard menu navigation preserve search terms', async () => {
     // Chrome API-created tabs can navigate before Playwright installs routing.
     // Capture the requested destination and use a local page to verify tab effects.

@@ -16,7 +16,7 @@ beforeEach(() => {
   calls = []; bookmarkUrl = 'https://example.com'; usage = [];
   tabs = [
     { id: 1, index: 0, windowId: 10, pinned: true, active: false, title: 'Pinned', url: 'https://pinned.example' },
-    { id: 2, index: 1, windowId: 10, pinned: false, active: true, mutedInfo: { muted: false }, title: 'Active' },
+    { id: 2, index: 1, windowId: 10, pinned: false, active: true, mutedInfo: { muted: false }, title: 'Active', url: 'https://source.example/' },
     { id: 3, index: 2, windowId: 10, pinned: false, active: false, title: 'Right' },
     { id: 4, index: 0, windowId: 20, pinned: false, active: true, title: 'Other window' },
   ] as chrome.tabs.Tab[];
@@ -189,6 +189,35 @@ for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
   });
 }
 
+for (const action of ['openBookmark', 'openHistoryPage'] as const) {
+  test(`${action} opens a new active tab and learns its original identity`, async () => {
+    await perform({ ...addressExecution('navigateAddress'), action, bookmarkId: 'b', newTab: true });
+    const url = action === 'openBookmark' ? bookmarkUrl : addressExecution('navigateAddress').url;
+    assert.deepEqual(calls, [['create', { windowId: 10, url, active: true }]]);
+    assert.equal(usage[0].target, action === 'openBookmark' ? 'bookmark:b' : `tab:${url}`);
+  });
+
+  test(`${action} protects pinned and changed sources in both opening modes`, async () => {
+    const payload = { ...addressExecution('navigateAddress'), action, bookmarkId: 'b' };
+    tabs[1].pinned = true;
+    await assert.rejects(perform(payload), { message: t('errorPinned') });
+    await perform({ ...payload, newTab: true });
+    calls = []; usage = [];
+    const original = { ...tabs[1], pinned: false };
+    for (const newTab of [false, true]) {
+      for (const patch of [{ active: false }, { windowId: 20 }, { url: 'https://changed.example/' }, { pendingUrl: 'https://pending.example/' }]) {
+        tabs[1] = { ...original, ...patch };
+        await assert.rejects(perform({ ...payload, newTab }), { message: t('errorTabChanged') });
+      }
+      tabs[1] = original;
+      await assert.rejects(perform({ ...payload, newTab, tabId: undefined }));
+      await assert.rejects(perform({ ...payload, newTab, expectedUrl: undefined }));
+    }
+    assert.deepEqual(calls, []);
+    assert.deepEqual(usage, []);
+  });
+}
+
 test('address navigation protects pinned sources while allowing an active new tab', async () => {
   Object.assign(tabs[1], { url: 'https://source.example/', pinned: true });
   await assert.rejects(perform(addressExecution('navigateAddress')), { message: t('errorPinned') });
@@ -245,7 +274,7 @@ test('bookmark URL validation shares the opening protocol policy and rejects mal
   for (const url of [undefined, '', 'invalid', 'javascript:alert(1)', 'data:text/html,a', ' https://example.com', 'https://exa\nmple.com']) {
     assert.equal(safeBookmarkUrl(url), false);
     bookmarkUrl = url as string;
-    await assert.rejects(perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b' }), { message: t('errorBookmarkUrl') });
+    await assert.rejects(perform({ action: 'openBookmark', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', bookmarkId: 'b' }), { message: t('errorBookmarkUrl') });
   }
 });
 
@@ -497,8 +526,8 @@ test('history rejects incognito, inactive and vanished source contexts', async (
 });
 
 test('successful history selections learn the query and share the full URL identity with tabs', async () => {
-  await perform({ action: 'openHistoryPage', windowId: 10, url: 'https://g.echo.tech/c2c-web?q=one#two', query: ' C2C-web ' });
-  assert.deepEqual(calls, [['create', { windowId: 10, url: 'https://g.echo.tech/c2c-web?q=one#two' }]]);
+  await perform({ action: 'openHistoryPage', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', url: 'https://g.echo.tech/c2c-web?q=one#two', query: ' C2C-web ' });
+  assert.deepEqual(calls, [['update', 2, { url: 'https://g.echo.tech/c2c-web?q=one#two' }]]);
   assert.equal(usage.length, 1);
   assert.equal(usage[0].query, 'c2c-web');
   assert.equal(usage[0].target, 'tab:https://g.echo.tech/c2c-web?q=one#two');
@@ -506,21 +535,21 @@ test('successful history selections learn the query and share the full URL ident
 });
 
 test('history failures and blank queries do not create preferences', async () => {
-  await perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/', query: ' ' });
-  chrome.tabs.create = async () => { throw new Error('Cannot create tab'); };
-  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/', query: 'example' }));
+  await perform({ action: 'openHistoryPage', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', url: 'https://example.com/', query: ' ' });
+  chrome.tabs.update = async () => { throw new Error('Cannot navigate tab'); };
+  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', url: 'https://example.com/', query: 'example' }));
   assert.deepEqual(usage, []);
 });
 
 test('history opening rejects unsafe URLs, malformed requests and private windows', async () => {
   for (const url of [undefined, 42, '', 'not a url', 'javascript:alert(1)', 'data:text/html,hello', 'file:///tmp/test', 'chrome://history/', ' https://example.com', 'https://exa\nmple.com']) {
-    await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url } as never));
+    await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', url } as never));
   }
   await assert.rejects(perform({ action: 'openHistoryPage', windowId: '10', url: 'https://example.com/' } as never));
   chrome.windows.get = async () => ({ id: 10, incognito: true }) as chrome.windows.Window;
-  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/' }));
+  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', url: 'https://example.com/' }));
   chrome.windows.get = async () => { throw new Error('No window'); };
-  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, url: 'https://example.com/' }));
+  await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', url: 'https://example.com/' }));
   assert.deepEqual(calls, []);
   assert.deepEqual(usage, []);
 });
@@ -564,12 +593,12 @@ test('pin and mute toggle the live state', async () => {
 });
 test('bookmark URL is resolved by ID and scripts are not executed', async () => {
   bookmarkUrl = 'javascript:alert(1)';
-  await assert.rejects(perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b' }), /Script bookmarks/);
+  await assert.rejects(perform({ action: 'openBookmark', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', bookmarkId: 'b' }), /Script bookmarks/);
   assert.equal(calls.length, 0);
 });
-test('bookmark opens in the original window', async () => {
-  await perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b' });
-  assert.deepEqual(calls, [['create', { windowId: 10, url: 'https://example.com' }]]);
+test('bookmark navigates the source tab using its live bookmarked URL', async () => {
+  await perform({ action: 'openBookmark', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', bookmarkId: 'b' });
+  assert.deepEqual(calls, [['update', 2, { url: 'https://example.com' }]]);
 });
 const chromePageTargets = [
   ['openExtensions', 'chrome://extensions/'], ['openPasswords', 'chrome://password-manager/passwords'],
@@ -685,7 +714,7 @@ test('only successful actions learn; tab identities use their live URL', async (
   await perform({ action: 'switch', windowId: 10, tabId: 1, query: ' IAM ' });
   assert.equal(usage[0].query, 'iam');
   assert.equal(usage[0].target, 'tab:https://pinned.example');
-  await perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b', query: 'guide' });
+  await perform({ action: 'openBookmark', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', bookmarkId: 'b', query: 'guide' });
   assert.ok(usage.some(record => record.target === 'bookmark:b'));
   await perform({ action: 'settings', windowId: 10, query: 'language' });
   assert.ok(usage.some(record => record.target === 'command:settings'));
@@ -771,11 +800,11 @@ test('failed browser operations never train, and failed learning never retries s
 
 test('home page choices train while unqueried navigation and private windows do not', async () => {
   await perform({ action: 'switch', windowId: 10, tabId: 1 });
-  await perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b' });
+  await perform({ action: 'openBookmark', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', bookmarkId: 'b' });
   assert.equal(usage.length, 0);
   await perform({ action: 'switch', windowId: 10, tabId: 1, query: '' });
   assert.ok(usage.some(record => record.query === '' && record.target === `tab:${tabs[0].url}`));
-  await perform({ action: 'openBookmark', windowId: 10, bookmarkId: 'b', query: '' });
+  await perform({ action: 'openBookmark', windowId: 10, tabId: 2, expectedUrl: 'https://source.example/', bookmarkId: 'b', query: '' });
   assert.ok(usage.some(record => record.query === '' && record.target === 'bookmark:b'));
   await perform({ action: 'newTab', windowId: 10, query: '' });
   assert.equal(usage[0].target, 'command:newTab');

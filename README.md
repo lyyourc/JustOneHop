@@ -34,6 +34,7 @@ Press **`⌘Shift+P`** (`Ctrl+Shift+P` on Windows/Linux) or click the toolbar ic
 - **Plain words, not syntax**: Search by title or domain, or type everyday actions like `new tab`, `reopen closed tab`, `dark mode`, `downloads`, `extensions`, or `passwords` (English & Chinese supported).
 - **Find the project page first**: When a query exactly matches the URL’s final path segment and appears in the title, that page ranks above title-prefix matches. Searching `justonehop` favors the repository page over its documents; adding `testing` finds the relevant document.
 - **Learns your habits locally**: Relevance always comes first; for the same query, items you pick often move up naturally within their tier. Hover the history icon on any learned result to see why or forget it with one click.
+- **Open bookmarks & history in place**: Click or press `Enter` to navigate the current tab; `⌘Enter` on macOS (`Alt+Enter` on Windows/Linux) opens a new active tab, just like Go to URL. The footer and Actions menu offer both choices. Pinned source tabs allow only a new tab; open-tab results still switch tabs.
 - **Open URLs & Search Google**: Type `example.com` or `localhost:3000` to go straight there, or press `Enter` on any query to search Google (`⌘Enter` for a new tab).
 
 ### 2. Tab Switcher (`Alt+Tab` for Chrome Tabs)

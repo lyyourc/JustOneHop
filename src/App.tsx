@@ -12,7 +12,7 @@ import { useResultSelection } from './useResultSelection';
 import { TuckRecoveryView } from './TuckRecoveryView';
 import { Favicon } from './Favicon';
 import { NavigationHint, matchesShortcut, shortcutKeys } from './Shortcut';
-import { addressEntry, addressActions } from './addressPresentation';
+import { addressEntry, addressActions, isPageNavigation, pageNavigationEntry } from './addressPresentation';
 import { addressNewTabShortcut } from './address';
 import { googleSearchEntry, insertGoogleSearch } from './googleSearch';
 import { NavigationRoot, BackLayer } from './Navigation';
@@ -74,7 +74,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const list = useRef<HTMLDivElement>(null);
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const mod = isMac ? '⌘' : 'Ctrl';
-  const items = useMemo(() => data ? entries(data) : [], [data, preferences.language]);
+  const items = useMemo(() => data ? entries(data).map(entry => pageNavigationEntry(entry, data)) : [], [data, preferences.language]);
   const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
   const committed = useRef<{ query: string; results: Entry[]; visible: Entry[]; ranking: Map<string, RankingInfo> }>({ query: '', results: [], visible: [], ranking: new Map() });
   const liveHomeScores = useMemo(() => data?.incognito ? emptyScores : homeUsage(usage), [usage, data?.incognito]);
@@ -88,11 +88,11 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const liveRecommendations = useMemo(() => homeRecommendations(homeItems, liveHomeScores), [homeItems, liveHomeScores]);
   const next = useMemo(() => {
     if (!query.trim()) return recommendations;
-    const candidates = mergeHistoryResults(search(items, query), historyEntries(history.outcome.items));
+    const candidates = mergeHistoryResults(search(items, query), historyEntries(history.outcome.items).map(entry => data ? pageNavigationEntry(entry, data) : entry));
     const baseline = search(candidates, query);
     const results = scores.size ? search(candidates, query, scores) : baseline;
     return { results, baseline };
-  }, [items, query, scores, history.outcome, recommendations]);
+  }, [items, query, scores, history.outcome, recommendations, data]);
   const address = useMemo(() => data ? addressEntry(query, data, next.results) : undefined, [query, data, next.results, preferences.language]);
   const nextResults = useMemo(() => address ? [address, ...next.results] : next.results, [address, next.results]);
   const nextRanking = useMemo(() => rankingInfo(nextResults, address ? [address, ...next.baseline] : next.baseline, query.trim() ? liveScores : liveRecommendations.scores), [nextResults, address, next, liveScores, liveRecommendations, query]);
@@ -110,7 +110,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const liveTarget = actionTarget && [...items, ...visible].find(item => item.id === actionTarget.id);
   const actionItems = useMemo(() => {
     if (!data || !liveTarget) return [];
-    const actions = (liveTarget.action === 'navigateAddress' ? addressActions(liveTarget, isMac) : actionsFor(liveTarget, data))
+    const actions = (liveTarget.action === 'navigateAddress' ? addressActions(liveTarget, isMac) : actionsFor(liveTarget, data, isMac))
       .sort((a, b) => Number(a.action.startsWith('close')) - Number(b.action.startsWith('close')));
     return actions;
   }, [data, liveTarget, preferences.language]);
@@ -219,7 +219,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   function toggleActions() {
     if (resultBusy) return;
     if (actionTarget) closeActions();
-    else if (selected && (!selected.disabled || selected.action === 'navigateAddress')) {
+    else if (selected && (!selected.disabled || isPageNavigation(selected))) {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       setActionTarget(selected); setActionQuery(''); setActionSelection(''); setError(''); }
   }
@@ -300,7 +300,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
         tabId: tab.id, windowId: data.windowId, expectedUrl: tab.url, query: learningQuery ?? '' });
       return;
     }
-    const execution = { action: entry.action, groupId: entry.groupId, groupChanges: entry.groupChanges, groupTabIds: entry.groupTabIds, settingsSection: entry.settingsSection, tabId: entry.tabId, bookmarkId: entry.bookmarkId, expectedUrl: entry.expectedUrl, bookmarkIds: entry.bookmarkIds, url: entry.url, windowId: data.windowId, query: learningQuery };
+    const execution = { action: entry.action, groupId: entry.groupId, groupChanges: entry.groupChanges, groupTabIds: entry.groupTabIds, settingsSection: entry.settingsSection, tabId: entry.tabId, bookmarkId: entry.bookmarkId, newTab: entry.newTab, expectedUrl: entry.expectedUrl, bookmarkIds: entry.bookmarkIds, url: entry.url, windowId: data.windowId, query: learningQuery };
     if (entry.action === 'settings') { openSettings(entry.settingsSection); void execute(execution).catch(() => {}); return; }
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     setBusy(true); setError(''); setNotice('');
@@ -364,7 +364,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       setter(pool[next].id);
       if ((event.target as HTMLElement).closest('.ranking-forget')) input.current?.focus();
     } else if (event.key === 'Enter') {
-      if (!storage && !actionTarget && current?.action === 'navigateAddress' && (event.target as HTMLElement).tagName !== 'BUTTON'
+      if (!storage && !actionTarget && current && isPageNavigation(current) && (event.target as HTMLElement).tagName !== 'BUTTON'
         && matchesShortcut(event, addressNewTabShortcut(isMac), isMac)) {
         event.preventDefault();
         if (!event.repeat) void run(addressActions(current, isMac)[1]);
@@ -392,14 +392,14 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const visibleShortcut = (entry: Entry) => entry.action === 'tabSwitcher' || (mode === 'popup' && ['close', 'reload'].includes(entry.action)) ? undefined : entry.shortcut;
   const current = actionTarget ? selectedAction : selected;
   const count = affected(current);
-  const newAddressAction = !actionTarget && selected?.action === 'navigateAddress' ? addressActions(selected, isMac)[1] : undefined;
-  const primaryLabel = current?.action === 'manageGroup' ? t('groupViewTabs') : current?.action === 'navigateAddress' ? t('openCurrentTab') : current?.action === 'openAddressNewTab' ? t('openNewTab') : current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
+  const newAddressAction = !actionTarget && selected && isPageNavigation(selected) ? addressActions(selected, isMac)[1] : undefined;
+  const primaryLabel = current?.action === 'manageGroup' ? t('groupViewTabs') : current?.newTab || current?.action === 'openAddressNewTab' ? t('openNewTab') : isPageNavigation(current) ? t('openCurrentTab') : current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
     : current?.kind === 'history' ? t('openHistoryPage') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
   return <NavigationRoot><BackLayer onBack={dismiss}><div className={`justonehop-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (groupRemoval) setGroupRemoval(null); else if (bookmarkRemoval) setBookmarkRemoval(null); else if (actionTarget) closeActions(); else dismiss(); }
   }}>
-    {tabSwitcherOpen && data ? <PaletteTabSwitcher data={data} theme={preferences.theme} onBack={() => setTabSwitcherOpen(false)} onClose={onClose} /> : historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} windowId={data.windowId} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
+    {tabSwitcherOpen && data ? <PaletteTabSwitcher data={data} theme={preferences.theme} onBack={() => setTabSwitcherOpen(false)} onClose={onClose} /> : historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} data={data} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
       initialEditor={groupEditor} initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
       onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : bindingOpen ? <BindingGuide isMac={isMac} onBack={() => setBindingOpen(false)} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} tabSwitcherShortcut={data?.tabSwitcherShortcut || ''} isMac={isMac}
       onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label={t('extensionName')} aria-busy={busy}>
@@ -425,7 +425,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
-              if (resultBusy || (item.disabled && item.action !== 'navigateAddress')) return;
+              if (resultBusy || (item.disabled && !isPageNavigation(item))) return;
               savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
               setSelection(item.id); setActionTarget(item); setActionQuery(''); setActionSelection(''); setError('');
             }} />
@@ -453,7 +453,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
           : undefined}
         primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval || !!groupRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
         secondary={newAddressAction ? { label: t('openNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
-        actions={{ open: !!actionTarget, disabled: !selected || (selected.disabled && selected.action !== 'navigateAddress') || resultBusy || !!bookmarkRemoval || !!groupRemoval, onToggle: toggleActions }} />
+        actions={{ open: !!actionTarget, disabled: !selected || (selected.disabled && !isPageNavigation(selected)) || resultBusy || !!bookmarkRemoval || !!groupRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}
   </div></BackLayer></NavigationRoot>;

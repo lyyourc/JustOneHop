@@ -172,7 +172,7 @@ Entry 的可选 category、shortcut、faviconPageUrl 仅承载呈现信息，不
 
 主搜索从原始 query 生成单个 `navigateAddress` 候选，仅在本轮匹配的 tab／bookmark／history 结果没有相同规范化完整 URL 时插入普通结果之前；去重使用已合并历史的本轮结果，不能仅凭快照中存在该地址就隐藏。协议、路径、query、hash 的区别保留，未匹配结果不参与去重。不进入学习排序或空首页。`addressUrl` 共享解析前端输入与后台目标：接受 HTTP(S)、裸域名、localhost／IP 和端口；裸域名默认 HTTPS，localhost／回环默认 HTTP，显式协议优先。拒绝空白、控制字符、反斜线、凭据、无效主机及其他协议，使用 URL 标准规范化并保留路径、query、hash 的语义。地址解析不处理普通搜索词；Google 候选按下节独立生成，不新增在线联想或权限。
 
-候选复用 SearchResultItem，标题「访问网址 / Go to URL」、说明为规范化完整地址。单击、普通 Enter 与底栏主操作「当前页打开」同义；`addressActions` 为底栏次要操作及共享 ActionMenu 提供 `openAddressNewTab`，macOS 绑定 Mod+Enter，Windows/Linux 绑定 Alt+Enter。地址与 Google 搜索候选允许这项修饰键 Enter，不扩展到普通标签页、书签、历史或命令；输入法、repeat、额外修饰键和聚焦按钮的保护继续适用。菜单支持中英文检索，关闭恢复主搜索 query／selection／caret；窄屏新开按钮使用 PaletteFooter 已有 compact-icon 契约，保留 tooltip 和可访问名称。固定来源页禁用主动作并提示，菜单与新开操作仍可用。其他候选的默认动作不变。
+候选复用 SearchResultItem，标题「访问网址 / Go to URL」、说明为规范化完整地址。单击、普通 Enter 与底栏主操作「当前页打开」同义；`addressActions` 为底栏次要操作及共享 ActionMenu 提供 `openAddressNewTab`，macOS 绑定 Mod+Enter，Windows/Linux 绑定 Alt+Enter。地址、Google 搜索、书签与历史候选允许这项修饰键 Enter，不扩展到已有标签页切换或其他命令；输入法、repeat、额外修饰键和聚焦按钮的保护继续适用。菜单支持中英文检索，关闭恢复主搜索 query／selection／caret；窄屏新开按钮使用 PaletteFooter 已有 compact-icon 契约，保留 tooltip 和可访问名称。固定来源页禁用主动作并提示，菜单与新开操作仍可用。书签与历史（主搜索／全部历史页）通过 `pageNavigationEntry` 绑定来源，通过 `addressActions` 共用这两种动作、快捷键、底栏与菜单语义；默认原地导航，显式新开使用 `newTab: true`，两者均不复用已有同 URL 页。已有标签页结果仍切换。书签保留按实时 bookmarkId 读取目标与 `bookmark:<id>` 学习，历史保留 HTTP(S)／无痕校验及 `tab:<URL>` 学习；后台核对真实来源与 expectedUrl，固定来源仅允许新开。见 [ADR 0020](adr/0020-open-in-browser.md) 的补充决策。
 
 地址候选携带来源 `tabId` 与 `expectedUrl`，原始输入变化期间沿用历史查询的最多 100ms 提交门控，旧结果不可执行。后台对两种动作均核对真实 sender／独立面板映射后的来源 ID、窗口与活动状态，执行层再次读取来源 URL／pendingUrl 并验证规范化 HTTP(S) 目标。原地导航拒绝固定来源页；新开明确指定来源窗口、active=true，不复用同 URL 页。成功提交后关闭面板，失败保留输入并反馈，来源失效不改绑其他页；两种动作不写本机学习。不改变承载和定位。决策见 [ADR 0020](adr/0020-open-in-browser.md)。
 
@@ -188,7 +188,7 @@ Entry 的可选 category、shortcut、faviconPageUrl 仅承载呈现信息，不
 
 明确的 `history / search history / search all history / 历史 / 历史记录 / 搜索历史` 意图将「搜索全部历史」置顶，进入子页时清空子页搜索框而保留主搜索上下文；普通关键词携带原词进入。有关键词且非无痕窗口时，普通查询的「搜索全部历史」在排序后固定插入第 7 条，不足 6 条则跟随已有结果，无本地匹配时位于 Google 之后，整体仍最多 100 行并为 Google 保留位置。入口不参与相关性或使用习惯排序，说明区分完成无匹配、超时、失败及结果达到上限。与其他候选同批呈现，点击／Enter／底栏同义，右键菜单也使用共享动作。
 
-`HistoryView` 是全部时间的关键词搜索子页，复用 `.search-bar`、`.results`、40px 候选行、`Favicon`、`HighlightedText`、`PaletteFooter`、`ActionMenu`、`BackLayer` 与 `SearchDismissButton`。没有独立标题栏，底栏标题「历史」，context「全部时间」；空关键词提示输入，不读取整个历史库。加载提示延迟 150ms，15 秒无结果提供重试；搜索与返回保持可用，返回主搜索恢复关键词、选择、滚动与光标。普通行单击、Enter、底栏主操作与菜单「打开页面」均在来源窗口新标签页打开；拖选文字后松开鼠标不打开。结果行复用主搜索的 `SearchResultItem` 手势保护；菜单同时提供「复制 URL」，遵守完整地址复制、不导航、不写学习及成功后恢复 query／selection／caret 的共享契约。两种查询最多返回 100 个匹配 URL，达到上限须提示，不能把全部时间称作全部结果。
+`HistoryView` 是全部时间的关键词搜索子页，复用 `.search-bar`、`.results`、40px 候选行、`Favicon`、`HighlightedText`、`PaletteFooter`、`ActionMenu`、`BackLayer` 与 `SearchDismissButton`。没有独立标题栏，底栏标题「历史」，context「全部时间」；空关键词提示输入，不读取整个历史库。加载提示延迟 150ms，15 秒无结果提供重试；搜索与返回保持可用，返回主搜索恢复关键词、选择、滚动与光标。普通行单击、Enter、底栏主操作与菜单「当前页打开」均在来源页原地导航；⌘Enter（Windows/Linux Alt+Enter）及底栏／菜单「在新标签页打开」在来源窗口新开并激活，固定来源页仅允许新开；拖选文字后松开鼠标不打开。结果行复用主搜索的 `SearchResultItem` 手势保护；菜单同时提供「复制 URL」，遵守完整地址复制、不导航、不写学习及成功后恢复 query／selection／caret 的共享契约。两种查询最多返回 100 个匹配 URL，达到上限须提示，不能把全部时间称作全部结果。
 
 安装权限新增 `history`，后台验证调用者和来源窗口，无痕来源不读取普通历史、不记录选择，仅返回并打开 HTTP(S) URL，不调用历史写入接口。显式选择成功打开后，以 query + 完整 URL 写入既有本机学习存储，仅保存选择及衰减权重／时间，不持久复制整个浏览历史；历史 API 读取本身和打开失败不记录。沿用 500 条上限、90 天未使用失效及 14 天权重减半的规则。原 `openHistory` 命令继续跳转 Chrome 原生历史页。决策见 [ADR 0014](adr/0014-history-search.md)。
 

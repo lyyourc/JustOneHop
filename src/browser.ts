@@ -152,9 +152,27 @@ async function performAction(payload: Execution): Promise<string> {
     await chrome.tabs.ungroup(tab.id!); return '';
   }
   if (isChromePageAction(action)) { await openChromePage(action, windowId); return target(`command:${action}`); }
-  if (action === 'openHistoryPage') {
-    if (window.incognito || !safeHistoryUrl(payload.url)) throw new Error(t('errorHistorySearch'));
-    await chrome.tabs.create({ windowId, url: payload.url }); return target(`tab:${payload.url}`);
+  if (action === 'openHistoryPage' || action === 'openBookmark') {
+    let url = payload.url;
+    if (action === 'openHistoryPage') {
+      if (window.incognito || !safeHistoryUrl(url)) throw new Error(t('errorHistorySearch'));
+    } else {
+      if (typeof bookmarkId !== 'string') throw new Error(t('errorBookmark'));
+      const [bookmark] = await chrome.bookmarks.get(bookmarkId);
+      if (!bookmark?.url || !safeBookmarkUrl(bookmark.url)) throw new Error(t('errorBookmarkUrl'));
+      url = bookmark.url;
+    }
+    if (!Number.isInteger(tabId) || typeof payload.expectedUrl !== 'string' || !payload.expectedUrl ||
+        (payload.newTab !== undefined && typeof payload.newTab !== 'boolean')) throw new Error(t('errorInvalidRequest'));
+    const source = await chrome.tabs.get(tabId!);
+    if (source.id !== tabId || !source.active || source.windowId !== windowId || source.url !== payload.expectedUrl ||
+        (source.pendingUrl && source.pendingUrl !== source.url)) throw new Error(t('errorTabChanged'));
+    if (payload.newTab) await chrome.tabs.create({ windowId, url, active: true });
+    else {
+      if (source.pinned) throw new Error(t('errorPinned'));
+      await chrome.tabs.update(source.id!, { url });
+    }
+    return target(action === 'openBookmark' ? `bookmark:${bookmarkId}` : `tab:${url}`);
   }
   if (action === 'settings') {
     if (payload.settingsSection !== undefined && !['language', 'theme', 'keyboard', 'binding', 'ranking', 'tabs'].includes(payload.settingsSection)) throw new Error(t('errorCommand'));
@@ -170,14 +188,6 @@ async function performAction(payload: Execution): Promise<string> {
     const id = recent[0]?.tab?.sessionId || recent[0]?.window?.sessionId;
     if (!id) throw new Error(t('errorRestore'));
     await chrome.sessions.restore(id); return target('command:restore');
-  }
-  if (action === 'openBookmark') {
-    if (typeof bookmarkId !== 'string') throw new Error(t('errorBookmark'));
-    const [bookmark] = await chrome.bookmarks.get(bookmarkId);
-    if (!bookmark?.url || !safeBookmarkUrl(bookmark.url)) {
-      throw new Error(t('errorBookmarkUrl'));
-    }
-    await chrome.tabs.create({ windowId, url: bookmark.url }); return target(`bookmark:${bookmarkId}`);
   }
   if (!Number.isInteger(tabId)) throw new Error(t('errorNoTab'));
   const tab = await chrome.tabs.get(tabId!);

@@ -49,6 +49,7 @@ export interface Execution {
   windowId: number;
   tabId?: number;
   bookmarkId?: string;
+  newTab?: boolean;
   expectedUrl?: string;
   bookmarkIds?: string[];
   url?: string;
@@ -109,6 +110,7 @@ export interface Entry {
   searchOnly?: boolean;
   tabId?: number;
   bookmarkId?: string;
+  newTab?: boolean;
   expectedUrl?: string;
   bookmarkIds?: string[];
   pinned?: boolean;

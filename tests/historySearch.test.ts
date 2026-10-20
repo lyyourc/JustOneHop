@@ -24,9 +24,15 @@ test('history entries offer opening and copying the complete URL', () => {
   assert.equal(entry.lastVisitTime, 345);
   assert.equal(entry.subtitle, 'example.com/docs');
   const actions = actionsFor(entry, snapshot);
-  assert.deepEqual(actions.map(action => action.action), ['openHistoryPage', 'copyUrl']);
-  assert.deepEqual(actions.map(action => action.url), ['https://example.com/docs?q=one#two', 'https://example.com/docs?q=one#two']);
-  assert.equal(usageTarget(actions[1]), '');
+  assert.deepEqual(actions.map(action => action.action), ['openHistoryPage', 'openHistoryPage', 'copyUrl']);
+  assert.ok(actions.every(action => action.url === entry.url));
+  assert.equal(actions[0].tabId, snapshot.currentTabId);
+  assert.equal(actions[0].expectedUrl, snapshot.tabs[0].url);
+  assert.equal(actions[0].newTab, undefined);
+  assert.equal(actions[1].newTab, true);
+  assert.equal(actions[1].shortcut, 'Alt+Enter');
+  assert.equal(actionsFor(entry, snapshot, true)[1].shortcut, 'Mod+Enter');
+  assert.equal(usageTarget(actions[2]), '');
 });
 
 test('history joins title, domain and exact URL metadata relevance tiers', () => {
