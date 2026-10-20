@@ -45,6 +45,41 @@ test('history joins title, domain and exact URL metadata relevance tiers', () =>
   assert.equal(search(historyEntries([page('hash', 'Other', 'https://example.com/#section')]), 'section')[0]?.id, 'history:hash');
 });
 
+test('exact page names put the repository before its documents across history, tabs and bookmarks', () => {
+  const url = 'https://github.com/lyyourc/JustOneHop';
+  const history = historyEntries([
+    page('docs', 'JustOneHop/docs/TESTING.md at main · lyyourc/JustOneHop', `${url}/blob/main/docs/TESTING.md`, 300),
+    page('readme', 'JustOneHop/README.md at main · lyyourc/JustOneHop', `${url}/blob/main/README.md`, 200),
+    page('root', 'lyyourc/JustOneHop: 小范围瞬移 · A Human-First Command Palette', url, 100),
+  ]);
+  const learned = new Map([[usageTarget(history[0]), 1e9]]);
+  assert.equal(search(history, 'justonehop', learned)[0].id, 'history:root');
+  assert.deepEqual(search(history, 'justonehop testing').map(item => item.id), ['history:docs']);
+  assert.deepEqual(search(history, 'testing justonehop').map(item => item.id), ['history:docs']);
+  const base = entries({ ...snapshot,
+    tabs: [{ ...snapshot.tabs[0], title: history[2].title, url }],
+    bookmarks: [{ ...snapshot.bookmarks[0], title: history[2].title, url }],
+  }).filter(entry => entry.kind === 'tab' || entry.kind === 'bookmark');
+  for (const root of base) assert.equal(search([history[0], root], 'justonehop', learned)[0].id, root.id);
+  assert.equal(search(mergeHistoryResults(base, history), 'justonehop', learned)[0].id, base[0].id);
+});
+
+test('page identity requires a complete terminal segment and preserves stronger title matches', () => {
+  const candidates = historyEntries([
+    page('prefix', 'JustOneHop guide', 'https://example.com/guide', 200),
+    page('root', 'team/JustOneHop repository', 'https://git.example/team/JustOneHop/?tab=readme#top', 100),
+    page('path-only', 'Unrelated page', 'https://other.example/justonehop', 700),
+    page('ancestor', 'Repository', 'https://git.example/team/JustOneHop/docs', 300),
+    page('query', 'Repository', 'https://example.com/?repo=justonehop', 400),
+    page('fragment', 'Repository', 'https://example.com/#justonehop', 500),
+    page('partial', 'Repository', 'https://example.com/justonehop-tools', 600),
+  ]);
+  assert.equal(search(candidates, 'JUSTONEHOP')[0].id, 'history:root');
+  assert.equal(search(candidates, 'justone')[0].id, 'history:prefix');
+  const exact = historyEntries([page('exact', 'JustOneHop', 'https://example.com/')]);
+  assert.equal(search([...candidates, ...exact], 'justonehop', new Map([[usageTarget(candidates[1]), 1e9]]))[0].id, 'history:exact');
+});
+
 test('history respects relevance and default source order while URL preferences can reorder same-tier results', () => {
   const history = historyEntries([page('new', 'Guide', 'https://new.example/', 200), page('old', 'Guide', 'https://old.example/', 100)]);
   const base = entries(snapshot).filter(entry => entry.kind === 'tab' || entry.kind === 'bookmark');

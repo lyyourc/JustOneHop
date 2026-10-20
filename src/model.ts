@@ -235,15 +235,19 @@ function buildSearchIndex(items: Entry[]) {
     const label = normalizeSearch(entryTitle(item));
     const aliases = item.kind === 'command' ? (item.aliases ?? commandAliases[item.action] ?? []).map(normalizeSearch) : [];
     // A service is often named by its domain while its page title is localized.
-    // Rank that identity like a name; paths, query strings and folders remain
-    // auxiliary metadata and still receive no typo tolerance.
-    let hostname = '';
-    if ((item.kind === 'tab' || item.kind === 'bookmark' || item.kind === 'history') && item.faviconPageUrl) {
-      try { hostname = new URL(item.faviconPageUrl).hostname.toLowerCase().replace(/^www\./, ''); } catch { /* No domain identity. */ }
+    // A complete terminal path segment identifies the page itself; ancestor
+    // segments and query strings remain auxiliary metadata without typo tolerance.
+    let hostname = '', pageName = '';
+    if ((item.kind === 'tab' || item.kind === 'bookmark' || item.kind === 'history') && (item.url || item.faviconPageUrl)) {
+      try {
+        const url = new URL(item.url || item.faviconPageUrl!);
+        hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+        if (url.protocol === 'http:' || url.protocol === 'https:') pageName = normalizeSearch(url.pathname.replace(/\/+$/, '').split('/').pop() || '');
+      } catch { /* No URL identity. */ }
     }
     const names = [title, label, ...aliases, ...(hostname ? [hostname] : [])];
     return {
-      kind: item.kind, pinned: item.kind === 'tab' && !!item.pinned, action: item.action, danger: item.danger, title, label, aliases, names,
+      kind: item.kind, pinned: item.kind === 'tab' && !!item.pinned, action: item.action, danger: item.danger, title, label, aliases, names, pageName,
       wordNames: names.map(name => name.split(/[^\p{L}\p{N}]+/u).join(' ')),
       categoryText: categoryTerms(item.category), keywords: normalizeSearch(`${item.keywords} ${item.groupTitle || ''}`),
       subtitle: item.kind === 'command' ? '' : normalizeSearch(item.subtitle),
@@ -291,6 +295,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     if (item.kind === 'command' && (names.includes(normalized) ||
         ((bookmarkPrefix || unbookmarkPrefix) && ['bookmarkTab', 'unbookmarkTab', 'removeBookmark'].includes(item.action)))) return 0;
     if (item.title === normalized) return 1;
+    if (item.pageName === normalized && item.title.includes(normalized)) return 1.5;
     if (names.some(name => name.startsWith(normalized))) return 2;
     // Whole phrases lead; separate word prefixes work in either order too.
     if (item.wordNames.some(name => terms.every(term => name.startsWith(term) || name.includes(` ${term}`)))) return 3;
