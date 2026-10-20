@@ -99,6 +99,8 @@
   "goToUrl": { "message": "Go to URL" },
   "searchGoogleFor": { "message": "Search Google for “$1”" },
   "openCurrentTab": { "message": "Open in Current Tab" },
+  "footerOpenCurrentTab": { "message": "Open Here" },
+  "footerOpenNewTab": { "message": "New Tab" },
   "addressPinned": { "message": "Pinned tab: use a new tab" },
   "errorInvalidRequest": { "message": "This address cannot be opened. Check the URL and try again." },
   "errorTabChanged": { "message": "The source tab has changed. Reopen JustOneHop and try again." },

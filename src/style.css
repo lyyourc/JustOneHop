@@ -136,6 +136,9 @@
 .palette-footer-context, .palette-footer-status { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 11px; white-space: nowrap; }
 .palette-footer-status > [role="status"], .palette-footer-status > [role="alert"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .palette-footer-context { flex-shrink: 8; font-size: 11px; font-weight: 400; line-height: 16px; }
+.palette-footer-context-content { display: inline-flex; width: max-content; flex: none; }
+/* Keep hidden context measurable so it returns when either language or space changes. */
+.palette-footer-context[data-overflow] { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; margin-left: 0; }
 /* Navigation hints are supporting text, matching origins and counts in other layers. */
 .palette-footer-context kbd { font: inherit; color: inherit; min-width: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .palette-footer-title + .palette-footer-context, .palette-footer-title + .palette-footer-status { margin-left: 16px; }
@@ -336,7 +339,7 @@ body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: light-d
 .bookmark-confirm-details li { margin: 4px 0; }
 .bookmark-confirm .confirm-controls { flex-shrink: 0; }
 
-.palette-footer { flex-shrink: 0; }
+.palette-footer { flex-shrink: 0; gap: 16px; }
 .binding-surface { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
 /* Non-interactive content keeps focus in its keyboard layer, outside the Tab order. */

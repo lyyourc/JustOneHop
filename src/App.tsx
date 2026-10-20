@@ -451,8 +451,8 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
-        primary={{ label: primaryLabel, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval || !!groupRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        secondary={newAddressAction ? { label: t('openNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
+        primary={{ label: primaryLabel, shortLabel: current?.newTab || current?.action === 'openAddressNewTab' ? t('footerOpenNewTab') : isPageNavigation(current) ? t('footerOpenCurrentTab') : undefined, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval || !!groupRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
+        secondary={newAddressAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
         actions={{ open: !!actionTarget, disabled: !selected || (selected.disabled && !isPageNavigation(selected)) || resultBusy || !!bookmarkRemoval || !!groupRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}

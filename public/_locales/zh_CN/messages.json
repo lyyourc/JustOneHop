@@ -99,6 +99,8 @@
   "goToUrl": { "message": "访问网址" },
   "searchGoogleFor": { "message": "在 Google 搜索『$1』" },
   "openCurrentTab": { "message": "当前页打开" },
+  "footerOpenCurrentTab": { "message": "当前页打开" },
+  "footerOpenNewTab": { "message": "新标签页打开" },
   "addressPinned": { "message": "当前页已固定，请在新标签页打开" },
   "errorInvalidRequest": { "message": "无法打开此地址，请检查 URL 后重试。" },
   "errorTabChanged": { "message": "来源标签页已变化，请重新打开小范围瞬移后重试。" },

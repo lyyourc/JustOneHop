@@ -159,8 +159,8 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
     {error ? <div className="error-banner" role="alert">{error}</div> : null}
     <PaletteFooter isMac={isMac} navigation={{ kind: 'back', label: `${t('back')} · ${t('historyKind')}`, tooltip: `${t('back')} (Esc)`, onAction: () => menu ? setMenu(false) : onBack() }}
       title={t('historyKind')} context={t('historyAllTime')} status={notice ? <span role="status">{notice}</span> : !menu && selected?.disabled ? <span role="status">{t('addressPinned')}</span> : undefined}
-      primary={{ label: menu ? chosen?.title || t('openCurrentTab') : t('openCurrentTab'), keys: ['↵'], disabled: unavailable || !selected || (menu ? !chosen || chosen.disabled : selected.disabled), onAction: () => menu ? void runAction(chosen?.id) : void open() }}
-      secondary={!menu && newTabAction ? { label: t('openNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: unavailable, onAction: () => void open(newTabAction) } : undefined}
+      primary={{ label: menu ? chosen?.title || t('openCurrentTab') : t('openCurrentTab'), shortLabel: !menu || chosen?.id === `${selected?.id}:current` ? t('footerOpenCurrentTab') : chosen?.newTab ? t('footerOpenNewTab') : undefined, keys: ['↵'], disabled: unavailable || !selected || (menu ? !chosen || chosen.disabled : selected.disabled), onAction: () => menu ? void runAction(chosen?.id) : void open() }}
+      secondary={!menu && newTabAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: unavailable, onAction: () => void open(newTabAction) } : undefined}
       actions={{ open: menu, disabled: unavailable || !selected, onToggle: toggleMenu }} />
     {menu ? <ActionMenu id="history-actions" title={selected?.title}
       actions={actions.map(action => ({ ...action, icon: <EntryGlyph name={action.icon} size={16} /> }))} query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionId(''); }}

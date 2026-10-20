@@ -96,6 +96,8 @@ npm run build
 | Open Settings | Click gear icon in footer | `⌘,` |
 | Go back one level | Click back arrow, `esc`, or swipe right with two fingers | `Esc` (or `Backspace` when search is empty) |
 
+The single-line footer keeps actions aligned to the right. Page actions use **Open Here** and **New Tab**, with full descriptions in tooltips and the Actions menu. Navigation hints hide together when space is tight; status feedback remains visible. On narrow screens, the new-tab action becomes an icon button.
+
 For full gesture rules, ranking details, and `Ctrl+Tab` setup, see the **[Usage Guide (Chinese)](docs/USAGE.md)**.
 
 ---

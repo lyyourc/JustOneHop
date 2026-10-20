@@ -2934,7 +2934,33 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   await expect(action).toBeFocused();
   await action.press('Escape');
   await expect(input).toHaveValue('Navigation fixture');
-  await input.fill('');
+  await input.fill('example.com/footer-layout');
+  const primary = ui.locator('.primary-action'), secondary = ui.locator('.secondary-action');
+  await expect(primary.locator('.primary-label')).toHaveText(chinese ? '当前页打开' : 'Open Here');
+  await expect(secondary.locator('.primary-label')).toHaveText(chinese ? '新标签页打开' : 'New Tab');
+  await expect(primary).toHaveAccessibleName(chinese ? '当前页打开' : 'Open in Current Tab');
+  await expect(secondary).toHaveAccessibleName(chinese ? '在新标签页打开' : 'Open in New Tab');
+  await expect(secondary).toHaveAttribute('title', /在新标签页打开|Open in New Tab/);
+  await ui.evaluate(() => { document.body.style.width = '100%'; });
+  for (const width of [750, 620, 750]) {
+    await ui.setViewportSize({ width, height: 600 });
+    if (width === 620) await expect(ui.locator('.navigation-hint')).toBeHidden();
+    else await expect(ui.locator('.navigation-hint')).toBeVisible();
+    const left = (await ui.locator('.palette-footer-location').boundingBox())!;
+    const right = (await ui.locator('.footer-actions').boundingBox())!;
+    expect(right.x - left.x - left.width).toBeGreaterThanOrEqual(16);
+    expect(await ui.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    expect((await ui.locator('.footer').boundingBox())!.height).toBe(44);
+    const newTab = (await secondary.boundingBox())!, separator = (await ui.locator('.footer-separator').boundingBox())!;
+    expect(separator.x).toBeGreaterThanOrEqual(newTab.x + newTab.width);
+    if (width === 620) await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-compact.png`) });
+  }
+  // Mouse opens the full action descriptions; keyboard closes and restores the query.
+  await ui.locator('.actions-button').click();
+  await expect(ui.locator('.action-row').first()).toContainText(chinese ? '当前页打开' : 'Open in Current Tab');
+  await expect(ui.locator('.action-row').nth(1)).toContainText(chinese ? '在新标签页打开' : 'Open in New Tab');
+  await ui.getByRole('combobox', { name: chinese ? '搜索操作' : 'Search actions' }).press('Escape');
+  await expect(input).toHaveValue('example.com/footer-layout');
   for (const theme of ['light', 'dark'] as const) {
     await ui.emulateMedia({ colorScheme: theme });
     await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-${theme}.png`) });
@@ -2947,9 +2973,12 @@ for (const language of ['Chinese', 'English']) test.describe(() => {
   expect(await ui.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   const locationBox = await ui.locator('.palette-footer-location').boundingBox(), actionsBox = await ui.locator('.footer-actions').boundingBox();
   expect(locationBox!.x + locationBox!.width).toBeLessThanOrEqual(actionsBox!.x);
+  await expect(secondary.locator('.secondary-compact-icon')).toBeVisible();
+  await expect(secondary.locator('.primary-label')).toBeHidden();
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-narrow.png`) });
+  await input.fill('');
   await input.press('Control+n');
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-narrow.png`) });
 });
 });
 
