@@ -227,7 +227,7 @@ test('English automatic tuck makes one reversible batch and undo respects closed
   expect(await groupId(retained)).toBe(-1);
 });
 
-test('English configurable auto tuck previews without moving tabs and a native alarm applies the saved duration', async () => {
+test('English auto tuck duration saves on selection and a native alarm applies it', async () => {
   const [old] = await seed('Configurable-Idle');
   await enableAutomaticTucking();
   expect(await worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toMatchObject({ periodInMinutes: 5 });
@@ -238,12 +238,13 @@ test('English configurable auto tuck previews without moving tabs and a native a
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('auto tuck'); await search.press('Enter');
   const duration = ui.getByRole('combobox', { name: 'Tuck after inactivity' });
+  const before = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
   await duration.click();
   await ui.getByRole('option', { name: '1 h', exact: true }).click();
-  await expect(ui.getByText('1 tabs currently qualify with this duration.', { exact: false })).toBeVisible();
-  expect(await groupId(old)).toBe(-1);
-  const before = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
-  await ui.getByRole('button', { name: 'Save duration', exact: true }).click();
+  await ui.locator('.palette-footer').getByRole('button', { name: 'Back', exact: true }).click();
+  await search.fill('auto tuck'); await search.press('Enter');
+  await expect(duration).toHaveText('1 h');
+  await expect(ui.getByRole('button', { name: 'Save duration', exact: true })).toHaveCount(0);
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
   await expect(ui.getByText('1 tabs will be tucked at the next idle check', { exact: true })).toBeVisible();
   expect(await groupId(old)).toBe(-1);
@@ -301,6 +302,29 @@ test('English configurable auto tuck previews without moving tabs and a native a
   expect(durationBox!.height).toBe(languageBox!.height);
   await ui.locator('.settings-body').evaluate(node => { node.scrollTop = 0; });
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-overview-en.png') });
+  // A failed status read must not prevent saving; a failed write keeps the old value.
+  await ui.evaluate(() => {
+    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = ((message: { type?: string }) => message.type === 'tuck-status'
+      ? Promise.resolve({ ok: false, error: 'Status unavailable' }) : send(message)) as typeof chrome.runtime.sendMessage;
+    const set = chrome.storage.local.set.bind(chrome.storage.local);
+    let fail = true;
+    chrome.storage.local.set = (async (items: Record<string, unknown>) => {
+      if (fail && items.preferences) { fail = false; throw new Error('Write failed'); }
+      return set(items);
+    }) as typeof chrome.storage.local.set;
+  });
+  await ui.getByRole('button', { name: 'Refresh status' }).click();
+  await expect(ui.locator('.tuck-status-copy [role="alert"]')).toBeVisible();
+  await duration.click();
+  await ui.getByRole('option', { name: '3 h', exact: true }).click();
+  await expect(ui.locator('.error-banner')).toBeVisible();
+  await expect(duration).toHaveText('1 h');
+  await duration.click();
+  await ui.getByRole('option', { name: '3 h', exact: true }).click();
+  await expect(duration).toHaveText('3 h');
+  await expect(ui.locator('.error-banner')).toHaveCount(0);
+  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(3);
 });
 
 test('Chinese preset auto tuck duration supports keyboard saving and narrow settings', async () => {
@@ -342,11 +366,10 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect(ui.getByRole('listbox').getByRole('option')).toHaveText(['1 小时', '3 小时', '12 小时', '1 天', '3 天', '7 天']);
   await duration.press('Home'); await duration.press('Enter');
   await expect(ui.getByRole('spinbutton')).toHaveCount(0);
-  await expect(ui.getByRole('button', { name: '保存时长', exact: true })).toBeEnabled();
-  await duration.press('Tab'); // Back
-  await ui.keyboard.press('Tab'); // Save duration
-  const save = ui.getByRole('button', { name: '保存时长', exact: true });
-  await expect(save).toBeFocused(); await expect(save).toBeEnabled(); await save.press('Enter');
+  await ui.keyboard.press('Escape');
+  const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
+  await search.fill('自动收起'); await search.press('Enter');
+  await expect(ui.getByRole('button', { name: '保存时长', exact: true })).toHaveCount(0);
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
   await expect(duration).toHaveText('1 小时');
   await expect(duration).toBeEnabled();
@@ -368,7 +391,6 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await duration.click();
   await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(7);
   await ui.getByRole('option', { name: '3 天', exact: true }).click();
-  await ui.getByRole('button', { name: '保存时长', exact: true }).click();
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(72);
   await expect(duration).toBeEnabled();
   await duration.click();

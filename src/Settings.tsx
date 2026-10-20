@@ -95,16 +95,13 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const [tuckSaving, setTuckSaving] = useState(false);
   const [tuckRulesOpen, setTuckRulesOpen] = useState(false);
   const tuckRulesId = useId();
-  const [tuckChoice, setTuckChoice] = useState(String(preferences.autoTuckAfterHours));
+  const tuckHours = preferences.autoTuckAfterHours;
   // Keep a previously saved duration visible until the user chooses a preset.
   const tuckOptions = tuckPresets.includes(preferences.autoTuckAfterHours) ? tuckPresets : [...tuckPresets, preferences.autoTuckAfterHours];
   const [tuckStatus, setTuckStatus] = useState<TuckStatus | null>(null);
   const [tuckStatusHours, setTuckStatusHours] = useState<number | null>(null);
   const [tuckStatusError, setTuckStatusError] = useState(false);
   const [tuckRefresh, setTuckRefresh] = useState(0);
-  const tuckHours = Number(tuckChoice);
-  const tuckValid = isAutoTuckAfterHours(tuckHours);
-  const tuckDirty = tuckValid && tuckHours !== preferences.autoTuckAfterHours;
   const tuckHint = useId();
   const tuckToggle = useId();
   const body = useRef<HTMLDivElement>(null);
@@ -129,12 +126,9 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
     if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'nearest' }); }
     else input.current?.focus();
   }, [bindingOpen, helpOpen]);
-  useEffect(() => {
-    setTuckChoice(String(preferences.autoTuckAfterHours));
-  }, [preferences.autoTuckAfterHours]);
   const showTuck = preferences.autoTuck && matches.has('tabs') && !bindingOpen && !helpOpen;
   useEffect(() => {
-    if (!showTuck || !tuckValid) return;
+    if (!showTuck) return;
     let cancelled = false;
     setTuckStatus(null); setTuckStatusError(false);
     const timer = setTimeout(() => {
@@ -143,11 +137,12 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
       }).catch(() => { if (!cancelled) setTuckStatusError(true); });
     }, 150);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [showTuck, tuckValid, tuckHours, preferences.autoTuck, tuckRefresh]);
-  async function saveTuckDuration() {
-    if (!tuckDirty || tuckSaving || !tuckStatus || tuckStatusHours !== tuckHours || tuckStatus.enabled !== preferences.autoTuck || tuckStatusError) return;
+  }, [showTuck, tuckHours, preferences.autoTuck, tuckRefresh]);
+  async function saveTuckDuration(value: string) {
+    const hours = Number(value);
+    if (!isAutoTuckAfterHours(hours) || hours === tuckHours || tuckSaving) return;
     setError(false); setTuckSaving(true);
-    try { await savePreferences({ autoTuckAfterHours: tuckHours }); setTuckRefresh(value => value + 1); }
+    try { await savePreferences({ autoTuckAfterHours: hours }); }
     catch { setError(true); }
     finally { setTuckSaving(false); }
   }
@@ -243,19 +238,18 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
                     <button className="tuck-refresh" aria-label={t('tuckRefresh')} title={t('tuckRefresh')} onClick={() => setTuckRefresh(value => value + 1)}><RotateCw size={14} /></button>
                   </div>
                   <div className="tuck-status-copy" aria-live="polite">
-                  {tuckStatusError ? <p role="alert">{t('tuckStatusError')}</p> : tuckStatus && tuckValid && tuckStatusHours === tuckHours && tuckStatus.enabled === preferences.autoTuck ? <>
+                  {tuckStatusError ? <p role="alert">{t('tuckStatusError')}</p> : tuckStatus && tuckStatusHours === tuckHours && tuckStatus.enabled === preferences.autoTuck ? <>
                     <div className="tuck-status-summary">
-                      <span>{tuckDirty ? t('tuckPreview', String(tuckStatus.eligibleCount))
-                        : tuckStatus.eligibleCount ? t('tuckWaiting', String(tuckStatus.eligibleCount)) : t('tuckNoCandidates')}</span>
-                      {!tuckDirty ? <span className="tuck-last-check">{tuckStatus.lastScanAt
+                      <span>{tuckStatus.eligibleCount ? t('tuckWaiting', String(tuckStatus.eligibleCount)) : t('tuckNoCandidates')}</span>
+                      <span className="tuck-last-check">{tuckStatus.lastScanAt
                         ? <time dateTime={new Date(tuckStatus.lastScanAt).toISOString()} title={new Date(tuckStatus.lastScanAt).toLocaleString()}>{t('tuckLastScan', new Date(tuckStatus.lastScanAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time>
-                        : t('tuckNotScanned')}</span> : null}
+                        : t('tuckNotScanned')}</span>
                     </div>
                     {tuckStatus.blockedCount ? <p>{t('tuckBlocked', String(tuckStatus.blockedCount))}</p> : null}
                   </> : null}
                   </div>
                 </div>
-                <Choice query={query} label={t('tuckAfter')} value={tuckChoice} onChange={setTuckChoice}
+                <Choice query={query} label={t('tuckAfter')} value={String(tuckHours)} onChange={value => void saveTuckDuration(value)}
                   options={tuckOptions.map(hours => ({ value: String(hours), label: tuckDuration(hours) }))} />
               </div>
             </fieldset> : null}
@@ -273,7 +267,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
     </div>
     {error ? <div className="error-banner" role="alert">{t('errorSaveSettings')}</div> : null}
     <PaletteFooter title={t('settings')}
-      primary={showTuck && (tuckDirty || !tuckValid) ? { label: t('tuckSave'), keys: ['Enter'], disabled: !tuckDirty || tuckSaving || !tuckStatus || tuckStatusHours !== tuckHours || tuckStatus.enabled !== preferences.autoTuck || tuckStatusError, onAction: () => void saveTuckDuration() } : undefined}
       navigation={{ kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: back }}
       context={<span className="settings-navigation" title={t('settingsNavigationHelp')} aria-label={t('settingsNavigationHelp')}>
         <span className="navigation-key"><span className="key-chord"><kbd>Tab</kbd></span><span>{t('nextControl')}</span></span>
