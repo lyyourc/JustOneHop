@@ -592,17 +592,17 @@
     "message": "自动收起标签页"
   },
   "autoTuckHint": {
-    "message": "电脑空闲时收起旧标签，页面保持打开。"
+    "message": "长时间未使用的标签页会在电脑空闲时自动折叠，不会被关闭或删除。"
   },
   "autoTuckOffHint": {
-    "message": "关闭会移回仍受管理的收起页，含手动收起页。"
+    "message": "关闭后，所有已收起的标签页都会恢复到标签栏。"
   },
   "tuckAfter": { "message": "闲置时长" },
   "tuckRules": { "message": "了解规则" },
   "tuckHours": { "message": "$1 小时" },
   "tuckDays": { "message": "$1 天" },
-  "tuckScheduleHint": { "message": "每 5 分钟及电脑进入空闲时检查。" },
-  "tuckTimingHint": { "message": "开启后重新计时；修改时长保留已有计时。" },
+  "tuckScheduleHint": { "message": "仅在电脑空闲时收起标签页，不会打扰日常使用。" },
+  "tuckTimingHint": { "message": "标签页闲置达到设定时长才会被收起，刚开启时不会立即收起现有页面。" },
   "tuckDisabledStatus": { "message": "尚未开启，所选时长将在开启后使用。" },
   "tuckPreview": { "message": "按此时长，目前有 $1 个标签页符合条件。保存后将在下次空闲检查时收起。" },
   "tuckWaiting": { "message": "$1 个标签页将在下次空闲检查时收起" },

@@ -592,17 +592,17 @@
     "message": "Auto Tuck Tabs"
   },
   "autoTuckHint": {
-    "message": "Tuck unused tabs while your computer is idle. Pages stay open."
+    "message": "Tabs you haven't used in a while are folded when your computer is idle. Pages stay open, never closed or deleted."
   },
   "autoTuckOffHint": {
-    "message": "Turning off returns all managed tabs, including manually tucked tabs."
+    "message": "Turning off returns all tucked tabs back to the tab bar."
   },
   "tuckAfter": { "message": "Tuck after inactivity" },
   "tuckRules": { "message": "How it works" },
   "tuckHours": { "message": "$1 h" },
   "tuckDays": { "message": "$1 d" },
-  "tuckScheduleHint": { "message": "Checks every 5 minutes and when your computer becomes idle." },
-  "tuckTimingHint": { "message": "Enabling starts a new inactivity period; changing the duration keeps existing timers." },
+  "tuckScheduleHint": { "message": "Only tucks tabs while your computer is idle, without interrupting your work." },
+  "tuckTimingHint": { "message": "Tabs are only tucked after being idle for the chosen duration; enabling will not immediately tuck existing tabs." },
   "tuckDisabledStatus": { "message": "Off. Your duration will apply when enabled." },
   "tuckPreview": { "message": "$1 tabs currently qualify with this duration. Save to apply at the next idle check." },
   "tuckWaiting": { "message": "$1 tabs will be tucked at the next idle check" },

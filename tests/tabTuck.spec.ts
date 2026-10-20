@@ -266,12 +266,12 @@ test('English auto tuck duration saves on selection and a native alarm applies i
   await expect(ui.locator('.tuck-description')).toContainText('How it works');
   await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
   await rules.click();
-  await expect(ui.locator('.tuck-rules-copy')).toContainText('including manually tucked tabs');
+  await expect(ui.locator('.tuck-rules-copy')).toContainText('returns all tucked tabs');
   const ruleParagraphs = ui.locator('.tuck-rules-copy p');
   await expect(ruleParagraphs).toHaveText([
-    'Checks every 5 minutes and when your computer becomes idle.',
-    'Enabling starts a new inactivity period; changing the duration keeps existing timers.',
-    'Turning off returns all managed tabs, including manually tucked tabs.',
+    'Only tucks tabs while your computer is idle, without interrupting your work.',
+    'Tabs are only tucked after being idle for the chosen duration; enabling will not immediately tuck existing tabs.',
+    'Turning off returns all tucked tabs back to the tab bar.',
   ]);
   const scheduleBox = await ruleParagraphs.nth(0).boundingBox();
   const timingBox = await ruleParagraphs.nth(1).boundingBox();
@@ -346,7 +346,7 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   const rules = ui.getByRole('button', { name: '了解规则' });
   await expect(rules).toBeFocused();
   await rules.press('Space');
-  await expect(ui.locator('.tuck-rules-copy')).toContainText('含手动收起页');
+  await expect(ui.locator('.tuck-rules-copy')).toContainText('所有已收起的标签页都会恢复到标签栏');
   await rules.press('Space');
   await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
   await ui.keyboard.press('Tab'); // Auto tuck switch
