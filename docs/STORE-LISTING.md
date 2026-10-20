@@ -198,6 +198,21 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ## 5. 本地打包与发布检查清单
 
+### 版本与发布状态
+
+`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 使用相同的三段数字版本，例如 `0.2.0`；Git tag 与 GitHub Release 使用 `v0.2.0`，附件名为 `justonehop-0.2.0.zip`。新增功能递增次版本，修复递增补丁版本；上传版本须高于商店后台已有版本。
+
+[CHANGELOG](../CHANGELOG.md) 按版本维护用户可见变化。准备中的版本标记 `Unreleased`；确定发布时改为 GitHub 发布日期（`YYYY-MM-DD`）。GitHub 发布与商店审核是独立状态：GitHub Release 可先提供下载，说明中明确商店尚未提交、审核中或已上线；只有后台和公开页确认后才标记商店上线。审核期间商店仍显示上一版不属于版本错误。
+
+历史 `0.1.0` 的提交包对应源码尚未确认，不根据 ZIP 修改时间推断 commit，也不把当前 HEAD 补标为 `v0.1.0`。截图采集记录中的版本属于历史证据，不随源码版本批量替换。
+
+### 准备与验证
+
+1. 在发布分支更新版本文件和 CHANGELOG，确认商店后台的已发布、审核中与草稿版本。
+2. 安装锁定依赖（`npm ci`），执行 `npm run release:check`。检查会拒绝不兼容 Chrome 的版本、不一致的版本文件或缺失的 CHANGELOG 版本条目；CI 同样执行，tag 构建另核对 tag 名。
+3. 按 [测试指南](TESTING.md) 根据待发布改动选择类型检查、相关单元测试与必要的浏览器用例，记录实际范围和限制。`npm run check` 包含全量 E2E，仅在明确要求时执行；版本和文档准备不自动触发全量浏览器测试。
+4. 在发布提交中确定 CHANGELOG 日期。提交全部发布文件后，从该提交构建最终 ZIP；若源码或依赖变化，重新验证受影响范围并打包。
+
 ### 生成发布 ZIP
 
 在仓库根目录执行：
@@ -207,18 +222,49 @@ npm run package:store
 ```
 
 该命令会自动：
-1. 运行完整构建（`npm run build`）；
-2. 提取 `dist/` 中的发布文件，严格剔除 `*.map` 源映射文件与代码末尾的 `sourceMappingURL` 注释；
-3. 将 `manifest.json` 放置于 ZIP 根目录，在 `releases/` 目录下生成 `justonehop-<version>.zip`；
-4. 执行 ZIP 包完整性校验。
+1. 检查源码版本与 CHANGELOG 一致；
+2. 运行完整构建（`npm run build`）；
+3. 提取 `dist/` 中的发布文件，严格剔除 `*.map` 源映射文件与代码末尾的 `sourceMappingURL` 注释；
+4. 将 `manifest.json` 放置于 ZIP 根目录，在 `releases/` 目录下生成 `justonehop-<version>.zip`；
+5. 执行 ZIP 包完整性校验。
 
-### 提交前最终检查清单
+本地打包会替换同版本 ZIP。发布后保留已上传附件，不以重建产物覆盖它；任何产品修订使用新版本。打包从现有 `dist/` 收集文件，最终发布应使用干净检出构建，避免旧构建遗留文件混入。
 
-- [ ] `manifest.json` 中的 `version` 与发布目标版本一致（如 `0.1.0`）。
-- [ ] 运行 `npm run check`，确保类型检查、单元测试与构建全部通过（0 errors）。
-- [ ] 确认公开仓库的政策与支持链接在隐私窗口下匿名可访问：
-  - [x] [Privacy Policy](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md) (HTTP 200)
-  - [x] [Usage Guide](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md) (HTTP 200)
-- [ ] 按照 [图片清单](store/README.md) 在 CWS 后台分别上传截图（中英文各 3 张 1280×800 截图，以及共用的小宣传图与大宣传图）。
-- [ ] 检查并粘贴本文档中的对应文案与英文审核指引。
-- [ ] 点击「Submit for review」提交审核。
+### Git tag 与 GitHub Release
+
+以下以 `0.2.0` 为例，仅在发布提交已审阅、工作区干净且验证完成后执行：
+
+```sh
+npm run release:check -- v0.2.0
+npm run package:store
+unzip -p releases/justonehop-0.2.0.zip manifest.json
+shasum -a 256 releases/justonehop-0.2.0.zip
+git tag -a v0.2.0 -m "JustOneHop 0.2.0"
+git push origin HEAD
+git push origin v0.2.0
+```
+
+tag 必须指向生成该 ZIP 的源码提交。已推送 tag 不移动；发布后修订递增版本。等待该提交／tag 的 Validate CI 通过后创建 Release。
+
+准备发布说明文件（例如系统临时目录中的 `justonehop-0.2.0-notes.md`），包含 CHANGELOG 的本版本内容、源码 commit、ZIP SHA-256、实际验证范围和商店状态。先创建草稿检查附件与说明，再发布：
+
+```sh
+gh release create v0.2.0 releases/justonehop-0.2.0.zip \
+  --verify-tag --draft --title "JustOneHop 0.2.0" \
+  --notes-file /tmp/justonehop-0.2.0-notes.md
+gh release view v0.2.0
+gh release edit v0.2.0 --draft=false
+```
+
+GitHub 自动生成的源码归档不是商店上传包；使用附加的 `justonehop-0.2.0.zip`。这些命令是发布步骤，不由本地打包命令自动执行。
+
+### 商店提交与上线确认
+
+- [ ] 核对后台已有版本与提交资格；若上一版仍在审核，先按后台提供的流程处理，再提交新版本。
+- [ ] 上传 GitHub Release 中的同一份 ZIP，核对 SHA-256 与包内 manifest 版本，不单独重建另一份商店包。
+- [ ] 确认公开仓库的 [Privacy Policy](https://github.com/lyyourc/JustOneHop/blob/main/docs/PRIVACY.en.md) 与 [Usage Guide](https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md) 在隐私窗口下匿名可访问。
+- [ ] 按照 [图片清单](store/README.md) 核对中英文截图与宣传图；功能或外观变化时更新对应素材。
+- [ ] 检查商店文案、权限声明与英文审核指引；点击「Submit for review」后才将 Release 商店状态标记为审核中。
+- [ ] 审核通过并上线后，核对公开页版本与安装后的扩展版本；同步更新 README 中英文安装状态、Release 说明及 [验收记录](ACCEPTANCE.md) 的商店状态行。
+
+商店拒审时保留事实状态并处理原因。若需修改扩展包，递增版本重新走流程，不替换既有 tag 或 Release 附件。

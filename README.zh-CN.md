@@ -63,9 +63,9 @@
 
 ## 安装方式
 
-### 方式一：Chrome 应用商店 *(审核中 / Pending Review)*
+### 方式一：Chrome 应用商店
 
-`v0.1.0` 已提交至 Chrome Web Store，目前处于 **Pending Review（审核中）**：
+当前源码版本为 **`0.2.0`**，变化见 [更新日志](CHANGELOG.md)，发布包见 [GitHub Releases](https://github.com/lyyourc/JustOneHop/releases)。最近的商店提交记录为 `0.1.0`（当时处于审核中）；当前审核结果与可用状态尚未重新确认，源码版本不代表商店线上版本。
 
 - **商店主页**：[Chrome Web Store · 小范围瞬移](https://chromewebstore.google.com/detail/justonehop/mbofggnjaoneioopfbpheapgphmkclbo) *(审核通过后即可直接访问安装；扩展 ID：`mbofggnjaoneioopfbpheapgphmkclbo`)*
 
@@ -128,3 +128,6 @@ npm run check   # 运行类型检查、单元测试、构建与端到端测试
 
 - [使用指南](docs/USAGE.zh-CN.md)（[English](docs/USAGE.md)） · [交互架构](docs/INTERACTION-ARCHITECTURE.md) · [ADR 架构决策](docs/adr/README.md)
 - [最近标签切换](docs/RECENT-TABS.md) · [页面存储查看](docs/PAGE-STORAGE.md) · [测试指南](docs/TESTING.md) · [Logo 规范](docs/brand/LOGO.md)
+- [更新日志](CHANGELOG.md) · [版本发布与商店指南](docs/STORE-LISTING.md#5-本地打包与发布检查清单)
+
+`npm run package:store` 会检查发布元数据并生成商店 ZIP。按测试指南选择每次改动的验证范围；`npm run check` 包含全量端到端测试。

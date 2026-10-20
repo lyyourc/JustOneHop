@@ -1,11 +1,12 @@
 {
   "name": "justonehop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "package:store": "npm run build && tsx scripts/package-store.ts",
+    "release:check": "tsx scripts/check-release.ts",
+    "package:store": "npm run release:check && npm run build && tsx scripts/package-store.ts",
     "dev": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",

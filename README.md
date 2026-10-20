@@ -63,9 +63,9 @@ Clean up a crowded tab strip without losing your place.
 
 ## Installation
 
-### Option 1: Chrome Web Store *(Pending Review)*
+### Option 1: Chrome Web Store
 
-JustOneHop `v0.1.0` has been submitted to the Chrome Web Store and is currently **Pending Review**:
+The current source version is **`0.2.0`**; see the [Changelog](CHANGELOG.md) and [GitHub Releases](https://github.com/lyyourc/JustOneHop/releases). The last recorded store submission is `0.1.0` (pending review at the time). Current approval and availability have not been reconfirmed; the source version does not indicate the live store version.
 
 - **Store Listing**: [JustOneHop on Chrome Web Store](https://chromewebstore.google.com/detail/justonehop/mbofggnjaoneioopfbpheapgphmkclbo) *(link becomes public once review completes; ID: `mbofggnjaoneioopfbpheapgphmkclbo`)*
 
@@ -128,3 +128,6 @@ After building local changes, search `Reload` inside the palette to reload the e
 
 - [Usage Guide](docs/USAGE.md) ([中文版](docs/USAGE.zh-CN.md)) · [Interaction Architecture](docs/INTERACTION-ARCHITECTURE.md) · [ADR Index](docs/adr/README.md)
 - [Recent Tabs](docs/RECENT-TABS.md) · [Site Storage](docs/PAGE-STORAGE.md) · [Testing Guide](docs/TESTING.md) · [Brand & Logo](docs/brand/LOGO.md)
+- [Changelog](CHANGELOG.md) · [Release & Store Guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单)
+
+`npm run package:store` checks release metadata and builds the store ZIP. Follow the Testing Guide to select checks for each change; `npm run check` includes the full E2E suite.
