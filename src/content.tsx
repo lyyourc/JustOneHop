@@ -101,6 +101,10 @@ if (!scope[marker]) {
     }
     if (message?.source !== 'justonehop') return;
     if (message.type === 'ping') { respond(true); return; }
+    if (message.type === 'source-deactivated') {
+      if (host && !retainBindingGuide) close();
+      return;
+    }
     if (message.type === 'close-for-reload') { if (host) close(); respond(true); return; }
     if (message.type === 'toggle') {
       void Promise.all([preferencesReady, usageReady]).then(() => {
@@ -116,7 +120,9 @@ if (!scope[marker]) {
       return true;
     }
   });
+  // Occlusion and application switching also hide a document. Only the
+  // shortcut switcher cancels on visibility loss; palettes follow tab activation.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && host && !retainBindingGuide) close();
+    if (document.hidden && recentSession) close();
   });
 }

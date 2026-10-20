@@ -106,6 +106,7 @@ For full gesture rules, ranking details, and `Ctrl+Tab` setup, see the **[Usage 
 ## Privacy & Boundaries
 
 - **Where it runs**: Opens as a centered overlay on regular webpages, and automatically falls back to a standalone popup window on restricted pages (such as `chrome://` or the Chrome Web Store).
+- **Switching apps**: The command palette keeps your search and current view when you switch to another app. Switching away from the source tab, navigating it, or closing it ends the session. The shortcut-driven Tab Switcher still cancels on focus loss.
 - **Your data stays local**: Preferences, search ranking, and group recovery records are stored only in local extension storage. Search ranking keeps up to 2,000 query–target records; records unused for 90 days expire. Inspected Storage/Cookie values are read in memory and never persisted; copied values go to your clipboard.
 - **Privacy Policy**: Read the full [Privacy Policy](docs/PRIVACY.en.md) ([中文版](docs/PRIVACY.md)). Effective October 19, 2026. Developer: `lyyourc` · Contact: [liangyida42@gmail.com](mailto:liangyida42@gmail.com).
 

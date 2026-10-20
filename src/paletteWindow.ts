@@ -10,6 +10,7 @@ interface Session { token: string; sourceTabId: number; sourceWindowId: number; 
 export async function cancelPaletteContinuation(_sender: chrome.runtime.MessageSender) {}
 let session: Session | undefined;
 let opening = false;
+let awayFromChrome = false;
 const ready = chrome.storage.session.get(KEY).then(value => { session = value[KEY] as Session | undefined; }).catch(() => {});
 const urlFor = (token: string) => chrome.runtime.getURL(`popup.html#window=${token}`);
 const isPaletteSender = (sender: chrome.runtime.MessageSender) => sender.url?.startsWith(chrome.runtime.getURL('popup.html#window='));
@@ -20,6 +21,7 @@ export function isNativePage(tab: chrome.tabs.Tab) {
 async function close() {
   const old = session;
   session = undefined;
+  awayFromChrome = false;
   await chrome.storage.session.remove(KEY).catch(() => {});
   if (old?.popupWindowId !== undefined) await chrome.windows.remove(old.popupWindowId).catch(() => {});
 }
@@ -106,18 +108,39 @@ export async function closePaletteWindowForShortcut(tab: chrome.tabs.Tab) {
 }
 chrome.windows.onFocusChanged.addListener(id => {
   void ready.then(async () => {
-    if (!opening && session?.popupWindowId !== undefined && id !== session.popupWindowId) {
-      const current = session;
-      const popup = await chrome.windows.get(current.popupWindowId!).catch(() => null);
-      // Focus events may arrive after the opening handoff. Check live state
-      // before treating an older event as a reason to dismiss the new window.
-      if (session === current && !popup?.focused) await close();
-    }
+    if (opening || session?.popupWindowId === undefined) return;
+    const current = session;
+    const focused = await chrome.windows.getLastFocused().catch(() => null);
+    if (session !== current) return;
+    // Chrome may reactivate the source window before its popup on app return.
+    // Keep that handoff passive: never focus a window on the user's behalf.
+    if (!focused?.focused) { awayFromChrome = true; return; }
+    if (id === chrome.windows.WINDOW_ID_NONE) return;
+    if (focused.id === current.popupWindowId) { awayFromChrome = false; return; }
+    if (awayFromChrome && focused.id === current.sourceWindowId) return;
+    awayFromChrome = false;
+    await close();
   }).catch(() => {});
 });
 chrome.windows.onRemoved.addListener(id => {
   void ready.then(async () => {
     if (session && [session.popupWindowId, session.sourceWindowId].includes(id)) await close();
+  }).catch(() => {});
+});
+chrome.tabs.onActivated.addListener(info => {
+  void ready.then(async () => {
+    if (session?.sourceWindowId === info.windowId && session.sourceTabId !== info.tabId) await close();
+  }).catch(() => {});
+});
+chrome.tabs.onUpdated.addListener((id, change) => {
+  void ready.then(async () => {
+    // The source may still be completing its initial load during launch.
+    if (!opening && session?.sourceTabId === id && change.status === 'loading') await close();
+  }).catch(() => {});
+});
+chrome.tabs.onDetached.addListener(id => {
+  void ready.then(async () => {
+    if (session?.sourceTabId === id) await close();
   }).catch(() => {});
 });
 chrome.tabs.onRemoved.addListener(id => {

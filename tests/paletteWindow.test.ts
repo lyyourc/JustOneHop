@@ -10,6 +10,9 @@ const event = <T extends unknown[]>() => {
 const removed = event<[number]>();
 const windowRemoved = event<[number]>();
 const focusChanged = event<[number]>();
+const activated = event<[chrome.tabs.OnActivatedInfo]>();
+const updated = event<[number, chrome.tabs.OnUpdatedInfo]>();
+const detached = event<[number]>();
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 const deferred = () => { let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; }); return { promise, resolve }; };
 let tabs: chrome.tabs.Tab[];
@@ -92,14 +95,14 @@ globalThis.chrome = {
       const popup = { id: 30, type: 'popup', focused: false } as chrome.windows.Window;
       windows.push(popup);
       tabs.push({ id: 30, windowId: 30, active: true, url: options.url } as chrome.tabs.Tab);
-      if (creationFocus) focus(30);
+      if (creationFocus) { focus(30); updated.emit(2, { status: 'loading' }); }
       return popup;
     },
     update: async (id: number, options: chrome.windows.UpdateInfo) => { calls.push(['focus', id]); if (options.focused) focus(id); return windows.find(window => window.id === id); },
     remove: async (id: number) => { calls.push(['close-window', id]); windows = windows.filter(window => window.id !== id); tabs = tabs.filter(tab => tab.windowId !== id); windowRemoved.emit(id); },
   },
   tabs: {
-    onRemoved: removed,
+    onRemoved: removed, onActivated: activated, onUpdated: updated, onDetached: detached,
     get: async (id: number) => { const tab = tabs.find(tab => tab.id === id); if (!tab) throw new Error('No tab'); return { ...tab }; },
     getZoom: async () => 1,
     query: async (query: chrome.tabs.QueryInfo) => tabs.filter(tab => (query.active === undefined || tab.active === query.active) &&
@@ -120,6 +123,44 @@ const { launchPalette, clearToolbarPopups } = await import('../src/paletteLaunch
 const nativeSender = () => ({ url: tabs.find(tab => tab.id === 30)!.url, tab: tabs.find(tab => tab.id === 30)! });
 const execute = (action: Execution['action'] = 'close', tabId = 2, sender: chrome.runtime.MessageSender = sourceSender(), acknowledged = () => {}) =>
   performPaletteAction({ action, windowId: 10, tabId, query: 'close', paletteState: state }, sender, acknowledged);
+
+test('native palette survives leaving Chrome and returning to the same panel without stealing focus', async () => {
+  await togglePaletteWindow(tabs[1]);
+  const sender = nativeSender();
+  calls = [];
+  for (const window of windows) window.focused = false;
+  focusChanged.emit(chrome.windows.WINDOW_ID_NONE);
+  // A delayed browser focus event must also respect the live unfocused state.
+  focusChanged.emit(10);
+  await tick();
+  assert.equal((await paletteSender(sender)).tab?.id, 2);
+  assert.deepEqual(calls, []);
+  focus(10);
+  await tick();
+  assert.equal((await paletteSender(sender)).tab?.id, 2);
+  assert.deepEqual(calls, []);
+  focus(30);
+  await tick();
+  assert.equal((await paletteSender(sender)).tab?.id, 2);
+  assert.deepEqual(calls, []);
+  focus(10);
+  await tick();
+  assert.equal(windows.some(window => window.id === 30), false);
+});
+
+for (const reason of ['tab switch', 'navigation', 'detach'] as const) {
+  test(`native palette closes on source ${reason} even while Chrome is unfocused`, async () => {
+    await togglePaletteWindow(tabs[1]);
+    for (const window of windows) window.focused = false;
+    focusChanged.emit(chrome.windows.WINDOW_ID_NONE);
+    await tick();
+    if (reason === 'tab switch') activated.emit({ tabId: 1, windowId: 10 });
+    if (reason === 'navigation') updated.emit(2, { status: 'loading' });
+    if (reason === 'detach') detached.emit(2);
+    await tick();
+    assert.equal(windows.some(window => window.id === 30), false);
+  });
+}
 
 beforeEach(async () => {
   await closePaletteWindowForShortcut({ windowId: 10 } as chrome.tabs.Tab);

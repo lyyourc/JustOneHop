@@ -5832,6 +5832,41 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true } });
+  test('English palette preserves query and settings while hidden but closes on a source tab switch', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/App-switch-retention`); await page.bringToFront();
+    const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
+    const surface = page.frameLocator('.justonehop-frame');
+    const search = surface.getByRole('combobox');
+    await expect(search).toBeFocused();
+    await page.keyboard.type('settings');
+    await expect(surface.getByRole('option').first().locator('.entry-title')).toHaveText('JustOneHop Settings');
+    await expect(search).toHaveAttribute('aria-activedescendant', 'justonehop-command:settings');
+    await page.keyboard.press('Enter');
+    const settings = surface.getByRole('textbox', { name: 'Search settings' });
+    await settings.fill('theme');
+    // Inject the OS visibility signal in the content-script world; this proves
+    // retention on occlusion, not a physical macOS application-switch gesture.
+    await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    } }), id);
+    await expect(settings).toHaveValue('theme');
+    await worker.evaluate(tabId => chrome.scripting.executeScript({ target: { tabId }, func: () => {
+      Reflect.deleteProperty(document, 'hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+    } }), id);
+    await surface.locator('.footer-back').click();
+    await expect(search).toHaveValue('settings');
+    await expect(search).toBeFocused();
+    await worker.evaluate(async () => { await chrome.tabs.create({ url: 'about:blank', active: true }); });
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
+    await page.bringToFront();
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
+  });
   test('English palette keeps an unfocused overlay and offers click recovery', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Focus-boundary`);
   const id = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!.id!, page.url());

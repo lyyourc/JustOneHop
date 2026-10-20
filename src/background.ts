@@ -84,7 +84,15 @@ chrome.tabs.onUpdated.addListener(changed);
 chrome.tabs.onMoved.addListener(changed);
 chrome.tabs.onAttached.addListener(changed);
 chrome.tabs.onDetached.addListener(changed);
-chrome.tabs.onActivated.addListener(changed);
+chrome.tabs.onActivated.addListener(info => {
+  for (const port of clients) {
+    const source = port.sender?.tab;
+    if (source?.id !== undefined && source.windowId === info.windowId && source.id !== info.tabId) {
+      void chrome.tabs.sendMessage(source.id, { source: 'justonehop', type: 'source-deactivated' }, { frameId: 0 }).catch(() => {});
+    }
+  }
+  changed();
+});
 chrome.bookmarks.onCreated.addListener(changed);
 chrome.bookmarks.onRemoved.addListener(changed);
 chrome.bookmarks.onChanged.addListener(changed);
