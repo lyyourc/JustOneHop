@@ -18,6 +18,17 @@ test('localized extension descriptions fit the Chrome manifest limit', () => {
     assert.ok(description.length <= 132, `Description has ${description.length} characters; Chrome allows 132`);
   }
 });
+test('serialized partial errors retain counts while unknown error details stay hidden', () => {
+  for (const key of ['errorGroupPartialCount', 'errorBookmarkPartialCount', 'errorUndoTuckPartialCount'] as const) {
+    const values = ['2', '3'];
+    const message = t(key, values);
+    assert.equal(errorMessage(new Error(errorMessage(new Error(message)))), message);
+    const chineseMessage = chinese[key].message.replace(/\$(\d)/g, (_, index) => values[Number(index) - 1]);
+    assert.equal(errorMessage(new Error(chineseMessage)), message);
+    assert.equal(errorMessage(new Error(message.replace('2', 'private detail'))), t('errorGeneric'));
+  }
+});
+
 test('fallback English handles singular, plural and missing browser APIs', () => {
   assert.equal(t('newTab'), 'New Tab');
   assert.equal(countMessage('resultOne', 'resultMany', 0), '0 results');

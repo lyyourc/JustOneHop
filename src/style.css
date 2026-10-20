@@ -136,15 +136,25 @@
 .footer-title-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-footer-context, .palette-footer-status { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 11px; white-space: nowrap; }
 .palette-footer-status > [role="status"], .palette-footer-status > [role="alert"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.operation-feedback { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 11px; color: var(--muted); }
+.operation-feedback:empty { position: absolute; width: 0; height: 0; overflow: hidden; }
+.operation-feedback:not(:empty) ~ .palette-footer-context, .operation-feedback:not(:empty) ~ .palette-footer-status { display: none; }
+.operation-feedback[role="alert"] { color: var(--danger); }
+.operation-feedback-message { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.operation-feedback-dismiss { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 4px; }
+.operation-feedback-dismiss:hover { background: var(--selected); }
+.palette-footer-title + .operation-feedback:not(:empty) { margin-left: 16px; }
 .palette-footer-context { flex-shrink: 8; font-size: 11px; font-weight: 400; line-height: 16px; }
 .palette-footer-context-content { display: inline-flex; width: max-content; flex: none; }
 /* Keep hidden context measurable so it returns when either language or space changes. */
 .palette-footer-context[data-overflow] { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; margin-left: 0; }
 /* Navigation hints are supporting text, matching origins and counts in other layers. */
 .palette-footer-context kbd { font: inherit; color: inherit; min-width: 0; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; }
-.palette-footer-title + .palette-footer-context, .palette-footer-title + .palette-footer-status { margin-left: 16px; }
+.palette-footer-title ~ .palette-footer-context, .palette-footer-title ~ .palette-footer-status { margin-left: 16px; }
 @media (max-width: 520px) {
   .palette-footer-context { display: none; }
+  .palette-footer-location:has(.operation-feedback:not(:empty)) .palette-footer-title { display: none; }
+  .palette-footer-title + .operation-feedback:not(:empty) { margin-left: 0; }
   .palette-footer-location { gap: 6px; }
   .palette-footer .footer-actions { flex-shrink: 0; }
 }

@@ -17,7 +17,8 @@ import { useHistoryQuery } from './useHistoryQuery';
 import { historyEntries } from './historySearch';
 import { actionsFor, search } from './model';
 import { execute, forgetSearchRanking } from './api';
-import { errorMessage, t } from './i18n';
+import { t } from './i18n';
+import { useOperationFeedback } from './OperationFeedback';
 import type { Entry, Snapshot } from './types';
 
 export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
@@ -26,12 +27,11 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
   const [query, setQuery] = useState(initialQuery);
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
   const [frozenRanking, setFrozenRanking] = useState<{ query: string; scores: ReadonlyMap<string, number> } | null>(null);
-  const [notice, setNotice] = useState('');
+  const feedback = useOperationFeedback();
   const { outcome, pending, retry } = useHistoryQuery(query, 'all');
   const [showLoading, setShowLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const executing = useRef(false);
-  const [error, setError] = useState('');
   const [menu, setMenu] = useState(false);
   const [actionQuery, setActionQuery] = useState('');
   const [actionId, setActionId] = useState('');
@@ -61,11 +61,6 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
     const timer = setTimeout(() => setShowLoading(true), 150);
     return () => clearTimeout(timer);
   }, [pending]);
-  useEffect(() => {
-    if (!notice) return;
-    const timer = setTimeout(() => setNotice(''), 2500);
-    return () => clearTimeout(timer);
-  }, [notice]);
   useLayoutEffect(() => {
     if (!menu && !busy) { input.current?.focus(); input.current?.setSelectionRange(...caret.current); }
   }, [menu, busy]);
@@ -80,10 +75,11 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
   }
   async function open(entry: Entry | undefined = selected) {
     if (!entry || entry.disabled || unavailable || executing.current) return;
-    executing.current = true; rememberCaret(); setBusy(true); setError('');
-    try { await execute({ action: 'openHistoryPage', windowId: data.windowId, tabId: entry.tabId, expectedUrl: entry.expectedUrl, newTab: entry.newTab, url: entry.url, query }); onClose(); }
-    catch (reason) { setError(errorMessage(reason)); }
-    finally { executing.current = false; setBusy(false); }
+    executing.current = true; rememberCaret(); setBusy(true);
+    try {
+      const result = await feedback.run(() => execute({ action: 'openHistoryPage', windowId: data.windowId, tabId: entry.tabId, expectedUrl: entry.expectedUrl, newTab: entry.newTab, url: entry.url, query }), t('actionCompleted'));
+      if (result.ok) onClose();
+    } finally { executing.current = false; setBusy(false); }
   }
   async function runAction(id?: string) {
     const action = actions.find(item => item.id === id);
@@ -92,19 +88,22 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
     if (action.action !== 'copyUrl' || !selected?.url || unavailable || executing.current) return;
     const anchor = input.current?.closest('.palette')?.querySelector<HTMLInputElement>('.action-search input') ?? input.current;
     if (!anchor) return;
-    executing.current = true; rememberCaret(); setBusy(true); setError(''); setNotice('');
-    try { await copyText(selected.url, anchor); setMenu(false); setNotice(t('urlCopied')); }
-    catch { setError(t('errorCopyUrl')); }
-    finally { executing.current = false; setBusy(false); }
+    const url = selected.url;
+    executing.current = true; rememberCaret(); setBusy(true);
+    try {
+      const result = await feedback.run(() => copyText(url, anchor), t('urlCopied'), t('errorCopyUrl'));
+      if (result.ok) setMenu(false);
+    } finally { executing.current = false; setBusy(false); }
   }
   async function forget(entry?: Entry) {
     if (!entry || unavailable || executing.current || !ranking.get(entry.id)?.learned) return;
     const previousRanking = frozenRanking;
     setFrozenRanking({ query, scores });
-    executing.current = true; rememberCaret(); setSelection(entry.id); setBusy(true); setError(''); setNotice('');
-    try { await forgetSearchRanking(usageTarget(entry), query); setNotice(t('rankingForgotten')); }
-    catch { setFrozenRanking(previousRanking); setError(t('errorForgetRanking')); }
-    finally { executing.current = false; setBusy(false); }
+    executing.current = true; rememberCaret(); setSelection(entry.id); setBusy(true);
+    try {
+      const result = await feedback.run(() => forgetSearchRanking(usageTarget(entry), query), t('rankingForgotten'), t('errorForgetRanking'));
+      if (!result.ok) setFrozenRanking(previousRanking);
+    } finally { executing.current = false; setBusy(false); }
   }
   const failure = outcome.state === 'error' ? t('errorHistorySearch') : outcome.state === 'timeout' ? t('historySearchTimeout') : '';
   return <BackLayer onBack={onBack}><section className="palette history-view" aria-label={t('historySearchLabel')} aria-busy={unavailable} onKeyDown={event => {
@@ -141,7 +140,7 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
   }}>
     <div className="main-surface" inert={menu ? true : undefined}>
       <header className="search-bar"><SearchFocusButton input={input} disabled={busy} />
-        <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError(''); setNotice(''); }}
+        <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('historySearchLabel')} aria-label={t('historySearchLabel')} role="combobox" aria-autocomplete="list" aria-expanded="true"
           aria-controls="justonehop-history-results" aria-activedescendant={selected ? `justonehop-${selected.id}` : undefined} autoComplete="off" spellCheck={false} disabled={busy} />
         <SearchDismissButton label={t('back')} />
@@ -156,9 +155,8 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
         {!pending && outcome.limited ? <p className="more-hint">{t('historyLimitedHint')}</p> : null}
       </div>
     </div>
-    {error ? <div className="error-banner" role="alert">{error}</div> : null}
     <PaletteFooter isMac={isMac} navigation={{ kind: 'back', label: `${t('back')} · ${t('historyKind')}`, tooltip: `${t('back')} (Esc)`, onAction: () => menu ? setMenu(false) : onBack() }}
-      title={t('historyKind')} context={t('historyAllTime')} status={notice ? <span role="status">{notice}</span> : !menu && selected?.disabled ? <span role="status">{t('addressPinned')}</span> : undefined}
+      title={t('historyKind')} context={t('historyAllTime')} status={!menu && selected?.disabled ? <span role="status">{t('addressPinned')}</span> : undefined}
       primary={{ label: menu ? chosen?.title || t('openCurrentTab') : t('openCurrentTab'), shortLabel: !menu || chosen?.id === `${selected?.id}:current` ? t('footerOpenCurrentTab') : chosen?.newTab ? t('footerOpenNewTab') : undefined, keys: ['↵'], disabled: unavailable || !selected || (menu ? !chosen || chosen.disabled : selected.disabled), onAction: () => menu ? void runAction(chosen?.id) : void open() }}
       secondary={!menu && newTabAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: unavailable, onAction: () => void open(newTabAction) } : undefined}
       actions={{ open: menu, disabled: unavailable || !selected, onToggle: toggleMenu }} />

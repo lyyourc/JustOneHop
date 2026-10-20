@@ -6,6 +6,7 @@ import { Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, RotateCw, Sea
 import { HighlightedText } from './HighlightedText';
 import { matchingSettings, type SettingRow } from './settingsSearch';
 import { PaletteFooter } from './PaletteFooter';
+import { useOperationFeedback } from './OperationFeedback';
 import { describeShortcut } from './Shortcut';
 import type { SettingsSection, TuckStatus } from './types';
 import { BindingGuide } from './BindingGuide';
@@ -90,8 +91,8 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const back = useNavigateBack();
   const [bindingOpen, setBindingOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [error, setError] = useState(false);
-  const [rankingReset, setRankingReset] = useState<'idle' | 'busy' | 'done'>('idle');
+  const feedback = useOperationFeedback();
+  const [rankingReset, setRankingReset] = useState<'idle' | 'busy'>('idle');
   const [tuckSaving, setTuckSaving] = useState(false);
   const [tuckRulesOpen, setTuckRulesOpen] = useState(false);
   const tuckRulesId = useId();
@@ -101,7 +102,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const [tuckStatus, setTuckStatus] = useState<TuckStatus | null>(null);
   const [tuckStatusHours, setTuckStatusHours] = useState<number | null>(null);
   const [tuckStatusError, setTuckStatusError] = useState(false);
-  const [tuckRefresh, setTuckRefresh] = useState(0);
+  const [tuckRefreshing, setTuckRefreshing] = useState(false);
   const tuckHint = useId();
   const tuckToggle = useId();
   const body = useRef<HTMLDivElement>(null);
@@ -137,21 +138,32 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
       }).catch(() => { if (!cancelled) setTuckStatusError(true); });
     }, 150);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [showTuck, tuckHours, preferences.autoTuck, tuckRefresh]);
+  }, [showTuck, tuckHours, preferences.autoTuck]);
+  async function refreshTuckStatus() {
+    if (tuckRefreshing) return;
+    setTuckRefreshing(true);
+    const result = await feedback.run(() => getTuckStatus(tuckHours), () => t('tuckStatusRefreshed'), t('tuckStatusError'));
+    if (result.ok) { setTuckStatus(result.value); setTuckStatusHours(tuckHours); setTuckStatusError(false); }
+    setTuckRefreshing(false);
+  }
   async function saveTuckDuration(value: string) {
     const hours = Number(value);
-    if (!isAutoTuckAfterHours(hours) || hours === tuckHours || tuckSaving) return;
-    setError(false); setTuckSaving(true);
-    try { await savePreferences({ autoTuckAfterHours: hours }); }
-    catch { setError(true); }
+    if (!isAutoTuckAfterHours(hours) || tuckSaving) return;
+    setTuckSaving(true);
+    try { await change({ autoTuckAfterHours: hours }); }
     finally { setTuckSaving(false); }
   }
   async function change(patch: Partial<Preferences>) {
-    setError(false);
-    try { await savePreferences(patch); } catch { setError(true); }
+    await feedback.run(() => savePreferences(patch), () => {
+      if (patch.language) return t('languageSaved', patch.language === 'system' ? t('followSystem') : patch.language === 'zh' ? '简体中文' : 'English');
+      if (patch.theme) return t('themeSaved', t(patch.theme === 'system' ? 'followSystem' : patch.theme === 'light' ? 'lightTheme' : 'darkTheme'));
+      if (patch.autoTuck !== undefined) return t(patch.autoTuck ? 'autoTuckEnabled' : 'autoTuckDisabled');
+      return t('tuckDurationSaved', tuckDuration(patch.autoTuckAfterHours!));
+    }, t('errorSaveSettings'));
   }
   async function changeHotkey() {
-    try { await openShortcuts(); onClose(); } catch { setError(true); }
+    const result = await feedback.run(openShortcuts, t('shortcutPageOpened'));
+    if (result.ok) onClose();
   }
   async function toggleAutoTuck() {
     if (tuckSaving) return;
@@ -161,9 +173,11 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   }
   async function resetRanking() {
     if (rankingReset === 'busy') return;
-    setError(false); setRankingReset('busy');
-    try { await resetSearchRanking(); onRankingReset?.(); setRankingReset('done'); }
-    catch { setError(true); setRankingReset('idle'); }
+    setRankingReset('busy');
+    try {
+      const result = await feedback.run(resetSearchRanking, () => t('rankingReset'));
+      if (result.ok) onRankingReset?.();
+    } finally { setRankingReset('idle'); }
   }
   return <BackLayer onBack={onBack}>{helpOpen ? <HelpView shortcut={shortcut} onBack={() => setHelpOpen(false)} /> : bindingOpen ? <BindingGuide onBack={() => setBindingOpen(false)} isMac={isMac} /> : <section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
     <header className="search-bar settings-search">
@@ -235,7 +249,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
               <div className="setting-row">
                 <div className="setting-copy">
                   <div className="tuck-duration-label"><label>{highlight(t('tuckAfter'))}</label>
-                    <button className="tuck-refresh" aria-label={t('tuckRefresh')} title={t('tuckRefresh')} onClick={() => setTuckRefresh(value => value + 1)}><RotateCw size={14} /></button>
+                    <button className="tuck-refresh" aria-label={t('tuckRefresh')} title={t('tuckRefresh')} aria-disabled={tuckRefreshing} onClick={() => void refreshTuckStatus()}><RotateCw size={14} /></button>
                   </div>
                   <div className="tuck-status-copy" aria-live="polite">
                   {tuckStatusError ? <p role="alert">{t('tuckStatusError')}</p> : tuckStatus && tuckStatusHours === tuckHours && tuckStatus.enabled === preferences.autoTuck ? <>
@@ -256,7 +270,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
           </div> : null}
           {matches.has('ranking') ? <div data-setting="ranking">
             <div className="setting-row">
-              <div className="setting-copy"><label>{highlight(t('searchRanking'))}</label><p>{highlight(t('searchRankingHint'))}</p>{rankingReset === 'done' ? <p className="setting-note" role="status">{t('rankingReset')}</p> : null}</div>
+              <div className="setting-copy"><label>{highlight(t('searchRanking'))}</label><p>{highlight(t('searchRankingHint'))}</p></div>
               <button className="ranking-reset" onClick={() => void resetRanking()} aria-disabled={rankingReset === 'busy'}>{highlight(t('resetSearchRanking'))}</button>
             </div>
           </div> : null}
@@ -265,7 +279,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
       {!matches.size ? <div className="empty"><Search size={26} /><strong role="status">{t('noResults')}</strong>
         <button className="ranking-reset" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
     </div>
-    {error ? <div className="error-banner" role="alert">{t('errorSaveSettings')}</div> : null}
     <PaletteFooter title={t('settings')}
       navigation={{ kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: back }}
       context={<span className="settings-navigation" title={t('settingsNavigationHelp')} aria-label={t('settingsNavigationHelp')}>

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { ArrowLeftRight, Pin } from 'lucide-react';
 import { Logo } from './Logo';
 import { HighlightedText } from './HighlightedText';
@@ -18,6 +18,13 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
   onBack?: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    setPending(false);
+    if (!closing) return;
+    const timer = setTimeout(() => setPending(true), 150);
+    return () => clearTimeout(timer);
+  }, [closing]);
   useLayoutEffect(() => { (searching ? input.current : listRef.current)?.focus(); }, [searching, listRef]);
   const activateSearch = () => { onSearch(); input.current?.focus(); };
   return <main className="justonehop-app recent-switcher" data-theme={theme} style={onBack ? { flex: 1, minHeight: 0, height: 'auto' } : undefined} onKeyDownCapture={event => {
@@ -49,10 +56,10 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
         {tab.pinned ? <Pin size={13} /> : null}<CurrentTabBadge current={tab.id === sourceId} />
       </div>)}
     </div>
-    {error ? <p role="alert" className="recent-error">{error}</p> : null}
     <PaletteFooter navigation={onBack ? { kind: 'back', label: `${t('back')} · ${t('recentSwitcher')}`, tooltip: `${t('back')} (Esc)`, onAction: onBack } : undefined}
       title={searching ? t('recentSwitcher') : t('recentRelease', releaseKey === 'Meta' ? '⌘' : releaseKey === 'Alt' ? '⌥' : 'Ctrl')}
       context={<NavigationHint />}
+      status={error ? <span role="alert" title={error}>{error}</span> : pending ? <span role="status">{t('operationPending')}</span> : undefined}
       primary={{ label: t('recentConfirm'), keys: ['↵'], disabled: !loaded || !tabs[index] || closing, onAction: onConfirm }}
       secondary={{ label: t('recentCancel'), keys: ['esc'], onAction: onCancel }} />
   </main>;

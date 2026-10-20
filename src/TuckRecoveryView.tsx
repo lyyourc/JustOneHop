@@ -4,7 +4,8 @@ import { BackLayer, useNavigateBack } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { execute } from './api';
-import { errorMessage, t } from './i18n';
+import { t } from './i18n';
+import { useOperationFeedback } from './OperationFeedback';
 import type { TuckRecoveryItem } from './types';
 
 export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: {
@@ -15,7 +16,8 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
   const [query, setQuery] = useState('');
   const [actionId, setActionId] = useState('resume');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const feedback = useOperationFeedback();
+  const executing = useRef(false);
   const back = useNavigateBack();
   const surface = useRef<HTMLElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -34,16 +36,20 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
   function toggleMenu() { if (!busy) { setMenu(!menu); setQuery(''); setActionId(selected ? 'resume' : 'back'); } }
   async function run(id: string) {
-    if (busy) return;
+    if (busy || executing.current) return;
     if (id === 'back') { onBack(); return; }
-    if (!item || (id === 'resume' && !selected)) return;
-    setBusy(true); setError('');
+    if (!item || !['resume', 'forget'].includes(id) || (id === 'resume' && !selected)) return;
+    executing.current = true; setBusy(true);
     try {
-      await execute({ action: id === 'resume' ? 'resumeTuck' : 'forgetTuckRecovery', windowId, recoveryId: item.id,
-        groupId: selected?.id, fingerprint: selected?.fingerprint });
-      await onComplete();
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setBusy(false); }
+      await feedback.run(async () => {
+        const outcome = await execute({ action: id === 'resume' ? 'resumeTuck' : 'forgetTuckRecovery', windowId, recoveryId: item.id,
+          groupId: selected?.id, fingerprint: selected?.fingerprint });
+        // A refresh failure does not undo the completed recovery decision.
+        try { await onComplete(); }
+        catch { throw new Error(t('errorRefreshAfterAction')); }
+        return outcome;
+      }, outcome => outcome?.message || t(id === 'resume' ? 'tuckResumed' : 'tuckRecoveryForgotten'));
+    } finally { executing.current = false; setBusy(false); }
   }
   return <BackLayer onBack={onBack}><section ref={surface} className="palette settings-view tuck-recovery" aria-label={t('reviewTuck')} aria-busy={busy}
     onKeyDown={event => {
@@ -83,7 +89,6 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
       </div>
       <p className="setting-note">{t('tuckRecoveryForgetHint')}</p>
     </div>
-    {error ? <div className="error-banner" role="alert">{error}</div> : null}
     <PaletteFooter isMac={isMac}
       navigation={{ kind: 'back', label: `${t('back')} · ${t('reviewTuck')}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={t('reviewTuck')} context={item?.title}

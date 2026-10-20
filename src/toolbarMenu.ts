@@ -1,5 +1,5 @@
 import { getPreferences, preferencesReady, subscribePreferences } from './preferences';
-import { t } from './i18n';
+import { errorMessage, t } from './i18n';
 import { openChromePage } from './chromePages';
 
 const shortcutId = 'justonehop-toolbar-shortcut';
@@ -41,7 +41,15 @@ export function startToolbarMenu() {
       if (windowId === undefined) throw new Error(t('errorWindow'));
       if (info.menuItemId === shortcutId) await openChromePage('openExtensionShortcuts', windowId);
       else await chrome.tabs.create({ windowId, url: chrome.runtime.getURL('help.html') });
-    })().catch(error => { console.warn('justonehop: unable to open toolbar menu target.', error); });
+      await Promise.all([chrome.action.setBadgeText({ text: '' }), chrome.action.setTitle({ title: t('extensionName') })]);
+    })().catch(async error => {
+      console.warn('justonehop: unable to open toolbar menu target.', error);
+      // No panel exists for toolbar failures; keep a visible marker and a readable retry hint on the originating icon.
+      await Promise.allSettled([
+        chrome.action.setBadgeText({ text: '!' }),
+        chrome.action.setTitle({ title: `${t('extensionName')}: ${errorMessage(error)} ${t('toolbarRetry')}` }),
+      ]);
+    });
     void refreshToolbarMenu();
   });
   // Chrome has no action-menu onShown or command-binding change event. Refresh

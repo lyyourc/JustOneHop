@@ -3,6 +3,7 @@ import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
+import { useOperationFeedback } from './OperationFeedback';
 import { ReadOnlyPreview } from './ReadOnlyPreview';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Copy, Database, Cookie, RotateCcw, FileText, LoaderCircle } from 'lucide-react';
@@ -17,7 +18,8 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
   const [busy, setBusy] = useState(true);
   const [showLoading, setShowLoading] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const feedback = useOperationFeedback();
+  const executing = useRef(false);
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState('');
   const [detail, setDetail] = useState<StorageEntry | null>(null);
@@ -46,14 +48,17 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
   ].filter(action => `${action.title} ${action.keywords}`.toLowerCase().includes(actionQuery.trim().toLowerCase()));
   const activeAction = actions.find(action => action.id === actionSelection) || actions[0];
 
-  async function refresh(learn = false) {
+  async function refresh(learn = false, report = false) {
     const revision = ++sequence.current;
-    setBusy(true); setError(''); setNotice(''); setDetail(null);
+    const operation = report ? feedback.begin(t('running')) : undefined;
+    setBusy(true); if (!report) setError(''); setDetail(null);
     try {
       const result = await readPageStorage({ ...request, query: learn && !learned.current ? request.query : undefined });
-      if (sequence.current === revision) { setData(result); if (learn) learned.current = true; }
+      if (sequence.current === revision) { setData(result); setError(''); if (learn) learned.current = true; }
+      if (operation !== undefined) feedback.success(operation, t('storageRefreshed'));
     } catch (reason) {
-      if (sequence.current === revision) { setData(null); setError(errorMessage(reason)); }
+      if (sequence.current === revision && !report) { setData(null); setError(errorMessage(reason)); }
+      if (operation !== undefined) feedback.error(operation, errorMessage(reason));
     } finally { if (sequence.current === revision) setBusy(false); }
   }
   useEffect(() => {
@@ -77,9 +82,12 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
     return () => { sequence.current++; view.removeEventListener('focus', focus); };
   }, []);
   async function authorize() {
-    waitingForAccess.current = true;
-    try { await openCookieAccess({ tabId: request.tabId, windowId: request.windowId, expectedUrl: request.expectedUrl }); }
-    catch (reason) { waitingForAccess.current = false; setError(errorMessage(reason)); }
+    if (executing.current) return;
+    executing.current = true; waitingForAccess.current = true;
+    try {
+      const result = await feedback.run(() => openCookieAccess({ tabId: request.tabId, windowId: request.windowId, expectedUrl: request.expectedUrl }), t('cookieAccessOpened'));
+      if (!result.ok) waitingForAccess.current = false;
+    } finally { executing.current = false; }
   }
   useEffect(() => {
     if (menu) return;
@@ -94,16 +102,23 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
   }
   function back() { if (menu) setMenu(false); else if (detail) setDetail(null); else onBack(); }
   async function act(id: string, targetEntry = current) {
-    if (busy || (id !== 'refresh' && !targetEntry)) return;
-    setMenu(false); setNotice(''); setError('');
-    if (id === 'refresh') { void refresh(); return; }
+    if (busy || executing.current || (id !== 'refresh' && !targetEntry)) return;
+    setMenu(false);
+    if (id === 'refresh') {
+      executing.current = true;
+      try { await refresh(false, true); }
+      finally { executing.current = false; }
+      return;
+    }
     if (!targetEntry) return;
     if (!detail) caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     if (id === 'detail') { setDetail(targetEntry); return; }
     const anchor = detail ? detailBody.current : input.current;
     if (!anchor) return;
-    try { await copyText(id === 'name' ? targetEntry.name : targetEntry.value, anchor); setNotice(t(id === 'name' ? 'copiedName' : 'copiedValue')); }
-    catch { setError(t('errorStorageCopy')); }
+    executing.current = true; setBusy(true);
+    try {
+      await feedback.run(() => copyText(id === 'name' ? targetEntry.name : targetEntry.value, anchor), t(id === 'name' ? 'copiedName' : 'copiedValue'), t('errorStorageCopy'));
+    } finally { executing.current = false; setBusy(false); }
   }
   function keyboard(event: KeyboardEvent) {
     event.stopPropagation();
@@ -136,7 +151,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       let next = (index + (down ? 1 : -1) + count) % count;
       if (arrow && modifier) next = down ? count - 1 : 0;
       else if (event.altKey || event.key.startsWith('Page')) next = Math.max(0, Math.min(count - 1, index + (down ? 1 : -1) * 6));
-      setSelection(rows[next].id); setNotice('');
+      setSelection(rows[next].id);
     } else if (event.key === 'Enter' && (event.target as HTMLElement).tagName !== 'BUTTON') {
       event.preventDefault();
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
@@ -149,23 +164,23 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       {detail ? <div className="storage-detail" ref={detailBody} tabIndex={0} aria-label={t('viewDetails')}>
         <StorageValue entry={detail} />
       </div> : <>
-        <div className="storage-search"><SearchFocusButton input={input} /><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setNotice(''); }}
+        <div className="storage-search"><SearchFocusButton input={input} /><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('storageSearch')} aria-label={t('storageSearchLabel')} role="combobox" aria-expanded="true" aria-controls="storage-results" aria-autocomplete="list"
           aria-activedescendant={selected ? `storage-row-${rows.indexOf(selected)}` : undefined} aria-describedby="storage-navigation" autoComplete="off" spellCheck={false} />
           <SearchDismissButton label={t('back')} /></div>
         <div className={`storage-list-content ${selected ? 'with-detail' : ''}`}>
         <div className="storage-results" id="storage-results" role="listbox" aria-label={t('storageEntries')} ref={list}>
-          {busy && !data && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void refresh(); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
+          {busy && !data && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void act('refresh'); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
             : !rows.length && !busy ? <div className="empty"><Database size={26} /><strong>{query ? t('noResults') : t('storageEmpty')}</strong></div>
             : rows.map((row, index) => <div key={row.id} id={`storage-row-${index}`} className="result storage-row" role="option" aria-selected={row.id === selected?.id}
               title={row.name || t('storageEmptyName')}
-              onClick={() => { setSelection(row.id); setNotice(''); input.current?.focus({ preventScroll: true }); }}
+              onClick={() => { setSelection(row.id); input.current?.focus({ preventScroll: true }); }}
               onDoubleClick={() => { setSelection(row.id); void act('detail', row); }}
               onContextMenu={event => {
                 event.preventDefault();
                 if (busy) return;
                 caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-                setSelection(row.id); setMenu(true); setActionQuery(''); setActionSelection(''); setError('');
+                setSelection(row.id); setMenu(true); setActionQuery(''); setActionSelection('');
               }}>
               <span className="entry-icon command">{row.cookie ? <Cookie size={18} /> : <Database size={18} />}</span>
               <span className="entry-copy"><span className="entry-title"><HighlightedText text={row.name || t('storageEmptyName')} query={query} allowTypos={false} /></span></span>
@@ -182,12 +197,10 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       actions={actions.map(action => ({ id: action.id, title: action.title, icon: <action.icon size={16} /> }))}
       query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }}
       selectedId={activeAction?.id} onSelectionChange={setActionSelection} onAction={id => void act(id)} onClose={() => setMenu(false)} /> : null}
-    {error && data ? <div className="error-banner" role="alert">{error}</div> : null}
     <PaletteFooter isMac={isMac}
       navigation={{ kind: 'back', label: `${t('back')} · ${title}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={title}
       context={<span className="storage-origin" title={request.expectedUrl}>{request.expectedUrl.replace(/^https?:\/\//, '').split('/')[0] || request.expectedUrl}</span>}
-      status={notice ? <span className="storage-notice" role="status">{notice}</span> : undefined}
       primary={{ label: menu ? activeAction?.title || t('copyValue') : t('copyValue'), keys: ['↵'], disabled: busy || (menu ? !activeAction : !current), onAction: () => void act(menu ? activeAction?.id || '' : 'value') }}
       actions={{ open: menu, disabled: busy, onToggle: openMenu }} />
   </section></BackLayer></BackLayer>;

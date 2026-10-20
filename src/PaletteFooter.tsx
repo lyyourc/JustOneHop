@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react';
 import { ChevronLeft, Settings2 } from 'lucide-react';
 import { t } from './i18n';
+import { OperationFeedbackStatus } from './OperationFeedback';
 import { describeShortcut, formatShortcut } from './Shortcut';
 
 function buttonKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
@@ -52,6 +53,7 @@ export function PaletteFooter({ navigation, title, context, status, primary, sec
         <NavigationIcon size={15} aria-hidden="true" />
       </button> : null}
       {title ? <div className="palette-footer-title"><span className="footer-title-label">{title}</span></div> : null}
+      <OperationFeedbackStatus />
       {status || context ? <div className={status ? 'palette-footer-status' : 'palette-footer-context'}>
         {status || <span className="palette-footer-context-content">{context}</span>}
       </div> : null}

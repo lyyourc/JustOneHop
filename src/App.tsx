@@ -19,6 +19,7 @@ import { NavigationRoot, BackLayer } from './Navigation';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
+import { OperationFeedbackProvider, useOperationFeedback } from './OperationFeedback';
 import { ActionMenu } from './ActionMenu';
 import { t, countMessage, errorMessage } from './i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
@@ -37,9 +38,14 @@ import type { Entry, Snapshot, StorageRead, SettingsSection, PaletteState, Execu
 
 const emptyScores: ReadonlyMap<string, number> = new Map();
 
-export function App({ mode, onClose, initialState, initialBinding = false }: { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState; initialBinding?: boolean }) {
+type AppProps = { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState; initialBinding?: boolean };
+export function App(props: AppProps) {
+  return <OperationFeedbackProvider><PaletteApp {...props} /></OperationFeedbackProvider>;
+}
+
+function PaletteApp({ mode, onClose, initialState, initialBinding = false }: AppProps) {
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
-  const [notice, setNotice] = useState('');
+  const feedback = useOperationFeedback();
   const [frozenRanking, setFrozenRanking] = useState<{ query: string; scores: ReadonlyMap<string, number> } | null>(null);
   const [groupId, setGroupId] = useState<number | undefined>(initialState?.group?.id);
   const [groupEditor, setGroupEditor] = useState<'name'>();
@@ -120,12 +126,6 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
   const [settled, setSettled] = useState(mode !== 'overlay');
 
   useEffect(() => {
-    if (!notice) return;
-    const timer = setTimeout(() => setNotice(''), 2500);
-    return () => clearTimeout(timer);
-  }, [notice]);
-
-  useEffect(() => {
     if (settled) return;
     const timer = setTimeout(() => setSettled(true), 200);
     return () => clearTimeout(timer);
@@ -159,15 +159,17 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     setExecutionBusy(true); setError('');
     refreshVersion.current++;
     try {
-      try { await execute(execution); }
+      let outcome;
+      try { outcome = await execute(execution); }
       catch (reason) {
         await refreshSnapshot().catch(() => {});
-        if (mounted.current) setError(errorMessage(reason));
         throw reason;
       }
       if (execution.action !== 'settings' && data && keepsPaletteOpen(execution.action, execution.tabId, data.currentTabId)) {
-        await refreshSnapshot().catch(() => { if (mounted.current) setError(t('errorRefreshAfterAction')); });
+        try { await refreshSnapshot(); }
+        catch { throw new Error(t('errorRefreshAfterAction')); }
       }
+      return outcome;
     } finally { executing.current = false; setExecutionBusy(false); }
   }
   function dismiss() {
@@ -229,12 +231,11 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     const previousRanking = frozenRanking;
     setFrozenRanking({ query, scores });
-    setSelection(entry.id); setBusy(true); setError(''); setNotice('');
+    setSelection(entry.id); setBusy(true); setError('');
     try {
-      await forgetSearchRanking(query.trim() ? usageTarget(entry) : liveRecommendations.targets.get(entry.id) ?? usageTarget(entry), query.trim() ? query : undefined);
-      setNotice(t('rankingForgotten'));
-    } catch { setFrozenRanking(previousRanking); setError(t('errorForgetRanking')); }
-    finally { executing.current = false; setBusy(false); }
+      const result = await feedback.run(() => forgetSearchRanking(query.trim() ? usageTarget(entry) : liveRecommendations.targets.get(entry.id) ?? usageTarget(entry), query.trim() ? query : undefined), t('rankingForgotten'), t('errorForgetRanking'));
+      if (!result.ok) setFrozenRanking(previousRanking);
+    } finally { executing.current = false; setBusy(false); }
   }
   async function run(entry?: Entry, confirmed = false) {
     if (!entry || entry.disabled || !data || resultBusy || ((bookmarkRemoval || groupRemoval) && !confirmed)) return;
@@ -242,15 +243,15 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       const group = data.groups?.find(group => group.id === entry.groupId);
       if (!group) return;
       setGroupRemoval({ ...entry, subtitle: group.title, groupTabIds: data.tabs.filter(tab => tab.groupId === group.id).map(tab => tab.id) });
-      setError(''); setNotice(''); return;
+      setError('');return;
     }
     if (confirmed) setGroupRemoval(null);
     if (entry.action === 'unbookmarkTab' && !confirmed) {
       const bookmarks = data.bookmarks.filter(bookmark => entry.bookmarkIds?.includes(bookmark.id));
-      if (bookmarks.some(bookmark => bookmark.unmodifiable)) { setError(t('errorBookmarkManaged')); return; }
+      if (bookmarks.some(bookmark => bookmark.unmodifiable)) { feedback.error(feedback.begin(t('operationPending')), t('errorBookmarkManaged')); return; }
       if (bookmarks.length > 1) {
         if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-        setError(''); setNotice('');
+        setError('');
         setBookmarkRemoval({ entry: { ...entry, bookmarkIds: [...entry.bookmarkIds!] }, bookmarks });
         return;
       }
@@ -261,10 +262,11 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       const anchor = input.current?.closest('.palette')?.querySelector<HTMLInputElement>('.action-search input') ?? input.current;
       if (!anchor) return;
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      executing.current = true; setBusy(true); setError(''); setNotice('');
-      try { await copyText(entry.url, anchor); closeActions(); setNotice(t('urlCopied')); }
-      catch { setError(t('errorCopyUrl')); }
-      finally { executing.current = false; setBusy(false); }
+      executing.current = true; setBusy(true); setError('');
+      try {
+        const result = await feedback.run(() => copyText(entry.url!, anchor), t('urlCopied'), t('errorCopyUrl'));
+        if (result.ok) closeActions();
+      } finally { executing.current = false; setBusy(false); }
       return;
     }
     if (entry.action === 'searchAllHistory') {
@@ -273,11 +275,11 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     }
     if (entry.action === 'tabSwitcher') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setError(''); setNotice(''); setTabSwitcherOpen(true); return;
+      closeActions(); setError('');setTabSwitcherOpen(true); return;
     }
     if (entry.action === 'help') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setError(''); setNotice(''); setHelpOpen(true); return;
+      closeActions(); setError('');setHelpOpen(true); return;
     }
     if (entry.action === 'manageGroup' || entry.action === 'renameGroup') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
@@ -303,17 +305,18 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
     const execution = { action: entry.action, groupId: entry.groupId, groupChanges: entry.groupChanges, groupTabIds: entry.groupTabIds, settingsSection: entry.settingsSection, tabId: entry.tabId, bookmarkId: entry.bookmarkId, newTab: entry.newTab, expectedUrl: entry.expectedUrl, bookmarkIds: entry.bookmarkIds, url: entry.url, windowId: data.windowId, query: learningQuery };
     if (entry.action === 'settings') { openSettings(entry.settingsSection); void execute(execution).catch(() => {}); return; }
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError('');
     const keepOpen = keepsPaletteOpen(entry.action, entry.tabId, data.currentTabId);
+    const operation = feedback.begin(t('operationPending'));
     try {
-      await executeAction({ ...execution, ...(keepOpen ? { paletteState: paletteState() } : {}) });
+      const outcome = await executeAction({ ...execution, ...(keepOpen ? { paletteState: paletteState() } : {}) });
       if (!keepOpen) { onClose(); return; }
       // A newly revealed removal action needs a fresh selection, not a second Enter.
       if (entry.action === 'bookmarkTab' && (!actionTarget || actionTarget.kind === 'command')) setSelection(null);
       closeActions();
-      setNotice(t(entry.action === 'bookmarkTab' ? 'tabBookmarked' : entry.action === 'unbookmarkTab' || entry.action === 'removeBookmark' ? 'tabUnbookmarked' : entry.action === 'tuck' ? 'tabTucked' : entry.action === 'undoTuck' ? 'tuckUndone' : 'actionCompleted'));
+      feedback.success(operation, outcome?.message || t(entry.action === 'bookmarkTab' ? 'tabBookmarked' : entry.action === 'unbookmarkTab' || entry.action === 'removeBookmark' ? 'tabUnbookmarked' : entry.action === 'tuck' ? 'tabTucked' : entry.action === 'undoTuck' ? 'tuckUndone' : 'actionCompleted'));
     } catch (reason) {
-      setError(errorMessage(reason));
+      feedback.error(operation, errorMessage(reason));
     } finally { setBusy(false); }
   }
   function hover(event: React.MouseEvent, id: string) {
@@ -407,7 +410,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       <div className={`main-surface ${actionTarget || bookmarkRemoval || groupRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval || groupRemoval ? true : undefined}>
         <header className="search-bar">
           <SearchFocusButton input={input} disabled={busy} />
-          <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError(''); setNotice(''); }}
+          <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError('');}}
             placeholder={t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
             aria-autocomplete="list" aria-expanded="true" aria-controls="justonehop-results"
             aria-describedby="justonehop-navigation"
@@ -445,9 +448,7 @@ export function App({ mode, onClose, initialState, initialBinding = false }: { m
       <PaletteFooter isMac={isMac}
         navigation={{ kind: 'settings', label: t('settings'), tooltip: `${t('settings')} (${mod},)`, disabled: busy || !!bookmarkRemoval || !!groupRemoval, onAction: () => openSettings() }}
         title={t('extensionName')} context={<NavigationHint />}
-        status={busy ? <span className="footer-status"><LoaderCircle className="spinner" size={13} />{t('running')}</span>
-          : notice ? <span role="status">{notice}</span>
-          : newAddressAction && selected?.disabled ? <span role="status">{t('addressPinned')}</span>
+        status={newAddressAction && selected?.disabled ? <span role="status">{t('addressPinned')}</span>
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}

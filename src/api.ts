@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import type { Reply, Request, Snapshot, PaletteState, Execution, StorageRead, PageStorage, CookieAccessRequest, HistorySearchResult, TuckStatus } from './types';
+import type { Reply, Request, Snapshot, PaletteState, Execution, ExecutionOutcome, StorageRead, PageStorage, CookieAccessRequest, HistorySearchResult, TuckStatus } from './types';
 
 async function send<T>(request: Request): Promise<T> {
   const reply = await chrome.runtime.sendMessage<Request, Reply<T>>(request);
@@ -11,7 +11,7 @@ export const getTuckStatus = (afterHours?: number): Promise<TuckStatus> => send<
 export const searchHistory = (query: string, scope: 'week' | 'all') => send<HistorySearchResult>({ source: 'justonehop', type: 'search-history', payload: { query, scope } });
 export const getPaletteState = () => send<PaletteState | undefined>({ source: 'justonehop', type: 'palette-state' });
 export const cancelPaletteContinuation = () => send<void>({ source: 'justonehop', type: 'cancel-palette-continuation' });
-export const execute = (payload: Execution) => send<void>({ source: 'justonehop', type: 'execute', payload });
+export const execute = (payload: Execution) => send<ExecutionOutcome | undefined>({ source: 'justonehop', type: 'execute', payload });
 
 export const openShortcuts = (preserveBindingGuide = false) => send<void>({ source: 'justonehop', type: 'open-shortcuts', preserveBindingGuide });
 export const resetSearchRanking = () => send<void>({ source: 'justonehop', type: 'reset-usage' });

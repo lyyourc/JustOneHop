@@ -24,6 +24,7 @@ let commands: chrome.commands.Command[] = [
   { name: 'toggle-palette', shortcut: binding },
 ];
 let commandError: Error | undefined;
+let navigationError: Error | undefined;
 let tabs: chrome.tabs.Tab[] = [];
 
 globalThis.chrome = {
@@ -42,6 +43,10 @@ globalThis.chrome = {
       if (commandError) throw commandError;
       return structuredClone(commands);
     },
+  },
+  action: {
+    setBadgeText: async (details: chrome.action.BadgeTextDetails) => { calls.push(['badge', details.text]); },
+    setTitle: async (details: chrome.action.TitleDetails) => { calls.push(['title', details.title]); },
   },
   contextMenus: {
     onClicked: clicked,
@@ -78,7 +83,7 @@ globalThis.chrome = {
       return { ...tab };
     },
     update: async (id: number, properties: chrome.tabs.UpdateProperties) => { calls.push(['tab-update', id, properties]); },
-    create: async (properties: chrome.tabs.CreateProperties) => { calls.push(['tab-create', properties]); },
+    create: async (properties: chrome.tabs.CreateProperties) => { if (navigationError) throw navigationError; calls.push(['tab-create', properties]); },
   },
 } as unknown as typeof chrome;
 
@@ -95,12 +100,25 @@ async function click(menuItemId: string, windowId?: number) {
 }
 
 beforeEach(async () => {
-  commandError = undefined;
+  commandError = undefined; navigationError = undefined;
   commands = [{ name: 'toggle-switcher', shortcut: 'Ctrl+Q' }, { name: 'toggle-palette', shortcut: binding }];
   tabs = [];
   storageChanged.emit({ preferences: { newValue: { language: 'en' } } }, 'local');
   await toolbar.refreshToolbarMenu();
   calls = [];
+});
+
+test('toolbar launch failure stays visible on its icon until a successful retry', async context => {
+  context.mock.method(console, 'warn', () => {});
+  navigationError = new Error('No window');
+  await click(helpId, 10);
+  assert.ok(calls.some(([name, text]) => name === 'badge' && text === '!'));
+  assert.ok(calls.some(([name, text]) => name === 'title' && String(text).includes('try again')));
+  navigationError = undefined;
+  calls = [];
+  await click(helpId, 10);
+  assert.ok(calls.some(([name, text]) => name === 'badge' && text === ''));
+  assert.ok(calls.some(([name, text]) => name === 'title' && text === 'JustOneHop'));
 });
 
 test('toolbar menu shows the actual palette binding and only uses action contexts', async () => {

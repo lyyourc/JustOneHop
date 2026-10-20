@@ -49,7 +49,8 @@ test('ungroupGroup removes the group and keeps every tab without learning', asyn
 
 test('closeGroup closes only confirmed members and protects pinned tabs without learning', async () => {
   for (const tab of tabs.slice(0, 3)) tab.groupId = 7;
-  await perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds: [3, 1, 2], query: 'Research' });
+  const outcome = await perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds: [3, 1, 2], query: 'Research' });
+  assert.equal(outcome?.message, 'Tabs closed: 2 · Pinned tabs kept: 1');
   assert.deepEqual(calls, [['remove', 2], ['remove', 3]]);
   assert.deepEqual(usage, []);
 });
@@ -68,7 +69,7 @@ test('closeGroup rejects changed membership, invalid confirmation and foreign gr
 test('closeGroup rechecks each member and reports partial completion if a later tab moves', async () => {
   tabs[1].groupId = tabs[2].groupId = 7;
   chrome.tabs.remove = async ids => { calls.push(['remove', ids]); tabs[2].groupId = 8; };
-  await assert.rejects(perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds: [2, 3] }), { message: t('errorGroupPartial') });
+  await assert.rejects(perform({ action: 'closeGroup', windowId: 10, groupId: 7, groupTabIds: [2, 3] }), { message: t('errorGroupPartialCount', ['1', '1']) });
   assert.deepEqual(calls, [['remove', 2]]);
 });
 
@@ -282,10 +283,10 @@ test('bookmark creation uses live title, native destination and exact live URL d
   bookmarkStore([{ id: 'different', title: 'Other', url: 'https://example.com/' }]);
   await snapshot(tabs[1]);
   tabs[1].title = 'Live title';
-  await perform(bookmarkExecution('bookmarkTab'));
+  assert.equal((await perform(bookmarkExecution('bookmarkTab')))?.message, 'Bookmark added');
   assert.deepEqual(calls, [['bookmarkCreate', { title: 'Live title', url: 'https://example.com' }]]);
   assert.equal((await snapshot(tabs[1])).bookmarks.length, 2);
-  await perform(bookmarkExecution('bookmarkTab'));
+  assert.equal((await perform(bookmarkExecution('bookmarkTab')))?.message, 'Page already bookmarked');
   assert.equal(calls.length, 1);
   assert.ok(usage.some(item => item.target === 'command:bookmarkTab'));
 });
@@ -340,10 +341,10 @@ test('bookmark queue is isolated by API instance and a failed write does not poi
 test('bookmark cancellation removes the complete observed set and repeated cancellation is idempotent', async () => {
   bookmarkStore([{ id: 'a', url: 'https://example.com' }, { id: 'b', url: 'https://example.com' }, { id: 'other', url: 'https://example.com/' }]);
   await snapshot(tabs[1]);
-  await perform(bookmarkExecution('unbookmarkTab', ['b', 'a']));
+  assert.equal((await perform(bookmarkExecution('unbookmarkTab', ['b', 'a'])))?.message, 'Bookmarks removed: 2');
   assert.deepEqual(calls, [['bookmarkRemove', 'b'], ['bookmarkRemove', 'a']]);
   assert.deepEqual((await snapshot(tabs[1])).bookmarks.map(item => item.id), ['other']);
-  await perform(bookmarkExecution('unbookmarkTab', ['b', 'a']));
+  assert.equal((await perform(bookmarkExecution('unbookmarkTab', ['b', 'a'])))?.message, 'Page is no longer bookmarked');
   assert.equal(calls.length, 2);
   assert.ok(usage.some(item => item.target === 'command:unbookmarkTab'));
 });
@@ -388,7 +389,7 @@ test('bookmark cancellation rereads individual URLs before remove and stops on p
     if (id === 'b') throw new Error('private failure detail');
     await remove(id);
   };
-  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a', 'b', 'c'])), { message: t('errorBookmarkPartial') });
+  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a', 'b', 'c'])), { message: t('errorBookmarkPartialCount', '1') });
   assert.deepEqual(calls, [['bookmarkRemove', 'a']]);
   assert.deepEqual(usage, []);
 });
@@ -400,7 +401,7 @@ test('bookmark cancellation stops when a new duplicate appears between removals'
     await remove(id);
     nodes.push({ id: 'new', title: 'New duplicate', url: 'https://example.com', syncing: false });
   };
-  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a', 'b'])), { message: t('errorBookmarkPartial') });
+  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a', 'b'])), { message: t('errorBookmarkPartialCount', '1') });
   assert.deepEqual(calls, [['bookmarkRemove', 'a']]);
 });
 
@@ -422,7 +423,7 @@ test('bookmark cancellation reports a final concurrent duplicate as partial and 
     await remove(id);
     nodes.push({ id: 'new', title: 'New duplicate', url: 'https://example.com', syncing: false });
   };
-  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a'])), { message: t('errorBookmarkPartial') });
+  await assert.rejects(perform(bookmarkExecution('unbookmarkTab', ['a'])), { message: t('errorBookmarkPartialCount', '1') });
   assert.deepEqual((await snapshot(tabs[1])).bookmarks.map(item => item.id), ['new']);
   assert.deepEqual(usage, []);
 });
@@ -579,17 +580,40 @@ test('refuses to operate on a tab that moved to another window', async () => {
   await assert.rejects(perform({ action: 'close', windowId: 10, tabId: 4 }), /another window/);
   assert.equal(calls.length, 0);
 });
-test('close right and others re-read live tabs and retain pinned tabs', async () => {
-  await perform({ action: 'closeRight', windowId: 10, tabId: 2 });
+test('close right and others re-read live tabs and report closed and protected counts', async () => {
+  assert.equal((await perform({ action: 'closeRight', windowId: 10, tabId: 2 }))?.message, 'Tabs closed: 1');
   assert.deepEqual(calls, [['remove', [3]]]);
   calls = [];
-  await perform({ action: 'closeOthers', windowId: 10, tabId: 3 });
+  assert.equal((await perform({ action: 'closeOthers', windowId: 10, tabId: 3 }))?.message, 'Tabs closed: 1 · Pinned tabs kept: 1');
   assert.deepEqual(calls, [['remove', [2]]]);
+  calls = [];
+  assert.equal((await perform({ action: 'closeRight', windowId: 10, tabId: 3 }))?.message, 'No tabs to close');
+  tabs[2].pinned = true;
+  assert.equal((await perform({ action: 'closeOthers', windowId: 10, tabId: 2 }))?.message, 'Tabs closed: 0 · Pinned tabs kept: 2');
+  assert.deepEqual(calls, []);
 });
-test('pin and mute toggle the live state', async () => {
-  await perform({ action: 'pin', windowId: 10, tabId: 1 });
-  await perform({ action: 'mute', windowId: 10, tabId: 2 });
+test('failed batch close reports confirmed closures without counting moved tabs as closed', async () => {
+  tabs.push({ ...tabs[2], id: 5, index: 3 });
+  chrome.tabs.query = async query => tabs.filter(tab => query.windowId === undefined || tab.windowId === query.windowId);
+  chrome.tabs.remove = async () => {
+    tabs = tabs.filter(tab => tab.id !== 3);
+    tabs.find(tab => tab.id === 5)!.windowId = 20;
+    throw new Error('native failure');
+  };
+  await assert.rejects(perform({ action: 'closeRight', windowId: 10, tabId: 2 }), {
+    message: 'Tabs closed: 1 · Tabs not closed: 1. The operation stopped; review the remaining tabs.',
+  });
+  assert.deepEqual(usage, []);
+});
+test('pin and mute report both directions from live state through callback and result', async () => {
+  const outcomes: unknown[] = [];
+  assert.equal((await perform({ action: 'pin', windowId: 10, tabId: 1 }, result => outcomes.push(result)))?.message, 'Tab unpinned');
+  assert.equal((await perform({ action: 'mute', windowId: 10, tabId: 2 }, result => outcomes.push(result)))?.message, 'Tab muted');
   assert.deepEqual(calls, [['update', 1, { pinned: false }], ['update', 2, { muted: true }]]);
+  assert.deepEqual(outcomes, [{ message: 'Tab unpinned' }, { message: 'Tab muted' }]);
+  tabs[1].mutedInfo = { muted: true };
+  assert.equal((await perform({ action: 'pin', windowId: 10, tabId: 2 }))?.message, 'Tab pinned');
+  assert.equal((await perform({ action: 'mute', windowId: 10, tabId: 2 }))?.message, 'Tab unmuted');
 });
 test('bookmark URL is resolved by ID and scripts are not executed', async () => {
   bookmarkUrl = 'javascript:alert(1)';

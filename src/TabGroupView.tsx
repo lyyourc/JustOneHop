@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useResultSelection } from './useResultSelection';
 import { keepsPaletteOpen } from './paletteActions';
 import { Layers, PanelTop, Save, X } from 'lucide-react';
@@ -15,12 +15,13 @@ import { HighlightedText } from './HighlightedText';
 import { bookmarkTabAction, entries, search } from './model';
 import { BookmarkConfirmation, type BookmarkRemoval } from './BookmarkConfirmation';
 import { EntryGlyph } from './SearchResultItem';
-import { errorMessage, t, countMessage } from './i18n';
-import type { Snapshot, Entry, Execution, PaletteState } from './types';
+import { t, countMessage } from './i18n';
+import { useOperationFeedback } from './OperationFeedback';
+import type { Snapshot, Entry, Execution, ExecutionOutcome, PaletteState } from './types';
 
 export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute, executionBusy, refreshError, paletteState, initialState, initialEditor }: {
   groupId: number; data: Snapshot; isMac: boolean; onBack: () => void; onClose: () => void; executionBusy: boolean; refreshError: string;
-  onExecute: (execution: Execution) => Promise<void>; paletteState: PaletteState; initialState?: PaletteState['group']; initialEditor?: 'name';
+  onExecute: (execution: Execution) => Promise<ExecutionOutcome | undefined>; paletteState: PaletteState; initialState?: PaletteState['group']; initialEditor?: 'name';
 }) {
   const group = data.groups?.find(group => group.id === groupId);
   const [query, setQuery] = useState(initialState?.id === groupId ? initialState.query : '');
@@ -32,8 +33,8 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   const [groupRemoval, setGroupRemoval] = useState<Entry | null>(null);
   const [localBusy, setBusy] = useState(false);
   const busy = localBusy || executionBusy;
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const feedback = useOperationFeedback();
+  const executing = useRef(false);
   const [bookmarkRemoval, setBookmarkRemoval] = useState<BookmarkRemoval | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const caret = useRef<[number, number]>(initialState?.id === groupId ? initialState.caret : [0, 0]);
@@ -56,11 +57,6 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   ];
   const actions = allActions.filter(action => `${action.title} ${action.keywords}`.toLocaleLowerCase().includes(actionQuery.trim().toLocaleLowerCase()));
   const chosen = actions.find(action => action.id === actionId) || actions[0];
-  useEffect(() => {
-    if (!notice) return;
-    const timer = setTimeout(() => setNotice(''), 2500);
-    return () => clearTimeout(timer);
-  }, [notice]);
   useLayoutEffect(() => {
     if (menu || busy || bookmarkRemoval || groupRemoval) return;
     if (editor === 'name') { nameInput.current?.focus(); nameInput.current?.select(); }
@@ -84,47 +80,55 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
     onBack();
   }
   async function run(id: string, target: Entry | undefined = selected, confirmed?: Entry) {
-    if (busy || !group || ((bookmarkRemoval || groupRemoval) && !confirmed)) return;
+    if (busy || executing.current || !group || ((bookmarkRemoval || groupRemoval) && !confirmed)) return;
     if (id === 'closeGroup' && !confirmed) {
-      rememberCaret(); setError(''); setNotice('');
+      rememberCaret();
       setGroupRemoval({ ...groupActions(group).find(action => action.action === id)!, groupTabIds: members.map(tab => tab.tabId!) });
       return;
     }
     const bookmark = confirmed?.action === 'unbookmarkTab' ? confirmed : bookmarkAction?.action === id ? bookmarkAction : undefined;
     if (bookmark && !confirmed && id === 'unbookmarkTab') {
       const bookmarks = data.bookmarks.filter(item => bookmark.bookmarkIds?.includes(item.id));
-      if (bookmarks.some(item => item.unmodifiable)) { setError(t('errorBookmarkManaged')); return; }
+      if (bookmarks.some(item => item.unmodifiable)) { feedback.error(feedback.begin(t('running')), t('errorBookmarkManaged')); return; }
       if (bookmarks.length > 1) {
-        rememberCaret(); setError(''); setNotice('');
+        rememberCaret();
         setBookmarkRemoval({ entry: { ...bookmark, bookmarkIds: [...bookmark.bookmarkIds!] }, bookmarks });
         return;
       }
     }
     if (confirmed) { setBookmarkRemoval(null); setGroupRemoval(null); }
-    if (id === 'renameGroup') { rememberCaret(); setName(group.title); setEditor('name'); setMenu(false); setError(''); return; }
-    rememberCaret(); setBusy(true); setError(''); setNotice('');
+    if (id === 'renameGroup') { rememberCaret(); setName(group.title); setEditor('name'); setMenu(false); return; }
+    rememberCaret();
+    let execution: Execution;
+    let message: string;
+    let after = () => { setMenu(false); setEditor(undefined); };
+    if (bookmark && (id === 'bookmarkTab' || id === 'unbookmarkTab')) {
+      execution = { action: id, windowId: data.windowId, groupId, tabId: bookmark.tabId,
+        expectedUrl: bookmark.expectedUrl, bookmarkIds: bookmark.bookmarkIds };
+      message = t(id === 'bookmarkTab' ? 'tabBookmarked' : 'tabUnbookmarked');
+    } else if (id === 'save') {
+      execution = { action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: { title: name.trim() } };
+      message = t('groupRenamed');
+      if (initialEditor) after = onBack;
+    } else if (id === 'ungroupGroup' || id === 'closeGroup') {
+      execution = { action: id, windowId: data.windowId, groupId, groupTabIds: confirmed?.groupTabIds };
+      message = t(id === 'ungroupGroup' ? 'groupUngrouped' : 'groupClosed');
+      after = onBack;
+    } else if (id === 'updateGroup') {
+      execution = { action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: { collapsed: !group.collapsed } };
+      message = t(group.collapsed ? 'groupExpanded' : 'groupCollapsed');
+    } else if (target && (id === 'switch' || id === 'close' || id === 'ungroupTab')) {
+      const keep = keepsPaletteOpen(id, target.tabId, data.currentTabId);
+      execution = { action: id, windowId: data.windowId, groupId, tabId: target.tabId,
+        ...(keep && id === 'close' ? { paletteState: { ...paletteState, group: { id: groupId, query, selection, caret: caret.current } } } : {}) };
+      message = t(id === 'close' ? 'tabClosed' : id === 'ungroupTab' ? 'tabUngrouped' : 'actionCompleted');
+      if (!keep) after = onClose;
+    } else return;
+    executing.current = true; setBusy(true);
     try {
-      if (bookmark && (id === 'bookmarkTab' || id === 'unbookmarkTab')) {
-        await onExecute({ action: id, windowId: data.windowId, groupId, tabId: bookmark.tabId,
-          expectedUrl: bookmark.expectedUrl, bookmarkIds: bookmark.bookmarkIds });
-        setNotice(t(id === 'bookmarkTab' ? 'tabBookmarked' : 'tabUnbookmarked'));
-      } else if (id === 'save') {
-        await onExecute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: { title: name.trim() } });
-        if (initialEditor) { onBack(); return; }
-      } else if (id === 'ungroupGroup' || id === 'closeGroup') {
-        await onExecute({ action: id, windowId: data.windowId, groupId, groupTabIds: confirmed?.groupTabIds });
-        onBack(); return;
-      } else if (id === 'updateGroup') {
-        await onExecute({ action: 'updateGroup', windowId: data.windowId, groupId, groupChanges: { collapsed: !group.collapsed } });
-      } else if (target && (id === 'switch' || id === 'close' || id === 'ungroupTab')) {
-        const keep = keepsPaletteOpen(id, target.tabId, data.currentTabId);
-        await onExecute({ action: id, windowId: data.windowId, groupId, tabId: target.tabId,
-          ...(keep && id === 'close' ? { paletteState: { ...paletteState, group: { id: groupId, query, selection, caret: caret.current } } } : {}) });
-        if (!keep) { onClose(); return; }
-      } else return;
-      setMenu(false); setEditor(undefined);
-    } catch (reason) { setError(errorMessage(reason)); }
-    finally { setBusy(false); }
+      const result = await feedback.run(() => onExecute(execution), outcome => outcome?.message || message);
+      if (result.ok) after();
+    } finally { executing.current = false; setBusy(false); }
   }
   const primary: { id: string; title: string; danger?: boolean } | undefined = menu ? chosen : editor ? { id: 'save', title: t('groupSave') } : selected ? { id: 'switch', title: t('switchTabPrimary') } : undefined;
   const groupLabel = `${t('categoryTabGroup')}: ${group?.title || t('unnamedGroup')}`;
@@ -148,7 +152,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
             onContextMenu={event => {
               event.preventDefault();
               if (busy) return;
-              rememberCaret(); setSelection(entry.id); setMenu(true); setActionQuery(''); setActionId(''); setError('');
+              rememberCaret(); setSelection(entry.id); setMenu(true); setActionQuery(''); setActionId('');
             }}>
             <span className="entry-icon"><Favicon pageUrl={entry.faviconPageUrl} fallback={<PanelTop size={18} />} /></span>
             <span className="entry-copy"><span className="entry-title"><HighlightedText text={entry.title} query={query} /></span><span className="entry-subtitle"><HighlightedText text={entry.subtitle} query={query} /></span></span>
@@ -158,12 +162,12 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
         </div>
       </>}
     </div>
-    {error || refreshError ? <div className="error-banner" role="alert">{error || refreshError}</div> : null}
+    {refreshError ? <div className="error-banner" role="alert">{refreshError}</div> : null}
     <PaletteFooter isMac={isMac}
       navigation={{ kind: 'back', label: `${t('back')} · ${groupLabel}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={groupLabel}
       context={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
-      status={notice ? <span role="status">{notice}</span> : selection === null && !editor ? <span role="status">{t('chooseNextTab')}</span> : undefined}
+      status={selection === null && !editor ? <span role="status">{t('chooseNextTab')}</span> : undefined}
       primary={primary ? { label: primary.title, keys: ['↵'], disabled: busy || !group || !!bookmarkRemoval || !!groupRemoval, danger: !!primary.danger, onAction: () => void run(primary.id) } : undefined}
       actions={{ open: menu, disabled: busy || !group || !!bookmarkRemoval || !!groupRemoval, onToggle: toggleMenu }} />
     {groupRemoval ? <GroupConfirmation target={groupRemoval} onCancel={() => setGroupRemoval(null)} onConfirm={() => void run('closeGroup', undefined, groupRemoval)} /> : bookmarkRemoval ? <BookmarkConfirmation target={bookmarkRemoval} onCancel={() => setBookmarkRemoval(null)}

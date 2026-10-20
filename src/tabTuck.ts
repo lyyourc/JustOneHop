@@ -97,6 +97,10 @@ export async function updateManagedGroup(windowId: number, groupId: number, chan
     try { await chrome.tabGroups.update(groupId, changes); }
     catch (error) { if (owned && previous) Object.assign(owned, previous); throw error; }
     await persist();
+    const changed = (['title', 'color', 'collapsed'] as const).filter(key => changes[key] !== undefined && changes[key] !== native[key]);
+    return t(!changed.length ? 'outcomeGroupUnchanged' : changed.length > 1 ? 'outcomeGroupUpdated'
+      : changed[0] === 'title' ? 'outcomeGroupRenamed' : changed[0] === 'color' ? 'outcomeGroupRecolored'
+        : changes.collapsed ? 'outcomeGroupCollapsed' : 'outcomeGroupExpanded');
   });
 }
 
@@ -327,15 +331,22 @@ export async function undoTuck(windowId: number) {
     const group = state.groups.find(item => item.id === batch?.groupId && item.windowId === windowId);
     if (!batch || !group || !(await validGroup(group))) { await persist(); throw new Error(t('errorUndoTuck')); }
     let count = 0;
-    for (const id of [...batch.ids]) {
-      const tab = await chrome.tabs.get(id).catch(() => null);
-      if (tab && tab.windowId === windowId && tab.groupId === group.id && group.members.includes(id)) {
-        await chrome.tabs.ungroup(id); group.members = group.members.filter(member => member !== id); touch(tab); count++;
+    const requested = batch.ids.length;
+    try {
+      for (const id of [...batch.ids]) {
+        const tab = await chrome.tabs.get(id).catch(() => null);
+        if (tab && tab.windowId === windowId && tab.groupId === group.id && group.members.includes(id)) {
+          await chrome.tabs.ungroup(id); group.members = group.members.filter(member => member !== id); touch(tab); count++;
+        }
       }
+      delete state.undo[windowId];
+      await label(group, true); await persist();
+    } catch (error) {
+      throw count ? new Error(t('errorUndoTuckPartialCount', [String(count), String(requested - count)])) : error;
     }
-    delete state.undo[windowId];
-    await label(group, true); await persist();
     if (!count) throw new Error(t('errorUndoTuck'));
+    return requested > count ? t('outcomeUndoTuckSkipped', [String(count), String(requested - count)])
+      : t('outcomeUndoTuckCount', String(count));
   });
 }
 async function scan() {

@@ -234,7 +234,7 @@ async function dragResultText(page: Page, row: Locator) {
 }
 
 test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
   test('URL actions: English exact copies preserve context and retry without navigation or learning', async () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     const urls = {
@@ -309,13 +309,21 @@ test.describe(() => {
     await expect(history).toHaveCount(1);
     await copySelected(fullSearch, history, urls.history, false, true);
     await fullSearch.press('Escape');
-    await search.fill('Urlcopy bookmark');
+    // Use a real source page: an ordinary bookmark click navigates that tab.
+    const source = await context.newPage(); await source.goto(`${origin}/Urlcopy-source`);
+    const sourceId = await worker.evaluate(async url => (await chrome.tabs.query({ url }))[0].id!, source.url());
+    const surface = await openStorageOverlay(source);
+    const sourceSearch = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await sourceSearch.fill('Urlcopy bookmark');
+    await expect(surface.locator('.result.bookmark')).toHaveCount(1);
+    await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+    const beforeNavigation = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id));
     // The input's old selection must not suppress an ordinary row click.
-    await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-    const opened = context.waitForEvent('page');
-    await ui.locator('.result.bookmark .entry-title').click();
-    await expect(await opened).toHaveURL(urls.bookmark);
-    await expect.poll(() => ui.isClosed()).toBe(true);
+    await sourceSearch.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+    await surface.locator('.result.bookmark .entry-title').click();
+    await expect(source).toHaveURL(urls.bookmark);
+    expect((await worker.evaluate(id => chrome.tabs.get(id), sourceId)).url).toBe(urls.bookmark);
+    expect(await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id))).toEqual(beforeNavigation);
     await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(expect.arrayContaining([
       ...baseline, expect.objectContaining({ query: 'urlcopy bookmark', weight: 1 }),
     ]));
@@ -1183,7 +1191,7 @@ test.describe(() => {
     await expect.poll(async () => (await bookmarks()).length).toBe(1);
     expect((await bookmarks())[0]).toMatchObject({ title: 'Bookmark menu target', url, parentId: '2' });
     expect(await worker.evaluate(url => chrome.bookmarks.search({ url }), page.url())).toEqual([]);
-    await expect(surface.locator('.palette-footer')).toContainText('Tab bookmarked');
+    await expect(surface.locator('.palette-footer')).toContainText('Bookmark added');
     await expect(root).toBeFocused(); await expect(root).toHaveValue('Bookmark menu');
     expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
     await expect(target).toHaveAttribute('aria-selected', 'true');
@@ -1244,7 +1252,7 @@ test.describe(() => {
     await expect.poll(ids).toEqual([]);
     await expect(confirmation).toHaveCount(0);
     await expect(surface.locator('.action-menu')).toHaveCount(0);
-    await expect(surface.locator('.palette-footer')).toContainText('Bookmark removed');
+    await expect(surface.locator('.palette-footer')).toContainText('Bookmarks removed: 3');
     await expect(group).toBeFocused(); await expect(group).toHaveValue('target');
     expect(await group.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual(groupCaret);
     await expect(member).toHaveAttribute('aria-selected', 'true');
@@ -1313,7 +1321,7 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
         .toEqual(index === 0 ? [seed.second.id] : []);
       await expect(ui.getByRole('alertdialog')).toHaveCount(0);
       await expect(ui.locator('.action-menu')).toHaveCount(0);
-      await expect(ui.locator('.palette-footer')).toContainText(english ? 'Bookmark removed' : '已取消收藏');
+      await expect(ui.locator('.palette-footer')).toContainText(english ? 'Bookmarks removed: 1' : '已移除 1 个书签');
       await expect(row).toHaveCount(0);
       await expect(rows).toHaveCount(2 - index);
       await expect(ui.locator('#justonehop-results [aria-selected="true"]')).toHaveAttribute('id', next);
@@ -1555,6 +1563,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await language.press('Enter');
   await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await expect(ui.getByRole('combobox', { name: 'Language', exact: true })).toBeFocused();
+  await expect(ui.locator('.operation-feedback')).toHaveText('Language set to English');
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ preferences: { language: string } }>('preferences')).preferences.language)).toBe('en');
   await ui.emulateMedia({ colorScheme: 'light' });
   const theme = ui.getByRole('combobox', { name: 'Theme', exact: true });
@@ -1562,8 +1571,10 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await ui.getByRole('option', { name: 'Dark', exact: true }).click();
   await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', 'dark');
   await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(41, 42, 45)');
+  await expect(ui.locator('.operation-feedback')).toHaveText('Theme set to Dark');
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-dark.png') });
   await theme.press('Escape');
+  await expect(ui.locator('.operation-feedback')).toHaveText('Theme set to Dark');
   const englishInput = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await expect(englishInput).toHaveValue('reload');
   await expect(englishInput).toBeFocused();
@@ -1588,6 +1599,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await second.getByRole('combobox', { name: '语言', exact: true }).click();
   await second.getByRole('option', { name: '跟随系统', exact: true }).click();
   await expect(second.getByText('系统语言：简体中文（Chrome 界面语言）')).toBeVisible();
+  await expect(second.locator('.operation-feedback')).toHaveText('语言已切换为跟随系统');
   await second.reload();
   await expect(second.locator('.justonehop-app')).toHaveAttribute('lang', 'zh-CN');
   await expect(second.locator('.justonehop-app')).toHaveAttribute('data-theme', 'system');
@@ -2013,8 +2025,10 @@ test.describe(() => {
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences)).toEqual({ language: 'en', theme: 'dark', autoTuck: false, autoTuckAfterHours: 168 });
+  await expect.poll(async () => (await ax()).some(n => n.role?.value === 'StaticText' && n.name?.value === 'Theme set to Dark')).toBe(true);
   await page.screenshot({ path: test.info().outputPath('settings-overlay.png') });
   await page.keyboard.press('Escape');
+  await expect.poll(async () => (await ax()).some(n => n.role?.value === 'StaticText' && n.name?.value === 'Theme set to Dark')).toBe(true);
   await expect.poll(async () => (await ax()).find(n => n.role?.value === 'combobox')?.value?.value).toBe('reload');
   await page.keyboard.press('Escape');
   await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
@@ -2025,7 +2039,7 @@ test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English settings report failed saves and allow retry without losing current preferences', async () => {
-  await ui.getByRole('button', { name: 'Settings', exact: true }).click();
+  await ui.locator('.settings-button').click();
   await ui.evaluate(() => {
     const original = chrome.storage.local.set.bind(chrome.storage.local);
     let fail = true;
@@ -2039,10 +2053,31 @@ test.describe(() => {
   await ui.getByRole('option', { name: '简体中文', exact: true }).click();
   await expect(ui.getByRole('alert')).toContainText('Could not save settings. Please try again.');
   await expect(language).toContainText('Follow System');
+  const settingsSearch = ui.getByRole('textbox', { name: 'Search settings', exact: true });
+  await settingsSearch.fill('language');
+  await expect(ui.locator('.operation-feedback')).toContainText('Could not save settings. Please try again.');
+  await settingsSearch.fill('');
   await language.click();
   await ui.getByRole('option', { name: '简体中文', exact: true }).click();
   await expect(ui.getByRole('region', { name: '设置', exact: true })).toBeVisible();
   await expect(ui.getByRole('alert')).toHaveCount(0);
+  await expect(ui.locator('.operation-feedback')).toHaveText('语言已切换为简体中文');
+  await ui.evaluate(() => {
+    const original = chrome.storage.local.set.bind(chrome.storage.local);
+    chrome.storage.local.set = ((...args: Parameters<typeof chrome.storage.local.set>) => new Promise<void>((resolve, reject) => {
+      (window as any).__completePreferenceSave = async () => {
+        chrome.storage.local.set = original;
+        try { await original(...args); resolve(); } catch (reason) { reject(reason); }
+      };
+    })) as typeof chrome.storage.local.set;
+  });
+  await ui.getByRole('combobox', { name: '主题', exact: true }).click();
+  await ui.getByRole('option', { name: '深色', exact: true }).click();
+  await expect(ui.locator('.operation-feedback')).toHaveText('正在执行…');
+  await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', 'system');
+  await ui.evaluate(() => (window as any).__completePreferenceSave());
+  await expect(ui.locator('.operation-feedback')).toHaveText('主题已切换为深色');
+  await expect(ui.getByRole('combobox', { name: '主题', exact: true })).toBeFocused();
 });
 });
 
@@ -3202,10 +3237,11 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await input.press('Control+n');
   await expect(surface.locator('.storage-row[aria-selected="true"]')).toContainText('empty');
   await input.press('Enter');
-  await expect(surface.locator('.storage-notice')).toContainText(chinese ? '已复制值' : 'Value copied');
+  await expect(surface.locator('.operation-feedback')).toContainText(chinese ? '已复制值' : 'Value copied');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('');
   await input.press('Control+p');
   await input.fill('config');
+  await expect(surface.locator('.operation-feedback')).toContainText(chinese ? '已复制值' : 'Value copied');
   await expect(surface.locator('.storage-row mark')).toHaveText('config');
   await input.press('Enter');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(raw);
@@ -3247,7 +3283,10 @@ for (const language of ['English', 'Chinese']) test.describe(() => {
   await expect(rootInput).toHaveValue('local storage'); await expect(rootInput).toBeFocused();
   // Preserve the source page as Chrome's active tab for the next root command.
   await worker.evaluate(async url => { const [tab] = await chrome.tabs.query({ url }); await chrome.tabs.update(tab.id!, { active: true }); }, page.url());
-  await rootInput.fill('session storage'); await rootInput.press('Enter');
+  await rootInput.fill('session storage');
+  await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+  await expect(surface.locator('[id="justonehop-command:sessionStorage"]')).toHaveAttribute('aria-selected', 'true');
+  await rootInput.press('Enter');
   await expect(surface.locator('.storage-row')).toHaveCount(1);
   await expect(surface.locator('.storage-row')).toContainText('session-only');
   await input.press('Enter'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('session-value');
@@ -5116,13 +5155,13 @@ test.describe(() => {
   await page.evaluate(() => navigator.clipboard.writeText('before selection'));
   await surface.locator('.storage-row').first().click();
   await expect(surface.locator('.storage-preview .preview-code')).toHaveValue('value');
-  await expect(surface.locator('.storage-notice')).toHaveCount(0);
+  await expect(surface.locator('.operation-feedback')).toBeEmpty();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('before selection');
   await surface.locator('.palette-footer .primary-action').click();
-  await expect(surface.locator('.storage-notice')).toContainText('Value copied');
-  await expect(surface.locator('.palette-footer-context')).toHaveCount(0);
+  await expect(surface.locator('.operation-feedback')).toContainText('Value copied');
+  await expect(surface.locator('.palette-footer-context')).toBeHidden();
   expect(await surface.locator('.palette-footer-title').boundingBox()).toEqual(locationTitle);
-  expect((await surface.locator('.palette-footer-status').boundingBox())!.x).toBe(contextBox!.x);
+  expect((await surface.locator('.operation-feedback').boundingBox())!.x).toBe(contextBox!.x);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('value');
   await search.fill('polish');
   await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 3));
@@ -5138,10 +5177,12 @@ test.describe(() => {
   await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
   await surface.locator('.palette-footer-title').click();
   await page.keyboard.press('Shift+Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(surface.locator('.action-search .search-focus')).toBeFocused();
   await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
   await actions.press('Control+n');
   await expect(surface.locator('.palette-footer .primary-action')).toHaveText(/Copy Name/);
   await actions.press('Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
+  await page.keyboard.press('Tab'); await expect(surface.locator('.action-search .search-focus')).toBeFocused();
   await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
   const primary = surface.locator('.palette-footer .primary-action');
   await primary.focus();
@@ -7012,6 +7053,7 @@ test.describe(() => {
   await expect(name).toBeFocused();
   await ui.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(ui.locator('.palette-footer .footer-title-label')).toHaveText('Tab Group: Reading');
+  await expect(ui.locator('.operation-feedback')).toContainText('Group renamed');
   await expect(search).toBeFocused(); await expect(search).toHaveValue('Group');
   expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 3]);
   await expect(lowerRow).toHaveAttribute('id', lowerId!);

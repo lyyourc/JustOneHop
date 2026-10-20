@@ -26,7 +26,17 @@ export function errorMessage(reason: unknown): string {
   if (/No tab|Invalid tab ID/i.test(message)) return t('errorClosedTab');
   if (/Extension context invalidated|Receiving end does not exist|message port closed/i.test(message)) return t('errorDisconnected');
   if (/No window|Invalid window/i.test(message)) return t('errorWindow');
-  const key = (Object.keys(english) as MessageKey[]).find(key => key.startsWith('error') &&
-    [english[key].message, chinese[key].message].includes(message));
-  return t(key || 'errorGeneric');
+  for (const key of Object.keys(english) as MessageKey[]) {
+    if (!key.startsWith('error')) continue;
+    for (const template of [english[key].message, chinese[key].message]) {
+      if (template === message) return t(key);
+      if (!/\$\d/.test(template)) continue;
+      // Only numeric count substitutions survive the worker's serialized error
+      // boundary; arbitrary native error text must still use the generic message.
+      const pattern = template.split(/\$\d/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('(\\d+)');
+      const match = new RegExp(`^${pattern}$`).exec(message);
+      if (match) return t(key, match.slice(1));
+    }
+  }
+  return t('errorGeneric');
 }

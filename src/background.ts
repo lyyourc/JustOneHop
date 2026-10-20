@@ -10,7 +10,7 @@ import { historyWindow, searchHistory, snapshot } from './browser';
 import { refreshToolbarMenu, startToolbarMenu } from './toolbarMenu';
 import { startToolbarIcon } from './toolbarIcon';
 import { forgetUsage, resetUsage } from './usageStorage';
-import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult, TuckStatus } from './types';
+import type { Request, Snapshot, PageStorage, PaletteState, HistorySearchResult, TuckStatus, ExecutionOutcome } from './types';
 
 chrome.action.onClicked.addListener(tab => launchPalette(tab).catch(error => console.warn('justonehop: unable to open palette.', error)));
 chrome.commands.onCommand.addListener(async command => {
@@ -26,14 +26,14 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'justonehop') return;
   if (!['snapshot', 'tuck-status', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
   let responded = false;
-  const success = (data?: void | Snapshot | PageStorage | PaletteState | HistorySearchResult | TuckStatus) => {
+  const success = (data?: void | Snapshot | PageStorage | PaletteState | HistorySearchResult | TuckStatus | ExecutionOutcome) => {
     if (responded) return;
     responded = true;
     // Switching/closing a tab can remove the caller before the reply. That
     // must not interrupt the successful action's queued usage write.
     try { respond({ ok: true, data }); } catch { /* Caller already gone. */ }
   };
-  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | PaletteState | HistorySearchResult | TuckStatus> => {
+  const result = request.type === 'cancel-palette-continuation' ? cancelPaletteContinuation(sender) : preferencesReady.then(async (): Promise<void | Snapshot | PageStorage | PaletteState | HistorySearchResult | TuckStatus | ExecutionOutcome> => {
     if (request.type === 'tuck-status') return getTuckStatus(request.afterHours);
     if (request.type === 'palette-state') return getPaletteWindowState(sender);
     sender = await paletteSender(sender);
@@ -46,7 +46,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
         if (!Number.isInteger(request.payload.windowId)) throw new Error(t('errorWindow'));
         await historyWindow(sender, request.payload.windowId);
       }
-      return performPaletteAction(request.payload, sender, () => success());
+      return performPaletteAction(request.payload, sender, success);
     }
     if (request.type === 'reset-usage') return resetUsage();
     if (request.type === 'forget-usage') return forgetUsage(request.payload?.target, request.payload?.query);

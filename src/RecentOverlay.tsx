@@ -20,7 +20,7 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
     if (current.closing || current.composing || !list.current?.ownerDocument.hasFocus()) return;
     const tabId = filterRecentTabs(current.tabs, current.query)[current.index]?.id;
     if (tabId === undefined) return;
-    current.closing = true; changed();
+    current.closing = true; current.error = ''; changed();
     try {
       const reply = await chrome.runtime.sendMessage({ source: 'justonehop-recent', type: 'accept-overlay', session: initial.session, tabId });
       if (reply?.ok) onClose();
@@ -100,7 +100,7 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
         onSearch={() => { current.searching = true; changed(); }} onQueryChange={query => {
         if (current.closing) return;
         const selected = filterRecentTabs(current.tabs, current.query)[current.index]?.id;
-        current.query = query; current.index = recentSelection(filterRecentTabs(current.tabs, query), selected); current.error = ''; changed();
+        current.query = query; current.index = recentSelection(filterRecentTabs(current.tabs, query), selected); changed();
       }} sourceId={initial.sourceId} loaded closing={current.closing}
         error={current.error} shortcut={initial.shortcut} releaseKey={initial.modifier} theme={getPreferences().theme} listRef={list}
         onSelect={index => { if (current.closing) return; current.index = index; changed(); void finish(); }} onConfirm={() => void finish()} onCancel={onClose} />

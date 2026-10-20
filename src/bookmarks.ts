@@ -1,5 +1,5 @@
 import { t, type MessageKey } from './i18n';
-import type { BookmarkItem, Execution } from './types';
+import type { BookmarkItem, Execution, ExecutionOutcome } from './types';
 
 export function safeBookmarkUrl(url: string | undefined): boolean {
   if (typeof url !== 'string' || url !== url.trim() || /[\u0000-\u001f\u007f]/.test(url)) return false;
@@ -51,11 +51,12 @@ function fail(key: MessageKey): never { throw new BookmarkActionError(key); }
 const writes = new WeakMap<typeof chrome.bookmarks, Promise<unknown>>();
 
 /** Serialize before reading any mutable context, including the originating window. */
-export function performBookmarkAction(payload: Execution): Promise<string> {
+export function performBookmarkAction(payload: Execution): Promise<ExecutionOutcome & { target: string }> {
   const api = chrome;
   const source = api.bookmarks;
-  const result: Promise<string> = (writes.get(source) || Promise.resolve()).catch(() => {}).then(async () => {
+  const result: Promise<ExecutionOutcome & { target: string }> = (writes.get(source) || Promise.resolve()).catch(() => {}).then(async () => {
     let removed = 0;
+    let message: string;
     try {
       if (payload.action === 'removeBookmark') {
         const window = await api.windows.get(payload.windowId).catch(() => fail('errorWindow'));
@@ -67,7 +68,7 @@ export function performBookmarkAction(payload: Execution): Promise<string> {
         if (!live || live.url !== payload.expectedUrl) fail('errorBookmarkChanged');
         if (live.unmodifiable) fail('errorBookmarkItemManaged');
         await source.remove(item.id);
-        return window.incognito ? '' : 'command:removeBookmark';
+        return { target: window.incognito ? '' : 'command:removeBookmark', message: t('outcomeBookmarksRemoved', '1') };
       }
       const context = async () => {
         if (!Number.isInteger(payload.tabId)) fail('errorNoTab');
@@ -100,7 +101,8 @@ export function performBookmarkAction(payload: Execution): Promise<string> {
           live = await context();
           // Chrome chooses its native default destination when parentId is absent.
           await source.create({ url: live.tab.url!, title: live.tab.title || live.tab.url! });
-        }
+          message = t('outcomeBookmarked');
+        } else message = t('outcomeAlreadyBookmarked');
       } else {
         const ids = payload.bookmarkIds;
         if (!Array.isArray(ids) || !ids.length || ids.some(id => typeof id !== 'string' || !id) || new Set(ids).size !== ids.length) fail('errorBookmarkChanged');
@@ -110,7 +112,9 @@ export function performBookmarkAction(payload: Execution): Promise<string> {
           if (current.matches.some(item => item.unmodifiable === 'managed')) fail('errorBookmarkManaged');
         };
         // A repeated cancellation is harmless only if every observed ID vanished.
-        if (!current.matches.length && ids.every(id => !current.ids.has(id))) return live.private ? '' : 'command:unbookmarkTab';
+        if (!current.matches.length && ids.every(id => !current.ids.has(id))) {
+          return { target: live.private ? '' : 'command:unbookmarkTab', message: t('outcomeAlreadyUnbookmarked') };
+        }
         validate();
         for (const id of ids) {
           current = await read();
@@ -126,10 +130,11 @@ export function performBookmarkAction(payload: Execution): Promise<string> {
         }
         current = await read();
         validate();
+        message = t('outcomeBookmarksRemoved', String(removed));
       }
-      return live.private ? '' : `command:${payload.action}`;
+      return { target: live.private ? '' : `command:${payload.action}`, message };
     } catch (error) {
-      if (removed) fail('errorBookmarkPartial');
+      if (removed) throw new Error(t('errorBookmarkPartialCount', String(removed)));
       if (error instanceof BookmarkActionError) throw error;
       fail('errorBookmarkWrite');
     } finally {

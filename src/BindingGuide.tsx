@@ -7,6 +7,7 @@ import { copyText } from './clipboard';
 import { openShortcuts } from './api';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
+import { useOperationFeedback } from './OperationFeedback';
 
 export function bindingCode() {
   return `['switch-recent', 'switch-recent-back'].forEach((commandName, i) => chrome.developerPrivate.updateExtensionCommand({extensionId: ${JSON.stringify(chrome.runtime.id)}, commandName, keybinding: i ? 'Ctrl+Shift+Tab' : 'Ctrl+Tab'}));`;
@@ -14,8 +15,7 @@ export function bindingCode() {
 
 export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boolean }) {
   const retainGuide = useContext(BindingNavigation);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const feedback = useOperationFeedback();
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
   const [query, setQuery] = useState('');
@@ -62,17 +62,21 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
     const anchor = back.current;
     if (!anchor || pending.current) return;
     const version = revision.current;
-    pending.current = true; setBusy(true); setError(''); setNotice(''); setMenu(false);
+    pending.current = true; setBusy(true); setMenu(false);
+    const operation = feedback.begin(t('running'));
+    let copied = false;
     try {
       if (action !== 'shortcuts') {
         try { await copyText(bindingCode(), anchor); }
-        catch { if (version === revision.current) setError(t('bindingCopyError')); return; }
-        if (version !== revision.current) return;
-        setNotice(t('bindingCodeCopied'));
+        catch { feedback.error(operation, t('bindingCopyError')); return; }
+        copied = true;
       }
+      // Returning cancels the follow-up navigation, not the completed copy result.
       if (action !== 'copy' && version === revision.current) await openBindingShortcuts();
-    } catch { if (version === revision.current) setError(t('errorGeneric')); }
-    finally { pending.current = false; if (version === revision.current) setBusy(false); }
+      feedback.success(operation, t(copied ? 'bindingCodeCopied' : 'shortcutPageOpened'));
+    } catch {
+      feedback.error(operation, t(copied ? 'bindingCopiedOpenFailed' : 'errorGeneric'));
+    } finally { pending.current = false; if (version === revision.current) setBusy(false); }
   }
   return <BackLayer onBack={leave}><section tabIndex={-1} className="palette binding-view" aria-label={t('bindCtrlTab')} onKeyDown={event => {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -96,13 +100,11 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
         <label className="binding-code-field">{t('bindingCode')}<textarea ref={field} aria-label={t('bindingCode')} value={bindingCode()} readOnly spellCheck={false} /></label>
       </div>
     </div>
-    {error ? <div className="error-banner" role="alert">{error}</div> : null}
     {menu ? <ActionMenu id="binding-actions" isMac={isMac} title={<span>{t('bindCtrlTab')}</span>}
       actions={actions} query={query} onQueryChange={value => { setQuery(value); setSelection(''); }} selectedId={selected?.id}
       onSelectionChange={setSelection} onAction={id => void perform(id as 'copy' | 'shortcuts')} onClose={() => setMenu(false)} /> : null}
     <PaletteFooter isMac={isMac} title={t('bindCtrlTab')}
       navigation={{ kind: 'back', label: `${t('back')} · ${t('bindCtrlTab')}`, tooltip: `${t('back')} · Esc`, buttonRef: back, onAction: leave }}
-      status={notice ? <span role="status">{notice}</span> : busy ? <span role="status">{t('running')}</span> : undefined}
       primary={menu ? { label: selected?.title || t('actions'), keys: ['↵'], disabled: busy || !selected, onAction: () => { if (selected) void perform(selected.id as 'copy' | 'shortcuts'); } }
         : { label: t('bindingCopyOpen'), keys: ['↵'], disabled: busy, onAction: () => void perform('both') }}
       actions={{ open: menu, disabled: busy, onToggle: toggleMenu }} />

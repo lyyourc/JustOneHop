@@ -99,6 +99,8 @@ npm run build
 
 The single-line footer keeps actions aligned to the right. Page actions use **Open Here** and **New Tab**, with full descriptions in tooltips and the Actions menu. Navigation hints hide together when space is tight; status feedback remains visible. On narrow screens, the new-tab action becomes an icon button.
 
+Settings, copying, and tab management report their results in the footer. Language and theme changes confirm the saved option; success messages remain briefly when you type or return to the parent view. Longer operations show progress, and failures stay visible until dismissed or retried.
+
 For full gesture rules, ranking details, and `Ctrl+Tab` setup, see the **[Usage Guide (Chinese)](docs/USAGE.md)**.
 
 ---

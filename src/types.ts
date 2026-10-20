@@ -49,6 +49,7 @@ export interface PaletteState {
   caret: [number, number];
   group?: { id: number; query: string; selection: string | null; caret: [number, number] };
 }
+export interface ExecutionOutcome { message?: string }
 export interface Execution {
   paletteState?: PaletteState;
   action: ActionId | 'settings';

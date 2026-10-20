@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { execute } from './api';
 import { errorMessage, t } from './i18n';
 import { BackLayer } from './Navigation';
+import { useOperationFeedback } from './OperationFeedback';
 import { RecentSwitcherView } from './RecentSwitcherView';
 import { filterRecentTabs, recentNavigation, recentSelection } from './recentSearch';
 import type { Snapshot } from './types';
@@ -17,7 +18,7 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
   const [selection, setSelection] = useState<number | null>(() =>
     data.tabs.find(tab => tab.id !== data.currentTabId)?.id ?? data.tabs[0]?.id ?? null);
   const [closing, setClosing] = useState(false);
-  const [error, setError] = useState('');
+  const feedback = useOperationFeedback();
   // Snapshot order already puts other tabs in MRU order and the source last.
   // The shared view only reads identity, title, URL and pinned state.
   const tabs = useMemo<chrome.tabs.Tab[]>(() => data.tabs.map(tab => ({
@@ -55,15 +56,18 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
     const target = visible.find(tab => tab.id === tabId);
     if (!target) return;
     executing.current = true;
-    setClosing(true); setError('');
+    setClosing(true);
+    const operation = feedback.begin(t('operationPending'));
     try {
       // Tab Switcher choices do not participate in query learning.
       await execute({ action: 'switch', tabId, windowId: target.windowId });
+      feedback.success(operation, t('actionCompleted'));
       if (alive.current) { alive.current = false; onClose(); }
     } catch (failure) {
+      feedback.error(operation, errorMessage(failure));
       if (!alive.current) return;
       executing.current = false;
-      setClosing(false); setError(errorMessage(failure));
+      setClosing(false);
     }
   }
 
@@ -86,8 +90,8 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
       onQueryChange={value => {
         if (!alive.current || executing.current) return;
         const matches = filterRecentTabs(tabs, value);
-        setQuery(value); setSelection(matches[recentSelection(matches, selected?.id)]?.id ?? null); setError('');
-      }} sourceId={data.currentTabId} loaded closing={closing} error={error} shortcut="" releaseKey="" theme={theme} listRef={list}
+        setQuery(value); setSelection(matches[recentSelection(matches, selected?.id)]?.id ?? null);
+      }} sourceId={data.currentTabId} loaded closing={closing} error="" shortcut="" releaseKey="" theme={theme} listRef={list}
       onSelect={at => {
         if (!alive.current || executing.current) return;
         const tabId = visible[at]?.id;

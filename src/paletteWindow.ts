@@ -1,7 +1,7 @@
 import { t } from './i18n';
 import { nativePanelBounds } from './panelGeometry';
 import { perform } from './browser';
-import type { Execution, PaletteState } from './types';
+import type { Execution, ExecutionOutcome, PaletteState } from './types';
 
 const KEY = 'justonehopPaletteWindow';
 interface Session { token: string; sourceTabId: number; sourceWindowId: number; popupWindowId?: number }
@@ -81,7 +81,7 @@ export async function getPaletteWindowState(sender: chrome.runtime.MessageSender
 }
 
 /** Legacy paletteState is accepted but can never create or rebind a host. */
-export async function performPaletteAction(payload: Execution, sender: chrome.runtime.MessageSender, onPerformed: () => void) {
+export async function performPaletteAction(payload: Execution, sender: chrome.runtime.MessageSender, onPerformed: (outcome?: ExecutionOutcome) => void) {
   if (!payload || !Number.isInteger(payload.windowId)) throw new Error(t('errorWindow'));
   const addressAction = ['navigateAddress', 'openAddressNewTab', 'openBookmark', 'openHistoryPage'].includes(payload.action);
   if (addressAction || ['close', 'closeOthers', 'closeRight', 'closeGroup'].includes(payload.action)) {
@@ -94,7 +94,7 @@ export async function performPaletteAction(payload: Execution, sender: chrome.ru
       throw new Error(t('errorTabChanged'));
     }
   }
-  await perform(payload, onPerformed);
+  return perform(payload, onPerformed);
 }
 
 export async function closePaletteWindowForShortcut(tab: chrome.tabs.Tab) {

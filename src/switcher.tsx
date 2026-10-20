@@ -53,7 +53,7 @@ async function finish() {
   if (!loaded || startupNavigation.length) { acceptAfterLoad = true; return; }
   const targetId = visibleTabs()[index]?.id;
   if (targetId === undefined) return;
-  closing = true;
+  closing = true; error = ''; changed();
   try {
     const [source, target] = await Promise.all([chrome.tabs.get(sourceId), chrome.tabs.get(targetId)]);
     if (target.windowId !== windowId) throw new Error(t('errorMovedTab'));
@@ -139,7 +139,7 @@ function Switcher() {
     onSearch={() => { searching = true; acceptAfterLoad = false; changed(); }} onQueryChange={value => {
     if (closing || aborted) return;
     const selected = visibleTabs()[index]?.id;
-    query = value; index = recentSelection(visibleTabs(), selected); error = ''; changed();
+    query = value; index = recentSelection(visibleTabs(), selected); changed();
   }} sourceId={sourceId} loaded={loaded} closing={closing}
     error={error} shortcut={shortcut} releaseKey={releaseKey} theme={getPreferences().theme} listRef={list}
     onSelect={at => { if (closing) return; index = at; changed(); void finish(); }} onConfirm={() => void finish()} onCancel={dismiss} />;

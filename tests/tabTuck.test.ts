@@ -88,6 +88,47 @@ const now = Date.UTC(2026, 9, 15);
 const tab = { id: 1, windowId: 10, index: 2, url: 'https://example.com', active: false, pinned: false,
   groupId: -1, highlighted: false, incognito: false, status: 'complete' } as chrome.tabs.Tab;
 
+test('group outcomes distinguish unchanged settings and each requested update', async () => {
+  groups = [{ id: 7, windowId: 10, title: 'Work', color: 'blue', shared: false, collapsed: false }];
+  const module = await start();
+  assert.equal(await module.updateManagedGroup(10, 7, { title: 'Work' }), 'Group already has these settings');
+  assert.equal(await module.updateManagedGroup(10, 7, { title: 'Research' }), 'Group renamed');
+  assert.equal(await module.updateManagedGroup(10, 7, { color: 'red' }), 'Group color updated');
+  assert.equal(await module.updateManagedGroup(10, 7, { collapsed: true }), 'Group collapsed');
+  assert.equal(await module.updateManagedGroup(10, 7, { collapsed: false }), 'Group expanded');
+  assert.equal(await module.updateManagedGroup(10, 7, { title: 'Reading', color: 'green' }), 'Group updated');
+});
+
+async function undoFixture() {
+  tabs = [{ ...tab, groupId: 7 }, { ...tab, id: 2, groupId: 7 }];
+  groups = [{ id: 7, windowId: 10, title: 'Tucked', color: 'grey', shared: false, collapsed: true }];
+  session[sessionKey] = { version: 1, enabled: true, clocks: {},
+    groups: [{ ...groups[0], key: 'owned', customTitle: true, members: [1, 2] }], undo: { 10: { groupId: 7, ids: [1, 2] } } };
+  return start();
+}
+
+test('undo tuck reports the number returned and skips tabs that changed after the batch was recorded', async () => {
+  let module = await undoFixture();
+  assert.equal(await module.undoTuck(10), 'Tabs returned from tucked group: 2');
+  module = await undoFixture();
+  tabs[1].groupId = -1;
+  assert.equal(await module.undoTuck(10), 'Tabs returned from tucked group: 1 · Unavailable or changed tabs skipped: 1');
+  assert.equal(module.canUndoTuck(10), false);
+});
+
+test('undo tuck failure reports completed work and preserves the remaining undo state', async context => {
+  const module = await undoFixture();
+  const ungroup = chrome.tabs.ungroup;
+  context.mock.method(chrome.tabs, 'ungroup', async (id: number) => {
+    if (id === 2) throw new Error('native failure');
+    await ungroup(id);
+  });
+  await assert.rejects(module.undoTuck(10), { message: 'Tabs returned from tucked group: 1 · Tabs not returned: 1. The operation stopped; review the group.' });
+  assert.equal(tabs[0].groupId, -1);
+  assert.equal(tabs[1].groupId, 7);
+  assert.equal(module.canUndoTuck(10), true);
+});
+
 test('automatic tuck requires a full seven days, including at the exact boundary', () => {
   assert.equal(idleTabEligible(tab, now - TUCK_AFTER + 1, now), false);
   assert.equal(idleTabEligible(tab, now - TUCK_AFTER, now), true);

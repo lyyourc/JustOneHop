@@ -168,6 +168,17 @@ beforeEach(async () => {
   reset();
 });
 
+test('palette mutation callback and API response preserve the execution outcome', async context => {
+  let acknowledged: unknown;
+  const outcome = await performPaletteAction({ action: 'closeRight', windowId: 10, tabId: 2 }, sourceSender(), value => { acknowledged = value; });
+  assert.deepEqual(outcome, { message: 'Tabs closed: 1' });
+  assert.deepEqual(acknowledged, outcome);
+  const { execute } = await import('../src/api.ts');
+  Object.assign(chrome.runtime, { sendMessage: async () => ({ ok: true, data: acknowledged }) });
+  context.after(() => { delete (chrome.runtime as Partial<typeof chrome.runtime>).sendMessage; });
+  assert.deepEqual(await execute({ action: 'closeRight', windowId: 10, tabId: 2 }), outcome);
+});
+
 for (const host of ['page', 'legacy action popup', 'native'] as const) {
   for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
     test(`${host}: ${action} binds navigation to the source without focusing a window or learning`, async () => {

@@ -7,7 +7,7 @@ import { closeTargets } from './model';
 import { recordUsage } from './usageStorage';
 import { settingsUsageTarget } from './usage';
 import { getBookmarks, performBookmarkAction, safeBookmarkUrl } from './bookmarks';
-import type { Execution, HistorySearchResult, Snapshot, TabItem } from './types';
+import type { Execution, ExecutionOutcome, HistorySearchResult, Snapshot, TabItem } from './types';
 
 function safeHistoryUrl(value: unknown): value is string {
   if (typeof value !== 'string' || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) return false;
@@ -74,12 +74,14 @@ export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
   };
 }
 
-export async function perform(payload: Execution, onPerformed?: () => void): Promise<void> {
-  const target = await performAction(payload);
+export async function perform(payload: Execution, onPerformed?: (outcome?: ExecutionOutcome) => void): Promise<ExecutionOutcome | undefined> {
+  const result = await performAction(payload);
+  const target = typeof result === 'string' ? result : result.target;
+  const outcome = typeof result === 'string' ? undefined : { message: result.message };
   if (payload.action === 'reloadExtension') { await reloadExtension(onPerformed); return; }
   // Let the panel refresh or dismiss as soon as Chrome finishes the action,
   // while this promise still owns queued persistence in the service worker.
-  onPerformed?.();
+  onPerformed?.(outcome);
   // An explicit empty query is a home choice; switcher navigation omits it.
   if (target && (typeof payload.query === 'string' || target.startsWith('command:')) &&
       (payload.action !== 'openHistoryPage' || payload.query?.trim())) {
@@ -87,9 +89,15 @@ export async function perform(payload: Execution, onPerformed?: () => void): Pro
     // action into an error or encourage the user to execute it a second time.
     await recordUsage(typeof payload.query === 'string' ? payload.query : '', target).catch(() => {});
   }
+  return outcome;
 }
 
-async function performAction(payload: Execution): Promise<string> {
+function closeOutcome(closed: number, protectedCount = 0): string {
+  return protectedCount ? t('outcomeClosedProtected', [String(closed), String(protectedCount)])
+    : closed ? t('outcomeClosedCount', String(closed)) : t('outcomeClosedNone');
+}
+
+async function performAction(payload: Execution): Promise<string | (ExecutionOutcome & { target: string })> {
   if (!payload || !Number.isInteger(payload.windowId)) throw new Error(t('errorWindow'));
   const { action, windowId, tabId, bookmarkId } = payload;
   if (action === 'bookmarkTab' || action === 'unbookmarkTab' || action === 'removeBookmark') return performBookmarkAction(payload);
@@ -118,7 +126,7 @@ async function performAction(payload: Execution): Promise<string> {
     if ((changes.title !== undefined && typeof changes.title !== 'string') ||
         (changes.collapsed !== undefined && typeof changes.collapsed !== 'boolean') ||
         (changes.color !== undefined && !['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'].includes(changes.color))) throw new Error(t('errorGroup'));
-    await updateManagedGroup(windowId, payload.groupId!, changes); return '';
+    return { target: '', message: await updateManagedGroup(windowId, payload.groupId!, changes) };
   }
   if (action === 'ungroupGroup' || action === 'closeGroup') {
     if (!Number.isInteger(payload.groupId) || payload.groupId! < 0) throw new Error(t('errorGroup'));
@@ -127,29 +135,32 @@ async function performAction(payload: Execution): Promise<string> {
     const members = (await chrome.tabs.query({ windowId })).filter(tab => tab.groupId === group.id);
     if (!members.length) throw new Error(t('errorGroup'));
     if (action === 'ungroupGroup') {
-      await chrome.tabs.ungroup(members.map(tab => tab.id!) as [number, ...number[]]); return '';
+      await chrome.tabs.ungroup(members.map(tab => tab.id!) as [number, ...number[]]);
+      return { target: '', message: t('outcomeUngroupedCount', String(members.length)) };
     }
     const expected = payload.groupTabIds;
     if (!Array.isArray(expected) || !expected.length || expected.some(id => !Number.isInteger(id)) || new Set(expected).size !== expected.length) {
       throw new Error(t('errorInvalidRequest'));
     }
     if (expected.length !== members.length || members.some(tab => !expected.includes(tab.id!))) throw new Error(t('errorGroupMembersChanged'));
-    let closed = 0;
+    let closed = 0, protectedCount = 0;
     try {
       for (const member of members) {
         const tab = await chrome.tabs.get(member.id!);
         if (tab.windowId !== windowId || tab.groupId !== group.id) throw new Error(t('errorGroupMembersChanged'));
-        if (tab.pinned) continue;
+        if (tab.pinned) { protectedCount++; continue; }
         await chrome.tabs.remove(tab.id!); closed++;
       }
-    } catch (reason) { throw closed ? new Error(t('errorGroupPartial')) : reason; }
-    return '';
+    } catch (reason) {
+      throw closed ? new Error(t('errorGroupPartialCount', [String(closed), String(members.length - closed)])) : reason;
+    }
+    return { target: '', message: closeOutcome(closed, protectedCount) };
   }
   if (action === 'ungroupTab') {
     if (!Number.isInteger(tabId) || !Number.isInteger(payload.groupId) || payload.groupId! < 0) throw new Error(t('errorGroup'));
     const tab = await chrome.tabs.get(tabId!);
     if (tab.windowId !== windowId || tab.groupId !== payload.groupId) throw new Error(t('errorGroup'));
-    await chrome.tabs.ungroup(tab.id!); return '';
+    await chrome.tabs.ungroup(tab.id!); return { target: '', message: t('outcomeUngroupedCount', '1') };
   }
   if (isChromePageAction(action)) { await openChromePage(action, windowId); return target(`command:${action}`); }
   if (action === 'openHistoryPage' || action === 'openBookmark') {
@@ -181,7 +192,7 @@ async function performAction(payload: Execution): Promise<string> {
   if (action === 'reloadExtension') return '';
   if (action === 'resumeTuck') { await resumeTuck(windowId, payload.recoveryId!, payload.groupId!, payload.fingerprint!); return ''; }
   if (action === 'forgetTuckRecovery') { await forgetTuckRecovery(payload.recoveryId!); return ''; }
-  if (action === 'undoTuck') { await undoTuck(windowId); return target('command:undoTuck'); }
+  if (action === 'undoTuck') return { target: target('command:undoTuck'), message: await undoTuck(windowId) };
   if (action === 'newTab') { await chrome.tabs.create({ windowId }); return target('command:newTab'); }
   if (action === 'restore') {
     const recent = await chrome.sessions.getRecentlyClosed({ maxResults: 1 });
@@ -193,21 +204,38 @@ async function performAction(payload: Execution): Promise<string> {
   const tab = await chrome.tabs.get(tabId!);
   if (tab.windowId !== windowId) throw new Error(t('errorMovedTab'));
   if (payload.groupId !== undefined && tab.groupId !== payload.groupId) throw new Error(t('errorGroup'));
+  let message: string | undefined;
   switch (action) {
-    case 'tuck': await tuckTab(tab.id!, windowId); break;
+    case 'tuck': await tuckTab(tab.id!, windowId); message = t('outcomeTucked'); break;
     case 'switch': await chrome.tabs.update(tab.id!, { active: true }); break;
     case 'reload': await chrome.tabs.reload(tab.id!); break;
-    case 'close': await chrome.tabs.remove(tab.id!); break;
-    case 'pin': await chrome.tabs.update(tab.id!, { pinned: !tab.pinned }); break;
-    case 'mute': await chrome.tabs.update(tab.id!, { muted: !tab.mutedInfo?.muted }); break;
+    case 'close': await chrome.tabs.remove(tab.id!); message = closeOutcome(1); break;
+    case 'pin':
+      await chrome.tabs.update(tab.id!, { pinned: !tab.pinned });
+      message = t(tab.pinned ? 'outcomeUnpinned' : 'outcomePinned'); break;
+    case 'mute':
+      await chrome.tabs.update(tab.id!, { muted: !tab.mutedInfo?.muted });
+      message = t(tab.mutedInfo?.muted ? 'outcomeUnmuted' : 'outcomeMuted'); break;
     case 'closeOthers':
     case 'closeRight': {
       const tabs = (await chrome.tabs.query({ windowId })).map(toTab);
       const ids = closeTargets(tabs, toTab(tab), action).map(target => target.id);
-      if (ids.length) await chrome.tabs.remove(ids);
+      const protectedCount = tabs.filter(candidate => candidate.id !== tab.id && candidate.pinned &&
+        (action === 'closeOthers' || candidate.index > tab.index)).length;
+      if (ids.length) {
+        try { await chrome.tabs.remove(ids); }
+        catch (error) {
+          // A batch removal may reject after Chrome has already closed some tabs.
+          const remaining = await chrome.tabs.query({}).catch(() => undefined);
+          const closed = remaining ? ids.filter(id => !remaining.some(tab => tab.id === id)).length : 0;
+          throw closed ? new Error(t('errorGroupPartialCount', [String(closed), String(ids.length - closed + protectedCount)])) : error;
+        }
+      }
+      message = closeOutcome(ids.length, protectedCount);
       break;
     }
     default: throw new Error(t('errorCommand'));
   }
-  return target(action === 'switch' ? (tab.url ? `tab:${tab.url}` : '') : `command:${action}`);
+  const usageTarget = target(action === 'switch' ? (tab.url ? `tab:${tab.url}` : '') : `command:${action}`);
+  return message === undefined ? usageTarget : { target: usageTarget, message };
 }
