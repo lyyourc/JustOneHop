@@ -61,7 +61,7 @@ if (!scope[marker]) {
     const frame = document.createElement('iframe');
     frame.className = 'justonehop-frame';
     frame.title = t('paletteLabel');
-    frame.setAttribute('sandbox', 'allow-same-origin');
+    frame.setAttribute('sandbox', 'allow-same-origin allow-popups');
     dialog.append(frame);
     const frameDocument = frame.contentDocument;
     if (!frameDocument?.body) throw new Error('Unable to create keyboard surface');

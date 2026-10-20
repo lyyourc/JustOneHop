@@ -1636,6 +1636,11 @@ test.describe(() => {
     const article = page.getByRole('article');
     await expect(search).toBeFocused();
     await expect(article).toContainText(shortcut);
+    const githubPromise = context.waitForEvent('page');
+    await page.locator('.help-github-card').click();
+    const githubPage = await githubPromise;
+    expect(githubPage.url()).toContain('github.com/lyyourc/JustOneHop');
+    await githubPage.close();
     expect(await worker.evaluate(async url => (await chrome.tabs.query({ url }))[0].windowId, page.url())).toBe(source.windowId);
     await expect(ui).toHaveURL('chrome://settings/');
     await search.fill('cookies');
@@ -1649,7 +1654,7 @@ test.describe(() => {
     for (const theme of ['light', 'dark']) {
       await worker.evaluate(async theme => chrome.storage.local.set({ preferences: { language: 'zh', theme } }), theme);
       await expect(page.locator('.justonehop-app')).toHaveAttribute('data-theme', theme);
-      await expect(page).toHaveTitle('使用帮助 · justonehop');
+      await expect(page).toHaveTitle('使用帮助 · 小范围瞬移');
       await expect(page.locator('.primary-action')).toHaveText('关闭帮助esc');
       expect(await article.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
       const footer = await page.locator('.palette-footer').boundingBox();
@@ -1701,6 +1706,11 @@ for (const locale of ['en-US', 'zh-CN'] as const) test.describe(() => {
     await expect(helpSearch).toBeFocused();
     await expect(article.getByRole('heading')).toHaveCount(5);
     await expect(article).toContainText(shortcut);
+    const githubPromise = context.waitForEvent('page');
+    await ui.locator('.help-github-card').click();
+    const githubPage = await githubPromise;
+    expect(githubPage.url()).toContain('github.com/lyyourc/JustOneHop');
+    await githubPage.close();
     await helpSearch.fill('cookies');
     await expect(article.getByRole('heading')).toHaveText(english ? 'View website storage' : '查看网站存储');
     await expect(article.locator('mark').first()).toContainText(/cookies/i);

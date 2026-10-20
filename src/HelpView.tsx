@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { BookOpen, ExternalLink, Search } from 'lucide-react';
 import { t } from './i18n';
 import { BackLayer, useNavigateBack } from './Navigation';
 import { PaletteFooter } from './PaletteFooter';
@@ -8,6 +8,9 @@ import { SearchDismissButton } from './SearchDismissButton';
 import { HighlightedText } from './HighlightedText';
 import { matchingHelp } from './helpSearch';
 import { describeShortcut } from './Shortcut';
+import { openHelpUrl } from './api';
+
+const GITHUB_DOCS_URL = 'https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md';
 
 export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () => void; shortcut: string; standalone?: boolean }) {
   const [query, setQuery] = useState('');
@@ -20,6 +23,19 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
   useEffect(() => { input.current?.focus(); }, []);
   useEffect(() => { article.current?.scrollTo({ top: 0 }); }, [query]);
   function clearSearch() { setQuery(''); input.current?.focus(); }
+  function openGitHubDocs(event?: React.MouseEvent | React.KeyboardEvent) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+      void chrome.tabs.create({ url: GITHUB_DOCS_URL, active: true }).catch(() => {});
+      return;
+    }
+    try {
+      const win = window.open(GITHUB_DOCS_URL, '_blank', 'noopener,noreferrer');
+      if (win) return;
+    } catch {}
+    void openHelpUrl(GITHUB_DOCS_URL).catch(() => {});
+  }
 
   return <BackLayer onBack={onBack} closes={standalone}><section tabIndex={-1} className="palette help-view" aria-label={t('help')} onKeyDown={event => {
     if (event.nativeEvent.isComposing || event.keyCode === 229 || event.key !== 'Tab') return;
@@ -44,7 +60,23 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
         event.preventDefault(); event.stopPropagation(); node.scrollTo({ top: event.key === 'Home' ? 0 : node.scrollHeight });
       }
     }}>
-      {!query.trim() ? <p className="help-intro">{t('helpIntro')}</p> : null}
+      {!query.trim() ? <>
+        <p className="help-intro">{t('helpIntro')}</p>
+        <a className="help-github-card" href={GITHUB_DOCS_URL} target="_blank" rel="noreferrer noopener"
+          tabIndex={-1} onClick={openGitHubDocs} title={t('openGitHubGuide')}>
+          <div className="help-github-header">
+            <div className="help-github-badge" aria-hidden="true"><BookOpen size={16} /></div>
+            <div className="help-github-copy">
+              <div className="help-github-title">{t('fullGuideTitle')}</div>
+              <div className="help-github-desc">{t('fullGuideDesc')}</div>
+            </div>
+          </div>
+          <span className="help-github-action" aria-hidden="true">
+            <span>{t('openGitHubGuide')}</span>
+            <ExternalLink size={12} aria-hidden="true" />
+          </span>
+        </a>
+      </> : null}
       <span className="sr-only" role="status">{t('helpSectionCount', String(sections.length))}</span>
       {sections.map(section => <section key={section.title}>
         <h2><HighlightedText text={t(section.title)} query={query} allowTypos={false} /></h2>

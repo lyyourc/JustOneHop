@@ -95,6 +95,7 @@ npm run build
 | More actions on item | Right-click row or click **Actions** | `⌘K` |
 | Recent Tab Switcher | Click `Tab Switcher` on home | `Control+J` (or configure `Ctrl+Tab`) |
 | Open Settings | Click gear icon in footer | `⌘,` |
+| View Help | Click "Help" on home or search `help` | Filter key points or jump to full GitHub guide |
 | Go back one level | Click back arrow, `esc`, or swipe right with two fingers | `Esc` (or `Backspace` when search is empty) |
 
 When a search field contains text, its trailing `esc` button turns into `×` on hover or keyboard focus. Clicking clears the search and returns focus to the input, keeping the current view open. With an empty search, the button stays `esc` and exits the current layer. The Escape key continues to exit one layer at a time.

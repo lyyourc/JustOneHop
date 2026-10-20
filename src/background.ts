@@ -24,7 +24,7 @@ chrome.tabs.onUpdated.addListener((tabId, change) => {
 });
 chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
   if (sender.id !== chrome.runtime.id || request?.source !== 'justonehop') return;
-  if (!['snapshot', 'tuck-status', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
+  if (!['snapshot', 'tuck-status', 'search-history', 'palette-state', 'execute', 'cancel-palette-continuation', 'open-shortcuts', 'open-help-url', 'reset-usage', 'forget-usage', 'read-page-storage', 'open-cookie-access'].includes(request.type)) return;
   let responded = false;
   const success = (data?: void | Snapshot | PageStorage | PaletteState | HistorySearchResult | TuckStatus | ExecutionOutcome) => {
     if (responded) return;
@@ -50,6 +50,18 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     }
     if (request.type === 'reset-usage') return resetUsage();
     if (request.type === 'forget-usage') return forgetUsage(request.payload?.target, request.payload?.query);
+    if (request.type === 'open-help-url') {
+      const url = typeof request.url === 'string' && /^https:\/\/github\.com\/lyyourc\/JustOneHop/i.test(request.url)
+        ? request.url
+        : 'https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md';
+      const targetWindow = sender.tab?.windowId;
+      if (targetWindow !== undefined) {
+        await chrome.tabs.create({ windowId: targetWindow, url, active: true });
+      } else {
+        await chrome.tabs.create({ url, active: true });
+      }
+      return;
+    }
     const windowId = sender.tab?.windowId ?? (await chrome.windows.getCurrent()).id;
     if (windowId === undefined) throw new Error(t('errorWindow'));
     if (request.type === 'open-shortcuts' && request.preserveBindingGuide) {

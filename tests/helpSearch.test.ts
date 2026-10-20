@@ -20,5 +20,7 @@ test('help searches bilingual titles and body, retaining whole matching sections
   assert.deepEqual(matchingHelp('cookie    domains').map(section => section.title), ['helpStorageTitle']);
   assert.ok(matchingHelp('cookie')[0].paragraphs.includes('helpStorageBody'));
   assert.deepEqual(matchingHelp('cookie 不存在的说明'), []);
+  assert.ok(matchingHelp('github').some(section => section.title === 'helpQuestionsTitle'));
+  assert.ok(matchingHelp('GitHub').some(section => section.title === 'helpQuestionsTitle'));
   assert.deepEqual(matchingHelp('zzzz-no-help'), []);
 });

@@ -14,6 +14,7 @@ export const cancelPaletteContinuation = () => send<void>({ source: 'justonehop'
 export const execute = (payload: Execution) => send<ExecutionOutcome | undefined>({ source: 'justonehop', type: 'execute', payload });
 
 export const openShortcuts = (preserveBindingGuide = false) => send<void>({ source: 'justonehop', type: 'open-shortcuts', preserveBindingGuide });
+export const openHelpUrl = (url?: string) => send<void>({ source: 'justonehop', type: 'open-help-url', url });
 export const resetSearchRanking = () => send<void>({ source: 'justonehop', type: 'reset-usage' });
 export const forgetSearchRanking = (target: string | string[], query?: string) => send<void>({ source: 'justonehop', type: 'forget-usage', payload: { target, query } });
 

@@ -88,6 +88,7 @@ export type Request =
   | { source: 'justonehop'; type: 'read-page-storage'; payload: StorageRead }
   | { source: 'justonehop'; type: 'open-cookie-access'; payload: CookieAccessRequest }
   | { source: 'justonehop'; type: 'open-shortcuts'; preserveBindingGuide?: boolean }
+  | { source: 'justonehop'; type: 'open-help-url'; url?: string }
   | { source: 'justonehop'; type: 'reset-usage' }
   | { source: 'justonehop'; type: 'forget-usage'; payload: { target: string | string[]; query?: string } }
   | { source: 'justonehop'; type: 'execute'; payload: Execution };
