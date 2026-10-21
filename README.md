@@ -18,9 +18,9 @@ Too many tabs open, with bookmarks and history scattered across different menus?
 
 ## Why JustOneHop?
 
-- **Human First (No Syntax to Memorize)**: Forget cryptic mode prefixes like `>`, `@`, or `%`. Type everyday words (`new tab`, `reopen`, `dark mode`, `downloads`), and switch freely between mouse clicking and keyboard shortcuts.
-- **Chrome Native**: Designed to feel built into Chrome—following CR2023 visuals with automatic Light & Dark themes, and working directly with native Tab Groups, bookmarks, history, and favicon caches.
-- **Predictable & Adaptive**: Relevance always comes first. Items you pick often gently move up within their relevance tier for the same query, and you can inspect or forget any learned preference with one click.
+- **Human First (Seamless Mouse & Keyboard Flow)**: Whether you prefer keyboard shortcuts, trackpad gestures, mouse clicking, or switching between them mid-flow, every path is a first-class citizen. Search naturally with plain words (`new tab`, `reopen`, `dark mode`, `downloads`) without awkward hand-offs.
+- **Chrome Native**: Built to feel like part of Chrome—blending with Chrome CR2023 visuals, adapting to Light/Dark mode, and reusing native Tab Groups, bookmarks, history, and favicon caches rather than creating a heavy, isolated silo.
+- **Predictable & Adaptive**: True relevance always comes first. Frequently chosen items move up smoothly within their relevance tier for the same query, and every learned preference is transparent and forgettable with one click.
 
 ---
 

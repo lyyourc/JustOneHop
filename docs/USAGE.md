@@ -76,7 +76,7 @@ When you open JustOneHop without typing anything, you are greeted by the **Home 
 
 <a id="搜索与导航"></a>
 
-Stop memorizing special prefix symbols like `>`, `@`, or `%`. JustOneHop indexes everything automatically:
+Whether searching open tabs, bookmarks, history, or browser settings, simply type the words in your head—JustOneHop handles everyday phrases and common aliases naturally:
 
 ![Unified Search Demo](demo/en-search.gif)
 
