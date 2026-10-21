@@ -208,14 +208,22 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ### 准备与验证
 
-1. 在发布分支更新版本文件和 CHANGELOG，确认商店后台的已发布、审核中与草稿版本。
+1. 在发布分支收齐版本文件、CHANGELOG 发布日期与发布文档，提交为发布候选；提交商店前确认后台的已发布、审核中与草稿版本。
 2. 安装锁定依赖（`npm ci`），执行 `npm run release:check`。检查会拒绝不兼容 Chrome 的版本、不一致的版本文件或缺失的 CHANGELOG 版本条目；CI 同样执行，tag 构建另核对 tag 名。
-3. 正式发版必须按 [测试指南](TESTING.md#正式发版验证) 执行 `npm run check`，覆盖类型检查、完整单元测试、构建和全量浏览器 E2E。发布请求即包含全量验证授权；单测、构建或定向 E2E 通过不能替代。报告失败、跳过与未执行项；失败未解决前停止正式发布，跳过项按测试指南处理。
-4. 在发布提交中确定 CHANGELOG 日期，提交全部发布文件后对最终提交完成验证并生成 ZIP；若源码或依赖变化，重新验证最终提交。已发布版本若补验失败，在 Release 显著标记未通过，暂停商店提交；产品修复使用新版本，不移动旧 tag 或替换旧附件。
+3. 对发布候选按 [测试指南](TESTING.md#正式发版验证) 执行 `npm run check`，覆盖类型检查、完整单元测试、构建和全量浏览器 E2E。发布请求即包含全量验证授权；报告失败、跳过与未执行项，失败未解决前停止正式发布，跳过项按测试指南处理。
+4. 全量通过后冻结发布内容，保留受测 commit、验证报告和 dist 哈希。后续文档／日期补录、创建 tag 或未引入额外代码变化的合并，按测试指南核对差异与产物后沿用全量证据，不因提交 SHA 变化重复运行。影响行为、产物或测试有效性的变更，按该指南重新确定验证范围。
+5. 从已验证的 dist 生成并核对 ZIP，再完成 tag CI 与发布。已发布版本若补验失败，在 Release 显著标记未通过，暂停商店提交；产品修复使用新版本，不移动旧 tag 或替换旧附件。
 
 ### 生成发布 ZIP
 
-在仓库根目录执行：
+发布验证已生成且核对未变化的 `dist/` 时，直接打包，避免再次构建：
+
+```sh
+npm run release:check
+npx tsx scripts/package-store.ts
+```
+
+尚无已验证产物时，可在仓库根目录执行以下命令构建并打包；该命令本身不构成全量验证：
 
 ```sh
 npm run package:store
@@ -236,7 +244,7 @@ npm run package:store
 
 ```sh
 npm run release:check -- v0.2.0
-npm run package:store
+npx tsx scripts/package-store.ts
 unzip -p releases/justonehop-0.2.0.zip manifest.json
 shasum -a 256 releases/justonehop-0.2.0.zip
 git tag -a v0.2.0 -m "JustOneHop 0.2.0"
@@ -244,7 +252,7 @@ git push origin HEAD
 git push origin v0.2.0
 ```
 
-tag 必须指向生成该 ZIP 的源码提交。已推送 tag 不移动；发布后修订递增版本。等待该提交／tag 的 Validate CI 通过后创建 Release。
+tag 必须指向与已验证发布产物对应的源码提交；若与受测 commit 不同，须已完成测试指南规定的差异与产物等价核对。已推送 tag 不移动；发布后修订递增版本。等待该提交／tag 的 Validate CI 通过后创建 Release，不额外触发全量 E2E。
 
 准备发布说明文件（例如系统临时目录中的 `justonehop-0.2.0-notes.md`），包含 CHANGELOG 的本版本内容、源码 commit、ZIP SHA-256、实际验证范围和商店状态。先创建草稿检查附件与说明，再发布：
 
