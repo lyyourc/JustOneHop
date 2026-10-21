@@ -9,7 +9,9 @@ test('History search: 100ms deadline freezes pending rows and rejects late or su
     bookmarks: [{ id: 'local', title: `${query} local`, url: `${fixtureOrigin}/${query}-local`, folder: '' }],
   } });
   await expect(ui.locator('.result.command')).toHaveCount(9);
-  await ui.clock.install(); await ui.clock.pauseAt(new Date());
+  const clockStart = Date.now();
+  await ui.clock.install({ time: clockStart });
+  await ui.clock.pauseAt(clockStart + 60_000);
   // Observe delivery separately from rendering, so absence checks follow the late reply.
   await ui.evaluate(() => {
     const original = chrome.runtime.sendMessage.bind(chrome.runtime);

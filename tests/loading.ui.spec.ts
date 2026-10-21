@@ -23,8 +23,9 @@ for (const scenario of ['fast', 'slow', 'failure and retry']) {
         },
       } });
     }, snapshot);
-    await ui.clock.install();
-    await ui.clock.pauseAt(new Date());
+    const clockStart = Date.now();
+    await ui.clock.install({ time: clockStart });
+    await ui.clock.pauseAt(clockStart + 60_000);
     await ui.goto('https://justonehop.test/popup.html');
     const input = ui.locator('.search-bar input');
     await expect(input).toBeFocused();

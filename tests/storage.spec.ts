@@ -200,6 +200,13 @@ for (const vimium of [false, true]) test.describe(() => {
   await expect.poll(async () => (await combo())?.name?.value).toBe('Search commands, tabs, bookmarks, and history');
   await page.keyboard.type('local storage');
   await expect.poll(async () => (await combo())?.value?.value).toBe('local storage');
+  // Input stays available while the snapshot/history results are still loading.
+  await expect.poll(async () => {
+    const nodes = await ax();
+    return nodes.some(node => node.role?.value === 'listbox' && !node.properties?.some(property => property.name === 'busy' && property.value?.value === true))
+      && nodes.some(node => node.role?.value === 'option' && node.name?.value?.includes('View Local Storage')
+        && node.properties?.some(property => property.name === 'selected' && property.value?.value === true));
+  }).toBe(true);
   await page.keyboard.press('Enter');
   await expect.poll(async () => (await combo())?.name?.value).toBe('Search storage keys');
   await expect.poll(async () => (await ax()).filter(node => node.role?.value === 'option').length).toBe(2);

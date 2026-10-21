@@ -16,23 +16,26 @@ test('native bounds include measured window decorations and preserve negative mo
   const tab = { width: 1200, height: 800 };
   const frame = { left: 1, top: 28, width: 2, height: 29 };
   const bounds = nativePanelBounds(owner, tab, frame);
-  assert.deepEqual(bounds, { left: -1176, top: 240, width: 752, height: 545 });
-  const rect = panelRect({ left: -1400, top: 140, width: 1200, height: 800 });
-  assert.equal(bounds.left + frame.left, rect.left);
-  assert.equal(bounds.top + frame.top, rect.top);
-  assert.equal(bounds.width - frame.width, rect.width);
-  assert.equal(bounds.height - frame.height, rect.height);
+  assert.deepEqual(bounds, { left: -1176, top: 156, width: 752, height: 545 });
+  assert.equal(bounds.left + frame.left + (bounds.width - frame.width) / 2, -800);
+  // Browser top + 16% of its 900 DIP height, independent of source chrome.
+  assert.equal(bounds.top + frame.top, 184);
+  for (const width of [960, 720]) {
+    const sidebar = nativePanelBounds(owner, { width, height: 700 }, frame);
+    assert.equal(sidebar.left + frame.left + (sidebar.width - frame.width) / 2, -800);
+    assert.equal(sidebar.top + frame.top, 184);
+  }
 });
 
 test('native bounds apply CSS limits and breakpoints before converting page zoom to screen DIPs', () => {
   const owner = { left: 22, top: 55, width: 1200, height: 905 };
   const tab = { width: 1200, height: 818 };
   const frame = { left: 0, top: 32, width: 0, height: 32 };
-  assert.deepEqual(nativePanelBounds(owner, tab, frame, 1.25), { left: 153, top: 241, width: 938, height: 677 });
-  assert.deepEqual(nativePanelBounds(owner, tab, frame, .8), { left: 322, top: 230, width: 600, height: 445 });
+  assert.deepEqual(nativePanelBounds(owner, tab, frame, 1.25), { left: 153, top: 168, width: 938, height: 677 });
+  assert.deepEqual(nativePanelBounds(owner, tab, frame, .8), { left: 322, top: 143, width: 600, height: 445 });
   // 640 screen DIPs at 125% is a narrow 512 CSS-px viewport (20px gutters).
   assert.deepEqual(nativePanelBounds({ left: 0, top: 0, width: 640, height: 700 },
-    { width: 640, height: 600 }, frame, 1.25), { left: 13, top: 98, width: 615, height: 572 });
+    { width: 640, height: 600 }, frame, 1.25), { left: 13, top: -2, width: 615, height: 572 });
 });
 
 test('popup frame uses native tab dimensions rather than initial or zoomed DOM dimensions', () => {
@@ -67,7 +70,7 @@ test('alignment isolates popup zoom and measures its frame independently of star
     await alignPanelWindow(source.id, owner.id);
     assert.deepEqual(calls, [
       ['settings', ownTab.id, { mode: 'automatic', scope: 'per-tab' }], ['zoom', ownTab.id, 1.25],
-      ['bounds', popup.id, { left: 153, top: 241, width: 938, height: 677 }],
+      ['bounds', popup.id, { left: 153, top: 168, width: 938, height: 677 }],
     ]);
   } finally {
     if (previousChrome) Object.defineProperty(globalThis, 'chrome', previousChrome); else Reflect.deleteProperty(globalThis, 'chrome');

@@ -140,7 +140,7 @@ test.describe(() => {
 
 test.describe('headed', { tag: '@headed' }, () => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
-  test('English palette launch native page aligns a separate window with the content viewport and executes against the source', async () => {
+  test('English palette launch native page anchors a separate window to the browser and executes against the source', async () => {
   const { source, palette } = await openNativePalette();
   const bounds = await palette.evaluate(async sourceId => {
     const current = await chrome.windows.getCurrent();
@@ -155,7 +155,7 @@ test.describe('headed', { tag: '@headed' }, () => {
   const viewportWidth = bounds.tab.width!, viewportHeight = bounds.tab.height!;
   const expectedWidth = Math.min(750, viewportWidth - (viewportWidth <= 520 ? 20 : 48));
   const topInset = viewportWidth <= 520 ? 24 : Math.min(150, Math.max(28, viewportHeight * .16));
-  const expectedTop = bounds.owner.top! + bounds.owner.height! - viewportHeight + topInset;
+  const expectedTop = bounds.owner.top! + (bounds.owner.width! <= 520 ? 24 : Math.min(150, Math.max(28, bounds.owner.height! * .16)));
   const contentTop = bounds.screenY + bounds.outerHeight - bounds.innerHeight - (bounds.outerWidth - bounds.innerWidth) / 2;
   expect(Math.abs(contentTop - expectedTop)).toBeLessThan(3);
   expect(Math.abs(bounds.screenX + bounds.outerWidth / 2 - bounds.owner.left! - bounds.owner.width! / 2)).toBeLessThan(3);
@@ -214,7 +214,7 @@ async function pointerViewport(page: Page, zoom: number) {
 
 for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1, 1.25, .8]) test.describe('headed', { tag: '@headed' }, () => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true, verticalTabs: layout === 'vertical tabs' } });
-  test(`English palette launch native storage panel matches the overlay screen position with ${layout} at ${zoom * 100}% zoom`, async () => {
+  test(`English palette launch hosts preserve their viewport and browser anchors with ${layout} at ${zoom * 100}% zoom`, async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Screen-alignment`); await page.bringToFront();
   const source = await worker.evaluate(async ({ url, zoom }) => {
     const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
@@ -229,11 +229,15 @@ for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1
   });
   const surface = page.frameLocator('.justonehop-frame');
   await expect(surface.getByRole('combobox')).toBeFocused();
-  // Read CSS geometry from the actual rendered overlay, then convert to screen
-  // DIPs. Playwright's cross-frame boundingBox already includes browser zoom.
+  // The overlay belongs to the page viewport; the standalone panel belongs to
+  // the browser window. Observe both anchors independently at each source zoom.
   const box = await surface.locator('.palette').evaluate(node => {
     const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
   });
+  const pageSize = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  expect(Math.abs(box.x + box.width / 2 - pageSize.width / 2)).toBeLessThan(1);
+  const overlayInset = pageSize.width <= 520 ? 24 : Math.min(150, Math.max(28, pageSize.height * .16));
+  expect(Math.abs(box.y - overlayInset)).toBeLessThan(1);
   await page.keyboard.press('Escape');
   // Start with a different extension-origin zoom. Temporary panels must copy
   // their source's zoom without changing this other extension page.
@@ -249,8 +253,10 @@ for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1
       top: own.top! + frameHeight - frameWidth / 2 + rect.y * zoom, width: rect.width * zoom, height: rect.height * zoom, zoom };
   });
   expect(native.zoom).toBe(zoom);
-  expect(Math.abs(native.left - viewport.left - box.x * zoom)).toBeLessThan(3);
-  expect(Math.abs(native.top - viewport.top - box.y * zoom)).toBeLessThan(3);
+  const owner = await worker.evaluate(id => chrome.windows.get(id), source.windowId);
+  expect(Math.abs(native.left + native.width / 2 - owner.left! - owner.width! / 2)).toBeLessThan(3);
+  const nativeInset = owner.width! / zoom <= 520 ? 24 * zoom : Math.min(150 * zoom, Math.max(28 * zoom, owner.height! * .16));
+  expect(Math.abs(native.top - owner.top! - nativeInset)).toBeLessThan(3);
   expect(Math.abs(native.width - box.width * zoom)).toBeLessThanOrEqual(1);
   expect(Math.abs(native.height - box.height * zoom)).toBeLessThanOrEqual(1);
   expect(await ui.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(1.5);

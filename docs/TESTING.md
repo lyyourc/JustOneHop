@@ -60,7 +60,7 @@ npm run test:e2e -- --grep 'storage and Tab Group layers preserve main palette g
 | `settingsHelp.spec.ts` | 设置、帮助、快捷键与外部入口 |
 | `storage.spec.ts`、`tabGroups.spec.ts` | 真实页面存储、剪贴板、权限与原生标签组 |
 | `switcher.spec.ts`、`switcherOverlay.spec.ts` | 切换器原生窗口、网页浮层及输入桥接 |
-| `lifecycle.spec.ts`、`hostGeometry.spec.ts` | 启动、重载、会话生命周期及承载几何 |
+| `lifecycle.spec.ts`、`workerLifecycle.spec.ts`、`hostGeometry.spec.ts` | 启动、重载、会话生命周期、后台停止／唤醒压力及承载几何 |
 | `tabTuck.spec.ts` | 自动收起、撤销及重启恢复 |
 
 `*.ui.spec.ts` 对应组件交互与展示职责。共享集成夹具只管理隔离环境、资源与诊断，各功能文件显式注册自身的生命周期钩子；文件拆分不引入跨测试 profile 复用。全量入口不按功能跳过压力、兼容或定位用例，缺少依赖和已知失败仍计入报告。
@@ -100,7 +100,7 @@ runner 在终端与 `validation.json.timings` 记录发现用例、构建、Play
 
 所有真实剪贴板读写（包括只复制而不读取的操作）须标记 `@clipboard`；同时需要原生窗口的用例保留 `@headed`，并通过运行目录下的跨进程锁与剪贴板组互斥，浏览器关闭后才释放。原生焦点测试必须标记 `@headed`，headless 独立窗口测试标记 `@windows`。`resource-wait-ms` 单独记录锁等待。
 
-该并发配置尚未通过完整套件的稳定性验证，不能替代默认发布验证；降低耗时但新增启动／清理超时不算性能验收通过。启用实验时先运行跨组代表用例，再比较全量覆盖、失败身份与阶段耗时。正式验证仍须保留 Vimium 依赖缺失等边界。
+该并发配置已在 Chrome 156.0.8078.4、Vimium 2.4.2 的候选构建上完成无失败、无跳过的完整套件验证，并达到五分钟目标；当前仍须显式启用，默认单 worker 不变。单轮通过不证明跨平台或长期稳定性；后续并发配置调整先运行跨组代表用例，再比较全量覆盖、失败身份与阶段耗时，新增启动／清理超时不算性能验收通过。正式验证仍须保留 Vimium 依赖缺失等边界。
 
 ## 构建与产物隔离
 
@@ -120,8 +120,10 @@ runner 在终端与 `validation.json.timings` 记录发现用例、构建、Play
 
 Vimium 兼容场景需指定 `JUSTONEHOP_VIMIUM_PATH`，指向已解包的 Vimium 扩展；场景会核实其 service worker 已加载。未提供路径时该场景跳过，不计为兼容性通过；开放 Shadow DOM 的视觉夹具不承担 Vimium 兼容验收。
 
+后台停止／唤醒压力用例单独放在 `workerLifecycle.spec.ts`，保留操作 trace 与生命周期事件附件，关闭该文件的 DOM／网络快照。Chrome 156 在该压力场景的响应正文调试接口中触发过主进程断言；该场景验证真实停止、消息唤醒和扩展重载，不依赖 DOM 快照。其他用例继续保留完整 trace；此隔离不减少压力次数或放宽断言。
+
 ## 证据与未解决项
 
 [验收记录](ACCEPTANCE.md) 保存实际执行范围、结果及限制；它不是当前全套测试通过的声明。报告跳过、失败、重跑与未验证范围，并区分隔离浏览器结果和日常 Chrome 重载。截图与 trace 留在忽略的测试产物目录或系统临时目录，不作为长期文档附件。
 
-屏幕定位目标仍暂停、未解决，详见 [ADR 0010](adr/0010-content-anchor-panel-geometry.md#待实现目标)。相关定位用例或历史内容区几何记录，不能证明该目标已经完成。验证设计中的独立证据判断见 [评审标准](CODING_STANDARDS.md)。
+定位按 [ADR 0010](adr/0010-content-anchor-panel-geometry.md) 的两个锚点分别验证：网页浮层相对页面视口水平居中、偏上；独立窗口的内容相对来源浏览器外框水平居中，顶部留白从来源窗口顶部计算。命令面板与 Tab Switcher 均需覆盖适用承载，并区分内容尺寸、页面缩放与原生框架。侧栏展开／折叠、窄窗口和缩放场景须依据各自锚点判断，不以两种承载屏幕坐标相等或显示器固定定位作为通过条件。预期值须来自契约与独立观测；历史内容区估算结果不能直接证明新定位决策通过。验证设计中的独立证据判断见 [评审标准](CODING_STANDARDS.md)。
