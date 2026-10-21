@@ -69,6 +69,9 @@ test('Chinese storage and Tab Group UI layers preserve actual embedded palette g
   await expect(surface.locator('[id="justonehop-tab:1"] .current-badge')).toHaveText('当前');
   await expect(surface.locator('.result.tab .current-badge')).toHaveCount(1);
   async function geometry() {
+    // Layer navigation can remount the panel before its entrance scale settles.
+    await expect.poll(() => surface.locator('.palette').evaluate(panel =>
+      panel.getAnimations().every(animation => animation.playState === 'finished'))).toBe(true);
     return surface.locator('.palette').evaluate(panel => {
       const box = (selector: string) => {
         const rect = panel.querySelector(selector)!.getBoundingClientRect();
