@@ -73,7 +73,7 @@
 ### 方式一：Chrome 应用商店 / 发行包
 
 - **Chrome 应用商店**：[小范围瞬移 · JustOneHop](https://chromewebstore.google.com/detail/justonehop/mbofggnjaoneioopfbpheapgphmkclbo)
-- **GitHub Releases**：在 [Releases 页面](https://github.com/lyyourc/JustOneHop/releases) 下载最新构建包，或查看 [更新日志](CHANGELOG.md)（当前源码版本：`0.2.0`）。
+- **GitHub Releases**：在 [Releases 页面](https://github.com/lyyourc/JustOneHop/releases) 下载最新构建包，或查看 [更新日志](CHANGELOG.md)（当前源码版本：`0.2.1`）。
 
 ### 方式二：从源码本地构建
 
