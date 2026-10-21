@@ -2,7 +2,7 @@
 
 User-visible changes are grouped by release. Git tags use `v<version>`; extension manifests and store packages use `<version>`. GitHub release dates do not imply Chrome Web Store approval. See the [release guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单).
 
-## [0.2.1] - Unreleased
+## [0.2.1] - 2026-10-22
 
 ### Fixed / 修复
 
