@@ -1,5 +1,6 @@
 import { useRef, type ComponentProps } from 'react';
 import type { RankingInfo } from './usage';
+import type { ResultAddress } from './resultAddress';
 import { RankingButton } from './RankingButton';
 import {
   BookOpen, Copy, Database, Cookie, ArrowRight, ArrowDownToLine, Bookmark,
@@ -23,13 +24,13 @@ export function EntryGlyph({ name, size = 18 }: { name: IconName; size?: number 
 }
 
 /** Every main-search kind shares this presentation; callers own navigation and execution. */
-export function SearchResultItem({ entry, query, ranking, onForget, disabled = false, selected, isMac, showKind = true, suppressTabShortcuts = false, onClick, ...props }: {
-  entry: Entry; query: string; ranking?: RankingInfo; onForget?: () => void; disabled?: boolean; selected: boolean; isMac: boolean; showKind?: boolean; suppressTabShortcuts?: boolean;
+export function SearchResultItem({ entry, query, address, ranking, onForget, disabled = false, selected, isMac, showKind = true, suppressTabShortcuts = false, onClick, ...props }: {
+  entry: Entry; query: string; address?: ResultAddress; ranking?: RankingInfo; onForget?: () => void; disabled?: boolean; selected: boolean; isMac: boolean; showKind?: boolean; suppressTabShortcuts?: boolean;
 } & Pick<ComponentProps<'div'>, 'id' | 'onClick' | 'onMouseMove' | 'onContextMenu'>) {
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const alias = entry.kind === 'command' ? matchingAlias(entry, query) : '';
   const protectPinned = entry.action === 'closeOthers' || entry.action === 'closeRight';
-  const subtitle = entry.kind !== 'command' || entry.action === 'navigateAddress' || entry.action === 'searchAllHistory' || entry.action === 'tabSwitcher' ? entry.subtitle
+  const subtitle = address ? <span className="distinct-address" title={address.url}><span className="distinct-address-base"><HighlightedText text={address.base} query={entrySearchQuery(query)} allowTypos={false} /></span><span className="distinct-address-detail"><HighlightedText text={address.detail} query={entrySearchQuery(query)} allowTypos={false} /></span></span> : entry.kind !== 'command' || entry.action === 'navigateAddress' || entry.action === 'searchAllHistory' || entry.action === 'tabSwitcher' ? entry.subtitle
     : alias ? <><HighlightedText text={alias} query={entrySearchQuery(query)} />{protectPinned ? ` · ${t('keepPinned')}` : ''}</>
       : protectPinned ? t('keepPinned') : '';
   const shortcut = suppressTabShortcuts && ['close', 'reload'].includes(entry.action) ? undefined : entry.shortcut;
@@ -46,7 +47,7 @@ export function SearchResultItem({ entry, query, ranking, onForget, disabled = f
         event.stopPropagation(); return;
       }
       if (!entry.disabled) onClick?.(event);
-    }} role="option" aria-disabled={entry.disabled || undefined} aria-selected={selected} className={`result ${entry.kind} ${entry.danger ? 'danger' : ''}`} title={`${entryTitle(entry)} — ${entry.subtitle}`}>
+    }} role="option" aria-disabled={entry.disabled || undefined} aria-selected={selected} className={`result ${entry.kind} ${entry.danger ? 'danger' : ''}`} title={`${entryTitle(entry)} — ${address?.url ?? entry.subtitle}`}>
     <ResultContent title={entryTitle(entry)} subtitle={subtitle} query={entrySearchQuery(query)} kind={entry.kind} color={entry.groupColor}
       pageUrl={entry.faviconPageUrl} icon={<EntryGlyph name={entry.icon} />}
       metadata={<>

@@ -130,6 +130,8 @@
   "runCommand": {
     "message": "Run Command"
   },
+  "completeQuery": { "message": "Complete" },
+  "queryCompletionHint": { "message": "Suggestion: $1. Press Tab or Right Arrow to complete." },
   "searchLabel": {
     "message": "Search commands, tabs, bookmarks, and history"
   },
@@ -393,7 +395,7 @@
     "message": "Search Ranking"
   },
   "searchRankingHint": {
-    "message": "Habits personalize home and reorder equally relevant search results. Hover the history icon for details; click it to forget."
+    "message": "Habits personalize home, reorder equally relevant results, and suggest previous queries. Hover the history icon for details; click it to forget. Reset clears ranking and query completion history."
   },
   "resetSearchRanking": {
     "message": "Reset Ranking"

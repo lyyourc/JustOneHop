@@ -102,6 +102,15 @@ Whether searching open tabs, bookmarks, history, or browser settings, simply typ
 
 When you type a project name like `justonehop`, JustOneHop recognizes when the word matches the final path segment of a URL. It prioritizes the repository root over deeper subpages. When you want a specific document, simply add another keyword like `justonehop testing`.
 
+### Complete a Previous Query
+
+After successfully using a query such as `github`, type `g` in the main search to see the remaining letters as a faint hint. Suggestions come from successful local selections, URL navigation, and web searches, with frequency and recency taken into account.
+
+- Press **Tab** or **→** at the end of the input, or click **Complete** in the footer, to fill the suggested query and keep typing.
+- Until accepted, results match only what you typed. **Enter** still executes the selected result; **↑ / ↓** only changes the selected result.
+- Without a hint, Tab moves focus as usual; **Shift+Tab** always moves focus backward. Moving the caret, selecting text, composing with an IME, or deleting text keeps completion out of the way.
+- Suggestions stay on-device, exclude destructive commands, and are disabled in incognito. **Settings → Reset Ranking** clears the shared query and ranking history. Merely typing or accepting a hint does not save a query.
+
 ### Smart Aliases & Typo Tolerance
 
 People type fast, and typos happen. JustOneHop includes a built-in alias dictionary for common browser actions:

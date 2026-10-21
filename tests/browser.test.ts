@@ -129,7 +129,7 @@ const addressExecution = (action: 'navigateAddress' | 'openAddressNewTab'): Exec
 });
 
 for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
-  test(`${action} uses the exact source and destination without learning`, async () => {
+  test(`${action} uses the exact source and destination and remembers only the query`, async () => {
     tabs[1].url = 'https://source.example/';
     tabs[1].pendingUrl = tabs[1].url;
     let acknowledged = 0;
@@ -138,7 +138,9 @@ for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
       ? [['update', 2, { url: 'https://destination.example/path?q=one#two' }]]
       : [['create', { windowId: 10, url: 'https://destination.example/path?q=one#two', active: true }]]);
     assert.equal(acknowledged, 1);
-    assert.deepEqual(usage, []);
+    assert.equal(usage.length, 1);
+    assert.equal(usage[0].query, 'destination.example');
+    assert.equal(usage[0].target, 'query:navigation');
   });
 
   test(`${action} rejects malformed requests without acknowledgement or learning`, async () => {
@@ -219,13 +221,27 @@ for (const action of ['openBookmark', 'openHistoryPage'] as const) {
   });
 }
 
+test('successful web searches supply completion records but incognito and omitted queries do not', async () => {
+  await perform({ ...addressExecution('openAddressNewTab'), query: 'react hooks', url: 'https://www.google.com/search?q=react+hooks' });
+  assert.equal(usage[0].query, 'react hooks');
+  assert.equal(usage[0].target, 'query:navigation');
+  usage = [];
+  await perform({ ...addressExecution('openAddressNewTab'), query: undefined });
+  assert.deepEqual(usage, []);
+  chrome.windows.get = (async (id: number) => ({ id, incognito: true })) as typeof chrome.windows.get;
+  await perform(addressExecution('openAddressNewTab'));
+  assert.deepEqual(usage, []);
+});
+
 test('address navigation protects pinned sources while allowing an active new tab', async () => {
   Object.assign(tabs[1], { url: 'https://source.example/', pinned: true });
   await assert.rejects(perform(addressExecution('navigateAddress')), { message: t('errorPinned') });
   assert.deepEqual(calls, []);
+  assert.equal(usage.length, 0);
   await perform({ ...addressExecution('openAddressNewTab'), url: 'http://localhost:3000/' });
   assert.deepEqual(calls, [['create', { windowId: 10, url: 'http://localhost:3000/', active: true }]]);
-  assert.deepEqual(usage, []);
+  assert.equal(usage.length, 1);
+  assert.equal(usage[0].target, 'query:navigation');
 });
 
 test('bookmark item removal deletes only the selected ID without requiring an open tab', async () => {

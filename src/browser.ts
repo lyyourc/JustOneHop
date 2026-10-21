@@ -118,7 +118,8 @@ async function performAction(payload: Execution): Promise<string | (ExecutionOut
     } else {
       await chrome.tabs.create({ windowId: source.windowId, url: payload.url, active: true });
     }
-    return '';
+    // Query-only history supplies completion without promoting a navigation result.
+    return typeof payload.query === 'string' && payload.query.trim() ? target('query:navigation') : '';
   }
   if (action === 'updateGroup') {
     if (!Number.isInteger(payload.groupId) || !payload.groupChanges) throw new Error(t('errorGroup'));

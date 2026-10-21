@@ -1,4 +1,5 @@
 import { SearchResultItem, EntryGlyph as Glyph } from './SearchResultItem';
+import { distinctResultAddresses } from './resultAddress';
 import { HistoryView } from './HistoryView';
 import { BookmarkConfirmation, type BookmarkRemoval } from './BookmarkConfirmation';
 import { PaletteTabSwitcher } from './PaletteTabSwitcher';
@@ -27,6 +28,7 @@ import { LoaderCircle, Search, AlertCircle, ExternalLink } from 'lucide-react';
 import { getPreferences, subscribePreferences } from './preferences';
 import { getUsage, subscribeUsage, usageReady } from './usageState';
 import { homeUsage, queryUsage, rankingInfo, usageTarget, type RankingInfo } from './usage';
+import { useQueryCompletion } from './useQueryCompletion';
 import { StorageView } from './StorageView';
 import { BindingGuide } from './BindingGuide';
 import { copyText } from './clipboard';
@@ -81,6 +83,10 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const mod = isMac ? '⌘' : 'Ctrl';
   const items = useMemo(() => data ? entries(data).map(entry => pageNavigationEntry(entry, data)) : [], [data, preferences.language]);
+  const safeCommands = useMemo(() => new Set(items.filter(item => item.kind === 'command' && !item.danger && item.action !== 'close').map(usageTarget)), [items]);
+  const completion = useQueryCompletion(input, query, usage, safeCommands,
+    !!data && !data.incognito && !busy && !actionTarget && !bookmarkRemoval && !groupRemoval && !settingsOpen && !helpOpen && !historyOpen && !tabSwitcherOpen && !storage && !bindingOpen && !recoveryId && groupId === undefined,
+    value => { savedCaret.current = [value.length, value.length]; setQuery(value); setSelection(''); setError(''); });
   const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
   const committed = useRef<{ query: string; results: Entry[]; visible: Entry[]; ranking: Map<string, RankingInfo> }>({ query: '', results: [], visible: [], ranking: new Map() });
   const liveHomeScores = useMemo(() => data?.incognito ? emptyScores : homeUsage(usage), [usage, data?.incognito]);
@@ -107,6 +113,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
     data && !data.incognito ? insertHistorySearch(nextResults, historySearchEntry(history.outcome, query), query) : nextResults, google);
   const results = history.pending ? committed.current.results : nextResults;
   const visible = history.pending ? committed.current.visible : nextVisible;
+  const addresses = useMemo(() => distinctResultAddresses(visible), [visible]);
   const displayQuery = history.pending ? committed.current.query : query;
   const ranking = history.pending ? committed.current.ranking : nextRanking;
   useLayoutEffect(() => { if (!history.pending) committed.current = { query, results: nextResults, visible: nextVisible, ranking: nextRanking }; });
@@ -410,12 +417,16 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
       <div className={`main-surface ${actionTarget || bookmarkRemoval || groupRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval || groupRemoval ? true : undefined}>
         <header className="search-bar">
           <SearchFocusButton input={input} disabled={busy} />
-          <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); setError('');}}
-            placeholder={t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
-            aria-autocomplete="list" aria-expanded="true" aria-controls="justonehop-results"
-            aria-describedby="justonehop-navigation"
-            aria-activedescendant={!history.pending && selected ? `justonehop-${selected.id}` : undefined}
-            autoComplete="off" autoCorrect="off" spellCheck={false} disabled={busy} />
+          <div className="query-input">
+            {completion.value ? <div className="query-completion" aria-hidden="true"><span style={{ transform: `translateX(-${completion.scroll}px)` }}><span className="query-completion-prefix">{query}</span>{completion.value.slice(query.length)}</span></div> : null}
+            <input data-back-on-empty ref={input} value={query} {...completion.inputProps}
+              placeholder={t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
+              aria-autocomplete="both" aria-expanded="true" aria-controls="justonehop-results"
+              aria-describedby={`justonehop-navigation${completion.value ? ' justonehop-completion' : ''}`}
+              aria-activedescendant={!history.pending && selected ? `justonehop-${selected.id}` : undefined}
+              autoComplete="off" autoCorrect="off" spellCheck={false} disabled={busy} />
+          </div>
+          <span className="sr-only" id="justonehop-completion" role="status">{completion.value ? t('queryCompletionHint', completion.value) : ''}</span>
           <SearchDismissButton label={t('closePalette')} query={query} input={input} disabled={busy} onClear={() => { setQuery(''); setSelection(''); setError(''); }} />
         </header>
         <span className="sr-only result-status" role="status">{data && !history.pending ? countMessage('resultOne', 'resultMany', visible.length) : loading && showLoading ? t('loading') : ''}</span>
@@ -424,7 +435,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
           {data && !history.pending && !visible.length ? <div className="empty"><Search size={30} /><strong>{t('noResults')}</strong>
             <p>{t('noResultsHint')}</p></div> : null}
           {visible.map(item => <div className="result-group" key={item.id}>
-            <SearchResultItem entry={item} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} suppressTabShortcuts={mode === 'popup'} id={`justonehop-${item.id}`} selected={!history.pending && selected?.id === item.id}
+            <SearchResultItem entry={item} address={addresses.get(item.id)} query={displayQuery} ranking={ranking.get(item.id)} onForget={() => void forget(item)} disabled={resultBusy || !!actionTarget} isMac={isMac} suppressTabShortcuts={mode === 'popup'} id={`justonehop-${item.id}`} selected={!history.pending && selected?.id === item.id}
             onMouseMove={event => hover(event, item.id)} onClick={() => { if (!resultBusy) { setSelection(item.id); void run(item); } }}
             onContextMenu={event => {
               event.preventDefault();
@@ -453,7 +464,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
         primary={{ label: primaryLabel, shortLabel: current?.newTab || current?.action === 'openAddressNewTab' ? t('footerOpenNewTab') : isPageNavigation(current) ? t('footerOpenCurrentTab') : undefined, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval || !!groupRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        secondary={newAddressAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
+        secondary={completion.value ? { label: t('completeQuery'), keys: ['Tab'], onAction: completion.accept } : newAddressAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
         actions={{ open: !!actionTarget, disabled: !selected || (selected.disabled && !isPageNavigation(selected)) || resultBusy || !!bookmarkRemoval || !!groupRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}

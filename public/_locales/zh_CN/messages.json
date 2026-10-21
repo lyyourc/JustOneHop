@@ -130,6 +130,8 @@
   "runCommand": {
     "message": "执行命令"
   },
+  "completeQuery": { "message": "补全" },
+  "queryCompletionHint": { "message": "建议：$1。按 Tab 或右方向键补全。" },
   "searchLabel": {
     "message": "搜索命令、标签页、书签和历史"
   },
@@ -393,7 +395,7 @@
     "message": "搜索排序"
   },
   "searchRankingHint": {
-    "message": "使用习惯用于首页推荐，搜索时只调整同级结果。悬停历史图标查看原因，点击即可忘记偏好。"
+    "message": "使用习惯用于首页推荐、同级结果排序与历史查询补全。悬停历史图标查看原因，点击忘记偏好；重置会一并清除排序与查询补全历史。"
   },
   "resetSearchRanking": {
     "message": "重置搜索排序"

@@ -13,7 +13,7 @@
 - **选择或执行验证**：先读 [测试指南](docs/TESTING.md) 的分层矩阵与预算，按实际改动选择最小充分验证；纯 UI、逻辑和工具链改动走各自分支。浏览器用例合计覆盖适用的鼠标、纯键盘和交替流程。
 - **评审实现或验证结论**：读 [评审标准](docs/CODING_STANDARDS.md)，检查跨视图一致性、需求与实现的区别，以及证据是否独立于被测假设。
 
-架构决策变更同步更新 `docs/adr/`；组件契约变更同步更新 [交互架构](docs/INTERACTION-ARCHITECTURE.md)（严格遵循黑盒契约与防腐规范，严禁写入代码实现流水）；用户可见行为变更同步更新 `README.md`、`README.zh-CN.md` 与 `docs/USAGE.md`。实际验收证据记入 [验收记录](docs/ACCEPTANCE.md)，通过项仅适用于所验证的构建与用例。
+架构决策变更同步更新 `docs/adr/`；组件契约变更同步更新 [交互架构](docs/INTERACTION-ARCHITECTURE.md)（严格遵循黑盒契约与防腐规范，严禁写入代码实现流水）。README（`README.md`、`README.zh-CN.md`）仅在用户明确要求时更新。仅核心功能或核心交互变化同步更新使用指南（`docs/USAGE.md`、`docs/USAGE.zh-CN.md`）；展示微调、边界修复等细节变更不追加使用说明。实际验收证据记入 [验收记录](docs/ACCEPTANCE.md)，通过项仅适用于所验证的构建与用例。
 
 ## 文档维护边界与防腐红线
 

@@ -1,6 +1,6 @@
 # ADR 0021：主搜索 Google 搜索候选
 
-- 状态：已采纳；补充 [ADR 0020](0020-open-in-browser.md) 的搜索与修饰键适用范围
+- 状态：已采纳；补充 [ADR 0020](0020-open-in-browser.md) 的搜索与修饰键适用范围；不新增学习的范围由 [ADR 0026](0026-local-query-completion.md) 的成功查询补全记录补充
 - 日期：2026-10-18
 
 ## 背景

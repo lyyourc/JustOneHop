@@ -1,4 +1,5 @@
 import { SearchResultItem, EntryGlyph } from './SearchResultItem';
+import { distinctResultAddresses } from './resultAddress';
 import { copyText } from './clipboard';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { getUsage, subscribeUsage } from './usageState';
@@ -48,6 +49,7 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
     const results = scores.size ? search(items, query, scores) : baseline;
     return { results, baseline };
   }, [outcome, pending, query, scores, data]);
+  const addresses = useMemo(() => distinctResultAddresses(results), [results]);
   const ranking = useMemo(() => rankingInfo(results, baseline, liveScores), [results, baseline, liveScores]);
   const { selected, setSelection } = useResultSelection(results, query);
   const unavailable = pending || busy;
@@ -149,7 +151,7 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
         {pending && showLoading ? <div className="empty" role="status"><LoaderCircle className="spinner" size={25} /><p>{t('historySearching')}</p></div> : null}
         {!pending && !failure && !results.length ? <div className="empty" role="status">{t(query.trim() ? 'historyNoResults' : 'historyEnterQuery')}</div> : null}
         {!pending && failure ? <div className="empty"><p role="alert">{failure}</p><button className="surface-button" onClick={retry}>{t('retry')}</button></div> : null}
-        {results.map(entry => <SearchResultItem entry={entry} query={query} ranking={ranking.get(entry.id)} onForget={() => void forget(entry)} disabled={unavailable || menu} isMac={isMac} showKind={false} key={entry.id} id={`justonehop-${entry.id}`} selected={selected?.id === entry.id} onClick={() => { if (!unavailable) { setSelection(entry.id); void open(entry); } }}
+        {results.map(entry => <SearchResultItem entry={entry} address={addresses.get(entry.id)} query={query} ranking={ranking.get(entry.id)} onForget={() => void forget(entry)} disabled={unavailable || menu} isMac={isMac} showKind={false} key={entry.id} id={`justonehop-${entry.id}`} selected={selected?.id === entry.id} onClick={() => { if (!unavailable) { setSelection(entry.id); void open(entry); } }}
           onMouseMove={event => { const position = { x: event.screenX, y: event.screenY }; if (!unavailable && pointer.current && (pointer.current.x !== position.x || pointer.current.y !== position.y)) setSelection(entry.id); pointer.current = position; }}
           onContextMenu={event => { event.preventDefault(); if (!unavailable) { rememberCaret(); setSelection(entry.id); setMenu(true); setActionQuery(''); setActionId(''); } }} />)}
         {!pending && outcome.limited ? <p className="more-hint">{t('historyLimitedHint')}</p> : null}

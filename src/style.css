@@ -73,6 +73,11 @@
 .action-search { position: relative; }
 .search-bar .search-focus-hint, .storage-search .search-focus-hint { top: calc(50% + 1px); }
 .search-bar input, .storage-search input { flex: 1; font-size: 14.5px; font-weight: 400; height: 100%; caret-color: var(--accent); }
+.query-input { position: relative; flex: 1; min-width: 0; height: 100%; font-size: 14.5px; }
+.query-input input { position: relative; width: 100%; padding: 1px 2px; }
+.query-completion { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; padding: 1px 2px; color: var(--faint); white-space: pre; pointer-events: none; }
+.query-completion > span { flex-shrink: 0; }
+.query-completion-prefix { color: transparent; }
 .icon-button { display: flex; align-items: center; justify-content: center; border-radius: 6px; }
 .search-dismiss { position: relative; flex-shrink: 0; min-width: 30px; min-height: 28px; }
 .search-dismiss:hover, .search-dismiss:focus-visible { background: var(--hover); }
@@ -103,6 +108,11 @@
 .entry-title { font-size: 13.5px; font-weight: 500; min-width: 0; flex-shrink: 1; }
 .entry-subtitle { color: var(--muted); font-size: 12px; min-width: 0; flex: 0 2 auto; max-width: 44%; }
 .justonehop-app mark.search-match { color: inherit; background: transparent; font-weight: 600; padding: 0; }
+.result .entry-subtitle:has(.distinct-address) { display: block; flex-shrink: 0; }
+.distinct-address { display: flex; min-width: 0; }
+.distinct-address-base { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.distinct-address-detail { flex: 0 0 auto; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.distinct-address-base:has(+ .distinct-address-detail:not(:empty)) { flex: 1 1 auto; }
 .action-alias { margin-left: 10px; color: var(--muted); font-size: 11px; }
 .entry-meta { display: flex; gap: 6px; align-items: center; color: var(--muted); margin-left: 6px; }
 .kind-label { font-size: 11px; white-space: nowrap; }

@@ -170,6 +170,9 @@ test.describe(() => {
   await expect.poll(() => ui.isClosed()).toBe(true);
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.query)).toBe('iam');
   const again = await reopen();
+  await again.fill(''); await again.fill('i');
+  await expect(ui.locator('.query-completion')).toHaveText('iam');
+  await again.press('Tab'); await expect(again).toHaveValue('iam');
   await expect(ui.locator('.result').first()).toContainText('EchoTech IAM');
   await again.press('Enter');
   await expect.poll(() => ui.isClosed()).toBe(true);
@@ -191,6 +194,8 @@ test.describe(() => {
   await expect(ui.getByRole('status')).toContainText('Default ordering restored');
   await expect(observer.locator('.result').first()).toContainText('EchoTech IAM');
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage)).toBeUndefined();
+  await observer.getByRole('combobox').fill(''); await observer.getByRole('combobox').fill('i');
+  await expect(observer.locator('.query-completion')).toHaveCount(0);
   await ui.getByRole('button', { name: 'Reset Ranking', exact: true }).scrollIntoViewIfNeeded();
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('ranking-settings.png') });
 });

@@ -1,7 +1,7 @@
 import type { Entry, SettingsSection } from './types';
 
 /** Local selections; an explicit empty query represents a home/action selection. */
-export interface UsageRecord { query: string; target: string; weight: number; lastUsed: number }
+export interface UsageRecord { query: string; queryText?: string; target: string; weight: number; lastUsed: number }
 export const USAGE_STORAGE_KEY = 'searchUsage';
 const HALF_LIFE = 14 * 24 * 60 * 60 * 1000;
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
@@ -46,7 +46,9 @@ export function normalizeUsage(value: unknown, now = Date.now()): UsageRecord[] 
     typeof record.target === 'string' && record.target.length > 0 && record.target.length <= 4096 &&
     Number.isFinite(record.weight) && record.weight > 0 && record.weight <= 100 &&
     Number.isFinite(record.lastUsed) && record.lastUsed > now - MAX_AGE && record.lastUsed <= now)
-    .map(record => ({ query: usageQuery(record.query), target: record.target, weight: record.weight, lastUsed: record.lastUsed }))
+    .map(record => ({ query: usageQuery(record.query),
+      ...(typeof record.queryText === 'string' && record.queryText.length <= 200 && usageQuery(record.queryText) === usageQuery(record.query) ? { queryText: record.queryText } : {}),
+      target: record.target, weight: record.weight, lastUsed: record.lastUsed }))
     .filter(record => record.query.length > 0 || /^(command|tab|bookmark):.+/.test(record.target))
     .sort((a, b) => b.lastUsed - a.lastUsed)
     .filter(record => {
@@ -61,7 +63,8 @@ export function addUsage(value: unknown, query: string, target: string, now = Da
   const normalized = usageQuery(query);
   if ((!normalized && !/^(command|tab|bookmark):.+/.test(target)) || normalized.length > 200 || !target || target.length > 4096) return history;
   const previous = history.find(record => record.query === normalized && record.target === target);
-  return [{ query: normalized, target, weight: Math.min(100, (previous ? usageWeight(previous, now) : 0) + 1), lastUsed: now },
+  const queryText = query.trim().replace(/\s+/g, ' ');
+  return [{ query: normalized, ...(queryText !== normalized ? { queryText } : {}), target, weight: Math.min(100, (previous ? usageWeight(previous, now) : 0) + 1), lastUsed: now },
     ...history.filter(record => record !== previous)].slice(0, MAX_RECORDS);
 }
 

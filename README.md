@@ -32,6 +32,7 @@ Too many tabs open, with bookmarks and history scattered across different menus?
 
 - **Plain words, bilingual support**: Search by page title or domain, or type everyday actions like `extensions`, `passwords`, `downloads`, or `clear cache` (switches to an existing tab if already open).
 - **Understands intent**: Searching a project name (e.g. `justonehop`) prioritizes the repository root, while adding a keyword (`justonehop testing`) finds specific docs. Type any URL to go straight there, or press `Enter` to search Google.
+- **Type less with local query completion**: After using `github` successfully, type `g` to see a faint completion. Accept with `Tab`, `→`, or the footer’s **Complete** button; `Enter` still runs the selected result. Suggestions stay on-device and are disabled in incognito.
 - **Open here or in a new tab**: Bookmarks, history, and URLs open in the current tab on `Enter`, or in a new active tab on `⌘Enter` (`Alt+Enter` on Windows/Linux).
 
 ### 2. Tab Switcher (`Alt+Tab` for Chrome Tabs)

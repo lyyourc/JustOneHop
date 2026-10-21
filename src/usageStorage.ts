@@ -15,7 +15,7 @@ export function recordUsage(query: string, target: string): Promise<void> {
   if ((!normalized && !/^(command|tab|bookmark):.+/.test(target)) || normalized.length > 200 || !target || target.length > 4096) return Promise.resolve();
   return enqueue(async () => {
     const stored = await chrome.storage.local.get(USAGE_STORAGE_KEY);
-    await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: addUsage(stored[USAGE_STORAGE_KEY], normalized, target) });
+    await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: addUsage(stored[USAGE_STORAGE_KEY], query, target) });
   });
 }
 

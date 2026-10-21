@@ -587,7 +587,11 @@ test.describe(() => {
       }
       await page.setViewportSize({ width: 1100, height: 760 });
     }
-    expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage ?? [])).toEqual([]);
+    await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage ?? [])).toEqual(
+      expect.arrayContaining(['click', 'enter', 'shortcut', 'footer'].map(method => expect.objectContaining({
+        query: `${method === 'shortcut' ? '谷歌搜索 ' : ''}UnmatchedSearch ${method} 中文 C++ & #part`.toLowerCase(), target: 'query:navigation',
+      }))),
+    );
   });
 
   test('Address navigation: exact existing results suppress the URL candidate but distinct destinations keep it', async () => {
@@ -681,7 +685,11 @@ test.describe(() => {
       }
       await page.setViewportSize({ width: 1100, height: 760 });
     }
-    expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage ?? [])).toEqual([]);
+    await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage ?? [])).toEqual(
+      expect.arrayContaining(['click', 'enter', 'shortcut', 'footer'].map(method => expect.objectContaining({
+        query: `${origin}/Address-${method}?Q=A%2Bb#Part`.replace('http://', '').toLowerCase(), target: 'query:navigation',
+      }))),
+    );
   });
 });
 
