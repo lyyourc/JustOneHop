@@ -68,6 +68,6 @@
   - [存储双栏视图组件](../src/StorageView.tsx)
 - **自动化测试**：
   - [页面存储单元测试](../tests/pageStorage.test.ts)
-  - [端到端浏览器测试](../tests/palette.spec.ts)（覆盖原始字符串、空值、超大 JSON、同名 Cookie、权限拒绝与页面跳转防护，验证系统剪贴板真实拷贝值）。
+  - [端到端浏览器测试](../tests/storage.spec.ts)（覆盖原始字符串、空值、超大 JSON、同名 Cookie、权限拒绝与页面跳转防护，验证系统剪贴板真实拷贝值）。
 - **本地手工测试**：
   - 运行 `node tests/storage-manual.mjs` 启动本地隔离测试环境。

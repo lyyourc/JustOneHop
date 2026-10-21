@@ -279,12 +279,19 @@ test('completed idle scans persist their timestamp through worker and browser re
 
 test('automatic tuck rechecks idle state per tab and does not stamp an interrupted scan', async () => {
   getPreferences().autoTuckAfterHours = 1;
-  tabs.push({ ...tab, id: 2 });
+  tabs.push({ ...tab, id: 2 }, { ...tab, id: 3 });
   const module = await start();
   queryIdle = () => moved.length ? 'active' : 'idle';
   alarmEvent.emit(alarm!);
   assert.equal((await module.getTuckStatus()).lastScanAt, undefined);
   assert.deepEqual(moved, [1]);
+  assert.notEqual(tabs[0].groupId, -1);
+  assert.deepEqual(tabs.slice(1).map(tab => tab.groupId), [-1, -1]);
+  assert.deepEqual(session[sessionKey].undo[10], { groupId: tabs[0].groupId, ids: [1] });
+  assert.equal(module.canUndoTuck(10), true);
+  await module.undoTuck(10);
+  assert.deepEqual(tabs.map(tab => tab.groupId), [-1, -1, -1]);
+  assert.equal(module.canUndoTuck(10), false);
 });
 
 test('failed candidate checks do not stamp a successful scan', async context => {

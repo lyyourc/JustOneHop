@@ -285,7 +285,7 @@ test('reporter distinguishes blocked tests from intentional skips and retains ar
   const path = temporary(t);
   const reporter = new ValidationReporter({ directory: path });
   const tests = [fakeTest('blocked-after-setup-failure', 'skipped'), fakeTest('intentional-skip', 'skipped', 'skipped'), fakeTest('failure', 'unexpected')];
-  reporter.onBegin({ ...config, rootDir: path }, { allTests: () => tests } as Suite);
+  reporter.onBegin({ ...config, rootDir: path, maxFailures: 5 }, { allTests: () => tests } as Suite);
   for (const test of tests.slice(0, 2)) {
     reporter.onTestBegin(test);
     reporter.onTestEnd(test, fakeResult('skipped'));
@@ -297,6 +297,7 @@ test('reporter distinguishes blocked tests from intentional skips and retains ar
   reporter.onEnd({ ...result, status: 'failed' });
   const report = JSON.parse(readFileSync(join(path, 'validation.json'), 'utf8'));
   assert.deepEqual(report.results.counts, { selected: 3, executed: 1, skipped: 1, failed: 1, flaky: 0, notRun: 1 });
+  assert.equal(report.playwright.maxFailures, 5);
   assert.equal(report.results.tests[0].notRun, true);
   assert.equal(report.results.tests[0].skipped, false);
   assert.deepEqual(report.results.tests[2].attempts[0].attachments, failed.attachments);
@@ -311,6 +312,35 @@ test('list mode enumerates tests without claiming execution, skips or success', 
   assert.equal(report.build.status, 'unverified');
   assert.equal(report.results.status, 'listed');
   assert.deepEqual(report.results.counts, { selected: 2, executed: 0, skipped: 0, failed: 0, flaky: 0, notRun: 0 });
+});
+
+test('formal validation uses the repository runner with fail-fast disabled', () => {
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  assert.ok(pkg.scripts.check.endsWith('npm run test:e2e:full'));
+  assert.deepEqual(pkg.scripts['test:e2e:full'].trim().split(/\s+/), ['tsx', 'scripts/run-e2e.ts', '--max-failures=0']);
+});
+
+test('runner rejects browser concurrency above the local resource budget before building', async t => {
+  const path = temporary(t);
+  for (const args of [['--workers=8'], ['--workers', '3'], ['-j4'], ['-j', '4'], ['--workers=50%'], ['--workers'], ['--workers=2', '-j1']]) {
+    assert.equal(await runE2E(args, { root: path, build: command('process.exit(99)') }), 2);
+  }
+  assert.equal(existsSync(join(path, 'test-results')), false);
+  const previousParallel = process.env.JUSTONEHOP_E2E_PARALLEL;
+  t.after(() => {
+    if (previousParallel === undefined) delete process.env.JUSTONEHOP_E2E_PARALLEL;
+    else process.env.JUSTONEHOP_E2E_PARALLEL = previousParallel;
+  });
+  delete process.env.JUSTONEHOP_E2E_PARALLEL;
+  for (const args of [['--workers=2'], ['--workers', '2'], ['-j2'], ['-j', '2']]) {
+    assert.equal(await runE2E(args, { root: path, build: command('process.exit(99)') }), 2);
+  }
+  assert.equal(existsSync(join(path, 'test-results')), false);
+  assert.equal(await runE2E(['--workers=1', '--list'], { root: path, playwright: command('process.exit(0)') }), 0);
+  process.env.JUSTONEHOP_E2E_PARALLEL = '1';
+  for (const args of [['--workers=1'], ['--workers=2'], ['--workers', '2'], ['-j2'], ['-j', '2']]) {
+    assert.equal(await runE2E([...args, '--list'], { root: path, build: command('process.exit(99)'), playwright: command('process.exit(0)') }), 0);
+  }
 });
 
 test('runner refuses overrides that would bypass its validation contract', async t => {

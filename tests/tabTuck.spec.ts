@@ -1,7 +1,8 @@
 import { test as base, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
-import { access, cp, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { browserPath } from './support/browserPath';
 import { createServer, type Server } from 'node:http';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const test = base.extend<{ startupStorageFailure: boolean }>({ startupStorageFailure: [false, { option: true }] });
@@ -14,19 +15,7 @@ let ui: Page;
 let profile: string;
 let popupUrl: string;
 let windowId: number;
-
-async function browserPath() {
-  if (process.env.JUSTONEHOP_CHROMIUM_PATH) return process.env.JUSTONEHOP_CHROMIUM_PATH;
-  try { await access(chromium.executablePath()); return chromium.executablePath(); } catch {}
-  if (process.platform === 'darwin') {
-    const cache = join(homedir(), 'Library/Caches/ms-playwright');
-    for (const directory of (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort().reverse()) {
-      const path = join(cache, directory, 'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing');
-      try { await access(path); return path; } catch {}
-    }
-  }
-  return chromium.executablePath();
-}
+let browserStarted = false;
 
 test.beforeAll(async () => {
   server = createServer((request, response) => {
@@ -40,6 +29,9 @@ test.beforeAll(async () => {
 test.afterAll(async () => { server.close(); });
 
 test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
+  const started = performance.now();
+  browserStarted = false;
+  profile = '';
   profile = await mkdtemp(join(tmpdir(), 'justonehop-tuck-e2e-'));
   const extension = join(profile, 'extension');
   await cp(resolve('dist'), extension, { recursive: true });
@@ -64,14 +56,19 @@ test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
     };
   ` : '';
   await writeFile(background, hook + failure + await readFile(background, 'utf8'));
+  const executablePath = await browserPath();
+  const prepared = performance.now();
   context = await chromium.launchPersistentContext(join(profile, 'browser'), {
-    executablePath: await browserPath(), headless: true, locale: 'en-US', reducedMotion: 'reduce',
+    executablePath, headless: true, locale: 'en-US', reducedMotion: 'reduce',
     ignoreDefaultArgs: process.platform === 'darwin' ? ['about:blank'] : [],
     viewport: { width: 1100, height: 760 },
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
   });
+  const launched = performance.now();
+  browserStarted = true;
   worker = context.serviceWorkers().find(item => item.url().endsWith('/background.js'))
     || await context.waitForEvent('serviceworker', item => item.url().endsWith('/background.js'));
+  const ready = performance.now();
   await worker.evaluate(() => chrome.storage.local.set({ preferences: { language: 'en', theme: 'light', autoTuck: false } }));
   popupUrl = worker.url().replace('background.js', 'popup.html');
   ui = await context.newPage();
@@ -83,10 +80,18 @@ test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
   await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
   windowId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
   for (const page of context.pages()) if (page !== ui) await page.close();
+  testInfo.annotations.push({ type: 'fixture-timing', description: JSON.stringify({
+    prepareMs: Math.round(prepared - started), launchMs: Math.round(launched - prepared),
+    workerMs: Math.round(ready - launched), uiMs: Math.round(performance.now() - ready),
+  }) });
 });
-test.afterEach(async () => {
-  await context?.close();
-  if (profile) await rm(profile, { recursive: true, force: true });
+test.afterEach(async ({}, testInfo) => {
+  const started = performance.now();
+  try { if (browserStarted) await context.close(); }
+  finally {
+    if (profile) await rm(profile, { recursive: true, force: true });
+    testInfo.annotations.push({ type: 'fixture-cleanup-ms', description: String(Math.round(performance.now() - started)) });
+  }
 });
 
 async function seed(...names: string[]) {
@@ -116,7 +121,7 @@ async function enableAutomaticTucking() {
     const { preferences } = await chrome.storage.local.get('preferences');
     await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: true } });
   });
-  await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.getAll()).length)).toBeGreaterThan(0);
+  await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.get('justonehop-auto-tuck'))?.periodInMinutes)).toBe(5);
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { enabled?: boolean } | undefined)?.enabled === true)).toBe(true);
 }
 async function runIdleScan() {
@@ -138,7 +143,12 @@ test('English tuck keeps the original pages and their state, then search brings 
   });
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('Tuck Alpha');
-  await expect(ui.getByRole('option').filter({ hasText: 'Tuck Alpha' }).first()).toBeVisible();
+  // History can arrive before the live tab snapshot; only the tab has tuck actions.
+  const target = ui.locator(`[id="justonehop-tab:${alpha}"]`);
+  await expect(target).toBeVisible();
+  await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
+  await search.press(process.platform === 'darwin' ? 'Meta+ArrowUp' : 'Control+Home');
+  await expect(target).toHaveAttribute('aria-selected', 'true');
   await search.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
   const actionSearch = ui.getByRole('combobox', { name: 'Search actions' });
   await actionSearch.fill('tuck');
@@ -164,7 +174,7 @@ test('English tuck keeps the original pages and their state, then search brings 
   expect(await alphaPage.locator('input').inputValue()).toBe('Keep this unsaved note');
 });
 
-test('English tuck preview navigation and Escape do not move a tucked tab', async () => {
+test('English tuck preview navigation and Escape do not move a tucked tab', { tag: '@windows' }, async () => {
   const [alpha, beta] = await seed('Preview-Alpha', 'Preview-Beta');
   await execute('tuck', alpha); await execute('tuck', beta);
   const tuckedGroup = await groupId(alpha);
@@ -285,17 +295,26 @@ test('English auto tuck duration saves on selection and a native alarm applies i
   expect(refreshBox!.x - labelBox!.x - labelBox!.width).toBeLessThanOrEqual(6);
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('auto-tuck-en.png') });
   await ui.getByRole('textbox', { name: 'Search settings' }).fill('');
-  const copyGap = (selector: string) => ui.locator(selector).evaluate(node => {
+  const copyMetrics = (selector: string) => ui.locator(selector).evaluate(node => {
     const title = node.querySelector('label')!.getBoundingClientRect();
-    const description = node.querySelector('.tuck-status-copy, p')!.getBoundingClientRect();
-    return { gap: description.top - title.bottom, height: description.height };
+    const description = node.querySelector<HTMLElement>('.tuck-status-copy, p')!;
+    const style = getComputedStyle(description);
+    return { gap: description.getBoundingClientRect().top - title.bottom,
+      fontSize: style.fontSize, lineHeight: style.lineHeight,
+      unclipped: description.scrollWidth <= description.clientWidth && description.scrollHeight <= description.clientHeight };
   });
-  const tuckCopy = await copyGap('.tuck-heading .setting-copy');
-  const helpCopy = await copyGap('[data-setting="help"] .setting-copy');
-  expect(Math.abs(tuckCopy.gap - helpCopy.gap)).toBeLessThan(1);
-  expect(Math.abs(tuckCopy.height - helpCopy.height)).toBeLessThan(1);
-  const durationCopy = await copyGap('.tuck-settings .setting-copy');
-  expect(Math.abs(durationCopy.gap - helpCopy.gap)).toBeLessThan(1);
+  const tuckCopy = await copyMetrics('.tuck-heading .setting-copy');
+  const helpCopy = await copyMetrics('[data-setting="help"] .setting-copy');
+  const durationCopy = await copyMetrics('.tuck-settings .setting-copy');
+  // Copy shares typography and spacing, but longer descriptions and the inline
+  // rules button may wrap. Equal paragraph heights would prohibit valid wrapping.
+  expect(helpCopy.unclipped).toBe(true);
+  for (const copy of [tuckCopy, durationCopy]) {
+    expect(Math.abs(copy.gap - helpCopy.gap)).toBeLessThan(1);
+    expect(copy.fontSize).toBe(helpCopy.fontSize);
+    expect(copy.lineHeight).toBe(helpCopy.lineHeight);
+    expect(copy.unclipped).toBe(true);
+  }
   const languageBox = await ui.getByRole('combobox', { name: 'Language', exact: true }).boundingBox();
   const durationBox = await duration.boundingBox();
   expect(Math.abs(languageBox!.x - durationBox!.x)).toBeLessThan(1);
@@ -315,87 +334,20 @@ test('English auto tuck duration saves on selection and a native alarm applies i
     }) as typeof chrome.storage.local.set;
   });
   await ui.getByRole('button', { name: 'Refresh status' }).click();
-  await expect(ui.locator('.tuck-status-copy [role="alert"]')).toBeVisible();
+  const feedback = ui.locator('.palette-footer .operation-feedback');
+  await expect(feedback).toHaveAttribute('role', 'alert');
+  await expect(feedback).toContainText('Could not read auto tuck status. Refresh to retry.');
   await duration.click();
   await ui.getByRole('option', { name: '3 h', exact: true }).click();
-  await expect(ui.locator('.error-banner')).toBeVisible();
+  await expect(feedback).toHaveAttribute('role', 'alert');
+  await expect(feedback).toContainText('Could not save settings. Please try again.');
   await expect(duration).toHaveText('1 h');
   await duration.click();
   await ui.getByRole('option', { name: '3 h', exact: true }).click();
   await expect(duration).toHaveText('3 h');
-  await expect(ui.locator('.error-banner')).toHaveCount(0);
+  await expect(feedback).toHaveAttribute('role', 'status');
+  await expect(feedback).toContainText('Tuck after 3 h saved');
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(3);
-});
-
-test('Chinese preset auto tuck duration supports keyboard saving and narrow settings', async () => {
-  await worker.evaluate(() => chrome.storage.local.set({ preferences: { language: 'zh', theme: 'light', autoTuck: false, autoTuckAfterHours: 168 } }));
-  await ui.reload();
-  await ui.getByRole('combobox').fill('自动收起');
-  await expect(ui.getByRole('option').first()).toContainText('自动收起');
-  await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
-  await ui.getByRole('combobox').press('Enter');
-  await ui.setViewportSize({ width: 390, height: 516 });
-  // The standalone extension test page defaults to 750px; use the same
-  // narrow overlay layout fixture as the existing settings visual tests.
-  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
-  const filter = ui.getByRole('textbox', { name: '搜索设置' });
-  await filter.fill('自动收起');
-  await filter.press('Tab'); // Clear filter
-  await ui.keyboard.press('Tab'); // Search Escape
-  await ui.keyboard.press('Tab'); // Rules in description
-  const rules = ui.getByRole('button', { name: '了解规则' });
-  await expect(rules).toBeFocused();
-  await rules.press('Space');
-  await expect(ui.locator('.tuck-rules-copy')).toContainText('所有已收起的标签页都会恢复到标签栏');
-  await rules.press('Space');
-  await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
-  await ui.keyboard.press('Tab'); // Auto tuck switch
-  const toggle = ui.getByRole('switch', { name: '自动收起标签页' });
-  await expect(toggle).toBeFocused();
-  await expect(ui.locator('.tuck-settings')).toHaveCount(0);
-  await toggle.press('Space');
-  await expect(toggle).toBeChecked();
-  const duration = ui.getByRole('combobox', { name: '闲置时长' });
-  await expect(duration).toBeEnabled();
-  await expect(toggle).toBeFocused();
-  await toggle.press('Tab');
-  await expect(ui.getByRole('button', { name: '刷新状态' })).toBeFocused();
-  await ui.keyboard.press('Tab');
-  await expect(duration).toBeFocused();
-  await duration.press('Enter');
-  await expect(ui.getByRole('listbox').getByRole('option')).toHaveText(['1 小时', '3 小时', '12 小时', '1 天', '3 天', '7 天']);
-  await duration.press('Home'); await duration.press('Enter');
-  await expect(ui.getByRole('spinbutton')).toHaveCount(0);
-  await ui.keyboard.press('Escape');
-  const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
-  await search.fill('自动收起'); await search.press('Enter');
-  await expect(ui.getByRole('button', { name: '保存时长', exact: true })).toHaveCount(0);
-  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
-  await expect(duration).toHaveText('1 小时');
-  await expect(duration).toBeEnabled();
-  await expect(ui.locator('.tuck-status-copy')).toContainText('目前没有符合条件');
-  expect(await ui.locator('.settings-view').evaluate(node => {
-    const box = node.getBoundingClientRect();
-    return box.left >= 0 && box.right <= innerWidth && node.scrollWidth <= node.clientWidth;
-  })).toBe(true);
-  await ui.screenshot({ path: test.info().outputPath('auto-tuck-presets-zh-narrow.png') });
-  await ui.reload();
-  await ui.getByRole('combobox').fill('自动收起');
-  await expect(ui.getByRole('option').first()).toContainText('自动收起');
-  await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
-  await ui.getByRole('combobox').press('Enter');
-  await expect(ui.getByRole('combobox', { name: '闲置时长' })).toHaveText('1 小时');
-  // Older saved durations remain honest until replaced by a preset.
-  await worker.evaluate(() => chrome.storage.local.set({ preferences: { language: 'zh', theme: 'light', autoTuck: true, autoTuckAfterHours: 48 } }));
-  await expect(duration).toHaveText('2 天');
-  await duration.click();
-  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(7);
-  await ui.getByRole('option', { name: '3 天', exact: true }).click();
-  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(72);
-  await expect(duration).toBeEnabled();
-  await duration.click();
-  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(6);
-  await expect(ui.getByRole('option', { name: '2 天', exact: true })).toHaveCount(0);
 });
 
 test('English disabling automatic tuck releases its own tabs and keeps a same-name user group', async () => {
@@ -421,27 +373,6 @@ test('English disabling automatic tuck releases its own tabs and keeps a same-na
   expect(await groupId(personal)).toBe(personalGroup);
   expect(await worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuck: boolean }).autoTuck)).toBe(false);
   await expect.poll(() => worker.evaluate(async () => Object.keys(((await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> }).clocks).length)).toBe(0);
-});
-
-test('English automatic tuck stops the batch when the user becomes active', async () => {
-  const ids = await seed('Resume-First', 'Resume-Second', 'Resume-Third');
-  await enableAutomaticTucking();
-  await worker.evaluate(() => {
-    const original = chrome.tabs.group.bind(chrome.tabs);
-    chrome.tabs.group = (async (options: chrome.tabs.GroupOptions) => {
-      const id = await original(options);
-      chrome.idle.queryState = (async () => 'active') as typeof chrome.idle.queryState;
-      return id;
-    }) as typeof chrome.tabs.group;
-  });
-  await runIdleScan();
-  await expect.poll(async () => (await liveTabs()).filter(tab => ids.includes(tab.id!) && tab.groupId !== -1).length).toBe(1);
-  await expect.poll(() => worker.evaluate(async () => {
-    const stored = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { undo: Record<number, { ids: number[] }> };
-    return Object.values(stored.undo).flatMap(batch => batch.ids).length;
-  })).toBe(1);
-  expect(await groupId(ids[1])).toBe(-1);
-  expect(await groupId(ids[2])).toBe(-1);
 });
 
 test('English tuck preserves a user rename made while a page is joining the group', async () => {
@@ -483,10 +414,12 @@ test('English disabling tuck releases other pages after a transient failure and 
   });
   await expect.poll(() => groupId(beta)).toBe(-1);
   expect(await groupId(alpha)).toBe(owned);
-  await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.getAll()).some(alarm => alarm.periodInMinutes === 0.5))).toBe(true);
+  // Toolbar theme sync also uses a 30-second alarm; only tuck's alarm proves
+  // that the failed release was scheduled for retry and subsequently stopped.
+  await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.get('justonehop-auto-tuck'))?.periodInMinutes)).toBe(0.5);
   await runIdleScan();
   await expect.poll(() => groupId(alpha)).toBe(-1);
-  await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.getAll()).length)).toBe(0);
+  await expect.poll(() => worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toBeUndefined();
 });
 
 test.describe(() => {
@@ -539,10 +472,22 @@ async function recoverySnapshot() {
   return ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }).then(reply => reply.data));
 }
 
-async function prepareRestart() {
+async function requireRecoveryConfirmation() {
+  // Model persisted evidence requiring explicit review (also used by migration).
+  // The real Chrome restart still restores native tabs/groups; their metadata
+  // need not be lost for this record to require the user's confirmation.
+  await worker.evaluate(async () => {
+    const { justonehopTabTuckRecovery } = await chrome.storage.local.get('justonehopTabTuckRecovery');
+    const saved = justonehopTabTuckRecovery as { records: { requiresConfirmation?: boolean }[] };
+    saved.records.forEach(record => { record.requiresConfirmation = true; });
+    await chrome.storage.local.set({ justonehopTabTuckRecovery: saved });
+  });
+}
+async function prepareRestart({ requiresConfirmation = false } = {}) {
   const [alpha, beta] = await seed('Restart-Alpha', 'Restart-Beta');
   await execute('tuck', alpha); await execute('tuck', beta);
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('justonehopTabTuckRecovery')).justonehopTabTuckRecovery as { records: unknown[] }).records.length)).toBe(1);
+  if (requiresConfirmation) await requireRecoveryConfirmation();
   await restartChrome();
   await expect.poll(async () => (await recoverySnapshot()).tabs.filter((tab: { url?: string }) => tab.url?.startsWith(origin)).length).toBe(2);
 }
@@ -611,12 +556,7 @@ test('English recovery requires explicit keyboard confirmation and keeps the can
   const [a, b] = await seed('Confirm-Alpha', 'Confirm-Beta');
   await execute('tuck', a); await execute('tuck', b);
   // Require review independently of whether this Chrome version restores names.
-  await worker.evaluate(async () => {
-    const { justonehopTabTuckRecovery } = await chrome.storage.local.get('justonehopTabTuckRecovery');
-    const saved = justonehopTabTuckRecovery as { records: { requiresConfirmation?: boolean }[] };
-    saved.records.forEach(record => { record.requiresConfirmation = true; });
-    await chrome.storage.local.set({ justonehopTabTuckRecovery: saved });
-  });
+  await requireRecoveryConfirmation();
   await restartChrome();
   await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(1);
   await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries[0].candidates.length).toBe(1);
@@ -671,13 +611,16 @@ test('English late restored group metadata reconnects automatically without crea
   }
   await expect.poll(async () => (await recoverySnapshot()).tabs.filter((tab: { tucked?: boolean }) => tab.tucked).length).toBe(2);
   expect((await recoverySnapshot()).tuckRecoveries).toEqual([]);
-  expect(await worker.evaluate(() => chrome.tabGroups.query({}).then(groups => groups.length))).toBe(1);
+  // Query native state through the live page after Chrome restarts.
+  expect(await ui.evaluate(() => chrome.tabGroups.query({}).then(groups => groups.length))).toBe(1);
 });
 
 test('English recovery rejects stale confirmation and forgetting leaves native pages and groups untouched', async () => {
-  await prepareRestart();
+  await prepareRestart({ requiresConfirmation: true });
+  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries[0]?.candidates.length).toBe(1);
   const snapshot = await recoverySnapshot();
   expect(snapshot.tuckRecoveries).toHaveLength(1);
+  expect(snapshot.tabs.filter((tab: { tucked?: boolean }) => tab.tucked)).toHaveLength(0);
   const pending = snapshot.tuckRecoveries[0], candidate = pending.candidates[0];
   await ui.evaluate(id => chrome.tabGroups.update(id, { title: 'My changed group', color: 'blue' }), candidate.id);
   const stale = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }),

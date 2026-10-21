@@ -1,0 +1,73 @@
+import { test, expect } from './support/paletteUI';
+
+test('Help document entry and return context zh-CN UI with supplied shortcut and link reply', async ({ palette, context }) => {
+  // Exercise the component's API fallback without navigating a real external page.
+  await context.addInitScript(() => { window.open = () => null; });
+  await palette.open({ snapshot: { shortcut: 'Alt+Space' }, reply: request => request.type === 'open-help-url' ? { ok: true, data: undefined } : undefined });
+  const { ui } = palette;
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
+  const article = ui.getByRole('article', { name: '使用帮助' });
+  const helpSearch = ui.getByRole('textbox', { name: '搜索帮助', exact: true });
+  const originalFooter = await ui.locator('.palette-footer').boundingBox();
+  await expect(ui.locator('.launch-hint')).toHaveCount(0);
+  await input.fill('help'); await expect(ui.locator('.launch-hint')).toHaveCount(0);
+  await input.press('Home'); await input.press('Shift+ArrowRight'); await input.press('Enter');
+  await expect(helpSearch).toBeFocused(); await expect(article.getByRole('heading')).toHaveCount(5);
+  await expect(article).toContainText('Alt+Space');
+  await ui.locator('.help-github-card').click();
+  await expect.poll(() => palette.requests.filter(request => request.type === 'open-help-url')).toHaveLength(1);
+  await helpSearch.fill('cookies');
+  await expect(article.getByRole('heading')).toHaveText('查看网站存储');
+  await expect(article.locator('mark').first()).toContainText(/cookies/i);
+  const headingBox = await article.getByRole('heading').boundingBox();
+  const searchBox = await ui.locator('.help-search').boundingBox();
+  expect(headingBox!.y - (searchBox!.y + searchBox!.height)).toBeLessThanOrEqual(12);
+  await helpSearch.fill('view website storage'); await expect(article.getByRole('heading')).toHaveCount(1);
+  await helpSearch.fill('135'); await expect(article.getByRole('heading')).toHaveCount(0);
+  await helpSearch.fill('zzzz-no-help'); await expect(article.getByRole('heading')).toHaveCount(0);
+  await expect(article.getByText('没有找到匹配结果')).toBeVisible();
+  await helpSearch.press('Backspace'); await expect(helpSearch).toHaveValue('zzzz-no-hel');
+  await article.getByRole('button', { name: '清空搜索' }).click();
+  await expect(helpSearch).toBeFocused(); await expect(helpSearch).toHaveValue('');
+  await helpSearch.press('Tab'); await expect(ui.locator('.help-search .search-dismiss')).toBeFocused();
+  await ui.keyboard.press('Tab'); await expect(article).toBeFocused();
+  await article.press('PageDown'); await expect.poll(() => article.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await article.press('Home'); expect(await article.evaluate(el => el.scrollTop)).toBe(0);
+  await article.press('ArrowDown'); await expect.poll(() => article.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await article.press('Home'); await article.press('Tab'); await expect(ui.locator('.footer-back')).toBeFocused();
+  await ui.keyboard.press('Shift+Tab'); await expect(article).toBeFocused(); await article.press('Escape');
+  await expect(input).toBeFocused(); await expect(input).toHaveValue('help');
+  expect(await input.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 1]);
+  await expect(ui.locator('.result[aria-selected="true"]')).toContainText('使用帮助');
+  await ui.locator('.settings-button').click();
+  await expect(ui.locator('.settings-preferences > div').last()).toHaveAttribute('data-setting', 'help');
+  const settingsSearch = ui.getByRole('textbox', { name: '搜索设置', exact: true });
+  await settingsSearch.fill('help'); await expect(ui.locator('[data-setting]')).toHaveCount(1);
+  await ui.getByRole('button', { name: '查看帮助' }).click(); await expect(helpSearch).toBeFocused();
+  await expect(article).toContainText('Alt+Space');
+  expect((await ui.locator('.palette-footer').boundingBox())!.y).toBe(originalFooter!.y);
+  await ui.locator('.footer-back').click(); await expect(settingsSearch).toHaveValue('help');
+  await expect(ui.getByRole('button', { name: '查看帮助' })).toBeFocused();
+  await ui.keyboard.press('Enter'); await expect(helpSearch).toBeFocused();
+  await ui.keyboard.press('Backspace'); await expect(ui.getByRole('button', { name: '查看帮助' })).toBeFocused();
+  await ui.keyboard.press('Escape'); await expect(input).toBeFocused();
+  await input.fill('使用说明'); await ui.locator('.result').first().click(); await expect(helpSearch).toBeFocused();
+  // This existing popup layout exercise is not native overlay positioning evidence.
+  await ui.setViewportSize({ width: 390, height: 400 });
+  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  for (const theme of ['light', 'dark']) {
+    await palette.provideStorage({ preferences: { language: 'system', theme } });
+    await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', theme);
+    expect(await article.evaluate(el => el.scrollWidth <= el.clientWidth && el.scrollHeight > el.clientHeight)).toBe(true);
+    const footer = await ui.locator('.palette-footer').boundingBox();
+    expect(footer!.height).toBe(44); expect(footer!.y + footer!.height).toBeLessThanOrEqual(400);
+  }
+  await ui.locator('.footer-back').click(); await expect(input).toBeFocused(); await expect(input).toHaveValue('使用说明');
+  await ui.keyboard.press('Meta+k'); await ui.locator('.action-row').first().click(); await expect(helpSearch).toBeFocused();
+  await helpSearch.fill('cookie'); await ui.locator('.help-search .search-clear').click();
+  await expect(helpSearch).toBeFocused(); await expect(helpSearch).toHaveValue('');
+  await helpSearch.fill('cookie'); await ui.locator('.help-search .search-dismiss').click();
+  await expect(helpSearch).toHaveValue(''); await expect(helpSearch).toBeFocused();
+  await ui.locator('.help-search .search-dismiss').click(); await expect(input).toBeFocused();
+  await expect(ui.locator('.action-menu')).toHaveCount(0);
+});

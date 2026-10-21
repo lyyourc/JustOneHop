@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "tsx scripts/run-e2e.ts",
-    "check": "npm run typecheck && npm test && npm run test:e2e"
+    "test:e2e:full": "tsx scripts/run-e2e.ts --max-failures=0",
+    "check": "npm run typecheck && npm test && npm run test:e2e:full"
   },
   "dependencies": {
     "@use-gesture/react": "^10.3.1",
