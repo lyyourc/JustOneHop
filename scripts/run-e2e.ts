@@ -13,6 +13,17 @@ export async function runE2E(args: string[], options: RunnerOptions = {}): Promi
     console.error('Use the repository Playwright config, reporter and output directory. Pass test files, --grep, --project, --list or other selectors to npm run test:e2e -- instead.');
     return 2;
   }
+  const workerOptions = args.filter(arg => arg === '--workers' || arg.startsWith('--workers=') || arg === '-j' || /^-j.+/.test(arg));
+  const workerValues = workerOptions.map(arg => arg === '--workers' || arg === '-j' ? args[args.indexOf(arg) + 1]
+    : arg.startsWith('--workers=') ? arg.slice('--workers='.length) : arg.slice(2));
+  if (workerOptions.length > 1 || workerValues.some(value => value !== '1' && value !== '2')) {
+    console.error('Local E2E supports at most 2 browser workers. Use --workers=1 or --workers=2; percentages are not accepted.');
+    return 2;
+  }
+  if (workerValues.includes('2') && process.env.JUSTONEHOP_E2E_PARALLEL !== '1') {
+    console.error('Two browser workers require JUSTONEHOP_E2E_PARALLEL=1 to preserve resource-group isolation.');
+    return 2;
+  }
   const root = options.root ?? resolve(fileURLToPath(new URL('..', import.meta.url)));
   const playwrightArgs = [...args];
   const reuseOptions = args.filter(arg => arg === '--reuse-build' || arg.startsWith('--reuse-build='));

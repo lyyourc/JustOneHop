@@ -18,21 +18,72 @@
 先在 `tests/*.spec.ts` 找对应场景，再用 `--list` 确认筛选结果。例如底栏／跨层布局改动：
 
 ```sh
-npm run test:e2e -- tests/palette.spec.ts --grep 'storage and Tab Group layers preserve main palette geometry' --list
-npm run test:e2e -- tests/palette.spec.ts --grep 'storage and Tab Group layers preserve main palette geometry'
+npm run test:e2e -- --grep 'storage and Tab Group layers preserve main palette geometry' --list
+npm run test:e2e -- --grep 'storage and Tab Group layers preserve main palette geometry'
 ```
 
-这只演示选择方式；涉及交互时还需选中相应的确认、返回、焦点和鼠键流程。同一用例可覆盖多个流程，无需为每条断言单独启动浏览器。Playwright 的 `--grep` 匹配包含文件名与 describe 的完整标题，精确选择可用唯一标题加 `$`，避免把裸用例名放在 `^` 后导致零匹配；选定用例也可用 `tests/palette.spec.ts:<行号>`。脚本、配置和测试标题可直接查阅，不在本文维护完整用例目录或数量。
+这只演示选择方式；涉及交互时还需选中相应的确认、返回、焦点和鼠键流程。同一用例可覆盖多个流程，无需为每条断言单独启动浏览器。Playwright 的 `--grep` 匹配包含文件名与 describe 的完整标题，精确选择可用唯一标题加 `$`，避免把裸用例名放在 `^` 后导致零匹配；选定用例也可用发现结果中的 `tests/<功能>.spec.ts:<行号>`。脚本、配置和测试标题可直接查阅，不在本文维护完整用例目录或数量。
+
+## 用例分层与浏览器启动预算
+
+按证据需求选择测试层，不以减少用例数本身作为优化目标：
+
+- 纯排序、别名、边界条件和由注入信号控制的状态分支优先放在单测；下沉前逐项对应原有断言，补齐缺失的外部结果与失败恢复验证。
+- 浏览器层保留真实 DOM 交互、闭合 Shadow DOM、权限、剪贴板、原生标签／窗口事件与实际重启。模拟 idle 或时间推进的分支不等于真实系统空闲验证；自动收起的原生 alarm、分组及撤销集成仍需浏览器证据。
+- 同环境、无不可逆状态污染的相关操作可组成一个有命名步骤的完整流程；语言、主题等展示变体只有在不会改变启动语义时才可在流程内切换。保持鼠标、纯键盘与交替流程，不把不同权限、承载或重启环境强行合并。
+- 合并后的每个步骤仍须有独立前置条件和结果断言。某步骤失败会阻断后续步骤，报告须说明未到达范围；不得提高超时容纳过长流程，或用减少独立启动数推算全量已达标。
+
+### 按功能分配证据
+
+每个功能分别确定低层行为覆盖和真实扩展连接点，不以历史测试标题或语言数量决定浏览器启动次数：
+
+| 功能 | 单测／独立 UI 的职责 | 扩展集成必须保留的证据 |
+| --- | --- | --- |
+| 搜索与推荐 | 别名、相关性、去重、语言、高亮、推荐呈现、菜单与选区 | 实际选择后的学习、存储同步、跨页面与重新打开后的状态 |
+| 书签与 Chrome 页面 | 双语标签、操作提示、确认状态、快捷键展示 | 精确书签 ID 的变更；各 WebUI 实际加载、已有标签复用与来源窗口归属 |
+| 设置与帮助 | 搜索、双语正文、主题、窄屏、逐层返回与反馈 | 真实偏好持久化／同步、Chrome 快捷键读取、外部页面与工具栏路由 |
+| 页面存储与标签组 | 给定数据的预览、格式化、菜单、中文布局与上下文恢复 | 来源页实际数据、原生剪贴板、权限与 Cookie 范围、真实分组操作、浮层承载几何 |
+| 最近标签切换 | 文案、过滤、按钮状态、窄屏与共享组件布局 | 原生窗口及网页浮层各自的启动、输入桥接、松键确认、取消、来源归属与闭合 iframe 键盘隔离 |
+| 自动收起与恢复 | 时长控件、状态呈现、状态机分支 | alarm、实际标签分组与撤销、Chrome 重启及恢复记录归属 |
+
+语言不改变底层操作时，真实业务流程保留代表语言，另一语言的交互与布局在 UI 层覆盖。不同输入入口可在同一功能用例中用命名步骤验证；每步重建自己的页面／会话前置条件，释放按键并清理自己创建的对象。原生窗口与浮层、正常启动与重启恢复、不同权限状态仍分别验证。移出压力套件或改为按变更选择仅改变执行范围，不能记为完整验证工作量减少。
+
+### 功能目录与执行隔离
+
+功能文件决定覆盖归属，Playwright 项目决定资源隔离；两者互相独立。每个用例只归属一个功能文件，同时根据真实资源需求进入 UI、原生窗口、剪贴板、普通窗口或普通集成项目。跨功能链路按其最终验证目标归属，不为每个涉及的组件复制整条流程。
+
+| 集成文件 | 主要验证职责 |
+| --- | --- |
+| `search.spec.ts`、`history.spec.ts` | 主搜索、历史查询及相关真实数据链路 |
+| `navigation.spec.ts`、`bookmarks.spec.ts` | 页面导航、Chrome 页面、书签原生操作 |
+| `learning.spec.ts` | 学习、忘记、推荐及持久状态 |
+| `settingsHelp.spec.ts` | 设置、帮助、快捷键与外部入口 |
+| `storage.spec.ts`、`tabGroups.spec.ts` | 真实页面存储、剪贴板、权限与原生标签组 |
+| `switcher.spec.ts`、`switcherOverlay.spec.ts` | 切换器原生窗口、网页浮层及输入桥接 |
+| `lifecycle.spec.ts`、`workerLifecycle.spec.ts`、`hostGeometry.spec.ts` | 启动、重载、会话生命周期、后台停止／唤醒压力及承载几何 |
+| `tabTuck.spec.ts` | 自动收起、撤销及重启恢复 |
+
+`*.ui.spec.ts` 对应组件交互与展示职责。共享集成夹具只管理隔离环境、资源与诊断，各功能文件显式注册自身的生命周期钩子；文件拆分不引入跨测试 profile 复用。全量入口不按功能跳过压力、兼容或定位用例，缺少依赖和已知失败仍计入报告。
+
+### 独立 UI 层
+
+`tests/*.ui.spec.ts` 由 `ui` 项目执行，加载实际 `dist/` UI 产物，通过测试夹具模拟 Chrome API 边界，不安装扩展。Playwright 每个 worker 复用普通 Chromium 进程，每例仍创建并销毁独立 context，页面脚本、存储与时钟不跨例共享。该层承载快照加载、延迟提示、受控历史响应、搜索／菜单导航、键盘保护、布局主题和设置反馈等 UI 分支；报告以 `test-layer` 注解明确模拟边界。设置场景可在同一测试内保持模拟存储以验证刷新后的呈现，但不把它算作扩展存储持久化或跨页面同步证据。未预期的 API 请求应显式失败；负向执行保护通过请求记录核对，不伪造原生标签页执行结果。
+
+该层只能证明真实 DOM、样式和交互对给定响应的行为，不能证明 service worker、消息传递、扩展权限或原生窗口集成。相关扩展 E2E 保持每例独立持久 profile。全量入口同时包含 UI 与扩展项目；日常可用 `--project=ui` 定向执行。两类项目共用全局最多 2 个 worker 的预算，`ui` 自身最多 1 个 worker。
+
+参考：[Playwright 扩展测试](https://playwright.dev/docs/chrome-extensions)要求持久上下文；[Dark Reader 的注入测试夹具](https://github.com/darkreader/darkreader/blob/56be2462b05ff6e4f294d36d863406dd8c5db9a7/tests/inject/support/background-stub.ts)展示了模拟后台边界的独立测试层。借鉴其分层，不把模拟层结果算作完整扩展集成通过。
 
 ## 正式发版验证
 
-正式发版以待发布提交为基线，执行 `npm run release:check -- v<version>` 和 `npm run check`（类型检查、完整单元测试、构建与全量 E2E）。同一提交已有完整单测和类型检查的有效证据时，可补跑 `npm run test:e2e`，明确各轮证据来源。GitHub Validate CI 当前只覆盖版本检查、类型、单测与构建，不能替代浏览器验证。
+正式发版以待发布提交为基线，执行 `npm run release:check -- v<version>` 和 `npm run check`（类型检查、完整单元测试、构建与全量 E2E）。同一提交已有完整单测和类型检查的有效证据时，可补跑 `npm run test:e2e:full`，明确各轮证据来源。GitHub Validate CI 当前只覆盖版本检查、类型、单测与构建，不能替代浏览器验证。
 
 全量运行必须报告通过、失败、跳过及未执行项；失败或未执行项未解决前，不发布正式 Release 或提交商店。缺少依赖导致的跳过必须补齐环境后验证，或明确记录为经发布负责人接受的范围例外，不能计为通过。定向修复复验有助于排查，但不能声称修复后的最终提交已通过全量；正式发布前须完成该最终提交的全量验证。
 
 发布请求授权首次全量运行，即使预计超过日常 10 分钟预算也先说明预计耗时后执行；超预算后的追加、复验与失败处理仍遵循下节停止条件。测试进行期间保持源码与构建不变，成功后从对应提交生成并核对最终发布包。
 
 ## 执行预算与停止条件
+
+`npm run test:e2e:full` 显式设置 `--max-failures=0`，不因失败数量中止，正式发版的 `npm run check` 使用该入口。日常排查可主动传 `--max-failures=5` 提前停止；余下用例记为 `notRun`，退出码仍为失败。报告记录实际 `playwright.maxFailures`；提前停止不能作为全量完成或性能达标的证据。完整 E2E 的性能目标为 5 分钟内，须同时报告用例覆盖、失败、跳过、环境及实测总耗时，保留原有断言与超时保护。
 
 - 执行前先用 `--list` 核对选择，向用户说明选中的数量、覆盖的改动以及预计耗时；没有历史耗时时明确说明估计不确定。避免宽泛关键词把无关用例带入。纯文档改动无需运行浏览器测试。
 - 先完成实现、静态检查、必要单元测试及代码检查，再运行相关 E2E。共享逻辑分支优先用单元测试覆盖，浏览器用例验证必要的真实鼠标、键盘和交替链路，不为每个分支重复启动浏览器。
@@ -41,7 +92,15 @@ npm run test:e2e -- tests/palette.spec.ts --grep 'storage and Tab Group layers p
 - 多项出现同类启动、API 或焦点超时时，停止追加批次，先分析已有产物；若证据指向环境问题，最多选一个代表用例复验，不重跑整批。定位故障耗时同样需及时告知，不能以持续分析替代预算报告。
 - 已通过的检查仅在后续改动使其结论失效时重跑。测试结束后只补验收文档，不重复构建或 E2E。最终报告列明实际轮次、耗时及仍失败／未验证项；分批通过不能写成一次全绿。
 
-runner 在终端与 `validation.json.timings` 记录发现用例、构建、Playwright 执行、前后源码／dist 校验和总耗时，失败阶段也记录；未执行阶段不出现。预算覆盖各次 runner 的总耗时；当前 runner 不自动终止超预算任务或限制重跑，执行者仍须遵守停止条件。浏览器用例使用独立 profile、逐项启动 Chrome；优先减少无关用例，原生焦点场景保持串行隔离。`palette.spec.ts` 还以 `fixture-timing`／`fixture-cleanup-ms` 注解记录准备、启动、worker 就绪、UI 加载与清理耗时，随每次尝试写入报告。
+runner 在终端与 `validation.json.timings` 记录发现用例、构建、Playwright 执行、前后源码／dist 校验和总耗时，失败阶段也记录；未执行阶段不出现。预算覆盖各次 runner 的总耗时；当前 runner 不自动终止超预算任务或限制重跑，执行者仍须遵守停止条件。扩展集成用例使用独立 profile、逐项启动 Chrome；独立 UI 层使用每例隔离 context。优先减少无关用例，原生焦点场景保持串行隔离。各功能集成用例的共享夹具与 `tabTuck.spec.ts` 还以 `fixture-timing`／`fixture-cleanup-ms` 注解记录准备、启动、worker 就绪、UI 加载与清理耗时，随每次尝试写入报告。共享面板夹具还记录 `worker-readiness`（包含就绪失败时已发现的 Worker、发起／完成的探测次数及错误）和 `fixture-close-timing`（浏览器关闭与 profile 删除的独立耗时）。这些诊断与原有阶段计时有重叠，不得相加为总耗时。性能分析只聚合 attempt 级注解，避免与测试级注解重复计数；对比相同代表用例的阶段耗时，不以失败更早退出或减少断言作为提速证据。
+
+## 并发实验与资源隔离
+
+默认执行仍为单 worker，`serial` 项目自身也限制为 1，避免直接覆盖全局 worker 数破坏隔离。设置 `JUSTONEHOP_E2E_PARALLEL=1` 可显式启用分组并发实验：`@headed` 原生窗口组、`@clipboard` 剪贴板组、`@windows` headless 窗口组各自单 worker，普通 `parallel` 组最多使用 2 个 worker，全局最多 2 个 worker。runner 拒绝大于 2、百分比或重复的 `--workers` / `-j` 参数；指定 2 个 worker 必须同时启用分组并发环境变量。项目筛选按上述顺序互斥，每条用例只执行一次；普通组使用 `fullyParallel`，各例继续使用独立 profile。`--project=headed` 等分组筛选仅在启用该环境变量时可用。比较普通组单／双 worker 时，两轮都启用分组配置，通过 `--workers=1` / `--workers=2` 控制并发度，保持用例、源码与构建相同。性能计时批次不附带高频整机进程扫描；内存诊断另选相同用例独立运行，记录采样方式和进程树 RSS 峰值，不把该批次耗时直接当作无采样基线。采样器的干扰须通过对照检查，不能默认其成本可忽略；RSS 求和可能重复计入共享内存，不代表系统实际独占内存。不得用 `describe.serial` 代替资源隔离，以免失败导致后续用例跳过。
+
+所有真实剪贴板读写（包括只复制而不读取的操作）须标记 `@clipboard`；同时需要原生窗口的用例保留 `@headed`，并通过运行目录下的跨进程锁与剪贴板组互斥，浏览器关闭后才释放。原生焦点测试必须标记 `@headed`，headless 独立窗口测试标记 `@windows`。`resource-wait-ms` 单独记录锁等待。
+
+该并发配置已在 Chrome 156.0.8078.4、Vimium 2.4.2 的候选构建上完成无失败、无跳过的完整套件验证，并达到五分钟目标；当前仍须显式启用，默认单 worker 不变。单轮通过不证明跨平台或长期稳定性；后续并发配置调整先运行跨组代表用例，再比较全量覆盖、失败身份与阶段耗时，新增启动／清理超时不算性能验收通过。正式验证仍须保留 Vimium 依赖缺失等边界。
 
 ## 构建与产物隔离
 
@@ -55,14 +114,16 @@ runner 在终端与 `validation.json.timings` 记录发现用例、构建、Play
 
 ## 浏览器与夹具边界
 
-测试使用临时 Chrome profile 和本地页面，与日常浏览器资料隔离。`JUSTONEHOP_CHROMIUM_PATH` 可指定 Chrome for Testing；默认选择逻辑见 [palette.spec.ts](../tests/palette.spec.ts)，调度配置见 [playwright.config.ts](../playwright.config.ts)。原生窗口与焦点用例通过场景选项启动有界面浏览器，避免默认 viewport 覆盖真实窗口尺寸。此类用例仍受系统前台焦点影响；失败时保存 `native-window-lifecycle.json`（窗口创建／导航／关闭及当前窗口、会话状态），结合 trace 判断，不能仅凭重跑成功认定竞态已解决。
+测试使用临时 Chrome profile 和本地页面，与日常浏览器资料隔离。两个 E2E 夹具共用 [浏览器选择器](../tests/support/browserPath.ts)，默认只使用当前 Playwright 配套 Chromium；缺失时运行 `npx playwright install chromium --no-shell --no-remove`，不再自动回退到其他缓存版本。可用 `PLAYWRIGHT_BROWSERS_PATH` 指定独立安装目录，安装和测试时须使用相同值。`JUSTONEHOP_CHROMIUM_PATH` 可显式覆盖可执行文件，用于版本对照；无效路径直接报错，不回退。实际版本继续写入 `browser-version` 注解，显式覆盖结果不能冒充配套版本验证。`--list` 不检查或启动浏览器。调度配置见 [playwright.config.ts](../playwright.config.ts)。原生窗口与焦点用例通过场景选项启动有界面浏览器，避免默认 viewport 覆盖真实窗口尺寸。此类用例仍受系统前台焦点影响；失败时保存 `native-window-lifecycle.json`（窗口创建／导航／关闭及当前窗口、会话状态）；启用命令钩子的原生夹具还在测试扩展副本中记录有界的焦点事件与窗口 API 调用结果，区分启动前拒绝和创建后关闭。原生启动前同时核对最后聚焦窗口及来源文档焦点；这些前置检查不能保证之后不会被系统切走焦点。结合 trace 判断，不能仅凭重跑成功认定竞态已解决。
 
-`palette.spec.ts` 在 `test.describe` 作用域内通过 `test.use({ environment: ... })` 显式声明 locale、shadow、pageAccess、cookieDomains、commands、toolbarMenus、headed、verticalTabs 和 vimium 等环境选项，默认保持闭合 Shadow DOM；测试标题仅用于说明和筛选。`tabTuck.spec.ts` 的启动存储失败也通过显式选项选择。开放 Shadow DOM、临时网站权限与后台命令钩子只写入测试扩展副本。结构测试和生产闭合 Shadow DOM / iframe 的键盘测试提供不同证据，修改相关路径时按需覆盖两者。
+各功能集成文件在 `test.describe` 作用域内通过 `test.use({ environment: ... })` 显式声明 locale、shadow、pageAccess、cookieDomains、commands、toolbarMenus、headed、verticalTabs 和 vimium 等环境选项，默认保持闭合 Shadow DOM；测试标题仅用于说明和筛选。`tabTuck.spec.ts` 的启动存储失败也通过显式选项选择。开放 Shadow DOM、临时网站权限与后台命令钩子只写入测试扩展副本。结构测试和生产闭合 Shadow DOM / iframe 的键盘测试提供不同证据，修改相关路径时按需覆盖两者。
 
 Vimium 兼容场景需指定 `JUSTONEHOP_VIMIUM_PATH`，指向已解包的 Vimium 扩展；场景会核实其 service worker 已加载。未提供路径时该场景跳过，不计为兼容性通过；开放 Shadow DOM 的视觉夹具不承担 Vimium 兼容验收。
+
+后台停止／唤醒压力用例单独放在 `workerLifecycle.spec.ts`，保留操作 trace 与生命周期事件附件，关闭该文件的 DOM／网络快照。Chrome 156 在该压力场景的响应正文调试接口中触发过主进程断言；该场景验证真实停止、消息唤醒和扩展重载，不依赖 DOM 快照。其他用例继续保留完整 trace；此隔离不减少压力次数或放宽断言。
 
 ## 证据与未解决项
 
 [验收记录](ACCEPTANCE.md) 保存实际执行范围、结果及限制；它不是当前全套测试通过的声明。报告跳过、失败、重跑与未验证范围，并区分隔离浏览器结果和日常 Chrome 重载。截图与 trace 留在忽略的测试产物目录或系统临时目录，不作为长期文档附件。
 
-屏幕定位目标仍暂停、未解决，详见 [ADR 0010](adr/0010-content-anchor-panel-geometry.md#待实现目标)。相关定位用例或历史内容区几何记录，不能证明该目标已经完成。验证设计中的独立证据判断见 [评审标准](CODING_STANDARDS.md)。
+定位按 [ADR 0010](adr/0010-content-anchor-panel-geometry.md) 的两个锚点分别验证：网页浮层相对页面视口水平居中、偏上；独立窗口的内容相对来源浏览器外框水平居中，顶部留白从来源窗口顶部计算。命令面板与 Tab Switcher 均需覆盖适用承载，并区分内容尺寸、页面缩放与原生框架。侧栏展开／折叠、窄窗口和缩放场景须依据各自锚点判断，不以两种承载屏幕坐标相等或显示器固定定位作为通过条件。预期值须来自契约与独立观测；历史内容区估算结果不能直接证明新定位决策通过。验证设计中的独立证据判断见 [评审标准](CODING_STANDARDS.md)。

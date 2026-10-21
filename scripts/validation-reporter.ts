@@ -52,7 +52,7 @@ export default class ValidationReporter implements Reporter {
         expectedStatus: test.expectedStatus, annotations: [...test.annotations], attempts: [], started: false });
     }
     updateValidation(this.directory, {
-      playwright: { version: config.version, workers: config.workers, projects: config.projects.map(project => ({ name: project.name, outputDir: project.outputDir, retries: project.retries })) },
+      playwright: { version: config.version, workers: config.workers, maxFailures: config.maxFailures, projects: config.projects.map(project => ({ name: project.name, outputDir: project.outputDir, retries: project.retries })) },
     });
     this.save('running');
   }

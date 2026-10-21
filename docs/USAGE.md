@@ -296,8 +296,10 @@ Navigating deep menus shouldn't feel like a trap:
 ### In-Page Overlay vs. Dedicated Window
 
 JustOneHop automatically chooses the best display mode based on the current page:
-1. **In-Page Overlay**: On standard web pages, it appears as a clean, floating modal centered slightly above the viewport.
-2. **Dedicated Window**: On pages where Chrome forbids script injection (such as `chrome://` settings, the Chrome Web Store, or blank tabs), JustOneHop opens as a lightweight, floating companion window in the exact same screen position.
+1. **In-Page Overlay**: On standard web pages, the panel sits horizontally centered near the top of the page viewport.
+2. **Dedicated Window**: On pages where Chrome forbids script injection (such as `chrome://` settings, the Chrome Web Store, or blank tabs), JustOneHop opens a lightweight companion window with its content horizontally centered near the top of the source browser window.
+
+The command palette and Tab Switcher share these rules. Each mode uses its own anchor, so their screen positions can differ; neither uses a fixed position on the display. Content size adapts to the source tab's viewport and page zoom, with the native title bar and borders taking additional space.
 
 ---
 

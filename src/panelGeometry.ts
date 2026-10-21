@@ -10,19 +10,18 @@ export function panelRect(viewport: PanelRect): PanelRect {
     width, height: Math.max(1, Math.min(516, viewport.height - inset - 24)) };
 }
 
-/** Tabs/windows use screen DIPs; panelRect uses CSS px. Estimate a centered,
- *  bottom-aligned content area; this cannot locate docked DevTools or sidebars. */
+/** Tabs/windows use screen DIPs; panelRect uses CSS px. Size from the source
+ *  viewport, but anchor to the browser window: sidebar origins are not exposed. */
 export function nativePanelBounds(owner: Pick<chrome.windows.Window, 'left' | 'top' | 'width' | 'height'>,
   tab: Pick<chrome.tabs.Tab, 'width' | 'height'>, frame: WindowFrame = { left: 0, top: 44, width: 0, height: 44 }, zoom = 1): PanelRect {
   const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   const outerWidth = owner.width || 1100, outerHeight = owner.height || 760;
   const width = Math.min(outerWidth, tab.width || outerWidth);
   const height = Math.min(outerHeight, tab.height || Math.max(1, outerHeight - 88));
-  const left = (owner.left || 0) + (outerWidth - width) / 2;
-  const top = (owner.top || 0) + outerHeight - height;
   const rect = panelRect({ left: 0, top: 0, width: width / scale, height: height / scale });
-  return { left: Math.round(left + rect.left * scale - frame.left),
-    top: Math.round(top + rect.top * scale - frame.top),
+  const anchor = panelRect({ left: 0, top: 0, width: outerWidth / scale, height: outerHeight / scale });
+  return { left: Math.round((owner.left || 0) + (outerWidth - rect.width * scale) / 2 - frame.left),
+    top: Math.round((owner.top || 0) + anchor.top * scale - frame.top),
     width: Math.round(rect.width * scale + frame.width), height: Math.round(rect.height * scale + frame.height) };
 }
 
