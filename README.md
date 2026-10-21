@@ -73,7 +73,7 @@ Too many tabs open, with bookmarks and history scattered across different menus?
 ### Option 1: Chrome Web Store / Releases
 
 - **Chrome Web Store**: [JustOneHop on Chrome Web Store](https://chromewebstore.google.com/detail/justonehop/mbofggnjaoneioopfbpheapgphmkclbo)
-- **GitHub Releases**: Download the latest package from [GitHub Releases](https://github.com/lyyourc/JustOneHop/releases) or check the [Changelog](CHANGELOG.md) (current source version: `0.2.0`).
+- **GitHub Releases**: Download the latest package from [GitHub Releases](https://github.com/lyyourc/JustOneHop/releases) or check the [Changelog](CHANGELOG.md) (current source version: `0.2.1`).
 
 ### Option 2: Build from Source
 

@@ -2,6 +2,18 @@
 
 User-visible changes are grouped by release. Git tags use `v<version>`; extension manifests and store packages use `<version>`. GitHub release dates do not imply Chrome Web Store approval. See the [release guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单).
 
+## [0.2.1] - 2026-10-22
+
+### Fixed / 修复
+
+- Anchor native command and tab-switcher panels to the source browser window, including vertical-tab layouts and page zoom. Webpage overlays remain anchored to the page viewport; the two hosts share sizing without requiring identical screen positions. / 原生命令面板与标签切换器锚定来源浏览器窗口，适配竖向标签栏与页面缩放；网页浮层继续锚定页面视口，两种承载共用尺寸策略，不再要求屏幕位置重合。
+
+### Changed / 改进
+
+- Organize browser tests by feature, separate component UI coverage from real extension integration, and cap browser concurrency at two workers. / 按功能组织浏览器测试，分离组件 UI 与真实扩展集成验证，并将浏览器并发限制为两个 worker。
+- Stabilize lifecycle stress diagnostics and asynchronous storage/clock assertions while retaining complete stop, wake, reload, and Vimium compatibility coverage. / 稳定生命周期压力诊断及存储就绪、模拟时钟断言，保留完整停止、唤醒、重载和 Vimium 兼容验证。
+- Refresh the bilingual introduction and document the independent positioning anchors and release validation boundaries. / 更新双语介绍，明确独立定位锚点与发布验收边界。
+
 ## [0.2.0] - 2026-10-21
 
 ### Added / 新增
