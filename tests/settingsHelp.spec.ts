@@ -816,7 +816,9 @@ test.describe(() => {
 
 test('Chinese binding guide returns to settings and retains its standalone handoff', { tag: '@clipboard' }, async () => {
   const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
-  await search.fill('ctrl tab'); await search.press('Enter');
+  await search.fill('ctrl tab');
+  await expect(ui.getByRole('option', { selected: true })).toBeVisible();
+  await search.press('Enter');
   const setup = ui.locator('[data-setting=binding] button');
   await expect(setup).toBeFocused(); await setup.press('Enter');
   await expect(ui.getByRole('region', { name: '配置 Ctrl+Tab', exact: true })).toBeVisible();

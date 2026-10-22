@@ -18,6 +18,7 @@ import { systemLanguage, t } from './i18n';
 import { isAutoTuckAfterHours, savePreferences, type Preferences } from './preferences';
 import { getTuckStatus, openShortcuts, resetSearchRanking } from './api';
 
+const categoryLabel = (category: SettingsCategory) => t(category === 'experimentalFeatures' ? 'settingsLabs' : category);
 const tuckPresets = [1, 12, 24, 72, 168];
 const tuckDuration = (hours: number) => hours % 24 === 0
   ? t(hours === 24 ? 'tuckDay' : 'tuckDays', String(hours / 24))
@@ -114,6 +115,8 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const [tuckStatus, setTuckStatus] = useState<TuckStatus | null>(null);
   const [tuckStatusHours, setTuckStatusHours] = useState<number | null>(null);
   const [tuckStatusError, setTuckStatusError] = useState(false);
+  const [showTuckLoading, setShowTuckLoading] = useState(false);
+  const currentTuckStatus = tuckStatusHours === tuckHours && tuckStatus?.enabled === preferences.autoTuck ? tuckStatus : null;
   const [tuckRefreshing, setTuckRefreshing] = useState(false);
   const tuckHint = useId();
   const tuckToggle = useId();
@@ -127,7 +130,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const helpCategory = category === 'help' && !detail;
   const detailVisible = (!!detail || helpCategory) && !searching;
   const categoryIcons = { appearance: Paintbrush, keyboard: Keyboard, experimentalFeatures: FlaskConical, help: BookOpen };
-  const location = `${t('settings')} · ${t(category)}${detailVisible && detail && detail !== category ? ` · ${t(detail === 'binding' ? 'bindCtrlTab' : detail)}` : ''}`;
+  const location = `${t('settings')} · ${categoryLabel(category)}${detailVisible && detail && detail !== category ? ` · ${t(detail === 'binding' ? 'bindCtrlTab' : detail)}` : ''}`;
   const paletteHotkeyHelp = `${shortcut ? describeShortcut(shortcut) : t('notAssigned')} — ${t('paletteHotkey')}. ${t('hotkeyHint')}`;
   const bindingHelp = `${tabSwitcherShortcut ? describeShortcut(tabSwitcherShortcut) : t('notAssigned')} — ${t('bindingHint')}`;
   const highlight = (text: string) => <HighlightedText text={text} query={query} allowTypos={false} />;
@@ -173,12 +176,14 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   useEffect(() => {
     if (!showTuck) return;
     let cancelled = false;
-    setTuckStatus(null); setTuckStatusError(false);
-    const timer = setTimeout(() => {
-      void getTuckStatus(tuckHours).then(status => {
-        if (!cancelled) { setTuckStatus(status); setTuckStatusHours(tuckHours); }
-      }).catch(() => { if (!cancelled) setTuckStatusError(true); });
-    }, 150);
+    setTuckStatus(null); setTuckStatusError(false); setShowTuckLoading(false);
+    const timer = setTimeout(() => setShowTuckLoading(true), 150);
+    void getTuckStatus(tuckHours).then(status => {
+      if (!cancelled) { setTuckStatus(status); setTuckStatusHours(tuckHours); }
+    }).catch(() => { if (!cancelled) setTuckStatusError(true); }).finally(() => {
+      clearTimeout(timer);
+      if (!cancelled) setShowTuckLoading(false);
+    });
     return () => { cancelled = true; clearTimeout(timer); };
   }, [showTuck, tuckHours, preferences.autoTuck]);
   async function refreshTuckStatus() {
@@ -235,7 +240,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         <label className="settings-category-select">{t('settingsCategories')}
           <select aria-label={t('settingsCategories')} value={searching ? '' : category} onChange={event => selectCategory(event.target.value as SettingsCategory)}>
             {searching ? <option value="" disabled>{t('searchSettings')}</option> : null}
-            {settingsCategories.map(item => <option key={item} value={item}>{t(item === 'experimentalFeatures' ? 'settingsLabs' : item)}</option>)}
+            {settingsCategories.map(item => <option key={item} value={item}>{categoryLabel(item)}</option>)}
           </select>
         </label>
         <div className="settings-category-list" role="tablist" aria-label={t('settingsCategories')} aria-orientation="vertical">
@@ -254,7 +259,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
                 const next = event.key === 'Home' ? 0 : event.key === 'End' ? settingsCategories.length - 1 : (at + (event.key === 'ArrowDown' ? 1 : -1) + settingsCategories.length) % settingsCategories.length;
                 selectCategory(settingsCategories[next]);
                 categories.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
-              }}><Icon size={16} aria-hidden="true" /><span>{t(item === 'experimentalFeatures' ? 'settingsLabs' : item)}</span></button>;
+              }}><Icon size={16} aria-hidden="true" /><span>{categoryLabel(item)}</span></button>;
           })}
         </div>
       </nav>
@@ -303,7 +308,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         </div>
       </> : null}
       {matches.has('tabs') || matches.has('ranking') ? <>
-        {searching ? <h2><FlaskConical size={14} />{highlight(t('experimentalFeatures'))}</h2> : null}
+        {searching ? <h2><FlaskConical size={14} />{highlight(categoryLabel('experimentalFeatures'))}</h2> : null}
         <div className="settings-group settings-experiments">
           {matches.has('tabs') ? <div data-setting="tabs">
             <div className="setting-row tuck-heading">
@@ -325,7 +330,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
               </div>
               <div className="tuck-status-copy" aria-live="polite">
                 <div className="tuck-status-details">
-                  {tuckStatusError ? <p role="alert">{t('tuckStatusError')}</p> : tuckStatus && tuckStatusHours === tuckHours && tuckStatus.enabled === preferences.autoTuck ? <>
+                  {tuckStatusError ? <p role="alert">{t('tuckStatusError')}</p> : currentTuckStatus ? <>
                     <div className="tuck-status-summary">
                       <span>{tuckStatus.eligibleCount ? t(tuckStatus.waitingReason === 'active' ? 'tuckWaitingActive' : tuckStatus.waitingReason === 'grace' ? 'tuckWaitingGrace' : 'tuckWaiting', String(tuckStatus.eligibleCount)) : t('tuckNoCandidates')}</span>
                     </div>
@@ -335,11 +340,11 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
                     ].filter(Boolean).join(' · ')}</p> : null}
                     {tuckStatus.blockedCount ? <p>{t('tuckBlocked', String(tuckStatus.blockedCount))}</p> : null}
                     {tuckStatus.lastFailureAt ? <p><time dateTime={new Date(tuckStatus.lastFailureAt).toISOString()} title={new Date(tuckStatus.lastFailureAt).toLocaleString()}>{t('tuckLastFailure', new Date(tuckStatus.lastFailureAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time></p> : null}
-                  </> : null}
+                  </> : <span className="tuck-loading">{showTuckLoading ? t('loading') : null}</span>}
                 </div>
                 <button className="tuck-refresh" aria-label={t('tuckRefresh')} title={t('tuckRefresh')} aria-disabled={tuckRefreshing} onClick={() => void refreshTuckStatus()}><RotateCw size={14} /></button>
                 <div className="tuck-check-row">
-                  <span className="tuck-last-check">{!tuckStatusError && tuckStatus && tuckStatusHours === tuckHours && tuckStatus.enabled === preferences.autoTuck ? tuckStatus.lastScanAt
+                  <span className="tuck-last-check">{!tuckStatusError && currentTuckStatus ? tuckStatus.lastScanAt
                     ? <time dateTime={new Date(tuckStatus.lastScanAt).toISOString()} title={new Date(tuckStatus.lastScanAt).toLocaleString()}>{t('tuckLastScan', new Date(tuckStatus.lastScanAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time>
                     : t('tuckNotScanned') : null}</span>
                   {tuckRulesButton}
