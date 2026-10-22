@@ -131,12 +131,10 @@ test('English interaction polish settings choices accept Control navigation with
   await expect(ui.locator('.settings-page')).toHaveCount(0);
   await expect(ui.locator('.search-bar input')).toHaveValue('theme');
   await ui.keyboard.press('Meta+k');
-  await expect(ui.locator('.action-search .search-dismiss')).toHaveText('esc');
-  await ui.locator('.action-search input').press('Tab');
-  await expect(ui.locator('.action-search .search-dismiss')).toBeFocused();
-  await expect(ui.locator('.action-search .search-dismiss kbd')).toBeVisible();
-  await expect(ui.locator('.action-search .search-dismiss svg')).toBeHidden();
-  await ui.keyboard.press('Enter');
+  await expect(ui.locator('.action-menu')).toBeVisible();
+  await expect(ui.locator('.action-search .search-focus, .action-search .search-dismiss')).toHaveCount(0);
+  await expect(ui.locator('.action-search input')).toBeFocused();
+  await ui.keyboard.press('Escape');
   await expect(ui.locator('.action-menu')).toHaveCount(0);
   await expect(ui.locator('.search-bar input')).toBeFocused();
 });

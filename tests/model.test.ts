@@ -607,6 +607,7 @@ test('feature commands are discoverable by intent and help is available on home'
     ['language', 'command:settings:language'], ['语言', 'command:settings:language'],
     ['theme', 'command:settings:theme'], ['主题', 'command:settings:theme'],
     ['icon', 'command:settings:searchIcon'], ['图标', 'command:settings:searchIcon'], ['emoji', 'command:settings:searchIcon'],
+    ['badge', 'command:settings:searchIcon'], ['徽章', 'command:settings:searchIcon'],
     ['hotkey', 'command:settings:keyboard'], ['快捷键', 'command:settings:keyboard'],
     ['reset search ranking', 'command:settings:ranking'], ['重置搜索排序', 'command:settings:ranking'],
     ['auto tuck', 'command:settings:tabs'], ['自动收起', 'command:settings:tabs'],

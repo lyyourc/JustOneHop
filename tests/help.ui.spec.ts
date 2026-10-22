@@ -52,7 +52,7 @@ test('Help document entry and return context zh-CN UI with supplied shortcut and
   await expect(ui.locator('.result[aria-selected="true"]')).toContainText('使用帮助');
   await ui.locator('.settings-button').click();
   await expect(ui.getByRole('tab', { name: '使用帮助', exact: true })).toBeVisible();
-  expect(await ui.getByRole('button', { name: '更换图标' }).evaluate(node => {
+  expect(await ui.getByRole('button', { name: '佩戴徽章' }).evaluate(node => {
     const css = getComputedStyle(node);
     return [css.height, css.fontSize, css.borderRadius, css.color, css.backgroundColor];
   })).toEqual(actionStyle);

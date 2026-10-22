@@ -22,7 +22,7 @@ export const settingCategory: Record<SettingRow, SettingsCategory> = {
   keyboard: 'keyboard', binding: 'keyboard', tabs: 'experimentalFeatures', ranking: 'experimentalFeatures',
 };
 const aliases: Record<SettingRow, string> = {
-  searchIcon: 'icon logo emoji image upload custom 图标 图片 上传 自定义 表情 外观',
+  searchIcon: 'badge 徽章 瞬移徽章 头像 avatar icon logo emoji image upload custom 图标 图片 上传 自定义 表情 外观',
   help: 'help user guide 帮助 使用说明 使用指南',
   language: 'English 简体中文 中文 英文', theme: 'light dark 外观 浅色 深色',
   keyboard: 'hotkey shortcut 快捷键', binding: 'ctrl tab Ctrl+Tab 切换',

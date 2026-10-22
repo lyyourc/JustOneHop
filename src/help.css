@@ -1,7 +1,7 @@
 body.justonehop-help { margin: 0; background: var(--page-background); }
 .help-page { min-height: 100dvh; padding: var(--space-6); }
-.help-page .palette { height: calc(100dvh - 48px); max-height: 900px; box-shadow: none; }
+.help-page .palette { height: calc(100dvh - var(--task-header-height)); max-height: 900px; box-shadow: none; }
 @media (max-width: 520px) {
   .help-page { padding: var(--space-inset); }
-  .help-page .palette { height: calc(100dvh - 20px); }
+  .help-page .palette { height: calc(100dvh - var(--keycap-size)); }
 }

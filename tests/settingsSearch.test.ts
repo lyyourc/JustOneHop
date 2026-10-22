@@ -8,6 +8,7 @@ test('settings search finds individual rows by bilingual labels, descriptions an
     ['help', ['help']], ['帮助', ['help']], ['使用说明', ['help']], ['general', []],
     ['LANG', ['language']], ['语言', ['language']], ['外观', ['language', 'theme', 'searchIcon']], ['dark', ['theme']],
     ['图标', ['searchIcon']], ['emoji', ['searchIcon']], ['image', ['searchIcon']],
+    ['徽章', ['searchIcon']], ['badge', ['searchIcon']],
     ['7 days', ['tabs']], ['自定义', ['searchIcon', 'keyboard']], ['12 hours', ['tabs']], ['时长', ['tabs']], ['页面始终保持打开', ['tabs']], ['search 排序', ['ranking']],
     ['userscript', []], ['scripts', []], ['脚本', []], ['ctrl tab', ['binding']], ['hotkey', ['keyboard']],
     ['实验性功能', ['tabs', 'ranking']], ['preferences', ['language', 'theme', 'searchIcon']],

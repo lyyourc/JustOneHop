@@ -16,8 +16,8 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await expect(settings.locator('.settings-appearance')).toHaveCSS('border-radius', '12px');
   await expect(settings.locator('.settings-body')).toHaveCSS('padding', '16px');
   await expect(settings.locator('.settings-appearance')).toHaveCSS('padding-left', '12px');
-  await expect(settings.locator('[data-setting="language"] label')).toHaveCSS('font-size', '14px');
-  await expect(settings.locator('[data-setting="language"] p')).toHaveCSS('font-size', '13px');
+  await expect(settings.locator('[data-setting="language"] label')).toHaveCSS('font-size', '13px');
+  await expect(settings.locator('[data-setting="language"] p')).toHaveCSS('font-size', '12px');
   const language = surface.getByRole('combobox', { name: 'Language', exact: true });
   await expect(language).toBeVisible();
   await search.press('Tab'); await surface.locator('.settings-search .search-dismiss').press('Tab');
@@ -73,7 +73,7 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   expect(await surface.locator('[data-setting="keyboard"]').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await settings.screenshot({ path: test.info().outputPath('settings-keyboard.png') });
   await appearance.click();
-  const change = surface.getByRole('button', { name: 'Change Icon' });
+  const change = surface.getByRole('button', { name: 'Wear Badge' });
   await change.click();
   const emoji = surface.getByRole('textbox', { name: 'Emoji', exact: true });
   await expect(emoji).toBeFocused(); await emoji.fill('🌱');
@@ -99,7 +99,7 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await search.fill('emoji');
   await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
   await change.click(); await emoji.fill('🚀');
-  await surface.getByRole('button', { name: 'Save Icon' }).click();
+  await surface.getByRole('button', { name: 'Wear Badge' }).click();
   await expect(search).toHaveValue('emoji'); await expect(change).toBeFocused();
   expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
   await search.press('Escape'); await expect(appearance).toHaveAttribute('aria-selected', 'true');
@@ -126,7 +126,7 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await expect(categories).toBeVisible();
   await categories.selectOption('appearance'); await change.click();
   await expect(search).toBeInViewport();
-  await expect(surface.getByRole('button', { name: 'Save Icon' })).toBeInViewport();
+  await expect(surface.getByRole('button', { name: 'Wear Badge' })).toBeInViewport();
   await expect(surface.locator('.settings-footer').getByRole('button', { name: 'Back', exact: true })).toBeInViewport();
   expect(await settings.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await settings.screenshot({ path: test.info().outputPath('settings-narrow.png') });

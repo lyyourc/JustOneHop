@@ -132,17 +132,20 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const bindingHelp = `${tabSwitcherShortcut ? describeShortcut(tabSwitcherShortcut) : t('notAssigned')} — ${t('bindingHint')}`;
   const highlight = (text: string) => <HighlightedText text={text} query={query} allowTypos={false} />;
   function openDetail(next: 'binding' | 'searchIcon' | 'help') {
+    feedback.dismiss();
     detailReturn.current = { query, category, scroll: body.current?.scrollTop ?? 0, selection: [input.current?.selectionStart ?? 0, input.current?.selectionEnd ?? 0] };
     returnTo.current = next;
     searchReturn.current = null;
     setCategory(settingCategory[next]); setQuery(''); setDetail(next); setDetailRevision(value => value + 1);
   }
   function closeDetail() {
+    feedback.dismiss();
     const previous = detailReturn.current;
     scrollTop.current = previous.scroll;
     setCategory(previous.category); setQuery(previous.query); setDetail(undefined);
   }
   function selectCategory(next: SettingsCategory) {
+    feedback.dismiss();
     if (!searching && !detail) categoryScroll.current[category] = body.current?.scrollTop ?? 0;
     returnTo.current = undefined; searchReturn.current = null;
     scrollTop.current = categoryScroll.current[next] ?? 0;
@@ -281,7 +284,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
           </div> : null}
           {matches.has('searchIcon') ? <div className="setting-row" data-setting="searchIcon">
             <div className="setting-copy"><label>{highlight(t('searchIcon'))}</label><p>{highlight(t('searchIconHint'))}</p></div>
-            <button className="ranking-reset" aria-label={t('searchIconChange')} onClick={() => openDetail('searchIcon')}><SearchIcon />{highlight(t('searchIconChange'))}</button>
+            <button className="surface-button" aria-label={t('searchIconChange')} onClick={() => openDetail('searchIcon')}><SearchIcon />{highlight(t('searchIconChange'))}</button>
           </div> : null}
         </div>
       </> : null}
@@ -296,7 +299,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
           </div> : null}
           {matches.has('binding') ? <div className="setting-row" data-setting="binding"><div className="setting-copy"><label>{highlight(t('ctrlTabSetting'))}</label><p>{highlight(t('bindingHint'))}</p></div>
             <div className="hotkey-controls"><kbd className="hotkey-value" title={bindingHelp} aria-label={bindingHelp}>{tabSwitcherShortcut || t('notAssigned')}</kbd>
-              <button className="ranking-reset" onClick={() => openDetail('binding')}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
+              <button className="surface-button" onClick={() => openDetail('binding')}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
         </div>
       </> : null}
       {matches.has('tabs') || matches.has('ranking') ? <>
@@ -363,11 +366,11 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         <h2><BookOpen size={14} />{highlight(t('help'))}</h2>
         <div className="settings-group"><div className="setting-row" data-setting="help">
           <div className="setting-copy"><label>{highlight(t('help'))}</label><p>{highlight(t('helpHint'))}</p></div>
-          <button className="ranking-reset" onClick={() => openDetail('help')}>{highlight(t('openHelp'))}</button>
+          <button className="surface-button" onClick={() => openDetail('help')}>{highlight(t('openHelp'))}</button>
         </div></div>
       </> : null}
       {!matches.size ? <div className="empty"><Search size={26} /><strong role="status">{t('noResults')}</strong>
-        <button className="ranking-reset" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
+        <button className="surface-button" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
     </div>
       </div>
     </div>

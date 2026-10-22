@@ -41,14 +41,11 @@ test('light and dark surfaces, compact rows and bottom action search fit without
     await input.press('Meta+ArrowUp');
     await expect(ui.locator('.result.tab')).toHaveAttribute('aria-selected', 'true');
     await input.press('Meta+k');
-    await expectIconSpacing(ui.locator('.action-search'), 14, 14);
+    await expect(ui.locator('.action-search .search-focus, .action-search .search-dismiss')).toHaveCount(0);
     await expect(ui.locator('.action-search input')).toBeFocused();
-    const ring = await ui.locator('.action-search').evaluate(node => {
-      const style = getComputedStyle(node, '::after');
-      return { inset: style.top, radius: style.borderRadius, width: style.borderTopWidth, color: style.borderTopColor, outline: getComputedStyle(node).outlineStyle };
-    });
-    expect(ring).toMatchObject({ inset: '4px', radius: '8px', width: '2px', outline: 'none' });
-    expect(ring.color).not.toBe('rgba(0, 0, 0, 0)');
+    await expect(ui.locator('.action-search input')).toHaveCSS('outline-style', 'none');
+    const ring = await ui.locator('.action-search').evaluate(node => getComputedStyle(node, '::after').content);
+    expect(ring).toBe('none');
     const searchBox = await ui.locator('.action-search').boundingBox();
     const actionList = await ui.locator('.action-list').boundingBox();
     expect(searchBox!.y).toBeGreaterThanOrEqual(actionList!.y + actionList!.height - 1);

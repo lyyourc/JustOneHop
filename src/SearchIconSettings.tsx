@@ -37,16 +37,21 @@ export function SearchIconSettings({ value, onBack }: { value?: string; onBack: 
     const result = await feedback.run(() => prepareSearchIcon(selected), t('searchIconPreviewReady'), t('errorSearchIconImage'));
     if (!alive.current) return;
     setBusy(false);
-    if (result.ok) setDraft(result.value);
+    if (result.ok) {
+      setDraft(result.value);
+      emoji.current?.focus();
+    }
   }
   return <BackLayer onBack={onBack} active={page?.active ?? true}><section className="palette settings-page search-icon-settings" aria-label={t('searchIcon')} onKeyDown={event => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.stopPropagation();
-    if (event.nativeEvent.isComposing || event.keyCode === 229 || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
-      if (event.target !== emoji.current) event.preventDefault();
-      return;
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Enter') {
+      if (event.shiftKey || event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'BUTTON') return;
+      event.preventDefault();
+      event.stopPropagation();
+      void save();
     }
-    if (event.target === emoji.current && event.key === 'Enter') { event.preventDefault(); void save(); }
   }}>
     {!page ? <TaskHeader /> : null}
     <div className="settings-body">
@@ -57,6 +62,14 @@ export function SearchIconSettings({ value, onBack }: { value?: string; onBack: 
         <span>{t('searchIconPreview')}</span>
       </div>
       <div className="settings-group">
+        <div className="setting-row"><div className="setting-copy"><label>{t('searchIconDefault')}</label>
+          <p>{t('searchIconDefaultHint')}</p></div>
+          <button type="button" className="surface-button" disabled={busy || draft === undefined} title={t('searchIconDefault')}
+            onClick={() => { setDraft(undefined); emoji.current?.focus(); }}>
+            <Logo size={16} />
+            <span>{t('searchIconDefault')}</span>
+          </button>
+        </div>
         <div className="setting-row"><div className="setting-copy"><label htmlFor={`${hint}-emoji`}>Emoji</label>
           <p id={hint}>{t('searchIconEmojiHint')}</p></div>
           <input ref={emoji} id={`${hint}-emoji`} className="search-icon-emoji" aria-describedby={hint} aria-invalid={!valid}
@@ -64,7 +77,7 @@ export function SearchIconSettings({ value, onBack }: { value?: string; onBack: 
             onChange={event => setDraft(event.target.value || undefined)} readOnly={busy} />
         </div>
         <div className="setting-row"><div className="setting-copy"><label>{t('searchIconImage')}</label><p>{t('searchIconImageHint')}</p></div>
-          <button className="ranking-reset" disabled={busy} onClick={() => file.current?.click()}>{t('searchIconUpload')}</button>
+          <button type="button" className="surface-button" disabled={busy} onClick={() => file.current?.click()}>{t('searchIconUpload')}</button>
           <input ref={file} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={event => {
             const selected = event.target.files?.[0]; event.target.value = '';
             if (selected) void upload(selected);
@@ -75,7 +88,6 @@ export function SearchIconSettings({ value, onBack }: { value?: string; onBack: 
     </div>
     <SettingsPageFooter title={t('searchIcon')}
       navigation={page ? { kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: back } : undefined}
-      primary={{ label: t('searchIconSave'), keys: ['↵'], disabled: busy || !valid || draft === value, onAction: () => void save() }}
-      secondary={{ label: t('searchIconDefault'), keys: [], trailingIcon: <Logo size={16} />, disabled: busy || draft === undefined, onAction: () => { setDraft(undefined); emoji.current?.focus(); } }} />
+      primary={{ label: t('searchIconSave'), keys: ['↵'], disabled: busy || !valid || draft === value, onAction: () => void save() }} />
   </section></BackLayer>;
 }

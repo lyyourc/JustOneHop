@@ -84,7 +84,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
         {section.paragraphs.map(key => <p key={key}><HighlightedText text={t(key, key === 'helpStartBody' ? shortcutLabel : undefined)} query={query} allowTypos={false} /></p>)}
       </section>)}
       {!sections.length ? <div className="empty"><Search size={26} /><strong>{t('noResults')}</strong>
-        <button className="ranking-reset" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
+        <button className="surface-button" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
     </article>
     <SettingsPageFooter navigation={standalone ? undefined : { kind: 'back', label: backLabel, tooltip: `${backLabel} (Esc)`, onAction: navigateBack }}
       title={t('help')} primary={standalone ? { label: backLabel, keys: ['esc'], onAction: navigateBack } : undefined} />

@@ -188,7 +188,7 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
       }
       const sender = host === 'native' ? await paletteSender(nativeSender())
         : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
-      const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: tabs[1].url, url: 'https://destination.example/', query: 'destination.example' };
+      const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: tabs[1].url, url: 'https://destination.example/', query: '' };
       calls = [];
       let acknowledged = 0;
       await performPaletteAction(payload, sender, () => { acknowledged++; });

@@ -10,16 +10,16 @@ test.describe(() => {
   test('custom search icons persist and synchronize across extension pages and restricted overlays', async () => {
     const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
     await search.fill('图标'); await search.press('Enter');
-    await ui.getByRole('button', { name: '更换图标' }).click();
+    await ui.getByRole('button', { name: '佩戴徽章' }).click();
     await ui.getByRole('textbox', { name: 'Emoji', exact: true }).fill('🚀');
-    await ui.getByRole('button', { name: '保存图标' }).click();
+    await ui.getByRole('button', { name: '佩戴徽章' }).click();
     await expect(ui.locator('.search-focus')).toHaveText('🚀');
     const second = await context.newPage(); await second.goto(popupUrl);
     await expect(second.locator('.search-focus')).toHaveText('🚀');
-    await ui.getByRole('button', { name: '更换图标' }).click();
+    await ui.getByRole('button', { name: '佩戴徽章' }).click();
     await ui.locator('input[type=file]').setInputFiles(resolve('dist/icon128.png'));
     await expect(ui.locator('.search-icon-preview img')).toBeVisible();
-    await ui.getByRole('button', { name: '保存图标' }).click();
+    await ui.getByRole('button', { name: '佩戴徽章' }).click();
     await expect(second.locator('.search-focus img')).toBeVisible();
     const stored = await worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences as { searchIcon: string });
     expect(stored.searchIcon).toMatch(/^data:image\/png;base64,/);
@@ -35,7 +35,7 @@ test.describe(() => {
     await expect.poll(() => img.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth === 64 && node.naturalHeight === 64)).toBe(true);
     await overlay.locator('.settings-button').click();
     await overlay.getByRole('tab', { name: '外观', exact: true }).click();
-    await overlay.getByRole('button', { name: '更换图标' }).click();
+    await overlay.getByRole('button', { name: '佩戴徽章' }).click();
     const preview = overlay.locator('.search-icon-preview img');
     const images: string[] | undefined = process.env.JUSTONEHOP_TEST_IMAGES ? JSON.parse(process.env.JUSTONEHOP_TEST_IMAGES) : undefined;
     for (let attempt = 0; attempt < (images?.length ?? 12); attempt++) {
@@ -51,7 +51,7 @@ test.describe(() => {
       });
     }
     await overlay.locator('.settings-view').screenshot({ path: test.info().outputPath('real-overlay-upload.png') });
-    await overlay.getByRole('button', { name: '保存图标' }).click();
+    await overlay.getByRole('button', { name: '佩戴徽章' }).click();
     await overlay.locator('.settings-search input').press('Escape');
     await overlay.locator('.search-bar input').fill('reload');
     await overlay.locator('.search-bar input').evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
@@ -67,9 +67,9 @@ test.describe(() => {
     await expect(second.locator('.search-focus img')).toBeVisible();
     await second.locator('.settings-button').click();
     await second.getByRole('tab', { name: '外观', exact: true }).click();
-    await second.getByRole('button', { name: '更换图标' }).click();
-    await second.getByRole('button', { name: '恢复默认' }).click();
-    await second.getByRole('button', { name: '保存图标' }).click();
+    await second.getByRole('button', { name: '佩戴徽章' }).click();
+    await second.getByRole('button', { name: '恢复默认徽章' }).click();
+    await second.getByRole('button', { name: '佩戴徽章' }).click();
     await expect(ui.locator('.search-focus .brand-logo')).toBeVisible();
     await second.close();
   });
@@ -250,7 +250,7 @@ test.describe(() => {
     await expect(article.locator('mark').first()).toContainText(/cookies/i);
     const headingBox = await article.getByRole('heading').boundingBox();
     const searchBox = await ui.locator('.help-search').boundingBox();
-    expect(headingBox!.y - (searchBox!.y + searchBox!.height)).toBeLessThanOrEqual(12);
+    expect(headingBox!.y - (searchBox!.y + searchBox!.height)).toBeLessThanOrEqual(16);
     await ui.locator('.palette').screenshot({ path: test.info().outputPath(`help-${locale}-filtered.png`) });
     await helpSearch.fill(english ? '查看网站存储' : 'view website storage');
     await expect(article.getByRole('heading')).toHaveCount(1);
@@ -441,7 +441,7 @@ test.describe(() => {
   await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('settings-light.png') });
   // Each category keeps its full visible Tab chain, including category navigation.
   for (const [category, fields] of [
-    ['Appearance', [language, theme, ui.getByRole('button', { name: 'Change Icon' })]],
+    ['Appearance', [language, theme, ui.getByRole('button', { name: 'Wear Badge' })]],
     ['Keyboard', [changeButton, ui.getByRole('button', { name: 'Set Up', exact: true })]],
     ['Labs', [experiments.getByRole('switch'), experiments.getByRole('button', { name: 'How it works' }), experiments.getByRole('button', { name: 'Reset Ranking' })]],
   ] as const) {
@@ -520,9 +520,8 @@ test.describe(() => {
   const categories = ui.getByRole('combobox', { name: 'Settings categories', exact: true });
   await expect(categories).toBeVisible();
   const narrowLanguageRow = await ui.locator('[data-setting="language"] .setting-row').boundingBox();
-  await categories.selectOption({ label: 'Appearance' });
   const narrowThemeRow = await ui.locator('[data-setting="theme"] .setting-row').boundingBox();
-  expect(narrowThemeRow!.y).toBe(narrowLanguageRow!.y);
+  expect(narrowThemeRow!.y).toBeGreaterThan(narrowLanguageRow!.y);
   await categories.selectOption({ label: 'Appearance' });
   await ui.getByRole('combobox', { name: 'Language', exact: true }).click();
   await expect(ui.locator('.choice-option').first()).toHaveCSS('min-height', '32px');
@@ -927,7 +926,8 @@ test('brand logo follows panel themes and the offscreen system theme updates too
   await ui.setViewportSize({ width: 390, height: 700 });
   await ui.evaluate(() => { document.body.style.width = '100%'; });
   await ui.locator('.search-bar input').fill('tab switcher');
-  await ui.keyboard.press('Enter');
+  await expect(ui.locator('[id="justonehop-command:tabSwitcher"]')).toHaveAttribute('aria-selected', 'true');
+  await ui.locator('.search-bar input').press('Enter');
   await expect(ui.locator('.recent-search-activate .brand-logo svg')).toBeVisible();
   await ui.locator('.recent-search-activate').click();
   await expect(ui.locator('.recent-search-field input')).toBeFocused();

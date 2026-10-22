@@ -343,7 +343,7 @@ test.describe(() => {
   await surface.getByRole('button', { name: 'Set Up', exact: true }).click();
   await page.keyboard.press('Meta+k');
   await surface.locator('.action-heading').click(); await page.keyboard.press('Escape');
-  await expect(surface.locator('.binding-view .primary-action')).toBeFocused();
+  await expect(surface.locator('.primary-action')).toBeFocused();
   await surface.locator('.binding-guide p').first().click(); await page.keyboard.press('Escape');
   await expect(surface.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await surface.locator('.settings-view .palette-footer-title').click();
@@ -459,14 +459,11 @@ test.describe(() => {
   await expect(surface.locator('.action-heading')).toHaveText('polish.key');
   await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
   await surface.locator('.palette-footer-title').click();
-  await page.keyboard.press('Shift+Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
-  await page.keyboard.press('Tab'); await expect(surface.locator('.action-search .search-focus')).toBeFocused();
-  await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
+  await expect(surface.locator('.action-search .search-focus, .action-search .search-dismiss')).toHaveCount(0);
+  await page.keyboard.press('Shift+Tab'); await expect(actions).toBeFocused();
   await actions.press('Control+n');
   await expect(surface.locator('.palette-footer .primary-action')).toHaveText(/Copy Name/);
-  await actions.press('Tab'); await expect(surface.locator('.action-search .search-dismiss')).toBeFocused();
-  await page.keyboard.press('Tab'); await expect(surface.locator('.action-search .search-focus')).toBeFocused();
-  await page.keyboard.press('Tab'); await expect(actions).toBeFocused();
+  await actions.press('Tab'); await expect(actions).toBeFocused();
   const primary = surface.locator('.palette-footer .primary-action');
   await primary.focus();
   for (const key of ['Shift+Enter', 'Control+Enter', 'Alt+Enter', 'Meta+Enter', 'Shift+Space']) {

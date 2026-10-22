@@ -332,7 +332,7 @@ test.describe(() => {
   await search.fill('close tab'); await expect(surface.locator('.result.command .entry-shortcut').first()).toHaveText('⌘W');
   await search.fill('reload'); await expect(surface.locator('.result.command .entry-shortcut').first()).toHaveText('⌘R');
   await search.fill('settings'); await search.press('Meta+,');
-  await expect(surface.locator('.settings-view .palette-footer-title')).toHaveText('Settings');
+  await expect(surface.locator('.settings-view .palette-footer-title')).toHaveText('Settings · Appearance');
 });
 });
 

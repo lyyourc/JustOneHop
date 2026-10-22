@@ -25,7 +25,7 @@ test(`${locale === 'en-US' ? 'English' : 'Chinese'} categorized candidates UI sh
   await search.fill('restore'); await expect(first.locator('.entry-shortcut kbd')).toHaveText(['⌘⇧T']);
   await search.fill('settings'); await expect(first.locator('.entry-shortcut kbd')).toHaveText(['⌘,']);
   await search.press('Meta+k'); await expect(ui.locator('.action-row .entry-shortcut kbd')).toHaveText(['⌘,']);
-  await ui.keyboard.press('Meta+,'); await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText(en ? 'Settings' : '设置');
+  await ui.keyboard.press('Meta+,'); await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText(en ? 'Settings · Appearance' : '设置 · 外观');
   await ui.keyboard.press('Escape'); await search.fill('ctrl tab'); await search.press('Meta+ArrowUp');
   await expect(ui.locator('[id="justonehop-command:settings:binding"]')).toHaveAttribute('aria-selected', 'true');
   await search.press('Enter'); const setup = ui.locator('[data-setting=binding] button');
@@ -200,6 +200,7 @@ test('Chinese home recommendations UI uses supplied usage events and freezes ord
   await input.press('Enter'); await expect(surface.locator('.help-view')).toBeVisible();
   await ui.keyboard.press('Escape'); await input.fill(''); await expect.poll(ids).toEqual(order);
   await surface.getByRole('button', { name: '设置', exact: true }).click();
+  await surface.getByRole('tab', { name: '实验室', exact: true }).click();
   // Deliver the controlled storage event before the reset completion refreshes home scores.
   await palette.provideStorage({ searchUsage: [] });
   await surface.getByRole('button', { name: '重置搜索排序', exact: true }).click();
