@@ -1,4 +1,4 @@
-import { Logo } from './Logo';
+import { SearchIcon } from './SearchIcon';
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { t } from './i18n';
 import { availableSearchButton, hasControlFocus } from './searchFocus';
@@ -50,6 +50,6 @@ export function SearchFocusButton({ input, size = 20, disabled = false }: {
       event.stopPropagation();
       if (event.nativeEvent.isComposing || event.keyCode === 229 || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) event.preventDefault();
     }}
-    onClick={() => input.current?.focus({ preventScroll: true })}><Logo size={size} /></button>
+    onClick={() => input.current?.focus({ preventScroll: true })}><SearchIcon size={size} /></button>
     {focusHint ? <span className="search-focus-hint" role="status">{t(focusHint)}</span> : null}</>;
 }

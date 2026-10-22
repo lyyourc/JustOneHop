@@ -5,6 +5,76 @@ import { registerPaletteFixture } from './support/paletteFixture';
 
 registerPaletteFixture();
 
+test.describe(() => {
+  test.use({ environment: { ...defaults, shadow: 'open', pageAccess: true } });
+  test('custom search icons persist and synchronize across extension pages and restricted overlays', async () => {
+    const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
+    await search.fill('图标'); await search.press('Enter');
+    await ui.getByRole('button', { name: '更换图标' }).click();
+    await ui.getByRole('textbox', { name: 'Emoji', exact: true }).fill('🚀');
+    await ui.getByRole('button', { name: '保存图标' }).click();
+    await expect(ui.locator('.search-focus')).toHaveText('🚀');
+    const second = await context.newPage(); await second.goto(popupUrl);
+    await expect(second.locator('.search-focus')).toHaveText('🚀');
+    await ui.getByRole('button', { name: '更换图标' }).click();
+    await ui.locator('input[type=file]').setInputFiles(resolve('dist/icon128.png'));
+    await expect(ui.locator('.search-icon-preview img')).toBeVisible();
+    await ui.getByRole('button', { name: '保存图标' }).click();
+    await expect(second.locator('.search-focus img')).toBeVisible();
+    const stored = await worker.evaluate(async () => (await chrome.storage.local.get('preferences')).preferences as { searchIcon: string });
+    expect(stored.searchIcon).toMatch(/^data:image\/png;base64,/);
+    const source = await context.newPage(); await source.goto(`${origin}/Focus-fixture`);
+    const tabId = await worker.evaluate(async url => (await chrome.tabs.query({ url }))[0].id!, source.url());
+    await worker.evaluate(async tabId => {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      await chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' });
+    }, tabId);
+    const overlay = source.frameLocator('.justonehop-frame');
+    const img = overlay.locator('.search-focus img');
+    await expect(img).toBeVisible();
+    await expect.poll(() => img.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth === 64 && node.naturalHeight === 64)).toBe(true);
+    await overlay.locator('.settings-button').click();
+    await overlay.getByRole('tab', { name: '外观', exact: true }).click();
+    await overlay.getByRole('button', { name: '更换图标' }).click();
+    const preview = overlay.locator('.search-icon-preview img');
+    const images: string[] | undefined = process.env.JUSTONEHOP_TEST_IMAGES ? JSON.parse(process.env.JUSTONEHOP_TEST_IMAGES) : undefined;
+    for (let attempt = 0; attempt < (images?.length ?? 12); attempt++) {
+      await test.step(`overlay upload ${attempt + 1}`, async () => {
+        const path = images?.[attempt] ?? (attempt % 2 ? process.env.JUSTONEHOP_TEST_JPEG : process.env.JUSTONEHOP_TEST_ICON);
+        const previous = await preview.elementHandle();
+        await overlay.locator('input[type=file]').setInputFiles(path || resolve(`dist/icon${attempt % 2 ? 48 : 16}.png`));
+        await expect.poll(() => previous!.evaluate(node => node.isConnected)).toBe(false);
+        await expect(overlay.getByRole('button', { name: '选择图片' })).toBeEnabled();
+        await expect(preview).toBeVisible();
+        await expect.poll(() => preview.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth === 64 && node.naturalHeight === 64)).toBe(true);
+        await overlay.locator('.settings-view').screenshot({ path: test.info().outputPath(`overlay-upload-${attempt + 1}.png`) });
+      });
+    }
+    await overlay.locator('.settings-view').screenshot({ path: test.info().outputPath('real-overlay-upload.png') });
+    await overlay.getByRole('button', { name: '保存图标' }).click();
+    await overlay.locator('.settings-search input').press('Escape');
+    await overlay.locator('.search-bar input').fill('reload');
+    await overlay.locator('.search-bar input').evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
+    await overlay.locator('.search-focus').click();
+    expect(await overlay.locator('.search-bar input').evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+    await overlay.locator('.search-bar input').fill('标签切换器');
+    await overlay.locator('.search-bar input').press('Enter');
+    await expect(overlay.locator('.recent-search-activate img')).toBeVisible();
+    await overlay.locator('.recent-search-activate').click();
+    await expect(overlay.locator('.recent-search-field input')).toBeFocused();
+    await source.close();
+    await second.reload();
+    await expect(second.locator('.search-focus img')).toBeVisible();
+    await second.locator('.settings-button').click();
+    await second.getByRole('tab', { name: '外观', exact: true }).click();
+    await second.getByRole('button', { name: '更换图标' }).click();
+    await second.getByRole('button', { name: '恢复默认' }).click();
+    await second.getByRole('button', { name: '保存图标' }).click();
+    await expect(ui.locator('.search-focus .brand-logo')).toBeVisible();
+    await second.close();
+  });
+});
+
 test('settings language and theme persist, synchronize, and preserve search focus', async () => {
   const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await input.fill('reload');
@@ -25,6 +95,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await expect(ui.locator('.operation-feedback')).toHaveText('Language set to English');
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ preferences: { language: string } }>('preferences')).preferences.language)).toBe('en');
   await ui.emulateMedia({ colorScheme: 'light' });
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   const theme = ui.getByRole('combobox', { name: 'Theme', exact: true });
   await theme.click();
   await ui.getByRole('option', { name: 'Dark', exact: true }).click();
@@ -48,6 +119,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await second.getByRole('option', { name: '简体中文', exact: true }).click();
   await expect(ui.locator('.result[aria-selected="true"]')).toContainText('刷新当前标签页');
   await expect(second.getByRole('region', { name: '设置', exact: true })).toBeVisible();
+  await second.getByRole('tab', { name: '外观', exact: true }).click();
   await second.getByRole('combobox', { name: '主题', exact: true }).click();
   await second.getByRole('option', { name: '浅色', exact: true }).click();
   await ui.emulateMedia({ colorScheme: 'dark' });
@@ -55,6 +127,7 @@ test('settings language and theme persist, synchronize, and preserve search focu
   await second.getByRole('combobox', { name: '主题', exact: true }).click();
   await second.getByRole('option', { name: '跟随系统', exact: true }).click();
   await expect(ui.locator('.palette')).toHaveCSS('background-color', 'rgb(41, 42, 45)');
+  await second.getByRole('tab', { name: '外观', exact: true }).click();
   await second.getByRole('combobox', { name: '语言', exact: true }).click();
   await second.getByRole('option', { name: '跟随系统', exact: true }).click();
   await expect(second.getByText('系统语言：简体中文（Chrome 界面语言）')).toBeVisible();
@@ -108,7 +181,8 @@ test.describe(() => {
     await page.locator('.search-clear').click();
     await search.press('Tab'); await page.keyboard.press('Tab'); await expect(article).toBeFocused();
     await article.press('PageDown'); await expect.poll(() => article.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
-    await article.press('Tab'); await expect(page.locator('.primary-action')).toBeFocused();
+    await article.press('Tab'); await expect(page.locator('.help-github-card')).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(page.locator('.primary-action')).toBeFocused();
     await page.setViewportSize({ width: 390, height: 400 });
     for (const theme of ['light', 'dark']) {
       await worker.evaluate(async theme => chrome.storage.local.set({ preferences: { language: 'zh', theme } }), theme);
@@ -195,7 +269,9 @@ test.describe(() => {
     await article.press('Home'); expect(await article.evaluate(el => el.scrollTop)).toBe(0);
     await article.press('ArrowDown'); await expect.poll(() => article.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
     await article.press('Home');
-    await article.press('Tab'); await expect(ui.locator('.footer-back')).toBeFocused();
+    await article.press('Tab'); await expect(ui.locator('.help-github-card')).toBeFocused();
+    await ui.keyboard.press('Tab'); await expect(ui.locator('.footer-back')).toBeFocused();
+    await ui.keyboard.press('Shift+Tab'); await expect(ui.locator('.help-github-card')).toBeFocused();
     await ui.keyboard.press('Shift+Tab'); await expect(article).toBeFocused();
     await article.press('Escape');
     await expect(input).toBeFocused(); await expect(input).toHaveValue('help');
@@ -204,20 +280,22 @@ test.describe(() => {
 
     // Mouse entry and footer return use the same document as keyboard search.
     await ui.locator('.settings-button').click();
-    await expect(ui.locator('.settings-preferences > div').last()).toHaveAttribute('data-setting', 'help');
+    await expect(ui.getByRole('tab', { name: helpName, exact: true })).toBeVisible();
     const settingsSearch = ui.getByRole('textbox', { name: english ? 'Search settings' : '搜索设置', exact: true });
     await settingsSearch.fill(english ? '帮助' : 'help');
     await expect(ui.locator('[data-setting]')).toHaveCount(1);
     await ui.getByRole('button', { name: readName }).click();
-    await expect(helpSearch).toBeFocused();
+    await expect(article).toBeFocused();
+    await expect(settingsSearch).toBeVisible();
     await expect(article).toContainText(shortcut);
-    expect((await ui.locator('.palette-footer').boundingBox())!.y).toBe(originalFooter!.y);
-    await ui.locator('.footer-back').click();
+    expect((await ui.locator('.settings-footer .palette-footer').boundingBox())!.y).toBe(originalFooter!.y);
+    await ui.locator('.settings-footer .footer-back').click();
     await expect(settingsSearch).toHaveValue(english ? '帮助' : 'help');
     await expect(ui.getByRole('button', { name: readName })).toBeFocused();
-    await ui.keyboard.press('Enter'); await expect(helpSearch).toBeFocused();
+    await ui.keyboard.press('Enter'); await expect(article).toBeFocused();
     await ui.keyboard.press('Backspace');
     await expect(ui.getByRole('button', { name: readName })).toBeFocused();
+    await ui.keyboard.press('Escape'); await expect(settingsSearch).toHaveValue(''); await expect(settingsSearch).toBeFocused();
     await ui.keyboard.press('Escape'); await expect(input).toBeFocused();
 
     await input.fill('使用说明');
@@ -294,6 +372,8 @@ test.describe(() => {
   await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
   await input.press('Enter');
   await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(ui.getByRole('textbox', { name: 'Search settings', exact: true })).toBeFocused();
+  await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
   await expect(ui.locator('[data-setting="keyboard"] .hotkey-value')).toHaveText(await worker.evaluate(async () => (await chrome.commands.getAll()).find(c => c.name === 'toggle-palette')!.shortcut!));
   await expect(ui.locator('[data-setting="binding"] .hotkey-value')).toHaveText(await worker.evaluate(async () => (await chrome.commands.getAll()).find(c => c.name === 'switch-recent')?.shortcut || 'Not assigned'));
   await expect(ui.locator('[data-setting="binding"] label')).toHaveText('Tab Switcher');
@@ -301,19 +381,25 @@ test.describe(() => {
   await expect(ui.locator('[data-setting="keyboard"] .hotkey-value')).toHaveAttribute('title', /(?:Shift \+ Command|Command \+ Shift) \+ P — Open \/ Close JustOneHop/);
   await expect(ui.locator('[data-setting="binding"] .hotkey-value')).toHaveAttribute('title', / — Switch tabs like in VS Code using the shortcut shown\./);
   await expect(ui.locator('[data-setting="binding"] .hotkey-value')).toHaveAttribute('aria-label', await ui.locator('[data-setting="binding"] .hotkey-value').getAttribute('title') as string);
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await ui.locator('[data-setting="language"] label').hover();
-  for (const label of await ui.locator('.setting-copy label:not([for])').all()) {
-    await expect(label).toHaveCSS('cursor', 'default');
+  for (const category of ['Appearance', 'Keyboard', 'Labs']) {
+    await ui.getByRole('tab', { name: category, exact: true }).click();
+    await expect(ui.locator('.settings-body h2')).toHaveCount(0);
+    for (const label of await ui.locator('.setting-copy label:not([for])').all()) {
+      await expect(label).toHaveCSS('cursor', 'default');
+    }
   }
   await expect(ui.locator('.setting-copy label[for]')).toHaveCSS('cursor', 'pointer');
-  await expect(ui.locator('.settings-body h2')).toHaveText(['General', 'Keyboard', 'Experimental Features']);
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   const header = ui.locator('.settings-search');
   const headerBox = await header.boundingBox();
   expect(headerBox!.height).toBe(mainHeader!.height);
   expect(headerBox!.y).toBe(mainHeader!.y);
   const settingsSearch = ui.getByRole('textbox', { name: 'Search settings', exact: true });
+  await header.locator('.search-focus').click();
   await expect(settingsSearch).toBeFocused();
-  await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText('Settings');
+  await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText('Settings · Appearance');
   const settingsFooter = await ui.locator('.settings-view .palette-footer').boundingBox();
   expect(settingsFooter!.y).toBe(mainFooter!.y);
   expect(settingsFooter!.height).toBe(44);
@@ -322,45 +408,59 @@ test.describe(() => {
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('设置');
   await input.press('Enter');
-  const preferences = ui.locator('.settings-preferences');
-  const language = preferences.getByRole('combobox', { name: 'Language', exact: true });
-  const theme = preferences.getByRole('combobox', { name: 'Theme', exact: true });
-  const languageBox = await language.boundingBox(), themeBox = await theme.boundingBox();
-  expect(themeBox!.y).toBeGreaterThan(languageBox!.y + languageBox!.height);
+  const language = ui.getByRole('combobox', { name: 'Language', exact: true });
+  const theme = ui.getByRole('combobox', { name: 'Theme', exact: true });
+  const languageBox = await language.boundingBox();
+  const languageRow = await ui.locator('[data-setting="language"] .setting-row').boundingBox();
+  await expect(language).toHaveCSS('height', '32px');
+  await expect(language).toHaveCSS('border-radius', '8px');
+  await expect(language).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
+  const themeBox = await theme.boundingBox();
+  // Both settings begin their category; descriptions may change control height offsets.
+  expect((await ui.locator('[data-setting="theme"] .setting-row').boundingBox())!.y).toBeGreaterThan(languageRow!.y);
   expect(themeBox!.x).toBe(languageBox!.x);
   expect(themeBox!.width).toBe(languageBox!.width);
+  await ui.getByRole('tab', { name: 'Labs', exact: true }).click();
   const experiments = ui.locator('.settings-experiments');
-  await expect(ui.locator('[data-setting="tabs"] > .setting-row p')).toContainText('Pages stay open, never closed or deleted.');
+  await expect(ui.locator('[data-setting="tabs"] > .setting-row p')).toContainText('Pages stay open.');
   await expect(ui.locator('.tuck-settings')).toHaveCount(0);
   await expect(experiments.getByRole('switch')).toHaveCount(1);
   await expect(experiments.getByRole('button')).toHaveText(['How it works', 'Reset Ranking']);
+  await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
   const changeButton = ui.getByRole('button', { name: 'Change in Chrome' });
   await expect(changeButton).toHaveCSS('height', '32px');
   await expect(changeButton).toHaveCSS('border-radius', '100px');
   await expect(changeButton).toHaveCSS('font-weight', '500');
-  await expect(language).toHaveCSS('height', '32px');
-  await expect(language).toHaveCSS('border-radius', '8px');
-  await expect(language).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(ui.locator('.settings-page .footer-divider')).toHaveCount(0);
   const navigation = ui.locator('.settings-navigation');
   await expect(navigation.locator('.navigation-key')).toHaveText(['TabNext', 'Shift+TabPrevious']);
   await expect(navigation.locator('kbd')).toHaveText(['Tab', 'Shift+Tab']);
   await expect(navigation).toHaveAttribute('title', 'Tab moves to the next control; Shift+Tab moves to the previous control.');
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-light.png') });
-  // Tab follows visible controls and wraps through the footer back to search.
-  const controls = [header.locator('.search-dismiss'), language, theme, ui.getByRole('button', { name: 'Read Help' }), ui.getByRole('button', { name: 'Change in Chrome' }),
-    ui.getByRole('button', { name: 'Set Up', exact: true }), experiments.getByRole('button', { name: 'How it works' }), experiments.getByRole('switch'),
-    experiments.getByRole('button', { name: 'Reset Ranking' }),
-    ui.locator('.footer-back'), header.locator('.search-focus'), settingsSearch];
-  for (const control of controls) { await ui.keyboard.press('Tab'); await expect(control).toBeFocused(); }
-  await ui.keyboard.press('Shift+Tab');
-  await expect(header.locator('.search-focus')).toBeFocused();
-  await ui.keyboard.press('Shift+Tab');
-  await expect(ui.locator('.footer-back')).toBeFocused();
-  await ui.keyboard.press('Tab');
-  await ui.keyboard.press('Tab');
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
+  await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('settings-light.png') });
+  // Each category keeps its full visible Tab chain, including category navigation.
+  for (const [category, fields] of [
+    ['Appearance', [language, theme, ui.getByRole('button', { name: 'Change Icon' })]],
+    ['Keyboard', [changeButton, ui.getByRole('button', { name: 'Set Up', exact: true })]],
+    ['Labs', [experiments.getByRole('switch'), experiments.getByRole('button', { name: 'How it works' }), experiments.getByRole('button', { name: 'Reset Ranking' })]],
+  ] as const) {
+    const categoryTab = ui.getByRole('tab', { name: category, exact: true });
+    await categoryTab.click();
+    await header.locator('.search-focus').click();
+    const controls = [header.locator('.search-dismiss'), categoryTab, ...fields,
+      ui.locator('.footer-back'), header.locator('.search-focus'), settingsSearch];
+    for (const control of controls) { await ui.keyboard.press('Tab'); await expect(control).toBeFocused(); }
+    await ui.keyboard.press('Shift+Tab');
+    await expect(header.locator('.search-focus')).toBeFocused();
+    await ui.keyboard.press('Shift+Tab');
+    await expect(ui.locator('.footer-back')).toBeFocused();
+    await ui.keyboard.press('Tab');
+    await ui.keyboard.press('Tab');
+  }
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await settingsSearch.fill('lang');
-  await expect(ui.locator('.settings-body h2')).toHaveText(['General']);
+  await expect(ui.locator('.settings-body h2')).toHaveText(['Appearance']);
   await expect(ui.locator('[data-setting]')).toHaveCount(1);
   await expect(ui.locator('[data-setting="language"] label mark')).toHaveText('Lang');
   await settingsSearch.fill('主题');
@@ -369,6 +469,8 @@ test.describe(() => {
   await settingsSearch.press('Tab');
   await expect(header.locator('.search-dismiss')).toBeFocused();
   await expect(header.locator('.search-dismiss')).toHaveAccessibleName('Clear search');
+  await ui.keyboard.press('Tab');
+  await expect(ui.getByRole('tab', { name: 'Appearance', exact: true })).toBeFocused();
   await ui.keyboard.press('Tab');
   await expect(theme).toBeFocused();
   await settingsSearch.fill('7 days');
@@ -415,8 +517,13 @@ test.describe(() => {
   const footer = await ui.locator('.settings-view .palette-footer').boundingBox();
   expect(footer!.height).toBe(44);
   expect(footer!.y + footer!.height).toBeLessThanOrEqual(palette!.y + palette!.height);
-  const narrowLanguage = await language.boundingBox(), narrowTheme = await theme.boundingBox();
-  expect(narrowTheme!.y).toBeGreaterThan(narrowLanguage!.y + narrowLanguage!.height);
+  const categories = ui.getByRole('combobox', { name: 'Settings categories', exact: true });
+  await expect(categories).toBeVisible();
+  const narrowLanguageRow = await ui.locator('[data-setting="language"] .setting-row').boundingBox();
+  await categories.selectOption({ label: 'Appearance' });
+  const narrowThemeRow = await ui.locator('[data-setting="theme"] .setting-row').boundingBox();
+  expect(narrowThemeRow!.y).toBe(narrowLanguageRow!.y);
+  await categories.selectOption({ label: 'Appearance' });
   await ui.getByRole('combobox', { name: 'Language', exact: true }).click();
   await expect(ui.locator('.choice-option').first()).toHaveCSS('min-height', '32px');
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-select-narrow.png') });
@@ -426,10 +533,16 @@ test.describe(() => {
   expect(menu!.y + menu!.height).toBeLessThanOrEqual(body!.y + body!.height);
   await ui.getByRole('option', { name: '简体中文', exact: true }).click();
   await expect(ui.getByRole('region', { name: '设置', exact: true })).toBeVisible();
-  await expect(ui.locator('.settings-body h2')).toHaveText(['通用', '键盘', '实验性功能']);
+  const chineseCategories = ui.getByRole('combobox', { name: '设置分类', exact: true });
+  for (const category of ['外观', '键盘', '实验室']) {
+    await chineseCategories.selectOption({ label: category });
+    await expect(ui.locator('.settings-body h2')).toHaveCount(0);
+  }
+  await chineseCategories.selectOption({ label: '外观' });
   await expect(navigation.locator('.navigation-key')).toHaveText(['Tab下一个', 'Shift+Tab上一个']);
   await expect(navigation.locator('kbd')).toHaveText(['Tab', 'Shift+Tab']);
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-narrow.png') });
+  await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('settings-narrow.png') });
+  await chineseCategories.selectOption({ label: '键盘' });
   const nextPage = context.waitForEvent('page');
   await ui.getByRole('button', { name: '前往修改' }).click();
   const shortcuts = await nextPage;
@@ -471,12 +584,13 @@ test.describe(() => {
   await page.keyboard.press('Tab'); // Search focus logo
   await page.keyboard.press('Tab'); // Search
   await page.keyboard.press('Tab'); // Search Escape button
+  await page.keyboard.press('Tab'); // Appearance category
   await page.keyboard.press('Tab'); // Language
   await page.keyboard.press('Enter');
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   await expect.poll(async () => (await ax()).some(n => n.role?.value === 'region' && n.name?.value === 'Settings')).toBe(true);
-  await page.keyboard.press('Tab'); // Theme
+  await page.keyboard.press('Tab'); // Theme follows Language in Appearance
   await page.keyboard.press('Enter');
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
@@ -509,6 +623,7 @@ for (const host of ['overlay', 'native'] as const) test.describe('headed', { tag
     const native = host === 'native' ? context.pages().find(page => page.url().includes('popup.html#window='))! : undefined;
     const surface = native || source.frameLocator('.justonehop-frame');
     await surface.locator('.settings-button').click();
+    await surface.getByRole('tab', { name: 'Keyboard', exact: true }).click();
     await surface.getByRole('button', { name: 'Set Up', exact: true }).click();
     const code = await surface.getByRole('textbox', { name: 'JavaScript code' }).inputValue();
     await surface.getByRole('button', { name: 'Copy & Open', exact: true }).click();
@@ -527,7 +642,7 @@ for (const host of ['overlay', 'native'] as const) test.describe('headed', { tag
         await expect.poll(activeTab).toBe(shortcutsId);
       }
       await source.bringToFront();
-      await surface.locator('.footer-back').click();
+      await surface.locator('.settings-footer .footer-back').click();
       await shortcuts.bringToFront();
       await expect.poll(activeTab).toBe(shortcutsId);
       await source.bringToFront();
@@ -566,8 +681,13 @@ test.describe(() => {
     expect(permissions).not.toContain('userScripts');
     expect(await ui.evaluate(() => '__legacyScriptExecuted' in globalThis)).toBe(false);
     await ui.locator('.settings-button').click();
-    await expect(ui.locator('[data-setting]')).toHaveCount(7);
-    await expect(ui.getByRole('button', { name: 'Manage Scripts', exact: true })).toHaveCount(0);
+    const settingIds: string[] = [];
+    for (const category of ['Appearance', 'Keyboard', 'Labs']) {
+      await ui.getByRole('tab', { name: category, exact: true }).click();
+      settingIds.push(...await ui.locator('[data-setting]').evaluateAll(rows => rows.map(row => row.getAttribute('data-setting')!)));
+      await expect(ui.getByRole('button', { name: 'Manage Scripts', exact: true })).toHaveCount(0);
+    }
+    expect(settingIds).toEqual(['language', 'theme', 'searchIcon', 'keyboard', 'binding', 'tabs', 'ranking']);
     const settings = ui.getByRole('textbox', { name: 'Search settings', exact: true });
     await settings.fill('scripts'); await expect(ui.locator('[data-setting]')).toHaveCount(0);
     await settings.fill('ctrl tab');
@@ -575,8 +695,9 @@ test.describe(() => {
     await setup.click();
     await expect(ui.getByRole('region', { name: 'Set Up Ctrl+Tab', exact: true })).toBeVisible();
     await expect(ui.locator('.binding-code-field textarea')).toHaveAttribute('readonly', '');
-    await ui.locator('.footer-back').click();
+    await ui.locator('.settings-footer .footer-back').click();
     await expect(settings).toHaveValue('ctrl tab'); await expect(setup).toBeFocused();
+    await ui.keyboard.press('Escape'); await expect(settings).toHaveValue(''); await expect(settings).toBeFocused();
     await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
     await search.fill('Ctrl+Tab');
     await expect(ui.locator('[id="justonehop-command:settings:binding"]')).toHaveAttribute('aria-selected', 'true');
@@ -599,6 +720,7 @@ test.describe(() => {
   await context.grantPermissions(['clipboard-read']);
   const before = await worker.evaluate(() => chrome.commands.getAll());
   await ui.locator('.settings-button').click();
+  await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
   await ui.getByRole('button', { name: 'Set Up', exact: true }).click();
   await expect(ui.locator('.palette-footer-title').filter({ hasText: 'Set Up Ctrl+Tab' })).toBeVisible();
   await expect(ui.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
@@ -613,7 +735,7 @@ test.describe(() => {
   await expect(ui.getByRole('status')).toContainText('Code copied');
   const code = await ui.evaluate(() => navigator.clipboard.readText());
   expect(code).not.toMatch(/[\r\n]/);
-  await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings · Keyboard · Set Up Ctrl+Tab');
   const calls: unknown[] = [];
   new Function('chrome', code)({ developerPrivate: { updateExtensionCommand: (value: unknown) => calls.push(value) } });
   expect(calls).toEqual([
@@ -625,12 +747,12 @@ test.describe(() => {
   await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   expect(await ui.locator('.binding-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await expect(ui.locator('.palette-footer .primary-action')).toBeInViewport({ ratio: 1 });
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('binding-guide.png') });
+  await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('binding-guide.png') });
   await ui.locator('.palette-footer .actions-button').click();
   await expect(ui.getByRole('dialog').getByRole('option', { name: 'Delete', exact: true })).toHaveCount(0);
-  await ui.locator('.palette-footer .footer-back').click();
+  await ui.locator('.settings-footer .footer-back').click();
   await expect(ui.locator('.action-menu')).toHaveCount(0);
-  await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings · Keyboard · Set Up Ctrl+Tab');
   await ui.evaluate(() => navigator.clipboard.writeText('before combined action'));
   await copy.focus();
   const created = context.waitForEvent('page');
@@ -639,7 +761,7 @@ test.describe(() => {
   expect(ui.isClosed()).toBe(false);
   await ui.bringToFront();
   await expect(ui.locator('.binding-guide')).toBeVisible();
-  await expect(ui.locator('.palette-footer-title')).toHaveText('Set Up Ctrl+Tab');
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings · Keyboard · Set Up Ctrl+Tab');
   expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
   await ui.locator('.palette-footer .actions-button').click();
   await ui.getByRole('dialog').getByRole('option', { name: /Open Chrome Shortcuts/ }).click();

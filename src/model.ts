@@ -109,6 +109,7 @@ export function entries(snapshot: Snapshot): Entry[] {
     ...([
       ['language', 'language', ['language', 'change language', 'lang', 'langauge', 'languge', 'laguage', 'English', '中文', '英文', '语言', '切换语言', '语言设置']],
       ['theme', 'theme', ['theme', 'appearance', 'change theme', 'dark mode', 'light mode', '深色模式', '浅色模式', '主题', '外观', '换主题', '切换主题']],
+      ['searchIcon', 'searchIcon', ['search icon', 'icon', 'logo', 'emoji', 'custom icon', 'upload image', 'appearance', '图标', '搜索框图标', '自定义图标', '图片', '表情', '外观']],
       ['keyboard', 'keyboardShortcuts', ['hotkey', 'hotkeys', 'shortcut', 'keyboard shortcuts', 'keybindings', 'shorcut', 'shotcut', '快捷键', '快捷键设置', '热键', '按键绑定']],
       ['binding', 'bindCtrlTab', ['ctrl tab', 'Ctrl+Tab', 'bind Ctrl+Tab', 'set up Ctrl+Tab', '设置 Ctrl+Tab', '配置 Ctrl+Tab', '绑定 Ctrl+Tab']],
       ['ranking', 'searchRanking', ['search ranking', 'reset search ranking', 'reset ranking', '搜索排序', '重置搜索排序', '重置排序', '清除排序', '使用习惯']],

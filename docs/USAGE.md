@@ -169,7 +169,7 @@ If you love the `Ctrl+Tab` or `Alt+Tab` workflow in code editors like VS Code, y
 
 Chrome reserves `Ctrl+Tab` by default and does not allow extensions to bind it directly in the normal extension shortcut UI. JustOneHop provides a clever 1-step setup helper:
 
-1. Open JustOneHop, type `ctrl tab`, and press `Enter` (or go to **Settings → Keyboard → Tab Switcher**).
+1. Open JustOneHop, type `ctrl tab`, and press `Enter` (or go to **Settings → Shortcuts → Tab Switcher**).
 2. Click **Copy & Open** in the footer. JustOneHop automatically copies the one-line configuration script tailored to your extension ID and opens `chrome://extensions/shortcuts`.
 3. Press **`⌘⌥J`** on macOS (or **`Ctrl+Shift+J`** on Windows/Linux) to reveal Chrome's DevTools Console.
 4. Paste and press `Enter`. Both `Ctrl+Tab` and `Ctrl+Shift+Tab` are configured instantly!
@@ -248,7 +248,7 @@ We all hoard tabs because we "might need them later", slowing down Chrome and cl
 
 ### Automatic Idle Tucking
 
-Go to **Settings → Experimental Features → Auto-tuck tabs**:
+Go to **Settings → Experimental → Auto-tuck tabs**:
 
 - Choose an idle duration threshold: **1 hour, 12 hours, 1 day, 3 days, or 7 days** (default: 7 days). Previously saved durations, including 3 hours, remain until you select a new value.
 - Runs when your computer is idle (at least 60 seconds without input, or locked), or Chrome has remained unfocused for **30 minutes**. The unfocused path uses the regular five-minute check; returning to Chrome resets the wait and stops further tucking.
@@ -296,6 +296,12 @@ Search: cookie
 <a id="面板位置底栏与返回"></a>
 
 JustOneHop is crafted with obsessive attention to UI ergonomics.
+
+### Settings Categories & Search
+
+Open Settings from the footer gear or search for `settings`. Use the left sidebar to choose **Appearance**, **Keyboard**, **Labs**, or **Help**; on narrow screens, use the category selector. Appearance opens by default and contains Language, Theme, and Search Bar Icon. Help opens the help content directly. The top search stays available across categories and settings subpages, and searches all settings. Category switching does not add extra Back steps; settings subpages use the footer Back arrow or `Esc`.
+
+Typing temporarily shows matching settings. Clear the query to restore the previous category or subpage and its draft; opening a result subpage and returning preserves your search context. To customize the search icon, open **Appearance → Search Bar Icon** and save explicitly. Temporary searches preserve the draft, while leaving the icon page through Back, category navigation, or another destination discards unsaved changes. Categories, search, fields, and actions are available by mouse or keyboard (`Tab` / `Shift+Tab` to move focus).
 
 ### The 44px Footer & Breadcrumbs
 

@@ -1,4 +1,21 @@
 import { test, expect, fixtureOrigin, snapshotTab } from './support/paletteUI';
+import type { Locator } from '@playwright/test';
+
+async function expectIconSpacing(bar: Locator, expectedLeft: number, expectedRight: number) {
+  const spacing = await bar.evaluate(node => {
+    const view = node.ownerDocument.defaultView!;
+    const icon = node.querySelector('.search-icon')!.getBoundingClientRect();
+    const input = node.querySelector('input')!;
+    const style = view.getComputedStyle(input);
+    const box = node.getBoundingClientRect();
+    const pill = view.getComputedStyle(node, '::before');
+    const edge = box.left + (pill.content === 'none' ? 0 : parseFloat(pill.left));
+    return { left: icon.left - edge,
+      right: input.getBoundingClientRect().left + parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth) - icon.right };
+  });
+  expect(spacing.left).toBeCloseTo(expectedLeft, 1);
+  expect(spacing.right).toBeCloseTo(expectedRight, 1);
+}
 
 test.use({ viewport: { width: 1100, height: 760 }, reducedMotion: 'reduce' });
 
@@ -13,6 +30,7 @@ test('light and dark surfaces, compact rows and bottom action search fit without
   for (const theme of ['light', 'dark'] as const) {
     await ui.emulateMedia({ colorScheme: theme });
     await input.fill('');
+    await expectIconSpacing(ui.locator('.search-bar'), 14, 10);
     expect((await ui.locator('.result').first().boundingBox())!.height).toBe(40);
     await expect(ui.locator('.section-start')).toHaveCount(0);
     await expect(ui.locator('.suggested-label')).toHaveCount(0);
@@ -23,12 +41,31 @@ test('light and dark surfaces, compact rows and bottom action search fit without
     await input.press('Meta+ArrowUp');
     await expect(ui.locator('.result.tab')).toHaveAttribute('aria-selected', 'true');
     await input.press('Meta+k');
+    await expectIconSpacing(ui.locator('.action-search'), 14, 14);
+    await expect(ui.locator('.action-search input')).toBeFocused();
+    const ring = await ui.locator('.action-search').evaluate(node => {
+      const style = getComputedStyle(node, '::after');
+      return { inset: style.top, radius: style.borderRadius, width: style.borderTopWidth, color: style.borderTopColor, outline: getComputedStyle(node).outlineStyle };
+    });
+    expect(ring).toMatchObject({ inset: '4px', radius: '8px', width: '2px', outline: 'none' });
+    expect(ring.color).not.toBe('rgba(0, 0, 0, 0)');
     const searchBox = await ui.locator('.action-search').boundingBox();
     const actionList = await ui.locator('.action-list').boundingBox();
     expect(searchBox!.y).toBeGreaterThanOrEqual(actionList!.y + actionList!.height - 1);
     await ui.locator('.palette').screenshot({ path: test.info().outputPath(`actions-${theme}.png`) });
     await ui.keyboard.press('Escape');
   }
+  await ui.setViewportSize({ width: 390, height: 600 });
+  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  await expectIconSpacing(ui.locator('.search-bar'), 8, 8);
+  await ui.locator('.settings-button').click();
+  await expectIconSpacing(ui.locator('.settings-search'), 8, 8);
+  await ui.locator('.settings-search input').press('Escape');
+  await expect(input).toHaveValue('Design System');
+  await input.fill('标签切换器'); await input.press('Enter');
+  await expectIconSpacing(ui.locator('.recent-switcher .search-bar'), 8, 8);
+  await ui.locator('.recent-search-activate').click();
+  await expect(ui.locator('.recent-search-field input')).toBeFocused();
 });
 
 for (const language of ['Chinese', 'English']) test(`${language} quiet layout exposes Ctrl P N navigation in results and actions at narrow widths`, async ({ palette }) => {

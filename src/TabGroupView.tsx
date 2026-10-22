@@ -7,6 +7,7 @@ import { GroupConfirmation } from './GroupConfirmation';
 import { BackLayer } from './Navigation';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
+import { TaskHeader } from './TaskHeader';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { Favicon } from './Favicon';
@@ -133,9 +134,10 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   const primary: { id: string; title: string; danger?: boolean } | undefined = menu ? chosen : editor ? { id: 'save', title: t('groupSave') } : selected ? { id: 'switch', title: t('switchTabPrimary') } : undefined;
   const groupLabel = `${t('categoryTabGroup')}: ${group?.title || t('unnamedGroup')}`;
   const body = <>
+    {editor ? <TaskHeader /> : null}
     <div className="group-surface" inert={menu || bookmarkRemoval || groupRemoval ? true : undefined}>
       {!group ? <p className="empty">{t('groupMissing')}</p> : editor ? <div className="settings-body">
-        <h2>{t('groupRename')}</h2>
+        <h1 className="task-title">{t('groupRename')}</h1>
         <label className="group-field">{t('groupName')}<input ref={nameInput} value={name} onChange={event => setName(event.target.value)} disabled={busy} /></label>
       </div> : <>
         <div className="search-bar"><SearchFocusButton input={input} disabled={busy} /><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
@@ -164,7 +166,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
     </div>
     {refreshError ? <div className="error-banner" role="alert">{refreshError}</div> : null}
     <PaletteFooter isMac={isMac}
-      navigation={{ kind: 'back', label: `${t('back')} · ${groupLabel}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
+      navigation={editor ? undefined : { kind: 'back', label: `${t('back')} · ${groupLabel}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={groupLabel}
       context={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
       status={selection === null && !editor ? <span role="status">{t('chooseNextTab')}</span> : undefined}

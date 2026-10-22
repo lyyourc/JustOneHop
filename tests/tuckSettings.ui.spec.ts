@@ -85,7 +85,12 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await filter.press('Tab');
   await expect(ui.locator('.settings-search .search-dismiss')).toBeFocused();
   await expect(ui.locator('.settings-search .search-dismiss')).toHaveAccessibleName('清空搜索');
-  await ui.keyboard.press('Tab'); // Rules follow the shared clear/dismiss button.
+  await ui.keyboard.press('Tab');
+  await expect(ui.getByRole('combobox', { name: '设置分类' })).toBeFocused();
+  await ui.keyboard.press('Tab'); // The switch is the first setting control.
+  const toggle = ui.getByRole('switch', { name: '自动收起标签页' });
+  await expect(toggle).toBeFocused();
+  await ui.keyboard.press('Tab');
   const rules = ui.getByRole('button', { name: '了解规则' });
   await expect(rules).toBeFocused();
   await rules.press('Space');
@@ -93,8 +98,7 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect(ui.locator('.tuck-rules-copy')).toContainText('电脑空闲或 Chrome 失去焦点满 30 分钟时收起，返回 Chrome 后停止');
   await rules.press('Space');
   await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
-  await ui.keyboard.press('Tab'); // Auto tuck switch
-  const toggle = ui.getByRole('switch', { name: '自动收起标签页' });
+  await ui.keyboard.press('Shift+Tab'); // Auto tuck switch
   await expect(toggle).toBeFocused();
   await expect(ui.locator('.tuck-settings')).toHaveCount(0);
   await toggle.press('Space');
@@ -103,14 +107,14 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect(duration).toBeEnabled();
   await expect(toggle).toBeFocused();
   await toggle.press('Tab');
-  await expect(ui.getByRole('button', { name: '刷新状态' })).toBeFocused();
-  await ui.keyboard.press('Tab');
   await expect(duration).toBeFocused();
   await duration.press('Enter');
   await expect(ui.getByRole('listbox').getByRole('option')).toHaveText(['1 小时', '12 小时', '1 天', '3 天', '7 天']);
   await expect(ui.getByRole('option', { name: '3 小时', exact: true })).toHaveCount(0);
   await duration.press('Home'); await duration.press('Enter');
   await expect(ui.getByRole('spinbutton')).toHaveCount(0);
+  await ui.keyboard.press('Escape');
+  await expect(filter).toHaveValue('');
   await ui.keyboard.press('Escape');
   const search = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
   await search.fill('自动收起'); await search.press('Enter');
@@ -129,7 +133,7 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await refresh.click();
   await expect(status).toContainText('2 个标签页已到期，等待 Chrome 失去焦点或电脑空闲');
   await expect(status).toContainText('4 个标签页尚未到期');
-  await expect(status).toContainText('3 个标签页受保护（当前、固定、已有分组等）');
+  await expect(status).toContainText('3 个标签页受保护');
   await expect(status).toContainText('1 个标签页等待收起组恢复核对');
   await expect(status).toContainText('尚未完成自动检查');
   await expect(status).toContainText('上次尝试失败：');
@@ -151,13 +155,13 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect(status).not.toContainText('失去焦点');
   await expect(status).toContainText('上次自动检查：');
   await expect(status).toContainText('上次尝试失败：');
-  await expect(status.locator('time').first()).toHaveAttribute('datetime', new Date(scannedAt).toISOString());
-  await expect(status.locator('time').last()).toHaveAttribute('datetime', new Date(failedAt).toISOString());
+  await expect(status.locator('.tuck-last-check time')).toHaveAttribute('datetime', new Date(scannedAt).toISOString());
+  await expect(status.locator('p time')).toHaveAttribute('datetime', new Date(failedAt).toISOString());
   store.tuckStatus = { notDueCount: 4, protectedCount: 3 } satisfies Partial<TuckStatus>;
   await refresh.press('Enter');
   await expect(status).toContainText('目前没有符合条件');
   await expect(status).toContainText('4 个标签页尚未到期');
-  await expect(status).toContainText('3 个标签页受保护（当前、固定、已有分组等）');
+  await expect(status).toContainText('3 个标签页受保护');
   await expect(status).not.toContainText('上次尝试失败');
   await expect(status).not.toContainText('等待收起组恢复核对');
   await ui.reload();

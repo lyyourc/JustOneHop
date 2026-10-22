@@ -151,6 +151,7 @@ test.describe(() => {
       await expect(confirmation).toContainText('Duplicate folder');
       await expect(confirmation.getByRole('button', { name: `Remove ${count} bookmarks`, exact: true })).toBeInViewport();
       await expect(cancel).toBeFocused();
+      if (count === 2 && mouse) await surface.locator('.palette').screenshot({ path: test.info().outputPath('bookmark-confirmation.png') });
     }
     async function returnToGroup() {
       await expect(confirmation).toHaveCount(0);

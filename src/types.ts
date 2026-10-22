@@ -102,7 +102,7 @@ export type Request =
   | { source: 'justonehop'; type: 'execute'; payload: Execution };
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string };
 export type IconName = 'search' | 'copy' | 'help' | 'extension' | 'password' | 'download' | 'history' | 'keyboard' | 'tab' | 'bookmark' | 'plus' | 'reload' | 'close' | 'others' | 'right' | 'restore' | 'pin' | 'volume' | 'settings' | 'database' | 'cookie' | 'tuck';
-export type SettingsSection = 'language' | 'theme' | 'keyboard' | 'binding' | 'ranking' | 'tabs';
+export type SettingsSection = 'language' | 'theme' | 'searchIcon' | 'keyboard' | 'binding' | 'ranking' | 'tabs';
 export interface Entry {
   category?: 'tabGroup' | 'tab' | 'storage' | 'settings' | 'chromePages' | 'justonehop';
   shortcut?: string;

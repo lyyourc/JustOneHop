@@ -1,6 +1,8 @@
+import { normalizeSearchIcon } from './searchIconData';
+
 export type Language = 'system' | 'zh' | 'en';
 export type Theme = 'system' | 'light' | 'dark';
-export interface Preferences { language: Language; theme: Theme; autoTuck: boolean; autoTuckAfterHours: number }
+export interface Preferences { language: Language; theme: Theme; autoTuck: boolean; autoTuckAfterHours: number; searchIcon?: string }
 export const DEFAULT_AUTO_TUCK_HOURS = 168;
 export function isAutoTuckAfterHours(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 8760;
@@ -8,7 +10,9 @@ export function isAutoTuckAfterHours(value: unknown): value is number {
 
 export function normalizePreferences(value: unknown): Preferences {
   const data = value as Partial<Preferences> | null;
+  const searchIcon = normalizeSearchIcon(data?.searchIcon);
   return {
+    ...(searchIcon ? { searchIcon } : {}),
     language: data?.language === 'zh' || data?.language === 'en' ? data.language : 'system',
     theme: data?.theme === 'light' || data?.theme === 'dark' ? data.theme : 'system',
     autoTuck: data?.autoTuck === true,
@@ -19,7 +23,7 @@ let current = normalizePreferences(null);
 const listeners = new Set<() => void>();
 function update(value: unknown) {
   const next = normalizePreferences(value);
-  if (current.language === next.language && current.theme === next.theme && current.autoTuck === next.autoTuck && current.autoTuckAfterHours === next.autoTuckAfterHours) return;
+  if (current.language === next.language && current.theme === next.theme && current.autoTuck === next.autoTuck && current.autoTuckAfterHours === next.autoTuckAfterHours && current.searchIcon === next.searchIcon) return;
   current = next;
   listeners.forEach(listener => listener());
 }

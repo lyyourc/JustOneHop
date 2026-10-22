@@ -3,6 +3,7 @@ import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { ActionMenu } from './ActionMenu';
 import { PaletteFooter } from './PaletteFooter';
+import { TaskHeader } from './TaskHeader';
 import { useOperationFeedback } from './OperationFeedback';
 import { ReadOnlyPreview } from './ReadOnlyPreview';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
@@ -159,6 +160,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
     }
   }
   return <BackLayer onBack={onBack}><BackLayer active={!!detail} onBack={() => setDetail(null)}><section tabIndex={-1} className="palette storage-view" aria-label={title} aria-busy={busy} onKeyDown={keyboard}>
+    {detail ? <TaskHeader /> : null}
     <span className="sr-only" id="storage-navigation">{t('navigationHelp')}</span>
     <div className={`storage-surface ${menu ? 'subdued' : ''}`} inert={menu ? true : undefined}>
       {detail ? <div className="storage-detail" ref={detailBody} tabIndex={0} aria-label={t('viewDetails')}>
@@ -170,7 +172,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
           <SearchDismissButton label={t('back')} query={query} input={input} onClear={() => { setQuery(''); setSelection(''); }} /></div>
         <div className={`storage-list-content ${selected ? 'with-detail' : ''}`}>
         <div className="storage-results" id="storage-results" role="listbox" aria-label={t('storageEntries')} ref={list}>
-          {busy && !data && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void act('refresh'); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
+          {busy && !data && showLoading ? <div className="empty"><LoaderCircle className="spinner" size={24} /><p>{t('loading')}</p></div> : error && !data ? <div className="empty storage-error" role="alert"><Database size={24} /><p>{error}</p><button className="surface-button" onClick={() => { if (error === t('errorStoragePermission')) void authorize(); else void act('refresh'); }}>{t(error === t('errorStoragePermission') ? 'allowCookieAccess' : 'retry')}</button></div>
             : !rows.length && !busy ? <div className="empty"><Database size={26} /><strong>{query ? t('noResults') : t('storageEmpty')}</strong></div>
             : rows.map((row, index) => <div key={row.id} id={`storage-row-${index}`} className="result storage-row" role="option" aria-selected={row.id === selected?.id}
               title={row.name || t('storageEmptyName')}
@@ -198,7 +200,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }}
       selectedId={activeAction?.id} onSelectionChange={setActionSelection} onAction={id => void act(id)} onClose={() => setMenu(false)} /> : null}
     <PaletteFooter isMac={isMac}
-      navigation={{ kind: 'back', label: `${t('back')} · ${title}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
+      navigation={detail ? undefined : { kind: 'back', label: `${t('back')} · ${title}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={title}
       context={<span className="storage-origin" title={request.expectedUrl}>{request.expectedUrl.replace(/^https?:\/\//, '').split('/')[0] || request.expectedUrl}</span>}
       primary={{ label: menu ? activeAction?.title || t('copyValue') : t('copyValue'), keys: ['↵'], disabled: busy || (menu ? !activeAction : !current), onAction: () => void act(menu ? activeAction?.id || '' : 'value') }}

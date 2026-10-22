@@ -81,6 +81,7 @@ test('History intent: bilingual commands enter an empty all-time search and rest
     const history = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
     await expect(history).toBeFocused(); await expect(history).toHaveValue('');
     await expect(ui.getByText('Enter a title or URL to search history', { exact: true })).toBeVisible();
+    if (query === 'history') await ui.locator('.palette').screenshot({ path: test.info().outputPath('history-empty.png') });
     if (query === '历史') await history.press('Escape');
     else await ui.locator('.history-view .footer-back').click();
     await expect(input).toBeFocused(); await expect(input).toHaveValue(query);

@@ -102,10 +102,11 @@ test('English Escape routing survives lost control focus through binding and set
   const language = ui.getByRole('combobox', { name: 'Language', exact: true });
   await language.press('Enter'); await escapeWithoutControlFocus();
   await expect(language).toHaveAttribute('aria-expanded', 'false'); await expect(language).toBeFocused();
+  await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
   const setup = ui.getByRole('button', { name: 'Set Up', exact: true });
   await setup.click();
   await ui.keyboard.press('Meta+k'); await escapeWithoutControlFocus();
-  await expect(ui.locator('.binding-view .primary-action')).toBeFocused();
+  await expect(ui.locator('.settings-footer .primary-action')).toBeFocused();
   await escapeWithoutControlFocus(); await expect(setup).toBeFocused();
   await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await escapeWithoutControlFocus(); await expect(search).toBeFocused(); await expect(search).toHaveValue('settings');
@@ -124,6 +125,7 @@ test('English Backspace returns from empty searches while preserving text editin
   const settings = ui.getByRole('textbox', { name: 'Search settings', exact: true });
   await settings.fill('test'); await settings.press('Backspace'); await expect(settings).toHaveValue('tes');
   await settings.press('Meta+a'); await settings.press('Backspace'); await expect(settings).toHaveValue('');
+  await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
   const setup = ui.getByRole('button', { name: 'Set Up', exact: true });
   await setup.click();
   const code = ui.getByLabel('JavaScript code');
@@ -133,7 +135,8 @@ test('English Backspace returns from empty searches while preserving text editin
   const actions = ui.getByRole('combobox', { name: 'Search actions' });
   await actions.fill('copy'); await actions.press('Backspace'); await expect(actions).toHaveValue('cop');
   await actions.fill(''); await actions.press('Backspace'); await expect(code).toBeFocused();
-  await ui.locator('.footer-back').focus(); await ui.keyboard.press('Backspace'); await expect(setup).toBeFocused();
+  await ui.locator('.settings-footer .footer-back').focus(); await ui.keyboard.press('Backspace'); await expect(setup).toBeFocused();
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   const language = ui.getByRole('combobox', { name: 'Language', exact: true });
   await language.press('Enter'); await language.press('Backspace'); await expect(language).toHaveAttribute('aria-expanded', 'false');
   await language.press('Backspace'); await expect(search).toBeFocused();

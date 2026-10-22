@@ -1,11 +1,12 @@
-import { BackLayer } from './Navigation';
+import { BackLayer, useNavigateBack } from './Navigation';
 import { BindingNavigation } from './BindingNavigation';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink } from 'lucide-react';
 import { t } from './i18n';
 import { copyText } from './clipboard';
 import { openShortcuts } from './api';
-import { PaletteFooter } from './PaletteFooter';
+import { SettingsPage, SettingsPageFooter } from './SettingsPage';
+import { TaskHeader } from './TaskHeader';
 import { ActionMenu } from './ActionMenu';
 import { useOperationFeedback } from './OperationFeedback';
 
@@ -14,6 +15,8 @@ export function bindingCode() {
 }
 
 export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boolean }) {
+  const page = useContext(SettingsPage);
+  const navigateBack = useNavigateBack();
   const retainGuide = useContext(BindingNavigation);
   const feedback = useOperationFeedback();
   const [busy, setBusy] = useState(false);
@@ -28,8 +31,9 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
   const wasMenu = useRef(false);
   useLayoutEffect(() => retainGuide(), [retainGuide]);
   useEffect(() => () => { revision.current++; }, []);
-  function focusPrimary() { back.current?.closest('.palette-footer')?.querySelector<HTMLButtonElement>('.primary-action')?.focus(); }
-  useLayoutEffect(() => { focusPrimary(); }, []);
+  function focusPrimary() { back.current?.closest('.palette')?.querySelector<HTMLButtonElement>('.primary-action')?.focus(); }
+  useLayoutEffect(() => { focusPrimary(); }, [page?.footer, page?.active]);
+  useEffect(() => { if (page && !page.active) setMenu(false); }, [page?.active]);
   useLayoutEffect(() => {
     if (!menu && wasMenu.current) {
       if (caret.current && field.current) { field.current.focus(); field.current.setSelectionRange(...caret.current); }
@@ -78,7 +82,7 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
       feedback.error(operation, t(copied ? 'bindingCopiedOpenFailed' : 'errorGeneric'));
     } finally { pending.current = false; if (version === revision.current) setBusy(false); }
   }
-  return <BackLayer onBack={leave}><section tabIndex={-1} className="palette binding-view" aria-label={t('bindCtrlTab')} onKeyDown={event => {
+  return <BackLayer onBack={leave} active={page?.active ?? true}><section tabIndex={-1} className="palette binding-view" aria-label={t('bindCtrlTab')} onKeyDown={event => {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     const modifier = isMac ? event.metaKey : event.ctrlKey;
     if (modifier && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'k') {
@@ -91,8 +95,10 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
     }
     if (!['BUTTON', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) { event.preventDefault(); void perform('both'); }
   }}>
+    {!page ? <TaskHeader buttonRef={back} /> : null}
     <div className={`binding-surface ${menu ? 'subdued' : ''}`} inert={menu ? true : undefined}>
       <div className="binding-body">
+        <h1 className="task-title">{t('bindCtrlTab')}</h1>
         <div className="binding-guide"><p>{t('bindingEffect')}</p>
           <ol><li>{t('bindingStepCopy')}</li><li>{t('bindingStepConsole', isMac ? '⌘⌥J' : 'Ctrl+Shift+J')}</li></ol>
           <p>{t('bindingPasteHint')}</p>
@@ -103,8 +109,8 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
     {menu ? <ActionMenu id="binding-actions" isMac={isMac} title={<span>{t('bindCtrlTab')}</span>}
       actions={actions} query={query} onQueryChange={value => { setQuery(value); setSelection(''); }} selectedId={selected?.id}
       onSelectionChange={setSelection} onAction={id => void perform(id as 'copy' | 'shortcuts')} onClose={() => setMenu(false)} /> : null}
-    <PaletteFooter isMac={isMac} title={t('bindCtrlTab')}
-      navigation={{ kind: 'back', label: `${t('back')} · ${t('bindCtrlTab')}`, tooltip: `${t('back')} · Esc`, buttonRef: back, onAction: leave }}
+    <SettingsPageFooter isMac={isMac} title={t('bindCtrlTab')}
+      navigation={page ? { kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, buttonRef: back, onAction: navigateBack } : undefined}
       primary={menu ? { label: selected?.title || t('actions'), keys: ['↵'], disabled: busy || !selected, onAction: () => { if (selected) void perform(selected.id as 'copy' | 'shortcuts'); } }
         : { label: t('bindingCopyOpen'), keys: ['↵'], disabled: busy, onAction: () => void perform('both') }}
       actions={{ open: menu, disabled: busy, onToggle: toggleMenu }} />

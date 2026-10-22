@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, RotateCcw, X } from 'lucide-react';
-import { BackLayer, useNavigateBack } from './Navigation';
+import { BackLayer } from './Navigation';
+import { TaskHeader } from './TaskHeader';
 import { PaletteFooter } from './PaletteFooter';
 import { ActionMenu } from './ActionMenu';
 import { execute } from './api';
@@ -18,7 +19,6 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
   const [busy, setBusy] = useState(false);
   const feedback = useOperationFeedback();
   const executing = useRef(false);
-  const back = useNavigateBack();
   const surface = useRef<HTMLElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const candidates = item?.candidates.filter(group => group.windowId === windowId) || [];
@@ -31,7 +31,7 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
   const action: { id: string; title: string; danger?: boolean } | undefined = menu ? actions.find(action => action.id === actionId) || actions[0]
     : { id: selected ? 'resume' : 'back', title: selected ? t('resumeTuck') : t('tuckRecoveryLater') };
   useLayoutEffect(() => {
-    if (!menu) (selected ? list.current : surface.current?.querySelector<HTMLButtonElement>('.footer-back'))?.focus();
+    if (!menu) (selected ? list.current : surface.current?.querySelector<HTMLButtonElement>('.task-back'))?.focus();
   }, [menu, selected?.id]);
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
   function toggleMenu() { if (!busy) { setMenu(!menu); setQuery(''); setActionId(selected ? 'resume' : 'back'); } }
@@ -71,7 +71,9 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
         // open its action menu to explicitly resume management.
       }
     }}>
+    <TaskHeader />
     <div className="settings-body" inert={menu ? true : undefined}>
+      <h1 className="task-title">{t('reviewTuck')}</h1>
       <p className="recovery-explanation">{item ? t('tuckRecoveryHint') : t('tuckRecoveryResolved')}</p>
       {item ? <p className="setting-note">{item.title} — {item.urls.join(' · ')}</p> : null}
       {item && !candidates.length ? <p>{t('tuckRecoveryMissing')}</p> : null}
@@ -90,7 +92,6 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
       <p className="setting-note">{t('tuckRecoveryForgetHint')}</p>
     </div>
     <PaletteFooter isMac={isMac}
-      navigation={{ kind: 'back', label: `${t('back')} · ${t('reviewTuck')}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
       title={t('reviewTuck')} context={item?.title}
       primary={{ label: action?.title || t('runCommand'), keys: ['↵'], disabled: busy || !action, danger: !!action?.danger, onAction: () => void run(action?.id || 'back') }}
       actions={{ open: menu, disabled: busy, onToggle: toggleMenu }} />

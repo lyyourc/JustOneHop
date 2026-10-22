@@ -17,8 +17,8 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one search index contains every source while cold home contains only eight safe defaults', () => {
   const items = entries(data);
-  assert.equal(items.length, 33);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 29);
+  assert.equal(items.length, 34);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 30);
   const home = homeEntries(items);
   assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
   assert.ok(home.every(entry => entry.kind === 'command' && !entry.danger && !entry.searchOnly));
@@ -606,6 +606,7 @@ test('feature commands are discoverable by intent and help is available on home'
     ['ctrl tab', 'command:settings:binding'], ['设置 Ctrl+Tab', 'command:settings:binding'],
     ['language', 'command:settings:language'], ['语言', 'command:settings:language'],
     ['theme', 'command:settings:theme'], ['主题', 'command:settings:theme'],
+    ['icon', 'command:settings:searchIcon'], ['图标', 'command:settings:searchIcon'], ['emoji', 'command:settings:searchIcon'],
     ['hotkey', 'command:settings:keyboard'], ['快捷键', 'command:settings:keyboard'],
     ['reset search ranking', 'command:settings:ranking'], ['重置搜索排序', 'command:settings:ranking'],
     ['auto tuck', 'command:settings:tabs'], ['自动收起', 'command:settings:tabs'],

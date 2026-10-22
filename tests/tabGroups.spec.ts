@@ -33,6 +33,7 @@ test.describe(() => {
     await ui.getByRole('button', { name: 'Open action menu' }).click();
     await ui.getByRole('option', { name: 'Rename Group', exact: true }).click();
     await ui.getByLabel('Group Name', { exact: true }).fill('DirectGroup Renamed');
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath('group-rename.png') });
     await ui.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(root).toBeFocused(); await expect(root).toHaveValue('DirectGroup');
     expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
@@ -41,6 +42,7 @@ test.describe(() => {
     const confirmation = ui.getByRole('alertdialog');
     await expect(confirmation).toContainText('DirectGroup Renamed'); await expect(confirmation).toContainText('2 tabs');
     await expect(confirmation.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+    await ui.locator('.palette').screenshot({ path: test.info().outputPath('group-confirmation.png') });
     await ui.keyboard.press('Escape'); await expect(actionSearch).toBeFocused();
     await ui.keyboard.press('Escape'); await expect(root).toBeFocused();
     expect(await root.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
@@ -137,7 +139,7 @@ test.describe(() => {
   });
   expect(await lowerRowVisible()).toBe(true);
   await action('Rename Group');
-  await ui.locator('.palette-footer .footer-back').click();
+  await ui.locator('.task-back').click();
   await expect(search).toBeFocused(); await expect(lowerRow).toHaveAttribute('id', lowerId!);
   expect(await lowerRowVisible()).toBe(true);
   await worker.evaluate(ids => chrome.tabs.remove(ids), extraTabs);

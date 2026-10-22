@@ -102,6 +102,7 @@ test.describe('windows', { tag: '@windows' }, () => {
     const other = await context.newPage(); await other.goto(`${origin}/Wheel-switcher-other`);
     const popup = await recentPopup(source);
     await popup.page.getByRole('button', { name: 'Search recent tabs…', exact: true }).click();
+    await popup.page.screenshot({ path: test.info().outputPath('switcher-window.png') });
     await popup.page.locator('.palette-footer-title').hover(); await popup.page.mouse.wheel(-140, 0);
     await expect.poll(popup.closed).toBe(true);
     expect(await popup.active()).toBe(popup.target.id);

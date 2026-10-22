@@ -44,7 +44,7 @@ function CookieAccess() {
     <strong className="permission-site">{patterns.map(pattern => pattern.replace('*://', '').replace('/*', '')).join(' · ') || origin}</strong>
     <p>{t('cookieAccessHint')}</p>
     {error ? <p className="permission-error" role="alert">{error}</p> : null}
-    <div className="permission-buttons"><button onClick={() => window.close()}>{t('back')}</button><button ref={button} className="permission-allow" disabled={!ready || busy} onClick={() => void grant()}>{t('cookieAccessConfirm')}</button></div>
+    <div className="permission-buttons"><button className="surface-button" onClick={() => window.close()}>{t('back')}</button><button ref={button} className="surface-button permission-allow" disabled={!ready || busy} onClick={() => void grant()}>{t('cookieAccessConfirm')}</button></div>
   </main>;
 }
 void preferencesReady.then(() => {

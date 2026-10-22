@@ -391,7 +391,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
     } else if (event.key === 'Tab') {
       // Trap keyboard focus inside the palette, including the non-modal popup.
       const scope = event.currentTarget as HTMLElement;
-      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, textarea, select, button:not(:disabled)'))
+      const nodes = Array.from(scope.querySelectorAll<HTMLElement>('input, textarea, select, button:not(:disabled), a[href], [role="listbox"][tabindex="0"], article[tabindex="0"]'))
         .filter(node => node.offsetParent !== null && !node.closest('[inert]') && !node.hasAttribute('disabled') && node.tabIndex >= 0 && (!actionTarget || node.closest('.action-menu')));
       const at = nodes.indexOf(event.target as HTMLElement);
       event.preventDefault();

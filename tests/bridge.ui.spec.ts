@@ -28,6 +28,7 @@ test('Chinese recent bridge UI embedded switcher mouse selection and narrow geom
   await expect(surface.locator('.primary-action')).toBeInViewport({ ratio: 1 }); await expect(surface.locator('.secondary-action')).toBeInViewport({ ratio: 1 });
   expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await expect.poll(() => surface.locator('.recent-overlay').evaluate(node => getComputedStyle(node).opacity)).toBe('1');
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('switcher-overlay-narrow.png') });
   await surface.getByRole('option').filter({ hasText: 'Bridge B' }).click();
   await expect.poll(() => palette.requests.filter(request => request.type === 'accept-overlay')).toEqual([
     { source: 'justonehop-recent', type: 'accept-overlay', session: 'ui-session', tabId: 2 },

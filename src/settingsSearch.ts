@@ -4,17 +4,25 @@ import type { MessageKey } from './i18n';
 import { termMatches } from './searchMatch';
 
 const fields = {
-  language: ['general', 'preferences', 'language', 'languageHint', 'systemLanguage', 'followSystem'],
-  theme: ['general', 'preferences', 'appearance', 'theme', 'themeHint', 'followSystem', 'lightTheme', 'darkTheme'],
-  help: ['general', 'help', 'helpHint', 'openHelp'],
-  keyboard: ['keyboard', 'keyboardShortcuts', 'paletteHotkey', 'hotkeyHint', 'changeHotkey'],
+  language: ['appearance', 'preferences', 'language', 'languageHint', 'systemLanguage', 'followSystem'],
+  theme: ['preferences', 'appearance', 'theme', 'themeHint', 'followSystem', 'lightTheme', 'darkTheme'],
+  searchIcon: ['preferences', 'appearance', 'searchIcon', 'searchIconHint', 'searchIconImage'],
+  help: ['help', 'helpHint', 'openHelp'],
+  keyboard: ['keyboard', 'keyboardShortcuts', 'paletteHotkey', 'paletteHotkeyHint', 'hotkeyHint', 'changeHotkey'],
   binding: ['keyboard', 'keyboardShortcuts', 'ctrlTabSetting', 'bindingHint', 'bindCtrlTab', 'setUpShortcut'],
-  tabs: ['experimentalFeatures', 'autoTuck', 'autoTuckHint', 'autoTuckOffHint', 'tuckAfter', 'tuckScheduleHint', 'tuckTimingHint'],
-  ranking: ['experimentalFeatures', 'searchRanking', 'searchRankingHint', 'resetSearchRanking'],
+  tabs: ['experimentalFeatures', 'settingsLabs', 'autoTuck', 'autoTuckHint', 'autoTuckOffHint', 'tuckAfter', 'tuckScheduleHint', 'tuckTimingHint', 'tuckProtectedHint'],
+  ranking: ['experimentalFeatures', 'settingsLabs', 'searchRanking', 'searchRankingHint', 'searchRankingResetHint', 'resetSearchRanking'],
 } satisfies Record<string, MessageKey[]>;
 
 export type SettingRow = keyof typeof fields;
+export type SettingsCategory = 'appearance' | 'keyboard' | 'experimentalFeatures' | 'help';
+export const settingsCategories: SettingsCategory[] = ['appearance', 'keyboard', 'experimentalFeatures', 'help'];
+export const settingCategory: Record<SettingRow, SettingsCategory> = {
+  language: 'appearance', help: 'help', theme: 'appearance', searchIcon: 'appearance',
+  keyboard: 'keyboard', binding: 'keyboard', tabs: 'experimentalFeatures', ranking: 'experimentalFeatures',
+};
 const aliases: Record<SettingRow, string> = {
+  searchIcon: 'icon logo emoji image upload custom 图标 图片 上传 自定义 表情 外观',
   help: 'help user guide 帮助 使用说明 使用指南',
   language: 'English 简体中文 中文 英文', theme: 'light dark 外观 浅色 深色',
   keyboard: 'hotkey shortcut 快捷键', binding: 'ctrl tab Ctrl+Tab 切换',

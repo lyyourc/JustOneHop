@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { BookOpen, ExternalLink, Search } from 'lucide-react';
 import { t } from './i18n';
 import { BackLayer, useNavigateBack } from './Navigation';
-import { PaletteFooter } from './PaletteFooter';
+import { SettingsPage, SettingsPageFooter } from './SettingsPage';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { HighlightedText } from './HighlightedText';
@@ -13,6 +13,7 @@ import { openHelpUrl } from './api';
 const GITHUB_DOCS_URL = 'https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md';
 
 export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () => void; shortcut: string; standalone?: boolean }) {
+  const page = useContext(SettingsPage);
   const [query, setQuery] = useState('');
   const input = useRef<HTMLInputElement>(null);
   const article = useRef<HTMLElement>(null);
@@ -20,7 +21,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
   const backLabel = t(standalone ? 'closeHelp' : 'back');
   const shortcutLabel = shortcut ? `${shortcut} (${describeShortcut(shortcut)})` : t('notAssigned');
   const sections = matchingHelp(query, shortcutLabel);
-  useEffect(() => { input.current?.focus(); }, []);
+  useEffect(() => { if (page) article.current?.focus(); else input.current?.focus(); }, []);
   useEffect(() => { article.current?.scrollTo({ top: 0 }); }, [query]);
   function clearSearch() { setQuery(''); input.current?.focus(); }
   function openGitHubDocs(event?: React.MouseEvent | React.KeyboardEvent) {
@@ -37,20 +38,20 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
     void openHelpUrl(GITHUB_DOCS_URL).catch(() => {});
   }
 
-  return <BackLayer onBack={onBack} closes={standalone}><section tabIndex={-1} className="palette help-view" aria-label={t('help')} onKeyDown={event => {
-    if (event.nativeEvent.isComposing || event.keyCode === 229 || event.key !== 'Tab') return;
+  return <BackLayer onBack={onBack} closes={standalone} active={page?.active ?? true}><section tabIndex={-1} className="palette help-view" aria-label={t('help')} onKeyDown={event => {
+    if (page || event.nativeEvent.isComposing || event.keyCode === 229 || event.key !== 'Tab') return;
     event.preventDefault(); event.stopPropagation();
-    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input, button:not(:disabled), article[tabindex]'));
+    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input, button:not(:disabled), a[href], article[tabindex]'));
     const at = controls.indexOf(event.target as HTMLElement);
     controls[(at + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
   }}>
-    <header className="search-bar help-search">
+    {!page ? <header className="search-bar help-search">
       <SearchFocusButton input={input} />
       <input ref={input} data-back-on-empty value={query} onChange={event => setQuery(event.target.value)}
         aria-label={t('searchHelp')} placeholder={t('searchHelpPlaceholder')} aria-controls="justonehop-help-content"
         autoComplete="off" spellCheck={false} />
       <SearchDismissButton label={backLabel} query={query} input={input} onClear={clearSearch} />
-    </header>
+    </header> : null}
     <article ref={article} id="justonehop-help-content" className={`help-body ${query.trim() ? 'filtered' : ''}`} tabIndex={0} aria-label={t('help')} onKeyDown={event => {
       if (event.nativeEvent.isComposing || event.keyCode === 229 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.target !== event.currentTarget) return;
       const node = event.currentTarget;
@@ -63,7 +64,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
       {!query.trim() ? <>
         <p className="help-intro">{t('helpIntro')}</p>
         <a className="help-github-card" href={GITHUB_DOCS_URL} target="_blank" rel="noreferrer noopener"
-          tabIndex={-1} onClick={openGitHubDocs} title={t('openGitHubGuide')}>
+          onClick={openGitHubDocs} title={t('openGitHubGuide')}>
           <div className="help-github-header">
             <div className="help-github-badge" aria-hidden="true"><BookOpen size={16} /></div>
             <div className="help-github-copy">
@@ -85,7 +86,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
       {!sections.length ? <div className="empty"><Search size={26} /><strong>{t('noResults')}</strong>
         <button className="ranking-reset" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
     </article>
-    <PaletteFooter navigation={standalone ? undefined : { kind: 'back', label: backLabel, tooltip: `${backLabel} (Esc)`, onAction: navigateBack }}
+    <SettingsPageFooter navigation={standalone ? undefined : { kind: 'back', label: backLabel, tooltip: `${backLabel} (Esc)`, onAction: navigateBack }}
       title={t('help')} primary={standalone ? { label: backLabel, keys: ['esc'], onAction: navigateBack } : undefined} />
   </section></BackLayer>;
 }

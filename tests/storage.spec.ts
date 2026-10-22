@@ -57,10 +57,10 @@ test.describe(() => {
   await surface.locator('.palette').screenshot({ path: test.info().outputPath(`storage-detail-${language}.png`) });
   await page.keyboard.press('Escape');
   await expect(input).toHaveValue('config'); await expect(input).toBeFocused();
-  // The footer chevron is the mouse path out of the deepest layer: one click, same as Escape.
+  // The task header returns from details one layer at a time, like Escape.
   await input.press('Meta+k'); await actionInput.fill('details'); await actionInput.press('Enter');
   await expect(surface.locator('.storage-detail')).toBeFocused();
-  await surface.locator('.palette-footer .footer-back').click();
+  await surface.locator('.task-back').click();
   await expect(input).toHaveValue('config'); await expect(input).toBeFocused();
   await input.fill('markup'); await input.press('Enter');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('<img src=x onerror=alert(1)>');
@@ -250,6 +250,16 @@ test.describe(() => {
   const permission = await opened;
   await expect(permission.getByRole('button', { name: 'Continue to Chrome' })).toBeEnabled();
   await expect(permission.locator('.permission-site')).toHaveText('127.0.0.1');
+  await expect(permission.getByRole('button', { name: 'Continue to Chrome' })).toHaveCSS('height', '32px');
+  await expect(permission.locator('h1')).toHaveCSS('font-size', '20px');
+  await permission.setViewportSize({ width: 390, height: 516 });
+  await expect(permission.locator('main.cookie-access')).toHaveCount(1);
+  await expect(permission.locator('.cookie-access > svg')).toHaveCount(1);
+  await test.info().attach('permission-layout', { body: JSON.stringify(await permission.evaluate(() => ({
+    html: document.body.innerHTML, height: innerHeight, scrollHeight: document.documentElement.scrollHeight,
+    icons: [...document.querySelectorAll('svg')].map(node => ({ rect: node.getBoundingClientRect().toJSON(), html: node.outerHTML })),
+  }))), contentType: 'application/json' });
+  await permission.screenshot({ path: test.info().outputPath('cookie-permission.png') });
   // Model Chrome's decision in headless; the real native prompt is tested manually.
   await permission.evaluate(() => {
     (window as unknown as { requested: unknown[] }).requested = [];

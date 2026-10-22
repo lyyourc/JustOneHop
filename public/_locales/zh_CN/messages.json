@@ -23,6 +23,21 @@
   "dismissFeedback": { "message": "关闭提示" },
   "languageSaved": { "message": "语言已切换为$1" },
   "themeSaved": { "message": "主题已切换为$1" },
+  "searchIcon": { "message": "搜索栏图标" },
+  "searchIconHint": { "message": "使用 Emoji 或图片，统一应用于搜索入口，仅保存在本机。" },
+  "searchIconChange": { "message": "更换图标" },
+  "searchIconEmojiHint": { "message": "输入或粘贴一个 Emoji，支持旗帜与肤色组合。" },
+  "searchIconImage": { "message": "本地图片" },
+  "searchIconImageHint": { "message": "PNG、JPEG 或 WebP，最大 5 MB、1600 万像素，自动缩小为静态图标。" },
+  "searchIconUpload": { "message": "选择图片" },
+  "searchIconPreview": { "message": "实际大小预览" },
+  "searchIconPreviewReady": { "message": "图片已就绪，保存后生效" },
+  "searchIconDefault": { "message": "恢复默认" },
+  "searchIconSave": { "message": "保存图标" },
+  "searchIconSaved": { "message": "搜索栏图标已保存" },
+  "searchIconRestored": { "message": "已恢复默认搜索栏图标" },
+  "errorSearchIconEmoji": { "message": "请输入一个 Emoji，或选择图片。" },
+  "errorSearchIconImage": { "message": "无法读取图片，请选择不超过 5 MB、1600 万像素的 PNG、JPEG 或 WebP。" },
   "autoTuckEnabled": { "message": "已开启自动收起" },
   "autoTuckDisabled": { "message": "已关闭自动收起" },
   "tuckDurationSaved": { "message": "已保存收起时长：$1" },
@@ -328,6 +343,8 @@
   "experimentalFeatures": { "message": "实验性功能" },
   "nextControl": { "message": "下一个" },
   "previousControl": { "message": "上一个" },
+  "settingsCategories": { "message": "设置分类" },
+  "settingsLabs": { "message": "实验室" },
   "settingsNavigationHelp": { "message": "Tab 切换到下一个控件，Shift+Tab 切换到上一个控件。" },
   "general": {
     "message": "通用"
@@ -365,6 +382,7 @@
   "paletteHotkey": {
     "message": "打开 / 关闭小范围瞬移"
   },
+  "paletteHotkeyHint": { "message": "只需记住这个快捷键，即可搜索并使用所有功能。" },
   "hotkeyHint": {
     "message": "如需自定义快捷键，可在 Chrome 扩展快捷键设置页中修改。"
   },
@@ -396,8 +414,9 @@
     "message": "搜索排序"
   },
   "searchRankingHint": {
-    "message": "使用习惯用于首页推荐、同级结果排序与历史查询补全。悬停历史图标查看原因，点击忘记偏好；重置会一并清除排序与查询补全历史。"
+    "message": "根据使用习惯推荐首页内容、调整同级结果排序，并补全历史查询。"
   },
+  "searchRankingResetHint": { "message": "重置会清除排序偏好与查询历史。" },
   "resetSearchRanking": {
     "message": "重置搜索排序"
   },
@@ -620,15 +639,18 @@
     "message": "自动收起标签页"
   },
   "autoTuckHint": {
-    "message": "长时间未使用的标签页会自动折叠，不会被关闭或删除。"
+    "message": "自动将闲置标签页折叠到分组中，页面保持打开。"
   },
   "autoTuckOffHint": {
     "message": "关闭后，所有已收起的标签页都会恢复到标签栏。"
   },
   "tuckAfter": { "message": "闲置时长" },
   "tuckRules": { "message": "了解规则" },
+  "tuckHour": { "message": "$1 小时" },
   "tuckHours": { "message": "$1 小时" },
+  "tuckDay": { "message": "$1 天" },
   "tuckDays": { "message": "$1 天" },
+  "tuckProtectedHint": { "message": "当前标签页、固定标签页、已有分组及其他受保护的页面不会被收起。" },
   "tuckScheduleHint": { "message": "电脑空闲或 Chrome 失去焦点满 30 分钟时收起，返回 Chrome 后停止。" },
   "tuckTimingHint": { "message": "标签页闲置达到设定时长才会被收起，刚开启时不会立即收起现有页面。" },
   "tuckDisabledStatus": { "message": "尚未开启，所选时长将在开启后使用。" },
@@ -637,7 +659,7 @@
   "tuckWaitingActive": { "message": "$1 个标签页已到期，等待 Chrome 失去焦点或电脑空闲" },
   "tuckWaitingGrace": { "message": "$1 个标签页已到期，等待 Chrome 失去焦点满 30 分钟" },
   "tuckNotDue": { "message": "$1 个标签页尚未到期" },
-  "tuckProtected": { "message": "$1 个标签页受保护（当前、固定、已有分组等）" },
+  "tuckProtected": { "message": "$1 个标签页受保护" },
   "tuckLastFailure": { "message": "上次尝试失败：$1，将自动重试。" },
   "tuckReleasePending": { "message": "自动收起已关闭，仍有 $1 个标签页未能移回，正在自动重试。" },
   "tuckNoCandidates": { "message": "目前没有符合条件的标签页" },

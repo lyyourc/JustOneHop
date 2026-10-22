@@ -19,7 +19,7 @@ export function PaletteFooter({ navigation, title, context, status, primary, sec
   context?: ReactNode;
   status?: ReactNode;
   primary?: { label: string; shortLabel?: string; keys: string[]; disabled?: boolean; danger?: boolean; onAction: () => void };
-  secondary?: { label: string; shortLabel?: string; keys: string[]; icon?: ReactNode; disabled?: boolean; onAction: () => void };
+  secondary?: { label: string; shortLabel?: string; keys: string[]; icon?: ReactNode; trailingIcon?: ReactNode; disabled?: boolean; onAction: () => void };
   actions?: { open: boolean; disabled?: boolean; onToggle: () => void };
   isMac?: boolean;
 }) {
@@ -62,8 +62,8 @@ export function PaletteFooter({ navigation, title, context, status, primary, sec
       {primary ? <button className={`primary-action ${primary.danger ? 'danger' : ''}`} disabled={primary.disabled} onKeyDown={buttonKeyboard} onClick={primary.onAction} title={`${describeShortcut(formatShortcut(primary.keys))} — ${primary.label}`} aria-label={primary.label}>
         <span className="primary-label">{primary.shortLabel || primary.label}</span><span className="key-chord"><kbd>{formatShortcut(primary.keys)}</kbd></span>
       </button> : null}
-      {secondary ? <button className={`secondary-action ${secondary.icon ? 'has-compact-icon' : ''}`} disabled={secondary.disabled} onKeyDown={buttonKeyboard} onClick={secondary.onAction} title={`${describeShortcut(formatShortcut(secondary.keys))} — ${secondary.label}`} aria-label={secondary.label}>
-        {secondary.icon ? <span className="secondary-compact-icon" aria-hidden="true">{secondary.icon}</span> : null}<span className="primary-label">{secondary.shortLabel || secondary.label}</span><span className="key-chord"><kbd>{formatShortcut(secondary.keys)}</kbd></span>
+      {secondary ? <button className={`secondary-action ${secondary.icon ? 'has-compact-icon' : ''}`} disabled={secondary.disabled} onKeyDown={buttonKeyboard} onClick={secondary.onAction} title={secondary.keys.length ? `${describeShortcut(formatShortcut(secondary.keys))} — ${secondary.label}` : secondary.label} aria-label={secondary.label}>
+        {secondary.icon ? <span className="secondary-compact-icon" aria-hidden="true">{secondary.icon}</span> : null}<span className="primary-label">{secondary.shortLabel || secondary.label}</span>{secondary.keys.length ? <span className="key-chord"><kbd>{formatShortcut(secondary.keys)}</kbd></span> : null}{secondary.trailingIcon ? <span className="secondary-trailing-icon" aria-hidden="true">{secondary.trailingIcon}</span> : null}
       </button> : null}
       {actions && (primary || secondary) ? <span className="footer-separator" aria-hidden="true" /> : null}
       {actions ? <button className={`actions-button ${actions.open ? 'pressed' : ''}`} aria-label={t('openActions')} aria-expanded={actions.open}

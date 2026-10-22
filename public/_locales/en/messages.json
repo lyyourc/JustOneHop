@@ -23,6 +23,21 @@
   "dismissFeedback": { "message": "Dismiss message" },
   "languageSaved": { "message": "Language set to $1" },
   "themeSaved": { "message": "Theme set to $1" },
+  "searchIcon": { "message": "Search Bar Icon" },
+  "searchIconHint": { "message": "Use an Emoji or image across search fields. Saved on this device." },
+  "searchIconChange": { "message": "Change Icon" },
+  "searchIconEmojiHint": { "message": "Type or paste one Emoji, including flags or skin tones." },
+  "searchIconImage": { "message": "Local Image" },
+  "searchIconImageHint": { "message": "PNG, JPEG or WebP · up to 5 MB and 16 megapixels. Resized to a still icon." },
+  "searchIconUpload": { "message": "Choose Image" },
+  "searchIconPreview": { "message": "Actual-size preview" },
+  "searchIconPreviewReady": { "message": "Image ready to preview. Save to apply." },
+  "searchIconDefault": { "message": "Use Default" },
+  "searchIconSave": { "message": "Save Icon" },
+  "searchIconSaved": { "message": "Search bar icon saved" },
+  "searchIconRestored": { "message": "Default search bar icon restored" },
+  "errorSearchIconEmoji": { "message": "Enter a single Emoji, or choose an image." },
+  "errorSearchIconImage": { "message": "Could not read image. Choose a PNG, JPEG or WebP up to 5 MB and 16 megapixels." },
   "autoTuckEnabled": { "message": "Automatic tucking enabled" },
   "autoTuckDisabled": { "message": "Automatic tucking disabled" },
   "tuckDurationSaved": { "message": "Tuck after $1 saved" },
@@ -328,6 +343,8 @@
   "experimentalFeatures": { "message": "Experimental Features" },
   "nextControl": { "message": "Next" },
   "previousControl": { "message": "Previous" },
+  "settingsCategories": { "message": "Settings categories" },
+  "settingsLabs": { "message": "Labs" },
   "settingsNavigationHelp": { "message": "Tab moves to the next control; Shift+Tab moves to the previous control." },
   "general": {
     "message": "General"
@@ -365,6 +382,7 @@
   "paletteHotkey": {
     "message": "Open / Close JustOneHop"
   },
+  "paletteHotkeyHint": { "message": "The only shortcut you need to remember. Search for any feature from here." },
   "hotkeyHint": {
     "message": "Change the shortcut for JustOneHop in Chrome’s extension shortcuts."
   },
@@ -396,8 +414,9 @@
     "message": "Search Ranking"
   },
   "searchRankingHint": {
-    "message": "Habits personalize home, reorder equally relevant results, and suggest previous queries. Hover the history icon for details; click it to forget. Reset clears ranking and query completion history."
+    "message": "Your usage personalizes home, orders equally relevant results, and suggests previous queries."
   },
+  "searchRankingResetHint": { "message": "Reset clears learned ranking and query history." },
   "resetSearchRanking": {
     "message": "Reset Ranking"
   },
@@ -620,15 +639,18 @@
     "message": "Auto Tuck Tabs"
   },
   "autoTuckHint": {
-    "message": "Tabs you haven't used in a while are folded automatically. Pages stay open, never closed or deleted."
+    "message": "Automatically folds inactive tabs into a group. Pages stay open."
   },
   "autoTuckOffHint": {
     "message": "Turning off returns all tucked tabs back to the tab bar."
   },
   "tuckAfter": { "message": "Tuck after inactivity" },
   "tuckRules": { "message": "How it works" },
-  "tuckHours": { "message": "$1 h" },
-  "tuckDays": { "message": "$1 d" },
+  "tuckHour": { "message": "$1 hour" },
+  "tuckHours": { "message": "$1 hours" },
+  "tuckDay": { "message": "$1 day" },
+  "tuckDays": { "message": "$1 days" },
+  "tuckProtectedHint": { "message": "Active, pinned, grouped, and other protected tabs are excluded." },
   "tuckScheduleHint": { "message": "Tucks tabs when your computer is idle or Chrome has been unfocused for 30 minutes. Stops when you return to Chrome." },
   "tuckTimingHint": { "message": "Tabs are only tucked after being idle for the chosen duration; enabling will not immediately tuck existing tabs." },
   "tuckDisabledStatus": { "message": "Off. Your duration will apply when enabled." },
@@ -636,8 +658,8 @@
   "tuckWaiting": { "message": "$1 eligible tabs waiting for the next check" },
   "tuckWaitingActive": { "message": "$1 eligible tabs waiting for Chrome to lose focus or your computer to become idle" },
   "tuckWaitingGrace": { "message": "$1 eligible tabs waiting until Chrome has been unfocused for 30 minutes" },
-  "tuckNotDue": { "message": "$1 tabs have not reached the duration" },
-  "tuckProtected": { "message": "$1 tabs excluded (active, pinned, grouped, or otherwise protected)" },
+  "tuckNotDue": { "message": "Not yet due: $1" },
+  "tuckProtected": { "message": "Protected: $1" },
   "tuckLastFailure": { "message": "Last attempt failed: $1. Will retry automatically." },
   "tuckReleasePending": { "message": "Automatic tucking is off. Tabs still awaiting return: $1. Retrying automatically." },
   "tuckNoCandidates": { "message": "No tabs currently qualify" },

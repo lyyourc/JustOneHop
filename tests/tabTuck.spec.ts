@@ -477,10 +477,10 @@ test('English auto tuck duration saves on selection and a native alarm applies i
   const duration = ui.getByRole('combobox', { name: 'Tuck after inactivity' });
   const before = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
   await duration.click();
-  await ui.getByRole('option', { name: '1 h', exact: true }).click();
+  await ui.getByRole('option', { name: '1 hour', exact: true }).click();
   await ui.locator('.palette-footer').getByRole('button', { name: 'Back', exact: true }).click();
   await search.fill('auto tuck'); await search.press('Enter');
-  await expect(duration).toHaveText('1 h');
+  await expect(duration).toHaveText('1 hour');
   await expect(ui.getByRole('button', { name: 'Save duration', exact: true })).toHaveCount(0);
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
   await expect(ui.getByText('1 eligible tabs waiting for Chrome to lose focus or your computer to become idle', { exact: true })).toBeVisible();
@@ -500,14 +500,15 @@ test('English auto tuck duration saves on selection and a native alarm applies i
   expect((await liveTabs()).some(tab => tab.id === old)).toBe(true);
   await ui.getByRole('textbox', { name: 'Search settings' }).fill('auto tuck');
   const rules = ui.getByRole('button', { name: 'How it works' });
-  await expect(ui.locator('.tuck-description')).toContainText('How it works');
+  await expect(ui.locator('.tuck-description')).toContainText('Pages stay open.');
   await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
   await rules.click();
   await expect(ui.locator('.tuck-rules-copy')).toContainText('returns all tucked tabs');
-  const ruleParagraphs = ui.locator('.tuck-rules-copy p');
+  const ruleParagraphs = ui.locator('.tuck-rules-copy li');
   await expect(ruleParagraphs).toHaveText([
-    'Tucks tabs when your computer is idle or Chrome has been unfocused for 30 minutes. Stops when you return to Chrome.',
     'Tabs are only tucked after being idle for the chosen duration; enabling will not immediately tuck existing tabs.',
+    'Tucks tabs when your computer is idle or Chrome has been unfocused for 30 minutes. Stops when you return to Chrome.',
+    'Active, pinned, grouped, and other protected tabs are excluded.',
     'Turning off returns all tucked tabs back to the tab bar.',
   ]);
   const scheduleBox = await ruleParagraphs.nth(0).boundingBox();
@@ -517,9 +518,11 @@ test('English auto tuck duration saves on selection and a native alarm applies i
   await rules.click();
   await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
   const labelBox = await ui.locator('.tuck-duration-label label').boundingBox();
-  const refreshBox = await ui.getByRole('button', { name: 'Refresh status' }).boundingBox();
-  expect(Math.abs(labelBox!.y + labelBox!.height / 2 - refreshBox!.y - refreshBox!.height / 2)).toBeLessThan(2);
-  expect(refreshBox!.x - labelBox!.x - labelBox!.width).toBeLessThanOrEqual(6);
+  const choiceBox = await duration.boundingBox();
+  expect(Math.abs(labelBox!.y + labelBox!.height / 2 - choiceBox!.y - choiceBox!.height / 2)).toBeLessThan(2);
+  const checkBox = await ui.locator('.tuck-last-check').boundingBox();
+  const rulesBox = await rules.boundingBox();
+  expect(Math.abs(checkBox!.y + checkBox!.height / 2 - rulesBox!.y - rulesBox!.height / 2)).toBeLessThan(2);
   await ui.locator('.palette').screenshot({ path: test.info().outputPath('auto-tuck-en.png') });
   await ui.getByRole('textbox', { name: 'Search settings' }).fill('');
   const copyMetrics = (selector: string) => ui.locator(selector).evaluate(node => {
@@ -531,23 +534,23 @@ test('English auto tuck duration saves on selection and a native alarm applies i
       unclipped: description.scrollWidth <= description.clientWidth && description.scrollHeight <= description.clientHeight };
   });
   const tuckCopy = await copyMetrics('.tuck-heading .setting-copy');
-  const helpCopy = await copyMetrics('[data-setting="help"] .setting-copy');
-  const durationCopy = await copyMetrics('.tuck-settings .setting-copy');
-  // Copy shares typography and spacing, but longer descriptions and the inline
-  // rules button may wrap. Equal paragraph heights would prohibit valid wrapping.
+  const durationBox = await duration.boundingBox();
+  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
+  const helpCopy = await copyMetrics('[data-setting="searchIcon"] .setting-copy');
+  // Descriptions share typography and spacing across categories; wrapping stays natural.
   expect(helpCopy.unclipped).toBe(true);
-  for (const copy of [tuckCopy, durationCopy]) {
+  for (const copy of [tuckCopy]) {
     expect(Math.abs(copy.gap - helpCopy.gap)).toBeLessThan(1);
     expect(copy.fontSize).toBe(helpCopy.fontSize);
     expect(copy.lineHeight).toBe(helpCopy.lineHeight);
     expect(copy.unclipped).toBe(true);
   }
   const languageBox = await ui.getByRole('combobox', { name: 'Language', exact: true }).boundingBox();
-  const durationBox = await duration.boundingBox();
   expect(Math.abs(languageBox!.x - durationBox!.x)).toBeLessThan(1);
   expect(durationBox!.height).toBe(languageBox!.height);
   await ui.locator('.settings-body').evaluate(node => { node.scrollTop = 0; });
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('settings-overview-en.png') });
+  await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('settings-overview-en.png') });
+  await ui.getByRole('tab', { name: 'Labs', exact: true }).click();
   // A failed status read must not prevent saving; a failed write keeps the old value.
   await ui.evaluate(() => {
     const send = chrome.runtime.sendMessage.bind(chrome.runtime);
@@ -565,15 +568,15 @@ test('English auto tuck duration saves on selection and a native alarm applies i
   await expect(feedback).toHaveAttribute('role', 'alert');
   await expect(feedback).toContainText('Could not read auto tuck status. Refresh to retry.');
   await duration.click();
-  await ui.getByRole('option', { name: '12 h', exact: true }).click();
+  await ui.getByRole('option', { name: '12 hours', exact: true }).click();
   await expect(feedback).toHaveAttribute('role', 'alert');
   await expect(feedback).toContainText('Could not save settings. Please try again.');
-  await expect(duration).toHaveText('1 h');
+  await expect(duration).toHaveText('1 hour');
   await duration.click();
-  await ui.getByRole('option', { name: '12 h', exact: true }).click();
-  await expect(duration).toHaveText('12 h');
+  await ui.getByRole('option', { name: '12 hours', exact: true }).click();
+  await expect(duration).toHaveText('12 hours');
   await expect(feedback).toHaveAttribute('role', 'status');
-  await expect(feedback).toContainText('Tuck after 12 h saved');
+  await expect(feedback).toContainText('Tuck after 12 hours saved');
   await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(12);
 });
 
@@ -983,8 +986,9 @@ test('English actual Chrome restart retains records and safely resumes a group w
     await expect(ui.locator('.tuck-recovery')).toBeVisible();
     expect((await recoverySnapshot()).tuckRecoveries).toHaveLength(1);
     expect((await recoverySnapshot()).tabs.filter((tab: { tucked?: boolean }) => tab.tucked)).toHaveLength(0);
+    await ui.keyboard.press('Shift+Tab');
+    await expect(ui.locator('.tuck-recovery .task-back')).toBeFocused();
     await ui.keyboard.press('Tab');
-    await expect(ui.locator('.tuck-recovery .footer-back')).toBeFocused();
     await ui.keyboard.press('Tab');
     await expect(ui.getByRole('button', { name: '继续管理这组', exact: true })).toBeFocused();
     await ui.keyboard.press('Enter');
@@ -1023,8 +1027,9 @@ test('English recovery requires explicit keyboard confirmation and keeps the can
   expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
   await ui.keyboard.press('Control+n');
   await ui.keyboard.press('Control+p');
+  await ui.keyboard.press('Shift+Tab');
+  await expect(ui.locator('.tuck-recovery .task-back')).toBeFocused();
   await ui.keyboard.press('Tab');
-  await expect(ui.locator('.tuck-recovery .footer-back')).toBeFocused();
   await ui.keyboard.press('Tab');
   await expect(ui.getByRole('button', { name: 'Continue Managing This Group', exact: true })).toBeFocused();
   await ui.keyboard.press('Enter');
@@ -1158,18 +1163,18 @@ test('English recovery rejects stale confirmation and forgetting leaves native p
   const before = await liveTabs();
   await openRecovery();
   await expect(ui.locator('.tuck-recovery .settings-header')).toHaveCount(0);
-  await expect(ui.locator('.tuck-recovery .footer-back')).toHaveAccessibleName('Back · Review Tucked Away Groups');
+  await expect(ui.locator('.tuck-recovery .task-back')).toHaveAccessibleName('Back');
   const selected = ui.locator('.recovery-candidate[aria-selected=true]');
   const selectedId = await selected.getAttribute('id');
   await selected.click({ button: 'right' });
   await expect(ui.getByRole('dialog')).toBeVisible();
-  await ui.locator('.tuck-recovery .footer-back').click();
+  await ui.locator('.tuck-recovery .task-back').click();
   await expect(ui.getByRole('dialog')).toHaveCount(0);
   await expect(ui.locator('.tuck-recovery .palette-footer-title')).toHaveText('Review Tucked Away Groups');
   await expect(ui.getByRole('listbox')).toBeFocused();
   await expect(selected).toHaveAttribute('id', selectedId!);
   expect((await recoverySnapshot()).tuckRecoveries).toHaveLength(1);
-  await ui.locator('.tuck-recovery .footer-back').click();
+  await ui.locator('.tuck-recovery .task-back').click();
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await expect(search).toBeFocused(); await expect(search).toHaveValue('recover tucked tabs');
   expect((await liveTabs()).map(tab => [tab.id, tab.groupId])).toEqual(before.map(tab => [tab.id, tab.groupId]));

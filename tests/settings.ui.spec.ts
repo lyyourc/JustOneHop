@@ -22,6 +22,7 @@ test('English settings report failed saves and allow retry without losing curren
   await expect(ui.getByRole('alert')).toHaveCount(0);
   await expect(ui.locator('.operation-feedback')).toHaveText('语言已切换为简体中文');
   palette.holdNextSave();
+  await ui.getByRole('tab', { name: '外观', exact: true }).click();
   await ui.getByRole('combobox', { name: '主题', exact: true }).click();
   await ui.getByRole('option', { name: '深色', exact: true }).click();
   await expect(ui.locator('.operation-feedback')).toHaveText('正在执行…');

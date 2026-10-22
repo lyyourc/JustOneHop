@@ -29,11 +29,16 @@ test('Chinese storage list UI shows supplied copy success, details, names and re
   await expect(input).toHaveValue('config');
   await input.press('Meta+k'); await actionInput.fill('details'); await actionInput.press('Enter');
   await expect(surface.locator('.storage-value')).toHaveText(JSON.stringify(JSON.parse(raw), null, 2));
-  await expect(surface.locator('.storage-detail')).toBeFocused(); await ui.keyboard.press('Enter');
+  await expect(surface.locator('.storage-detail')).toBeFocused();
+  await expect(surface.locator('.storage-detail')).toHaveCSS('padding', '16px');
+  await surface.locator('.palette').screenshot({ path: test.info().outputPath('storage-detail-spacing.png') });
+  await ui.keyboard.press('Enter');
   await expect.poll(palette.copies).toEqual(['', raw, 'app.config', raw]);
   await ui.keyboard.press('Escape'); await expect(input).toHaveValue('config'); await expect(input).toBeFocused();
   await input.press('Meta+k'); await actionInput.fill('details'); await actionInput.press('Enter');
-  await expect(surface.locator('.storage-detail')).toBeFocused(); await surface.locator('.palette-footer .footer-back').click();
+  await expect(surface.locator('.storage-detail')).toBeFocused();
+  await expect(surface.locator('.palette-footer .footer-back')).toHaveCount(0);
+  await surface.locator('.task-back').click();
   await expect(input).toHaveValue('config'); await expect(input).toBeFocused();
   await input.fill('markup'); await input.press('Enter');
   await expect.poll(palette.copies).toEqual(['', raw, 'app.config', raw, '<img src=x onerror=alert(1)>']);
