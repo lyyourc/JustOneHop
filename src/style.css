@@ -447,6 +447,8 @@ body.justonehop-popup { margin: 0; width: var(--panel-width); height: var(--pane
 .tuck-settings { min-width: 0; border: 0; margin: var(--section-gap) 0 0; padding: var(--section-gap) 0 0; border-top: var(--border-width) solid var(--line); }
 .tuck-status-copy { display: grid; grid-template-columns: minmax(0, 1fr) var(--control-height); align-items: start; column-gap: var(--control-gap); min-width: 0; margin-top: var(--section-gap); }
 .tuck-status-copy p { margin: var(--label-gap) 0 0; }
+/* Reserve the summary and counts before the asynchronous status arrives. */
+.tuck-status-details { min-height: calc(2lh + var(--label-gap)); }
 .tuck-status-summary { color: var(--text); }
 .tuck-check-row { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0 var(--control-gap); margin-top: var(--label-gap); }
 .tuck-last-check { color: var(--muted); font-size: var(--type-caption); }

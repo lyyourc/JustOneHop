@@ -37,6 +37,10 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await settings.screenshot({ path: test.info().outputPath('settings-sidebar-light.png') });
 
   await surface.getByRole('tab', { name: 'Labs', exact: true }).click();
+  await expect(settings.locator('.footer-title-label')).toHaveText('Settings · Labs');
+  await search.fill('auto tuck');
+  await expect(settings.locator('.settings-body h2')).toHaveText('Labs');
+  await search.press('Escape');
   const tuck = surface.locator('[data-setting="tabs"]');
   const ranking = surface.locator('[data-setting="ranking"]');
   await expect(tuck).toHaveCSS('border-radius', '12px');
@@ -93,12 +97,29 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await surface.locator('.settings-footer').getByRole('button', { name: 'Back', exact: true }).click();
   await expect(change).toBeFocused();
   await change.click(); await expect(emoji).toHaveValue('');
+  await ui.keyboard.press('Escape');
+  await expect(surface.locator('.search-icon-settings')).toHaveCount(0);
+  await expect(change).toBeFocused();
+  await change.press('Enter');
+  await search.focus(); await ui.keyboard.press('Escape');
+  await expect(surface.locator('.search-icon-settings')).toHaveCount(0);
+  await expect(change).toBeFocused();
+  await change.click();
+  await surface.locator('.settings-search .search-dismiss').click();
+  await expect(surface.locator('.search-icon-settings')).toHaveCount(0);
+  await expect(change).toBeFocused();
+  await change.click();
   await appearance.click();
   await expect(surface.locator('.search-icon-settings')).toHaveCount(0);
 
   await search.fill('emoji');
   await search.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-  await change.click(); await emoji.fill('🚀');
+  await change.click(); await emoji.fill('🌱');
+  await ui.keyboard.press('Escape');
+  await expect(surface.locator('.search-icon-settings')).toHaveCount(0);
+  await expect(search).toHaveValue('emoji'); await expect(change).toBeFocused();
+  expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
+  await change.press('Enter'); await expect(emoji).toHaveValue(''); await emoji.fill('🚀');
   await surface.getByRole('button', { name: 'Wear Badge' }).click();
   await expect(search).toHaveValue('emoji'); await expect(change).toBeFocused();
   expect(await search.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);

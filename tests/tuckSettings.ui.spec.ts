@@ -26,6 +26,9 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
     }
     return changes;
   });
+  let releaseStatus: (() => void) | undefined;
+  let statusReady: Promise<void> = Promise.resolve();
+  await context.exposeBinding('__waitForTuckStatus', () => statusReady);
   const unexpectedRequests: Request[] = [];
   await context.exposeBinding('__unexpectedTuckRequest', (_source, request: Request) => { unexpectedRequests.push(request); });
   const snapshot: Snapshot = { windowId: 1, currentTabId: 1, tabs: [], bookmarks: [], shortcut: '' };
@@ -56,6 +59,7 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
           if (request.type === 'search-history') return { ok: true, data: { items: [], limited: false } };
           if (request.type === 'execute' && request.payload.action === 'settings') return { ok: true, data: undefined };
           if (request.type === 'tuck-status') {
+            await (globalThis as unknown as { __waitForTuckStatus: () => Promise<void> }).__waitForTuckStatus();
             const { preferences, tuckStatus } = await bridge({ operation: 'get', keys: ['preferences', 'tuckStatus'] });
             // Display-only status: no alarm scheduling, worker scan or native grouping is simulated.
             const status: TuckStatus = {
@@ -101,8 +105,18 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await ui.keyboard.press('Shift+Tab'); // Auto tuck switch
   await expect(toggle).toBeFocused();
   await expect(ui.locator('.tuck-settings')).toHaveCount(0);
+  statusReady = new Promise<void>(resolve => { releaseStatus = resolve; });
+  store.tuckStatus = { notDueCount: 4 } satisfies Partial<TuckStatus>;
   await toggle.press('Space');
   await expect(toggle).toBeChecked();
+  const loading = ui.locator('.tuck-loading');
+  await expect(loading).toHaveText('正在加载');
+  const loadingBox = await ui.locator('[data-setting="tabs"]').boundingBox();
+  releaseStatus!();
+  await expect(ui.locator('.tuck-status-copy')).toContainText('4 个标签页尚未到期');
+  await expect(loading).toHaveCount(0);
+  const loadedBox = await ui.locator('[data-setting="tabs"]').boundingBox();
+  expect(loadedBox!.height).toBeCloseTo(loadingBox!.height, 1);
   const duration = ui.getByRole('combobox', { name: '闲置时长' });
   await expect(duration).toBeEnabled();
   await expect(toggle).toBeFocused();

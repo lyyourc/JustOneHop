@@ -332,20 +332,20 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
                 <div className="tuck-status-details">
                   {tuckStatusError ? <p role="alert">{t('tuckStatusError')}</p> : currentTuckStatus ? <>
                     <div className="tuck-status-summary">
-                      <span>{tuckStatus.eligibleCount ? t(tuckStatus.waitingReason === 'active' ? 'tuckWaitingActive' : tuckStatus.waitingReason === 'grace' ? 'tuckWaitingGrace' : 'tuckWaiting', String(tuckStatus.eligibleCount)) : t('tuckNoCandidates')}</span>
+                      <span>{currentTuckStatus.eligibleCount ? t(currentTuckStatus.waitingReason === 'active' ? 'tuckWaitingActive' : currentTuckStatus.waitingReason === 'grace' ? 'tuckWaitingGrace' : 'tuckWaiting', String(currentTuckStatus.eligibleCount)) : t('tuckNoCandidates')}</span>
                     </div>
-                    {tuckStatus.notDueCount || tuckStatus.protectedCount ? <p>{[
-                      tuckStatus.notDueCount ? t('tuckNotDue', String(tuckStatus.notDueCount)) : '',
-                      tuckStatus.protectedCount ? t('tuckProtected', String(tuckStatus.protectedCount)) : '',
+                    {currentTuckStatus.notDueCount || currentTuckStatus.protectedCount ? <p>{[
+                      currentTuckStatus.notDueCount ? t('tuckNotDue', String(currentTuckStatus.notDueCount)) : '',
+                      currentTuckStatus.protectedCount ? t('tuckProtected', String(currentTuckStatus.protectedCount)) : '',
                     ].filter(Boolean).join(' · ')}</p> : null}
-                    {tuckStatus.blockedCount ? <p>{t('tuckBlocked', String(tuckStatus.blockedCount))}</p> : null}
-                    {tuckStatus.lastFailureAt ? <p><time dateTime={new Date(tuckStatus.lastFailureAt).toISOString()} title={new Date(tuckStatus.lastFailureAt).toLocaleString()}>{t('tuckLastFailure', new Date(tuckStatus.lastFailureAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time></p> : null}
+                    {currentTuckStatus.blockedCount ? <p>{t('tuckBlocked', String(currentTuckStatus.blockedCount))}</p> : null}
+                    {currentTuckStatus.lastFailureAt ? <p><time dateTime={new Date(currentTuckStatus.lastFailureAt).toISOString()} title={new Date(currentTuckStatus.lastFailureAt).toLocaleString()}>{t('tuckLastFailure', new Date(currentTuckStatus.lastFailureAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time></p> : null}
                   </> : <span className="tuck-loading">{showTuckLoading ? t('loading') : null}</span>}
                 </div>
                 <button className="tuck-refresh" aria-label={t('tuckRefresh')} title={t('tuckRefresh')} aria-disabled={tuckRefreshing} onClick={() => void refreshTuckStatus()}><RotateCw size={14} /></button>
                 <div className="tuck-check-row">
-                  <span className="tuck-last-check">{!tuckStatusError && currentTuckStatus ? tuckStatus.lastScanAt
-                    ? <time dateTime={new Date(tuckStatus.lastScanAt).toISOString()} title={new Date(tuckStatus.lastScanAt).toLocaleString()}>{t('tuckLastScan', new Date(tuckStatus.lastScanAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time>
+                  <span className="tuck-last-check">{!tuckStatusError && currentTuckStatus ? currentTuckStatus.lastScanAt
+                    ? <time dateTime={new Date(currentTuckStatus.lastScanAt).toISOString()} title={new Date(currentTuckStatus.lastScanAt).toLocaleString()}>{t('tuckLastScan', new Date(currentTuckStatus.lastScanAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time>
                     : t('tuckNotScanned') : null}</span>
                   {tuckRulesButton}
                 </div>
