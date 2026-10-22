@@ -1,17 +1,22 @@
 import { groupFingerprint, matchRecovery, readTuckRecords, recoveryCandidates, type TuckRecord, type RecoveryGroup } from './tuckRecovery';
 import type { TuckRecoveryItem, TuckStatus } from './types';
+import { tuckOrderForBatch } from './tuckOrder';
 import { getPreferences, isAutoTuckAfterHours, preferencesReady, subscribePreferences } from './preferences';
 import { t } from './i18n';
 
 export const TUCK_AFTER = 7 * 24 * 60 * 60 * 1000;
 const ALARM = 'justonehop-auto-tuck';
+const FOCUS_KEY = 'justonehopTabTuckFocus';
+const FOCUS_GRACE = 30 * 60_000;
+let unfocusedAt: number | undefined;
+let focusRevision = 0;
 const SESSION_KEY = 'justonehopTabTuckSession';
 const RECOVERY_KEY = 'justonehopTabTuckRecovery';
 const CLOCK_KEY = 'justonehopTabTuckClocks';
 type Clock = { url: string; usedAt: number };
-type Group = { key?: string; id: number; windowId: number; title: string; color?: chrome.tabGroups.TabGroup['color']; customTitle?: boolean; members: number[] };
+type Group = { key?: string; id: number; windowId: number; title: string; color?: chrome.tabGroups.TabGroup['color']; customTitle?: boolean; metadataPending?: boolean; members: number[] };
 type Batch = { groupId: number; ids: number[] };
-type State = { version: 1; enabled: boolean; clocks: Record<number, Clock>; groups: Group[]; undo: Record<number, Batch>; active?: Record<number, number>; lastScanAt?: number };
+type State = { pendingOrder?: Record<number, { id: number; before: number }[]>; order?: Record<number, number[]>; version: 1; enabled: boolean; clocks: Record<number, Clock>; groups: Group[]; undo: Record<number, Batch>; active?: Record<number, number>; lastScanAt?: number; lastFailureAt?: number };
 let state: State = { version: 1, enabled: false, clocks: {}, groups: [], undo: {} };
 let ready = Promise.resolve();
 let queue = Promise.resolve();
@@ -19,6 +24,10 @@ let notify = () => {};
 let started = false;
 const invalidGroups = new Set<number>();
 const joiningTabs = new Set<number>();
+const movingTabs = new Map<number, number>();
+const movingGroups = new Set<number>();
+const releasingTabs = new Set<number>();
+let membershipRevision = 0;
 const activeTabs = new Map<number, number>();
 let records: TuckRecord[] = [];
 let pendingRecovery: TuckRecoveryItem[] = [];
@@ -68,7 +77,7 @@ export async function resumeTuck(windowId: number, recoveryId: string, groupId: 
       state.groups.some(owned => owned.id === groupId || recordKey(owned) === recoveryId)) throw new Error(t('errorTuckRecoveryChanged'));
     invalidGroups.delete(groupId);
     // Explicit confirmation adopts the current metadata. A changed name (even
-    // an empty one) is custom; unchanged generated names can still track counts.
+    // an empty one) is custom; unchanged generated names can still follow the locale.
     const owned: Group = { key: record.key, id: group.id, windowId, title: group.title,
       color: group.color as chrome.tabGroups.TabGroup['color'], customTitle: record.customTitle || group.title !== record.title,
       members: group.tabs.map(tab => tab.id) };
@@ -155,6 +164,26 @@ export function idleTabEligible(tab: chrome.tabs.Tab, lastUsed: number, now: num
     Number.isFinite(lastUsed) && lastUsed > 0 && now - lastUsed >= thresholdMs;
 }
 const thresholdMs = () => getPreferences().autoTuckAfterHours * 60 * 60 * 1000;
+async function waitingReason(): Promise<TuckStatus['waitingReason']> {
+  const revision = focusRevision;
+  const idle = await chrome.idle.queryState(60);
+  if (revision !== focusRevision) return 'active';
+  if (idle !== 'active') return 'scheduled';
+  const windows = await chrome.windows.getAll({});
+  if (revision !== focusRevision || windows.some(window => window.focused)) return 'active';
+  return unfocusedAt !== undefined && Date.now() - unfocusedAt >= FOCUS_GRACE ? 'scheduled' : 'grace';
+}
+async function canAutoTuck() {
+  return getPreferences().autoTuck && await waitingReason() === 'scheduled' && getPreferences().autoTuck;
+}
+async function syncFocus() {
+  const revision = focusRevision;
+  const windows = await chrome.windows.getAll({});
+  if (revision !== focusRevision) return;
+  if (windows.some(window => window.focused)) unfocusedAt = undefined;
+  else unfocusedAt ??= Date.now();
+  await chrome.storage.session.set({ [FOCUS_KEY]: { unfocusedAt } });
+}
 function recoveryBlocks(windowId: number) {
   return pendingRecovery.length > 0 && (!state.groups.some(group => group.windowId === windowId) ||
     pendingRecovery.some(item => item.candidates.some(group => group.windowId === windowId)));
@@ -171,12 +200,20 @@ export async function getTuckStatus(afterHours?: number): Promise<TuckStatus> {
     const threshold = afterHours === undefined ? thresholdMs() : afterHours * 60 * 60 * 1000;
     let eligibleCount = 0;
     let blockedCount = 0;
-    for (const tab of tabs) if (idleTabEligible(tab, usedAt(tab, checkedAt), checkedAt, threshold)) {
-      if (recoveryBlocks(tab.windowId)) blockedCount++;
+    let notDueCount = 0;
+    let protectedCount = 0;
+    for (const tab of tabs) {
+      if (tab.incognito || tuckFlags(tab).tucked) continue;
+      if (!plain(tab) || tab.active || tab.highlighted || tab.audible || tab.status === 'loading') protectedCount++;
+      else if (!idleTabEligible(tab, usedAt(tab, checkedAt), checkedAt, threshold)) notDueCount++;
+      else if (recoveryBlocks(tab.windowId)) blockedCount++;
       else eligibleCount++;
     }
-    return { enabled: getPreferences().autoTuck, eligibleCount, blockedCount, checkedAt,
-      ...(state.lastScanAt === undefined ? {} : { lastScanAt: state.lastScanAt }) };
+    return { enabled: getPreferences().autoTuck, eligibleCount, blockedCount, notDueCount, protectedCount,
+      waitingReason: await waitingReason(), checkedAt,
+      ...(!getPreferences().autoTuck && state.enabled ? { pendingReleaseCount: tabs.filter(tab => tuckFlags(tab).tucked).length } : {}),
+      ...(state.lastScanAt === undefined ? {} : { lastScanAt: state.lastScanAt }),
+      ...(state.lastFailureAt === undefined ? {} : { lastFailureAt: state.lastFailureAt }) };
   });
 }
 async function normalTabs() { return chrome.tabs.query({ windowType: 'normal' }); }
@@ -188,9 +225,17 @@ function prune(tabs: chrome.tabs.Tab[]) {
     return tab && tab.groupId === group.id && tab.windowId === group.windowId && !tab.pinned;
   });
   state.groups = state.groups.filter(group => group.members.length);
+  for (const [windowId, order] of Object.entries(state.order || {})) {
+    if (!state.groups.some(group => group.windowId === Number(windowId))) delete state.order![Number(windowId)];
+    else state.order![Number(windowId)] = order.filter(id => live.get(id)?.windowId === Number(windowId));
+  }
+  for (const windowId of Object.keys(state.pendingOrder || {})) {
+    if (!state.groups.some(group => group.windowId === Number(windowId))) delete state.pendingOrder![Number(windowId)];
+  }
   for (const [windowId, batch] of Object.entries(state.undo)) {
     const group = state.groups.find(group => group.id === batch.groupId && group.windowId === Number(windowId));
-    batch.ids = batch.ids.filter(id => group?.members.includes(id));
+    const members = new Set(group?.members);
+    batch.ids = batch.ids.filter(id => members.has(id));
     if (!batch.ids.length) delete state.undo[Number(windowId)];
   }
 }
@@ -203,8 +248,10 @@ async function persist(tabs?: chrome.tabs.Tab[]) {
   }
   prune(tabs);
   for (const group of state.groups) {
-    const members = tabs.filter(tab => tab.groupId === group.id && group.members.includes(tab.id!));
+    const memberIds = new Set(group.members);
+    const members = tabs.filter(tab => tab.groupId === group.id && memberIds.has(tab.id!));
     if (!members.length) continue;
+    if (group.metadataPending) continue;
     const record: TuckRecord = { key: recordKey(group), title: group.title, color: group.color, customTitle: group.customTitle, urls: members.map(tab => tab.url || ''),
       context: contextUrls(tabs, group.windowId, group.id) };
     forgetRecord(record.key); records.push(record);
@@ -225,12 +272,23 @@ async function persist(tabs?: chrome.tabs.Tab[]) {
     [RECOVERY_KEY]: { version: 1, records } });
   notify();
 }
+function groupMetadataMatches(group: Group, native: chrome.tabGroups.TabGroup | null) {
+  return !invalidGroups.has(group.id) && native && native.windowId === group.windowId &&
+    (native.title || '') === group.title && native.color === (group.color || 'grey');
+}
 async function validGroup(group: Group): Promise<chrome.tabs.Tab[] | null> {
-  const native = await chrome.tabGroups.get(group.id).catch(() => null);
+  const native = await chrome.tabGroups.get(group.id).catch(error => {
+    if (group.metadataPending) throw error;
+    return null;
+  });
   const tabs = native ? await chrome.tabs.query({ groupId: group.id }) : [];
+  if (group.metadataPending && native && !invalidGroups.has(group.id)) {
+    group.title = native.title || ''; group.color = native.color;
+    delete group.metadataPending;
+  }
+  const members = new Set(group.members);
   // A renamed/recolored group or one the user added pages to is now theirs.
-  if (invalidGroups.has(group.id) || !native || native.windowId !== group.windowId || native.title !== group.title || native.color !== (group.color || 'grey') ||
-    tabs.some(tab => !group.members.includes(tab.id!))) {
+  if (!groupMetadataMatches(group, native) || tabs.some(tab => !members.has(tab.id!))) {
     // Deliberate edits end ownership. Missing groups from closing windows keep
     // their evidence so Chrome session restore can reconnect them later.
     if (native || (await chrome.tabs.query({ windowId: group.windowId }).catch(() => [])).length) forgetRecord(recordKey(group));
@@ -238,21 +296,83 @@ async function validGroup(group: Group): Promise<chrome.tabs.Tab[] | null> {
     delete state.undo[group.windowId];
     return null;
   }
-  group.members = group.members.filter(id => tabs.some(tab => tab.id === id && !tab.pinned));
+  const liveMembers = new Set(tabs.filter(tab => !tab.pinned).map(tab => tab.id));
+  group.members = group.members.filter(id => liveMembers.has(id));
   return tabs;
+}
+function groupCheck(group: Group) {
+  let revision = membershipRevision;
+  let remaining = 0;
+  return async () => {
+    const native = await chrome.tabGroups.get(group.id).catch(() => null);
+    if (!groupMetadataMatches(group, native) || revision !== membershipRevision || remaining-- <= 0) {
+      revision = membershipRevision;
+      if (!await validGroup(group)) return false;
+      remaining = 32;
+    }
+    return true;
+  };
+}
+async function moveTab(id: number, index: number) {
+  movingTabs.set(id, index);
+  try { await chrome.tabs.move(id, { index }); }
+  catch (error) { movingTabs.delete(id); throw error; }
+}
+async function finishOrder(group: Group, automatic: boolean, check = groupCheck(group)) {
+  const pending = state.pendingOrder?.[group.windowId];
+  if (!pending?.length) return;
+  while (pending.length) {
+    if (automatic && !await canAutoTuck()) return;
+    if (!await check()) { pending.length = 0; return; }
+    const revision = focusRevision;
+    const membersRevision = membershipRevision;
+    const { id } = pending[0];
+    const order = state.order?.[group.windowId] || [];
+    const rank = order.indexOf(id);
+    const successor = order.slice(rank + 1).find(candidate => group.members.includes(candidate));
+    const neighbour = successor ?? order.slice(0, rank).reverse().find(candidate => group.members.includes(candidate));
+    const [tab, target] = await Promise.all([
+      chrome.tabs.get(id).catch(() => null), neighbour === undefined ? null : chrome.tabs.get(neighbour).catch(() => null),
+    ]);
+    if (automatic && (!getPreferences().autoTuck || revision !== focusRevision)) return;
+    if (invalidGroups.has(group.id) || membersRevision !== membershipRevision || state.pendingOrder?.[group.windowId] !== pending) return;
+    if (!tab || !target || tab.groupId !== group.id || target.groupId !== group.id ||
+      tab.windowId !== group.windowId || target.windowId !== group.windowId || tab.pinned) {
+      pending.shift(); continue;
+    }
+    if (tab.active) return;
+    const index = target.index - (tab.index < target.index ? 1 : 0) + (successor === undefined ? 1 : 0);
+    if (tab.index !== index) await moveTab(id, index);
+    pending.shift();
+  }
+}
+async function ungroupTab(id: number) {
+  releasingTabs.add(id);
+  try { await chrome.tabs.ungroup(id); }
+  finally { releasingTabs.delete(id); }
+}
+async function updateGroupLabel(group: Group, changes: chrome.tabGroups.UpdateProperties) {
+  const previous = { title: group.title, color: group.color };
+  if (changes.title !== undefined) group.title = changes.title;
+  if (changes.color !== undefined) group.color = changes.color;
+  // Native events must see the expected metadata, but a rejected update must
+  // not make our next ownership check mistake the old label for a user edit.
+  try { await chrome.tabGroups.update(group.id, changes); }
+  catch (error) { Object.assign(group, previous); throw error; }
 }
 async function label(group: Group, collapse = false) {
   const tabs = await validGroup(group);
   if (!tabs?.length) return;
-  if (!group.customTitle) group.title = `${t('tuckGroupTitle')} · ${tabs.length}`;
-  await chrome.tabGroups.update(group.id, { title: group.title, ...(collapse && !tabs.some(tab => tab.active) ? { collapsed: true } : {}) });
+  await updateGroupLabel(group, { title: group.customTitle ? group.title : t('tuckGroupTitle'),
+    ...(collapse && !tabs.some(tab => tab.active) ? { collapsed: true } : {}) });
 }
 async function releaseTab(tab: chrome.tabs.Tab) {
   const group = state.groups.find(group => group.id === tab.groupId && group.windowId === tab.windowId && group.members.includes(tab.id!));
   if (!group || !(await validGroup(group))) return;
   const live = await chrome.tabs.get(tab.id!).catch(() => null);
   if (!live || live.groupId !== group.id || live.windowId !== group.windowId) return;
-  await chrome.tabs.ungroup(live.id!);
+  if (invalidGroups.has(group.id)) { await validGroup(group); return; }
+  await ungroupTab(live.id!);
   group.members = group.members.filter(id => id !== live.id);
   touch(live);
   // The group stays at the end; a returned page goes just before it. No other
@@ -273,12 +393,36 @@ async function tuckBatch(windowId: number, ids: number[], automatic: boolean) {
     throw new Error(t('errorTuckRecoveryPending'));
   }
   const added: number[] = [];
+  let created = false;
   let group = state.groups.find(item => item.windowId === windowId);
+  let checkedRevision = membershipRevision;
   if (group && !(await validGroup(group))) group = undefined;
+  if (group) {
+    await finishOrder(group, automatic);
+    if (state.pendingOrder?.[windowId]?.length) { await persist(); return 0; }
+  }
+  const strip = (await chrome.tabs.query({ windowId })).sort((a, b) => a.index - b.index);
+  const existing = strip.filter(tab => tab.groupId === group?.id).map(tab => tab.id!);
+  const order = tuckOrderForBatch(group ? state.order?.[windowId] : undefined, strip.map(tab => tab.id!), existing);
+  (state.order ??= {})[windowId] = order;
+  const ranks = new Map(order.map((id, index) => [id, index]));
+  let membershipChecksLeft = 0;
+  async function batchGroupValid() {
+    if (!group) return true;
+    // Metadata remains a live per-tab read. Membership is reused only within
+    // this batch, with event invalidation and periodic full checks as a backstop.
+    const native = await chrome.tabGroups.get(group.id).catch(() => null);
+    if (!groupMetadataMatches(group, native) || checkedRevision !== membershipRevision || membershipChecksLeft-- <= 0) {
+      checkedRevision = membershipRevision;
+      if (!await validGroup(group)) return false;
+      membershipChecksLeft = 32;
+    }
+    return true;
+  }
   try {
     for (const id of ids) {
-      if (automatic && (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active')) break;
-      if (group && !(await validGroup(group))) break;
+      if (automatic && !await canAutoTuck()) break;
+      if (!await batchGroupValid()) break;
       const tab = await chrome.tabs.get(id).catch(() => null);
       if (!tab || tab.windowId !== windowId || !plain(tab)) continue;
       if (automatic && !idleTabEligible(tab, usedAt(tab, Date.now()), Date.now(), thresholdMs())) continue;
@@ -288,24 +432,49 @@ async function tuckBatch(windowId: number, ids: number[], automatic: boolean) {
         if (!other) continue;
         await chrome.tabs.update(other.id!, { active: true });
       }
+      if (automatic && !await canAutoTuck()) break;
+      if (group && (invalidGroups.has(group.id) || checkedRevision !== membershipRevision) && !await batchGroupValid()) break;
+      const revision = focusRevision;
       const live = await chrome.tabs.get(id);
+      if (automatic && (!getPreferences().autoTuck || revision !== focusRevision)) break;
       if (!plain(live) || live.active || live.windowId !== windowId) continue;
+      // The candidate may have started playing, loading, or been used while
+      // native checks were pending. Recheck all protections on the final read.
+      if (automatic && !idleTabEligible(live, usedAt(live, Date.now()), Date.now(), thresholdMs())) continue;
+      if (state.order?.[windowId] !== order) break;
+      if (group && (invalidGroups.has(group.id) || checkedRevision !== membershipRevision)) break;
       joiningTabs.add(id);
       let groupId: number;
       try { groupId = await chrome.tabs.group({ tabIds: [id], ...(group ? { groupId: group.id } : { createProperties: { windowId } }) }); }
       finally { joiningTabs.delete(id); }
       if (!group) {
-        group = { key: crypto.randomUUID(), id: groupId, windowId, title: '', members: [] };
-        state.groups.push(group);
+        // Chrome may omit an unnamed group's title and choose its initial color.
+        // Validate against the group we just created, not assumed defaults.
+        group = { key: crypto.randomUUID(), id: groupId, windowId, title: '', metadataPending: true, members: [id] };
+        created = true;
+        state.groups.push(group); added.push(id);
+        const native = await chrome.tabGroups.get(groupId);
+        group.title = native.title || ''; group.color = native.color;
+        delete group.metadataPending;
+      } else { group.members.push(id); added.push(id); }
+      if (state.order?.[windowId] !== order) break;
+      const rank = ranks.get(id);
+      const successor = rank === undefined ? undefined : existing.find(member => (ranks.get(member) ?? -1) > rank);
+      if (existing.length) {
+        ((state.pendingOrder ??= {})[windowId] ??= []).push({ id, before: successor ?? -1 });
+        await finishOrder(group, automatic, batchGroupValid);
+        if (state.pendingOrder[windowId]?.length || state.order?.[windowId] !== order) break;
       }
-      group.members.push(id); added.push(id);
+      if (successor !== undefined) existing.splice(existing.indexOf(successor), 0, id);
+      else existing.push(id);
     }
     if (group && added.length && await validGroup(group)) {
-      // Set our expected name before Chrome emits onUpdated for it.
-      if (!group.customTitle) group.title = `${t('tuckGroupTitle')} · ${group.members.length}`;
-      await chrome.tabGroups.update(group.id, { title: group.title, color: group.color || 'grey' });
-      if (!automatic || (getPreferences().autoTuck && await chrome.idle.queryState(60) !== 'active')) {
-        await chrome.tabGroups.move(group.id, { index: -1 });
+      await updateGroupLabel(group, { title: group.customTitle ? group.title : t('tuckGroupTitle'),
+        color: created ? 'grey' : group.color || 'grey' });
+      if (!automatic || await canAutoTuck()) {
+        movingGroups.add(group.id);
+        try { await chrome.tabGroups.move(group.id, { index: -1 }); }
+        finally { movingGroups.delete(group.id); }
         const live = await chrome.tabs.query({ groupId: group.id });
         if (!live.some(tab => tab.active)) await chrome.tabGroups.update(group.id, { collapsed: true });
       }
@@ -332,11 +501,14 @@ export async function undoTuck(windowId: number) {
     if (!batch || !group || !(await validGroup(group))) { await persist(); throw new Error(t('errorUndoTuck')); }
     let count = 0;
     const requested = batch.ids.length;
+    const check = groupCheck(group);
     try {
       for (const id of [...batch.ids]) {
+        if (!await check()) break;
         const tab = await chrome.tabs.get(id).catch(() => null);
+        if (invalidGroups.has(group.id)) { await validGroup(group); break; }
         if (tab && tab.windowId === windowId && tab.groupId === group.id && group.members.includes(id)) {
-          await chrome.tabs.ungroup(id); group.members = group.members.filter(member => member !== id); touch(tab); count++;
+          await ungroupTab(id); group.members = group.members.filter(member => member !== id); touch(tab); count++;
         }
       }
       delete state.undo[windowId];
@@ -351,20 +523,34 @@ export async function undoTuck(windowId: number) {
 }
 async function scan() {
   if (state.enabled !== getPreferences().autoTuck) await preferencesChanged();
-  if (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active') return;
+  if (!await canAutoTuck()) return;
   const tabs = (await normalTabs()).sort((a, b) => a.index - b.index);
   const now = Date.now();
   const windows = new Map<number, number[]>();
+  for (const group of state.groups) if (state.pendingOrder?.[group.windowId]?.length) windows.set(group.windowId, []);
   for (const tab of tabs) if (idleTabEligible(tab, usedAt(tab, now), now, thresholdMs())) {
     const ids = windows.get(tab.windowId) || []; ids.push(tab.id!); windows.set(tab.windowId, ids);
   }
   for (const [windowId, ids] of windows) {
-    if (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active') return;
+    if (!await canAutoTuck()) return;
     await tuckBatch(windowId, ids, true);
   }
-  if (!getPreferences().autoTuck || await chrome.idle.queryState(60) === 'active') return;
+  if (!await canAutoTuck()) return;
   state.lastScanAt = Date.now();
+  delete state.lastFailureAt;
   await persist();
+}
+async function runScan() {
+  const lastScanAt = state.lastScanAt;
+  try { await scan(); }
+  catch (error) {
+    state.lastScanAt = lastScanAt;
+    state.lastFailureAt = Date.now();
+    // Preserve the failure independently of a failed tab query or partial batch.
+    await chrome.storage.session.set({ [SESSION_KEY]: state }).catch(() => {});
+    notify();
+    throw error;
+  }
 }
 async function ensureAlarm() {
   const alarm = await chrome.alarms.get(ALARM);
@@ -374,20 +560,25 @@ async function preferencesChanged() {
   const enabled = getPreferences().autoTuck;
   if (enabled !== state.enabled) {
     delete state.lastScanAt;
+    delete state.lastFailureAt;
     if (enabled) {
       const tabs = await normalTabs();
       for (const tab of tabs) touch(tab);
       await ensureAlarm();
+      await syncFocus();
     } else {
       // Keep the previous enabled state until release succeeds. If Chrome is
       // temporarily editing/closing a tab, the next alarm retries the remainder.
       let failed = false;
       for (const group of [...state.groups]) {
         const tabs = await validGroup(group);
+        const check = groupCheck(group);
         for (const tab of tabs || []) {
+          if (!await check()) break;
           const live = await chrome.tabs.get(tab.id!).catch(() => null);
+          if (invalidGroups.has(group.id)) { await validGroup(group); break; }
           if (live?.groupId === group.id && live.windowId === group.windowId) {
-            try { await chrome.tabs.ungroup(live.id!); touch(live); }
+            try { await ungroupTab(live.id!); touch(live); }
             catch { if (await chrome.tabs.get(live.id!).catch(() => null)) failed = true; }
           }
         }
@@ -412,8 +603,10 @@ export function startTabTucking(changed: () => void) {
   ready = (async () => {
     await preferencesReady;
     const [session, local, tabs] = await Promise.all([
-      chrome.storage.session.get(SESSION_KEY), chrome.storage.local.get([CLOCK_KEY, RECOVERY_KEY]), normalTabs(),
+      chrome.storage.session.get([SESSION_KEY, FOCUS_KEY]), chrome.storage.local.get([CLOCK_KEY, RECOVERY_KEY]), normalTabs(),
     ]);
+    const savedFocus = (session[FOCUS_KEY] as { unfocusedAt?: number } | undefined)?.unfocusedAt;
+    if (focusRevision === 0 && typeof savedFocus === 'number' && Number.isFinite(savedFocus) && savedFocus > 0 && savedFocus <= Date.now()) unfocusedAt = savedFocus;
     records = readTuckRecords(local[RECOVERY_KEY]);
     const saved = session[SESSION_KEY] as State | undefined;
     const stored = local[CLOCK_KEY] as { version?: number; enabled?: boolean; clocks?: Record<string, number>; lastScanAt?: number } | undefined;
@@ -449,16 +642,26 @@ export function startTabTucking(changed: () => void) {
     for (const group of [...state.groups]) await validGroup(group);
     await preferencesChanged();
     if (getPreferences().autoTuck) await ensureAlarm();
+    await syncFocus();
   })();
   void ready.catch(error => console.warn('justonehop: initialize tab tuck', error));
   subscribePreferences(() => background(preferencesChanged));
   chrome.alarms.onAlarm.addListener(alarm => {
     if (alarm.name === ALARM) background(async () => {
       if (state.enabled && !getPreferences().autoTuck) await preferencesChanged();
-      else await scan();
+      else await runScan();
     });
   });
-  chrome.idle.onStateChanged.addListener(status => { if (status !== 'active') background(scan); });
+  chrome.idle.onStateChanged.addListener(status => {
+    focusRevision++;
+    if (status !== 'active') background(runScan);
+  });
+  chrome.windows.onFocusChanged.addListener(windowId => {
+    // Invalidate immediately, even while a batch is awaiting a Chrome API call.
+    focusRevision++;
+    unfocusedAt = windowId === chrome.windows.WINDOW_ID_NONE ? Date.now() : undefined;
+    background(syncFocus);
+  });
   chrome.tabs.onActivated.addListener(({ tabId, windowId }) => background(async () => {
     const previous = activeTabs.get(windowId);
     activeTabs.set(windowId, tabId);
@@ -475,15 +678,45 @@ export function startTabTucking(changed: () => void) {
     if (!state.enabled && !state.groups.length && !records.length) return;
     touch(tab); await recover(); await persist();
   }));
-  const reconcile = () => background(async () => {
-    if (!state.enabled && !state.groups.length && !records.length) return;
-    const tabs = await normalTabs();
-    for (const group of [...state.groups]) await label(group);
-    await persist(tabs);
+  let reconcileQueued = false;
+  const reconcile = () => {
+    // A batch emits one event per tab. Reconcile their final state once when the
+    // serial queue reaches it; events during that read still schedule a follow-up.
+    // Ownership invalidation below stays synchronous, even while work is queued.
+    if (reconcileQueued) return;
+    reconcileQueued = true;
+    background(async () => {
+      reconcileQueued = false;
+      if (!state.enabled && !state.groups.length && !records.length) return;
+      const tabs = await normalTabs();
+      for (const group of [...state.groups]) await label(group);
+      await persist(tabs);
+    });
+  };
+  chrome.tabs.onMoved.addListener((id, info) => {
+    const group = state.groups.find(group => group.windowId === info.windowId && group.members.includes(id));
+    const expectedIndex = movingTabs.get(id);
+    movingTabs.delete(id);
+    if (!group || joiningTabs.has(id) || expectedIndex === info.toIndex || releasingTabs.has(id) || movingGroups.has(group.id)) return;
+    // Invalidate at the move event, before a later removal can hide the user's
+    // reorder from a comparison of the surviving members.
+    membershipRevision++;
+    delete state.order?.[info.windowId];
+    delete state.pendingOrder?.[info.windowId];
+    // Start the native snapshot now, before queued activation/return work can
+    // move a member out and erase the order the user just chose.
+    const snapshot = chrome.tabs.query({ windowId: info.windowId });
+    background(async () => {
+      const tabs = await snapshot;
+      (state.order ??= {})[info.windowId] = tabs.sort((a, b) => a.index - b.index).map(tab => tab.id!);
+      await persist();
+    });
+    reconcile();
   });
-  chrome.tabs.onRemoved.addListener(reconcile);
-  chrome.tabs.onAttached.addListener(reconcile);
-  chrome.tabs.onDetached.addListener(reconcile);
+  const membershipChanged = () => { membershipRevision++; reconcile(); };
+  chrome.tabs.onRemoved.addListener(membershipChanged);
+  chrome.tabs.onAttached.addListener(membershipChanged);
+  chrome.tabs.onDetached.addListener(membershipChanged);
   chrome.tabs.onUpdated.addListener((id, change, tab) => {
     if (change.url) background(async () => {
       if (!state.enabled && !state.groups.length && !records.length) return;
@@ -491,16 +724,21 @@ export function startTabTucking(changed: () => void) {
     });
     if (change.groupId !== undefined) {
       const group = state.groups.find(item => item.id === change.groupId);
-      if (group && !group.members.includes(id) && !joiningTabs.has(id)) invalidGroups.add(group.id);
+      const expectedJoin = joiningTabs.has(id) || releasingTabs.has(id) || group?.members.includes(id);
+      if (!expectedJoin) {
+        membershipRevision++;
+        if (group) invalidGroups.add(group.id);
+      }
     }
+    if (change.pinned !== undefined) membershipRevision++;
     if (change.groupId !== undefined || change.pinned !== undefined) reconcile();
   });
   chrome.tabGroups.onCreated.addListener(reconcile);
-  chrome.tabGroups.onRemoved.addListener(reconcile);
+  chrome.tabGroups.onRemoved.addListener(membershipChanged);
   chrome.tabGroups.onUpdated.addListener(group => {
     const owned = state.groups.find(item => item.id === group.id);
     if (!owned && pendingRecovery.length) reconcile();
-    if (owned && (group.title !== owned.title || group.color !== (owned.color || 'grey'))) {
+    if (owned && ((group.title || '') !== owned.title || group.color !== (owned.color || 'grey'))) {
       invalidGroups.add(group.id); reconcile();
     }
   });

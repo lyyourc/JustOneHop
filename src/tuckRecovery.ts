@@ -26,16 +26,18 @@ export function recoveryCandidates(record: TuckRecord, groups: RecoveryGroup[]) 
   return groups.filter(group => group.title === record.title ||
     group.tabs.some(tab => record.urls.includes(tab.url)));
 }
+const matchesEvidence = (record: TuckRecord, group: RecoveryGroup) =>
+  group.title === record.title && group.color === (record.color || 'grey') &&
+  sameUrls(record.urls, group.tabs.map(tab => tab.url)) && sameUrls(record.context, group.context);
 /** Require a one-to-one match on name, color, full URL multiset and window context. */
 export function matchRecovery(records: TuckRecord[], groups: RecoveryGroup[]): Map<string, RecoveryGroup> {
   const matches = new Map<string, RecoveryGroup>();
   for (const record of records) {
     if (record.requiresConfirmation) continue;
-    const candidates = groups.filter(group => group.title === record.title && group.color === (record.color || 'grey') &&
-      sameUrls(record.urls, group.tabs.map(tab => tab.url)) && sameUrls(record.context, group.context));
+    const candidates = groups.filter(group => matchesEvidence(record, group));
     if (candidates.length !== 1) continue;
     const group = candidates[0];
-    if (records.filter(other => recoveryCandidates(other, [group]).length).length !== 1) continue;
+    if (records.filter(other => matchesEvidence(other, group)).length !== 1) continue;
     matches.set(record.key, group);
   }
   return matches;

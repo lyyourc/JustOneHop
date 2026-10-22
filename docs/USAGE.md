@@ -239,7 +239,7 @@ JustOneHop integrates seamlessly with Chrome's native Tab Groups:
 
 <a id="收起标签页"></a>
 
-We all hoard tabs because we "might need them later", slowing down Chrome and cluttering the tab strip. **Tab Tucking** solves this by sliding tabs into a neat, native collapsed tab group (e.g. `Tucked · 5`) without closing them or losing form states.
+We all hoard tabs because we "might need them later", slowing down Chrome and cluttering the tab strip. **Tab Tucking** solves this by sliding tabs into a neat, native collapsed tab group named `Tuck Away` without closing them or losing form states.
 
 ### Manual Tucking
 
@@ -250,10 +250,13 @@ We all hoard tabs because we "might need them later", slowing down Chrome and cl
 
 Go to **Settings → Experimental Features → Auto-tuck tabs**:
 
-- Choose an idle duration threshold: **1 hour, 3 hours, 12 hours, 1 day, 3 days, or 7 days** (default: 7 days).
-- Runs gently in the background **only when your computer is idle** (at least 60 seconds of zero user activity).
+- Choose an idle duration threshold: **1 hour, 12 hours, 1 day, 3 days, or 7 days** (default: 7 days). Previously saved durations, including 3 hours, remain until you select a new value.
+- Runs when your computer is idle (at least 60 seconds without input, or locked), or Chrome has remained unfocused for **30 minutes**. The unfocused path uses the regular five-minute check; returning to Chrome resets the wait and stops further tucking.
+- Settings distinguish tabs that are not yet due, protected tabs, eligible tabs waiting for a check, and recovery-blocked tabs. The last failed attempt appears separately from the last completed check and clears after a successful check.
 - **Safety first**: Never touches pinned tabs, playing audio, active tabs, split screens, or incognito tabs.
 - Turning the switch off immediately moves all tucked tabs back to your normal tab strip.
+
+Tabs tucked in separate batches keep their original left-to-right order from before the first tuck in that window. Manually reordering the tucked group establishes a new order; after a full browser restart, the restored tab strip becomes the new reference. Undo returns the latest batch without restoring historical positions across the whole window.
 
 ### Restoring & Undoing
 

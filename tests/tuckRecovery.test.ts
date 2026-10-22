@@ -19,6 +19,22 @@ test('URL multiplicity and duplicate groups are ambiguous; no greedy assignment'
   assert.equal(matchRecovery([record], [group, { ...group, id: 801 }]).size, 0);
   assert.equal(matchRecovery([record, { ...record, key: 'other' }], [group]).size, 0);
 });
+test('same-name groups in separate windows recover independently, including staged restoration', () => {
+  const first = { ...record, title: 'Tuck Away' };
+  const second = { ...first, key: 'second', urls: ['https://c.test'], context: ['https://other.test'] };
+  const firstGroup = { ...group, title: first.title };
+  const secondGroup = { ...firstGroup, id: 801, windowId: 901, context: second.context,
+    tabs: [{ id: 60, title: 'Other', url: second.urls[0] }] };
+  assert.deepEqual([...matchRecovery([first, second], [firstGroup, secondGroup]).keys()], ['saved', 'second']);
+  assert.deepEqual([...matchRecovery([first, second], [firstGroup]).keys()], ['saved']);
+  assert.deepEqual([...matchRecovery([second], [secondGroup]).keys()], ['second']);
+  // Identical member URLs still remain distinguishable by complete window context.
+  assert.equal(matchRecovery([first, { ...second, urls: first.urls }],
+    [firstGroup, { ...secondGroup, tabs: firstGroup.tabs }]).size, 2);
+  // A confirmation-only record with the same full evidence is still ambiguous.
+  assert.equal(matchRecovery([first, { ...first, key: 'legacy', requiresConfirmation: true }], [firstGroup]).size, 0);
+});
+
 test('legacy discovery always asks before management, and changed members invalidate confirmation', () => {
   assert.equal(matchRecovery([{ ...record, requiresConfirmation: true }], [group]).size, 0);
   assert.notEqual(groupFingerprint(group), groupFingerprint({ ...group, tabs: [...group.tabs, { id: 66, title: 'New', url: 'https://new.test' }] }));

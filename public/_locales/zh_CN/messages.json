@@ -298,7 +298,7 @@
   "helpBackBody": { "message": "• 逐层返回：按 Esc、点击返回箭头，或在二级页的空搜索框中按 Backspace，均逐层返回并恢复原搜索与选中项；在主搜索层按 Esc 关闭面板。\n• 触控板横滑：面板内也可向返回方向横滑（常见 macOS 自然滚动为双指右滑）：滑动足够距离、出现蓝色箭头时，子页或菜单立即返回一层，惯性不会继续返回；滚动停下后才可再次横滑。主搜索、快捷键切换器和独立帮助等滚动停下后关闭。滑动不足时可反向、按键或点击取消，已返回不会撤销；可横向滚动的文本／输入区域不触发。" },
   "helpTabsTitle": { "message": "整理与切换标签页" },
   "helpTabsBody": { "message": "• 整理标签页：固定、静音和关闭其他页面后，可继续在面板中整理。批量关闭会自动保留固定标签页。如果关闭了唤起小范围瞬移的页面，包括批量关闭时包含该页，本次面板会结束。\n• 标签组管理：搜索标签组名称可进入组管理，支持整组展开/折叠、改名、解散分组或安全关闭。\n• Tab Switcher：选择「小范围瞬移：Tab Switcher」可在面板内筛选最近标签页，点击或 Enter 确认切换，取消则返回原搜索。通过快捷键启动切换器时，按住修饰键选择、松开即切换；若点击搜索框或按 Cmd/Ctrl+F 进入筛选，则暂停松键切换，改由输入后按 Enter 或点击确认。" },
-  "helpTuckBody": { "message": "• 收起标签页：「收起标签页」将页面移入窗口末尾的折叠组，不关闭或主动卸载页面；随时搜索并切换到该页即可移回标签栏。\n• 自动收起：可在设置中开启「自动收起标签页」，选择闲置多久后收起（1／3／12 小时或 1／3／7 天，默认 7 天），并在底栏保存时长。每 5 分钟及电脑进入空闲时检查，设置中可查看候选数量和上次自动检查。关闭开关会移回所有仍受管理的收起页，包括手动收起的页面。\n• 恢复收起组：浏览器重启后若有无法自动确认归属的收起组，搜索「恢复收起组」核对即可。" },
+  "helpTuckBody": { "message": "• 收起标签页：「收起标签页」将页面移入窗口末尾的折叠组，不关闭或主动卸载页面；随时搜索并切换到该页即可移回标签栏。\n• 自动收起：可在设置中开启「自动收起标签页」，选择闲置多久后收起（1／12 小时或 1／3／7 天，默认 7 天），选择后自动保存。电脑空闲或 Chrome 失去焦点满 30 分钟时收起，返回 Chrome 后停止；设置中可查看等待原因和上次自动检查。关闭开关会移回所有仍受管理的收起页，包括手动收起的页面。\n• 恢复收起组：浏览器重启后若有无法自动确认归属的收起组，搜索「恢复收起组」核对即可。" },
   "helpStorageTitle": { "message": "查看网站存储" },
   "helpStorageBody": { "message": "• 查看网站存储：在网页中搜索「local storage」「session storage」或「cookies」，左侧选择 key，右侧预览 value；JSON 自动格式化预览，不修改数据。\n• 复制数值：Enter 或「复制值」复制原始字符串。\n• Cookie 权限：首次读取 Cookie 时只按需申请当前网站域名的访问权限（cookies 权限），可随时在 Chrome 扩展设置中撤销（Cookie 撤销）。" },
   "helpQuestionsTitle": { "message": "常见问题" },
@@ -620,7 +620,7 @@
     "message": "自动收起标签页"
   },
   "autoTuckHint": {
-    "message": "长时间未使用的标签页会在电脑空闲时自动折叠，不会被关闭或删除。"
+    "message": "长时间未使用的标签页会自动折叠，不会被关闭或删除。"
   },
   "autoTuckOffHint": {
     "message": "关闭后，所有已收起的标签页都会恢复到标签栏。"
@@ -629,15 +629,21 @@
   "tuckRules": { "message": "了解规则" },
   "tuckHours": { "message": "$1 小时" },
   "tuckDays": { "message": "$1 天" },
-  "tuckScheduleHint": { "message": "仅在电脑空闲时收起标签页，不会打扰日常使用。" },
+  "tuckScheduleHint": { "message": "电脑空闲或 Chrome 失去焦点满 30 分钟时收起，返回 Chrome 后停止。" },
   "tuckTimingHint": { "message": "标签页闲置达到设定时长才会被收起，刚开启时不会立即收起现有页面。" },
   "tuckDisabledStatus": { "message": "尚未开启，所选时长将在开启后使用。" },
-  "tuckPreview": { "message": "按此时长，目前有 $1 个标签页符合条件。保存后将在下次空闲检查时收起。" },
-  "tuckWaiting": { "message": "$1 个标签页将在下次空闲检查时收起" },
+  "tuckPreview": { "message": "按此时长，目前有 $1 个标签页符合条件。保存后将在下次自动检查时收起。" },
+  "tuckWaiting": { "message": "$1 个标签页已到期，等待下次检查" },
+  "tuckWaitingActive": { "message": "$1 个标签页已到期，等待 Chrome 失去焦点或电脑空闲" },
+  "tuckWaitingGrace": { "message": "$1 个标签页已到期，等待 Chrome 失去焦点满 30 分钟" },
+  "tuckNotDue": { "message": "$1 个标签页尚未到期" },
+  "tuckProtected": { "message": "$1 个标签页受保护（当前、固定、已有分组等）" },
+  "tuckLastFailure": { "message": "上次尝试失败：$1，将自动重试。" },
+  "tuckReleasePending": { "message": "自动收起已关闭，仍有 $1 个标签页未能移回，正在自动重试。" },
   "tuckNoCandidates": { "message": "目前没有符合条件的标签页" },
   "tuckBlocked": { "message": "另有 $1 个标签页等待收起组恢复核对，请搜索「恢复收起组」。" },
   "tuckLastScan": { "message": "上次自动检查：$1" },
-  "tuckNotScanned": { "message": "等待电脑空闲时进行首次自动检查。" },
+  "tuckNotScanned": { "message": "尚未完成自动检查" },
   "tuckStatusError": { "message": "无法读取自动收起状态，请刷新重试。" },
   "tuckRefresh": { "message": "刷新状态" },
   "tuckSave": { "message": "保存时长" },
@@ -652,7 +658,7 @@
     "message": "已收起"
   },
   "tuckGroupTitle": {
-    "message": "已收起"
+    "message": "收起来"
   },
   "tabTucked": {
     "message": "标签页已收起，随时可以搜索找回。"

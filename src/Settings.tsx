@@ -15,7 +15,7 @@ import { systemLanguage, t } from './i18n';
 import { isAutoTuckAfterHours, savePreferences, type Preferences } from './preferences';
 import { getTuckStatus, openShortcuts, resetSearchRanking } from './api';
 
-const tuckPresets = [1, 3, 12, 24, 72, 168];
+const tuckPresets = [1, 12, 24, 72, 168];
 const tuckDuration = (hours: number) => hours % 24 === 0 ? t('tuckDays', String(hours / 24)) : t('tuckHours', String(hours));
 
 function Choice<T extends string>({ label, value, options, onChange, query }: {
@@ -127,7 +127,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
     if (target) { target.focus({ preventScroll: true }); target.scrollIntoView({ block: 'nearest' }); }
     else input.current?.focus();
   }, [bindingOpen, helpOpen]);
-  const showTuck = preferences.autoTuck && matches.has('tabs') && !bindingOpen && !helpOpen;
+  const showTuck = matches.has('tabs') && !bindingOpen && !helpOpen;
   useEffect(() => {
     if (!showTuck) return;
     let cancelled = false;
@@ -243,6 +243,10 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
             <div className="tuck-rules-copy" id={tuckRulesId} hidden={!tuckRulesOpen}>
               <p>{highlight(t('tuckScheduleHint'))}</p><p>{highlight(t('tuckTimingHint'))}</p><p>{highlight(t('autoTuckOffHint'))}</p>
             </div>
+            {!preferences.autoTuck && (tuckStatus?.pendingReleaseCount || tuckStatusError) ? <div className="tuck-status-copy" role="status">
+              <p>{tuckStatusError ? t('tuckStatusError') : t('tuckReleasePending', String(tuckStatus!.pendingReleaseCount))}</p>
+              <button className="tuck-refresh" aria-label={t('tuckRefresh')} aria-disabled={tuckRefreshing} onClick={() => void refreshTuckStatus()}><RotateCw size={14} /></button>
+            </div> : null}
             {preferences.autoTuck ? <fieldset className="tuck-settings" disabled={tuckSaving}>
               <div className="setting-row">
                 <div className="setting-copy">
@@ -252,12 +256,17 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
                   <div className="tuck-status-copy" aria-live="polite">
                   {tuckStatusError ? <p role="alert">{t('tuckStatusError')}</p> : tuckStatus && tuckStatusHours === tuckHours && tuckStatus.enabled === preferences.autoTuck ? <>
                     <div className="tuck-status-summary">
-                      <span>{tuckStatus.eligibleCount ? t('tuckWaiting', String(tuckStatus.eligibleCount)) : t('tuckNoCandidates')}</span>
+                      <span>{tuckStatus.eligibleCount ? t(tuckStatus.waitingReason === 'active' ? 'tuckWaitingActive' : tuckStatus.waitingReason === 'grace' ? 'tuckWaitingGrace' : 'tuckWaiting', String(tuckStatus.eligibleCount)) : t('tuckNoCandidates')}</span>
                       <span className="tuck-last-check">{tuckStatus.lastScanAt
                         ? <time dateTime={new Date(tuckStatus.lastScanAt).toISOString()} title={new Date(tuckStatus.lastScanAt).toLocaleString()}>{t('tuckLastScan', new Date(tuckStatus.lastScanAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time>
                         : t('tuckNotScanned')}</span>
                     </div>
+                    {tuckStatus.notDueCount || tuckStatus.protectedCount ? <p>{[
+                      tuckStatus.notDueCount ? t('tuckNotDue', String(tuckStatus.notDueCount)) : '',
+                      tuckStatus.protectedCount ? t('tuckProtected', String(tuckStatus.protectedCount)) : '',
+                    ].filter(Boolean).join(' · ')}</p> : null}
                     {tuckStatus.blockedCount ? <p>{t('tuckBlocked', String(tuckStatus.blockedCount))}</p> : null}
+                    {tuckStatus.lastFailureAt ? <p><time dateTime={new Date(tuckStatus.lastFailureAt).toISOString()} title={new Date(tuckStatus.lastFailureAt).toLocaleString()}>{t('tuckLastFailure', new Date(tuckStatus.lastFailureAt).toLocaleString(preferences.language === 'system' ? undefined : preferences.language, { dateStyle: 'short', timeStyle: 'short' }))}</time></p> : null}
                   </> : null}
                   </div>
                 </div>

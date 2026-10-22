@@ -105,7 +105,8 @@ async function createPaletteUI(context: BrowserContext, ui: Page) {
         }
         if (request.type === 'execute' && request.payload.action === 'settings') return { ok: true, data: undefined };
         if (request.type === 'tuck-status') return { ok: true, data: {
-          enabled: (store.preferences as Preferences).autoTuck, eligibleCount: 0, blockedCount: 0, checkedAt: Date.now(),
+          enabled: (store.preferences as Preferences).autoTuck, eligibleCount: 0, blockedCount: 0,
+          notDueCount: 0, protectedCount: 0, waitingReason: 'active', checkedAt: Date.now(),
         } };
         return rejectUnexpected(JSON.stringify(request));
       });

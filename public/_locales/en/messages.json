@@ -298,7 +298,7 @@
   "helpBackBody": { "message": "• Going back: Press Esc, click the back arrow, or press Backspace in an empty secondary search field to return one level with your search and selection restored. At the main search, Esc closes JustOneHop.\n• Swipe back: Swipe horizontally in the back direction inside the panel (commonly two fingers swiping right with macOS natural scrolling). When the blue arrow appears, child views return immediately; scrolling settles before closing the main search or standalone Help. Horizontally scrollable text areas do not trigger this." },
   "helpTabsTitle": { "message": "Manage and switch tabs" },
   "helpTabsBody": { "message": "• Manage tabs: Pinning, muting, and closing other tabs keep the palette open for continued cleanup. Bulk close preserves pinned tabs. Closing the tab you opened JustOneHop from ends the palette session.\n• Tab groups: Search a tab group’s name to manage its tabs (expand/collapse, rename, ungroup, or close group).\n• Tab Switcher: Choose JustOneHop: Tab Switcher to filter recent tabs inside the palette, then click a row or press Enter to switch; Cancel returns to your search. When launching the switcher with its shortcut, hold the modifier key to select and release to switch; click the search field or press Cmd/Ctrl+F to pause release-to-switch and filter by text instead." },
-  "helpTuckBody": { "message": "• Tuck away tabs: “Tuck Away Tab” moves a tab into a collapsed group at the end of the window without closing or discarding it; switch to the tab from search anytime to bring it back.\n• Auto tuck tabs: Turn on in Settings to choose how long tabs can remain unused before tucking (1/3/12 hours or 1/3/7 days; 7 days by default). Checks run every 5 minutes and when your computer becomes idle. Turning this off returns all still-managed tabs, including manually tucked tabs.\n• Recover tucked tabs: If a group needs confirmation after a browser restart, search for “recover tucked tabs”." },
+  "helpTuckBody": { "message": "• Tuck away tabs: “Tuck Away Tab” moves a tab into a collapsed group at the end of the window without closing or discarding it; switch to the tab from search anytime to bring it back.\n• Auto tuck tabs: Turn on in Settings to choose how long tabs can remain unused before tucking (1/12 hours or 1/3/7 days; 7 days by default). Tucking runs when your computer is idle or Chrome has been unfocused for 30 minutes, and stops when you return to Chrome. Turning this off returns all still-managed tabs, including manually tucked tabs.\n• Recover tucked tabs: If a group needs confirmation after a browser restart, search for “recover tucked tabs”." },
   "helpStorageTitle": { "message": "View website storage" },
   "helpStorageBody": { "message": "• View website storage: Search for “local storage”, “session storage”, or “cookies” on a webpage. Select a key on the left to preview its value on the right; JSON is formatted for reading, and storage is read-only.\n• Copy value: Press Enter or click Copy Value to copy the original string.\n• Cookie access: Reading cookies requests permission only for the current site’s domains, which you can revoke anytime in Chrome’s extension settings." },
   "helpQuestionsTitle": { "message": "Common questions" },
@@ -620,7 +620,7 @@
     "message": "Auto Tuck Tabs"
   },
   "autoTuckHint": {
-    "message": "Tabs you haven't used in a while are folded when your computer is idle. Pages stay open, never closed or deleted."
+    "message": "Tabs you haven't used in a while are folded automatically. Pages stay open, never closed or deleted."
   },
   "autoTuckOffHint": {
     "message": "Turning off returns all tucked tabs back to the tab bar."
@@ -629,15 +629,21 @@
   "tuckRules": { "message": "How it works" },
   "tuckHours": { "message": "$1 h" },
   "tuckDays": { "message": "$1 d" },
-  "tuckScheduleHint": { "message": "Only tucks tabs while your computer is idle, without interrupting your work." },
+  "tuckScheduleHint": { "message": "Tucks tabs when your computer is idle or Chrome has been unfocused for 30 minutes. Stops when you return to Chrome." },
   "tuckTimingHint": { "message": "Tabs are only tucked after being idle for the chosen duration; enabling will not immediately tuck existing tabs." },
   "tuckDisabledStatus": { "message": "Off. Your duration will apply when enabled." },
-  "tuckPreview": { "message": "$1 tabs currently qualify with this duration. Save to apply at the next idle check." },
-  "tuckWaiting": { "message": "$1 tabs will be tucked at the next idle check" },
+  "tuckPreview": { "message": "$1 tabs currently qualify with this duration. Save to apply at the next automatic check." },
+  "tuckWaiting": { "message": "$1 eligible tabs waiting for the next check" },
+  "tuckWaitingActive": { "message": "$1 eligible tabs waiting for Chrome to lose focus or your computer to become idle" },
+  "tuckWaitingGrace": { "message": "$1 eligible tabs waiting until Chrome has been unfocused for 30 minutes" },
+  "tuckNotDue": { "message": "$1 tabs have not reached the duration" },
+  "tuckProtected": { "message": "$1 tabs excluded (active, pinned, grouped, or otherwise protected)" },
+  "tuckLastFailure": { "message": "Last attempt failed: $1. Will retry automatically." },
+  "tuckReleasePending": { "message": "Automatic tucking is off. Tabs still awaiting return: $1. Retrying automatically." },
   "tuckNoCandidates": { "message": "No tabs currently qualify" },
   "tuckBlocked": { "message": "$1 more tabs are waiting for tucked-group recovery. Search for “recover tucked tabs”." },
   "tuckLastScan": { "message": "Last automatic check: $1" },
-  "tuckNotScanned": { "message": "Waiting for the first automatic check while your computer is idle." },
+  "tuckNotScanned": { "message": "No automatic check completed yet" },
   "tuckStatusError": { "message": "Could not read auto tuck status. Refresh to retry." },
   "tuckRefresh": { "message": "Refresh status" },
   "tuckSave": { "message": "Save duration" },
@@ -652,7 +658,7 @@
     "message": "Tucked Away"
   },
   "tuckGroupTitle": {
-    "message": "Tucked Away"
+    "message": "Tuck Away"
   },
   "tabTucked": {
     "message": "Tab tucked away. Find it anytime in search."

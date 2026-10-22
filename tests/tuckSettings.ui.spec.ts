@@ -56,11 +56,13 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
           if (request.type === 'search-history') return { ok: true, data: { items: [], limited: false } };
           if (request.type === 'execute' && request.payload.action === 'settings') return { ok: true, data: undefined };
           if (request.type === 'tuck-status') {
-            const { preferences } = await bridge({ operation: 'get', keys: 'preferences' });
+            const { preferences, tuckStatus } = await bridge({ operation: 'get', keys: ['preferences', 'tuckStatus'] });
             // Display-only status: no alarm scheduling, worker scan or native grouping is simulated.
             const status: TuckStatus = {
               enabled: (preferences as Preferences).autoTuck,
-              eligibleCount: 0, blockedCount: 0, checkedAt: Date.now(),
+              eligibleCount: 0, blockedCount: 0, notDueCount: 0, protectedCount: 0,
+              waitingReason: 'active', checkedAt: Date.now(),
+              ...tuckStatus as Partial<TuckStatus>,
             };
             return { ok: true, data: status };
           }
@@ -88,6 +90,7 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect(rules).toBeFocused();
   await rules.press('Space');
   await expect(ui.locator('.tuck-rules-copy')).toContainText('所有已收起的标签页都会恢复到标签栏');
+  await expect(ui.locator('.tuck-rules-copy')).toContainText('电脑空闲或 Chrome 失去焦点满 30 分钟时收起，返回 Chrome 后停止');
   await rules.press('Space');
   await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
   await ui.keyboard.press('Tab'); // Auto tuck switch
@@ -104,7 +107,8 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await ui.keyboard.press('Tab');
   await expect(duration).toBeFocused();
   await duration.press('Enter');
-  await expect(ui.getByRole('listbox').getByRole('option')).toHaveText(['1 小时', '3 小时', '12 小时', '1 天', '3 天', '7 天']);
+  await expect(ui.getByRole('listbox').getByRole('option')).toHaveText(['1 小时', '12 小时', '1 天', '3 天', '7 天']);
+  await expect(ui.getByRole('option', { name: '3 小时', exact: true })).toHaveCount(0);
   await duration.press('Home'); await duration.press('Enter');
   await expect(ui.getByRole('spinbutton')).toHaveCount(0);
   await ui.keyboard.press('Escape');
@@ -114,12 +118,48 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect.poll(() => (store.preferences as Preferences).autoTuckAfterHours).toBe(1);
   await expect(duration).toHaveText('1 小时');
   await expect(duration).toBeEnabled();
-  await expect(ui.locator('.tuck-status-copy')).toContainText('目前没有符合条件');
+  const status = ui.locator('.tuck-status-copy');
+  await expect(status).toContainText('目前没有符合条件');
+  const failedAt = Date.UTC(2026, 0, 2, 9, 10);
+  store.tuckStatus = {
+    eligibleCount: 2, notDueCount: 4, protectedCount: 3, blockedCount: 1,
+    waitingReason: 'active', lastFailureAt: failedAt,
+  } satisfies Partial<TuckStatus>;
+  const refresh = ui.getByRole('button', { name: '刷新状态' });
+  await refresh.click();
+  await expect(status).toContainText('2 个标签页已到期，等待 Chrome 失去焦点或电脑空闲');
+  await expect(status).toContainText('4 个标签页尚未到期');
+  await expect(status).toContainText('3 个标签页受保护（当前、固定、已有分组等）');
+  await expect(status).toContainText('1 个标签页等待收起组恢复核对');
+  await expect(status).toContainText('尚未完成自动检查');
+  await expect(status).toContainText('上次尝试失败：');
+  await expect(status).toContainText('将自动重试');
+  await expect(status.locator('time')).toHaveAttribute('datetime', new Date(failedAt).toISOString());
   expect(await ui.locator('.settings-view').evaluate(node => {
     const box = node.getBoundingClientRect();
     return box.left >= 0 && box.right <= innerWidth && node.scrollWidth <= node.clientWidth;
   })).toBe(true);
   await ui.screenshot({ path: test.info().outputPath('auto-tuck-presets-zh-narrow.png') });
+  store.tuckStatus = { ...store.tuckStatus as Partial<TuckStatus>, waitingReason: 'grace' };
+  await refresh.press('Enter');
+  await expect(status).toContainText('2 个标签页已到期，等待 Chrome 失去焦点满 30 分钟');
+  await expect(status).not.toContainText('或电脑空闲');
+  const scannedAt = failedAt - 300_000;
+  store.tuckStatus = { ...store.tuckStatus as Partial<TuckStatus>, waitingReason: 'scheduled', lastScanAt: scannedAt };
+  await refresh.click();
+  await expect(status).toContainText('2 个标签页已到期，等待下次检查');
+  await expect(status).not.toContainText('失去焦点');
+  await expect(status).toContainText('上次自动检查：');
+  await expect(status).toContainText('上次尝试失败：');
+  await expect(status.locator('time').first()).toHaveAttribute('datetime', new Date(scannedAt).toISOString());
+  await expect(status.locator('time').last()).toHaveAttribute('datetime', new Date(failedAt).toISOString());
+  store.tuckStatus = { notDueCount: 4, protectedCount: 3 } satisfies Partial<TuckStatus>;
+  await refresh.press('Enter');
+  await expect(status).toContainText('目前没有符合条件');
+  await expect(status).toContainText('4 个标签页尚未到期');
+  await expect(status).toContainText('3 个标签页受保护（当前、固定、已有分组等）');
+  await expect(status).not.toContainText('上次尝试失败');
+  await expect(status).not.toContainText('等待收起组恢复核对');
   await ui.reload();
   await ui.getByRole('combobox').fill('自动收起');
   await expect(ui.getByRole('option').first()).toContainText('自动收起');
@@ -127,15 +167,25 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await ui.getByRole('combobox').press('Enter');
   await expect(ui.getByRole('combobox', { name: '闲置时长' })).toHaveText('1 小时');
   // Older saved durations remain honest until replaced by a preset.
-  await ui.evaluate(() => chrome.storage.local.set({ preferences: { language: 'zh', theme: 'light', autoTuck: true, autoTuckAfterHours: 48 } }));
-  await expect(duration).toHaveText('2 天');
+  await ui.evaluate(() => chrome.storage.local.set({ preferences: { language: 'zh', theme: 'light', autoTuck: true, autoTuckAfterHours: 3 } }));
+  await expect(duration).toHaveText('3 小时');
   await duration.click();
-  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(7);
+  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(6);
+  await expect(ui.getByRole('option', { name: '3 小时', exact: true })).toHaveAttribute('aria-selected', 'true');
   await ui.getByRole('option', { name: '3 天', exact: true }).click();
   await expect.poll(() => (store.preferences as Preferences).autoTuckAfterHours).toBe(72);
   await expect(duration).toBeEnabled();
   await duration.click();
-  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(6);
-  await expect(ui.getByRole('option', { name: '2 天', exact: true })).toHaveCount(0);
+  await expect(ui.getByRole('listbox').getByRole('option')).toHaveCount(5);
+  await expect(ui.getByRole('option', { name: '3 小时', exact: true })).toHaveCount(0);
+  await duration.press('Escape');
+  store.tuckStatus = { pendingReleaseCount: 2 } satisfies Partial<TuckStatus>;
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(status).toContainText('仍有 2 个标签页未能移回，正在自动重试');
+  expect(await ui.locator('.settings-view').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  store.tuckStatus = { pendingReleaseCount: 0 } satisfies Partial<TuckStatus>;
+  await ui.getByRole('button', { name: '刷新状态' }).press('Enter');
+  await expect(status).toHaveCount(0);
   expect(unexpectedRequests).toEqual([]);
 });

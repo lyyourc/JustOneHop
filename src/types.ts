@@ -22,8 +22,13 @@ export interface TuckStatus {
   enabled: boolean;
   eligibleCount: number;
   blockedCount: number;
+  notDueCount: number;
+  protectedCount: number;
+  waitingReason: 'active' | 'grace' | 'scheduled';
   checkedAt: number;
   lastScanAt?: number;
+  lastFailureAt?: number;
+  pendingReleaseCount?: number;
 }
 export interface TuckRecoveryItem {
   id: string; title: string; urls: string[];
