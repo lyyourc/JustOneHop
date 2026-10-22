@@ -10,7 +10,7 @@ beforeEach(() => {
     get: async () => structuredClone(stored),
     set: async (value: typeof stored) => { stored = structuredClone(value); },
     remove: async (key: string) => { delete stored[key]; },
-  } } } as unknown as typeof chrome;
+  }, session: { get: async () => ({}), set: async () => {} } } } as unknown as typeof chrome;
 });
 
 test('simultaneous selections are serialized without lost updates', async () => {

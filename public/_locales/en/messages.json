@@ -130,6 +130,7 @@
   "runCommand": {
     "message": "Run Command"
   },
+  "continueSearch": { "message": "Continue Search" },
   "completeQuery": { "message": "Complete" },
   "queryCompletionHint": { "message": "Suggestion: $1. Press Tab or Right Arrow to complete." },
   "searchLabel": {
@@ -771,7 +772,7 @@
     "message": "History could not be read · Retry in all history"
   },
   "historyLimitedHint": {
-    "message": "History result limit reached · Narrow your search"
+    "message": "History search limit reached · Try Chinese text or more specific keywords"
   },
   "historyAllTime": {
     "message": "All time"

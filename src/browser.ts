@@ -3,8 +3,12 @@ import { t } from './i18n';
 import { addressUrl } from './address';
 import { reloadExtension } from './reloadExtension';
 import { isChromePageAction, openChromePage } from './chromePages';
-import { closeTargets } from './model';
+import { closeTargets, search } from './model';
+import { historyEntries } from './historySearch';
+import { isPinyinTerm, pinyinMatches } from './pinyinMatch';
+import { termMatches } from './searchMatch';
 import { recordUsage } from './usageStorage';
+import { getSearchContinuation, recordSearchContinuation } from './searchContinuation';
 import { settingsUsageTarget } from './usage';
 import { getBookmarks, performBookmarkAction, safeBookmarkUrl } from './bookmarks';
 import type { Execution, ExecutionOutcome, HistorySearchResult, Snapshot, TabItem } from './types';
@@ -36,13 +40,28 @@ export async function historyWindow(sender: chrome.runtime.MessageSender, expect
 export async function searchHistory(request: { query: string; scope: 'week' | 'all' }, sender: chrome.runtime.MessageSender): Promise<HistorySearchResult> {
   if (!request || typeof request.query !== 'string' || !['week', 'all'].includes(request.scope)) throw new Error(t('errorHistorySearch'));
   await historyWindow(sender);
-  const results = await chrome.history.search({ text: request.query, startTime: request.scope === 'week' ? Date.now() - 7 * 24 * 60 * 60 * 1000 : 0, maxResults: 100 });
+  const startTime = request.scope === 'week' ? Date.now() - 7 * 24 * 60 * 60 * 1000 : 0;
+  const terms = request.query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  // Chrome only recalls literal text. Supplement it with a bounded local scan,
+  // keeping the native query so older literal hits are not lost to the scan cap.
+  const [results, recent] = await Promise.all([
+    chrome.history.search({ text: request.query, startTime, maxResults: 100 }),
+    terms.some(isPinyinTerm) ? chrome.history.search({ text: '', startTime, maxResults: 1000 }) : Promise.resolve([]),
+  ]);
+  const phonetic = recent.filter(item => {
+    const text = `${item.title || ''} ${item.url || ''}`;
+    return terms.some(term => pinyinMatches(text, term).length > 0) &&
+      terms.every(term => termMatches(text, term, false).length > 0);
+  });
+  const unique = new Map([...results, ...phonetic].map(item => [item.id, item]));
+  const pages = [...unique.values()].filter(item => typeof item.id === 'string' && safeHistoryUrl(item.url)).map(item => ({
+    id: item.id, url: item.url!, title: typeof item.title === 'string' && item.title ? item.title : item.url!,
+    lastVisitTime: typeof item.lastVisitTime === 'number' && Number.isFinite(item.lastVisitTime) ? item.lastVisitTime : 0,
+  }));
+  const byId = new Map(pages.map(page => [`history:${page.id}`, page]));
   return {
-    items: results.filter(item => typeof item.id === 'string' && safeHistoryUrl(item.url)).map(item => ({
-      id: item.id, url: item.url!, title: typeof item.title === 'string' && item.title ? item.title : item.url!,
-      lastVisitTime: typeof item.lastVisitTime === 'number' && Number.isFinite(item.lastVisitTime) ? item.lastVisitTime : 0,
-    })),
-    limited: results.length >= 100,
+    items: (phonetic.length ? search(historyEntries(pages), request.query).map(entry => byId.get(entry.id)!) : pages).slice(0, 100),
+    limited: results.length >= 100 || recent.length >= 1000 || pages.length > 100,
   };
 }
 
@@ -64,6 +83,7 @@ export async function snapshot(senderTab?: chrome.tabs.Tab): Promise<Snapshot> {
     chrome.tabs.query({ windowId: active.windowId }), getBookmarks(), chrome.commands.getAll(), chrome.tabGroups.query({ windowId: active.windowId }), chrome.windows.get(active.windowId),
   ]);
   return {
+    searchContinuation: active.incognito || window.incognito ? undefined : await getSearchContinuation(active.windowId).catch(() => undefined),
     incognito: !!(active.incognito || window.incognito),
     groups: groups.map(group => ({ ...group, title: group.title || t('unnamedGroup') })),
     currentTabId: active.id, windowId: active.windowId, canUndoTuck: canUndoTuck(active.windowId), tuckRecoveries: tuckRecoveries(),
@@ -81,7 +101,9 @@ export async function perform(payload: Execution, onPerformed?: (outcome?: Execu
   if (payload.action === 'reloadExtension') { await reloadExtension(onPerformed); return; }
   // Let the panel refresh or dismiss as soon as Chrome finishes the action,
   // while this promise still owns queued persistence in the service worker.
+  const continuation = recordSearchContinuation(payload, target).catch(() => {});
   onPerformed?.(outcome);
+  await continuation;
   // An explicit empty query is a home choice; switcher navigation omits it.
   if (target && (typeof payload.query === 'string' || target.startsWith('command:')) &&
       (payload.action !== 'openHistoryPage' || payload.query?.trim())) {

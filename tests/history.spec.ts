@@ -7,6 +7,27 @@ registerPaletteFixture();
 
 test.describe(() => {
 test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+test('History pinyin recalls a visited Chinese title through main and all-history search', async () => {
+    const url = `${origin}/pinyin-history-page`;
+    const visited = await context.newPage();
+    await visited.route(url, route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<!doctype html><title>产品路线图</title><h1>产品路线图</h1>' }));
+    await visited.goto(url);
+    await expect.poll(() => worker.evaluate(async url => (await chrome.history.search({ text: '产品路线图', startTime: 0 })).some(item => item.url === url), url)).toBe(true);
+    await visited.close();
+    await ui.bringToFront();
+    const input = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await input.fill('cplxt');
+    await expect(ui.locator('.result.history .entry-title')).toHaveText('产品路线图');
+    await expect(ui.locator('.result.history .entry-title mark')).toHaveText('产品路线图');
+    await ui.locator('#justonehop-search-all-history').click();
+    const full = ui.getByRole('combobox', { name: 'Search browsing history', exact: true });
+    await full.fill('chanpinluxiantu');
+    await expect(ui.locator('.history-view .result.history .entry-title')).toHaveText('产品路线图');
+    await full.press('Escape');
+    await expect(input).toHaveValue('cplxt');
+    await expect(input).toBeFocused();
+  });
+
 test('History search: seventh entry follows six results and real visits support mouse opening and keyboard return', async () => {
     const query = 'JustOneHopHistoryNative';
     const urls = ['mouse', 'keyboard', 'third', 'fourth', 'fifth', 'sixth', 'seventh'].map(suffix => `${origin}/${query}-${suffix}`);

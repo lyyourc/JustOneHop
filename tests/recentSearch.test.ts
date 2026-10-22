@@ -17,6 +17,18 @@ test('recent search matches title and URL terms without changing MRU order', () 
   assert.deepEqual(filterRecentTabs([{} as chrome.tabs.Tab], 'missing'), []);
 });
 
+test('recent search puts literal matches before pinyin and keeps MRU within each group', () => {
+  const candidates = [
+    { id: 1, title: '项目文档', url: 'https://one.example' },
+    { id: 2, title: 'WD reference', url: 'https://two.example' },
+    { id: 3, title: '产品文档', url: 'https://three.example' },
+  ] as chrome.tabs.Tab[];
+  assert.deepEqual(filterRecentTabs(candidates, 'wd').map(tab => tab.id), [2, 1, 3]);
+  assert.deepEqual(filterRecentTabs(candidates, 'wendang').map(tab => tab.id), [1, 3]);
+  assert.deepEqual(filterRecentTabs(candidates, 'xmwd one').map(tab => tab.id), [1]);
+  assert.deepEqual(filterRecentTabs(candidates, '').map(tab => tab.id), [1, 2, 3]);
+});
+
 test('recent selection preserves visible targets and cannot confirm a hidden source after removal', () => {
   const visible = filterRecentTabs(tabs, 'Project Console');
   assert.equal(recentSelection(visible, 1), 0);

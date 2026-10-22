@@ -36,6 +36,29 @@ test('unified bilingual search, action menu, Esc and search fallback', async ({ 
   await expect(ui.getByRole('button', { name: '打开操作菜单' })).toBeEnabled();
 });
 
+test('pinyin search keeps literal hits first and highlights Chinese through keyboard and mouse navigation', async ({ palette }) => {
+  const { ui } = palette;
+  await palette.open({ snapshot: { tabs: [
+    { ...snapshotTab(2, 'roadmap'), title: '产品路线图', pinned: true },
+    { ...snapshotTab(3, 'literal'), title: 'CPLXT' },
+  ] } });
+  const input = ui.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
+  await input.pressSequentially('cplxt');
+  await expect(ui.getByRole('option').first()).toContainText('CPLXT');
+  const chinese = ui.locator('[id="justonehop-tab:2"]');
+  await expect(chinese.locator('.entry-title mark')).toHaveText('产品路线图');
+  await input.press('ArrowDown');
+  await expect(chinese).toHaveAttribute('aria-selected', 'true');
+  await chinese.click({ button: 'right' });
+  await expect(ui.getByRole('combobox', { name: '搜索操作' })).toBeFocused();
+  await ui.keyboard.press('Escape');
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('cplxt');
+  await input.fill('chanpin luxian');
+  await expect(ui.getByRole('option').first()).toContainText('产品路线图');
+  await expect(chinese.locator('.entry-title mark')).toHaveText('产品路线');
+});
+
 test('Palette startup renders a recoverable error when background messages fail', async ({ palette }) => {
   const { ui } = palette;
   const errors: string[] = [];

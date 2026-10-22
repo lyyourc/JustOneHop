@@ -1,7 +1,12 @@
-/** Filtering preserves the session's MRU order and never searches outside it. */
+import { termMatches } from './searchMatch';
+
+/** Literal hits lead phonetic hits; each group preserves the session's MRU order. */
 export function filterRecentTabs(tabs: chrome.tabs.Tab[], query: string) {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  return tabs.filter(tab => terms.every(term => `${tab.title || ''} ${tab.url || ''}`.toLocaleLowerCase().includes(term)));
+  const text = (tab: chrome.tabs.Tab) => `${tab.title || ''} ${tab.url || ''}`.toLocaleLowerCase();
+  const literal = (tab: chrome.tabs.Tab) => terms.every(term => text(tab).includes(term));
+  return tabs.filter(tab => terms.every(term => termMatches(text(tab), term, false).length > 0))
+    .sort((a, b) => Number(literal(b)) - Number(literal(a)));
 }
 
 /** Keep a visible selection while editing; a removed target requires a new choice. */

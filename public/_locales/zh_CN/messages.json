@@ -130,6 +130,7 @@
   "runCommand": {
     "message": "执行命令"
   },
+  "continueSearch": { "message": "继续搜索" },
   "completeQuery": { "message": "补全" },
   "queryCompletionHint": { "message": "建议：$1。按 Tab 或右方向键补全。" },
   "searchLabel": {
@@ -771,7 +772,7 @@
     "message": "历史读取失败，搜索全部历史以重试"
   },
   "historyLimitedHint": {
-    "message": "历史结果已达上限，请缩小关键词范围"
+    "message": "历史检索已达上限，可改用中文原文或更具体的关键词"
   },
   "historyAllTime": {
     "message": "全部时间"

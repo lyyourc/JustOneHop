@@ -1,19 +1,31 @@
-import { useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type RefObject } from 'react';
 import { queryCompletion } from './queryCompletion';
 import type { UsageRecord } from './usage';
+import type { SearchContinuation } from './types';
+import { SEARCH_CONTINUATION_TTL, validContinuation } from './searchContinuation';
 
-export function useQueryCompletion(input: RefObject<HTMLInputElement | null>, query: string, history: UsageRecord[], safeCommands: ReadonlySet<string>, enabled: boolean, onChange: (query: string) => void) {
+export function useQueryCompletion(input: RefObject<HTMLInputElement | null>, query: string, history: UsageRecord[], safeCommands: ReadonlySet<string>, enabled: boolean, onChange: (query: string) => void, continuation?: SearchContinuation) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    setNow(Date.now());
+    if (!continuation) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, continuation.at + SEARCH_CONTINUATION_TTL - Date.now()));
+    return () => clearTimeout(timer);
+  }, [continuation]);
   const [atEnd, setAtEnd] = useState(true);
   const [composing, setComposing] = useState(false);
   const [suppressed, setSuppressed] = useState(false);
   const [scroll, setScroll] = useState(0);
   const previous = useRef({ query: '', value: '' });
   const candidate = useMemo(() => {
+    if (validContinuation(continuation, now) && continuation.query.toLowerCase().startsWith(query.toLowerCase()) && continuation.query.length > query.length) {
+      return query + continuation.query.slice(query.length);
+    }
     // Keep an existing hint stable during background refreshes, but honor forgetting.
     const retained = previous.current.query === query && previous.current.value
       ? queryCompletion(history.filter(record => record.query === previous.current.value.toLowerCase()), query, safeCommands) : '';
     return retained || queryCompletion(history, query, safeCommands);
-  }, [history, query, safeCommands]);
+  }, [history, query, safeCommands, continuation, now]);
   useLayoutEffect(() => { previous.current = { query, value: candidate }; }, [query, candidate]);
   const value = enabled && atEnd && !composing && !suppressed ? candidate : '';
   function select() {

@@ -29,6 +29,7 @@ import { getPreferences, subscribePreferences } from './preferences';
 import { getUsage, subscribeUsage, usageReady } from './usageState';
 import { homeUsage, queryUsage, rankingInfo, usageTarget, type RankingInfo } from './usage';
 import { useQueryCompletion } from './useQueryCompletion';
+import { canContinueSearch, SEARCH_CONTINUATION_KEY } from './searchContinuation';
 import { StorageView } from './StorageView';
 import { BindingGuide } from './BindingGuide';
 import { copyText } from './clipboard';
@@ -86,7 +87,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   const safeCommands = useMemo(() => new Set(items.filter(item => item.kind === 'command' && !item.danger && item.action !== 'close').map(usageTarget)), [items]);
   const completion = useQueryCompletion(input, query, usage, safeCommands,
     !!data && !data.incognito && !busy && !actionTarget && !bookmarkRemoval && !groupRemoval && !settingsOpen && !helpOpen && !historyOpen && !tabSwitcherOpen && !storage && !bindingOpen && !recoveryId && groupId === undefined,
-    value => { savedCaret.current = [value.length, value.length]; setQuery(value); setSelection(''); setError(''); });
+    value => { savedCaret.current = [value.length, value.length]; setQuery(value); setSelection(''); setError(''); }, data?.searchContinuation);
   const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
   const committed = useRef<{ query: string; results: Entry[]; visible: Entry[]; ranking: Map<string, RankingInfo> }>({ query: '', results: [], visible: [], ranking: new Map() });
   const liveHomeScores = useMemo(() => data?.incognito ? emptyScores : homeUsage(usage), [usage, data?.incognito]);
@@ -200,9 +201,13 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
     const listener = (message: { source?: string; type?: string }) => {
       if (message.source === 'justonehop' && message.type === 'changed') changed();
     };
+    const storageChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'session' && changes[SEARCH_CONTINUATION_KEY]) changed();
+    };
+    chrome.storage.onChanged.addListener(storageChanged);
     const port = chrome.runtime.connect({ name: 'justonehop' });
     port.onMessage.addListener(listener);
-    return () => { mounted.current = false; refreshVersion.current++; clearTimeout(timer); port.disconnect(); window.removeEventListener('focus', focusWindow); };
+    return () => { mounted.current = false; refreshVersion.current++; clearTimeout(timer); port.disconnect(); chrome.storage.onChanged.removeListener(storageChanged); window.removeEventListener('focus', focusWindow); };
   }, []);
 
   useEffect(() => {
@@ -309,7 +314,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
         tabId: tab.id, windowId: data.windowId, expectedUrl: tab.url, query: learningQuery ?? '' });
       return;
     }
-    const execution = { action: entry.action, groupId: entry.groupId, groupChanges: entry.groupChanges, groupTabIds: entry.groupTabIds, settingsSection: entry.settingsSection, tabId: entry.tabId, bookmarkId: entry.bookmarkId, newTab: entry.newTab, expectedUrl: entry.expectedUrl, bookmarkIds: entry.bookmarkIds, url: entry.url, windowId: data.windowId, query: learningQuery };
+    const execution = { continueSearch: !actionTarget && canContinueSearch(query, entry, visible), action: entry.action, groupId: entry.groupId, groupChanges: entry.groupChanges, groupTabIds: entry.groupTabIds, settingsSection: entry.settingsSection, tabId: entry.tabId, bookmarkId: entry.bookmarkId, newTab: entry.newTab, expectedUrl: entry.expectedUrl, bookmarkIds: entry.bookmarkIds, url: entry.url, windowId: data.windowId, query: learningQuery };
     if (entry.action === 'settings') { openSettings(entry.settingsSection); void execute(execution).catch(() => {}); return; }
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     setBusy(true); setError('');
@@ -420,7 +425,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
           <div className="query-input">
             {completion.value ? <div className="query-completion" aria-hidden="true"><span style={{ transform: `translateX(-${completion.scroll}px)` }}><span className="query-completion-prefix">{query}</span>{completion.value.slice(query.length)}</span></div> : null}
             <input data-back-on-empty ref={input} value={query} {...completion.inputProps}
-              placeholder={t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
+              placeholder={completion.value ? '' : t('searchPlaceholder')} aria-label={t('searchLabel')} role="combobox"
               aria-autocomplete="both" aria-expanded="true" aria-controls="justonehop-results"
               aria-describedby={`justonehop-navigation${completion.value ? ' justonehop-completion' : ''}`}
               aria-activedescendant={!history.pending && selected ? `justonehop-${selected.id}` : undefined}
@@ -464,7 +469,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
         primary={{ label: primaryLabel, shortLabel: current?.newTab || current?.action === 'openAddressNewTab' ? t('footerOpenNewTab') : isPageNavigation(current) ? t('footerOpenCurrentTab') : undefined, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval || !!groupRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        secondary={completion.value ? { label: t('completeQuery'), keys: ['Tab'], onAction: completion.accept } : newAddressAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
+        secondary={completion.value ? { label: t(query ? 'completeQuery' : 'continueSearch'), keys: ['Tab'], onAction: completion.accept } : newAddressAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
         actions={{ open: !!actionTarget, disabled: !selected || (selected.disabled && !isPageNavigation(selected)) || resultBusy || !!bookmarkRemoval || !!groupRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}

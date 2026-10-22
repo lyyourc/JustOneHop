@@ -169,7 +169,12 @@ test.describe(() => {
   await input.press('Enter');
   await expect.poll(() => ui.isClosed()).toBe(true);
   await expect.poll(() => worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.[0]?.query)).toBe('iam');
-  const again = await reopen();
+  setUI(await context.newPage()); await ui.goto(popupUrl);
+  const again = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+  await expect(again).toHaveValue('');
+  await expect(ui.locator('.query-completion')).toHaveText('iam');
+  await ui.getByRole('button', { name: 'Continue Search', exact: true }).click();
+  await expect(again).toHaveValue('iam');
   await again.fill(''); await again.fill('i');
   await expect(ui.locator('.query-completion')).toHaveText('iam');
   await again.press('Tab'); await expect(again).toHaveValue('iam');

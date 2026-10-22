@@ -475,7 +475,7 @@ test('bookmark writes reject stale or unsafe URLs and never learn failed or priv
   assert.deepEqual(usage, []);
 });
 
-test('history reads are uncached, bounded to 100 and use explicit week/all start times', async () => {
+test('literal history reads are uncached, bounded to 100 and use explicit week/all start times', async () => {
   const searches: chrome.history.HistoryQuery[] = [];
   chrome.history.search = async query => { searches.push(query); return []; };
   const before = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -483,11 +483,32 @@ test('history reads are uncached, bounded to 100 and use explicit week/all start
   const after = Date.now() - 7 * 24 * 60 * 60 * 1000;
   await searchHistory({ query: 'guide', scope: 'week' }, historySender());
   await searchHistory({ query: 'guide', scope: 'all' }, historySender());
-  assert.equal(searches.length, 3);
+  assert.equal(searches.length, 6);
   assert.equal(searches[0].text, 'guide');
   assert.equal(searches[0].maxResults, 100);
   assert.ok(searches[0].startTime! >= before && searches[0].startTime! <= after);
-  assert.deepEqual(searches[2], { text: 'guide', startTime: 0, maxResults: 100 });
+  assert.deepEqual(searches[1], { text: '', startTime: searches[0].startTime, maxResults: 1000 });
+  assert.deepEqual(searches[4], { text: 'guide', startTime: 0, maxResults: 100 });
+  assert.deepEqual(searches[5], { text: '', startTime: 0, maxResults: 1000 });
+  assert.deepEqual(usage, []);
+});
+
+test('history supplements native literal hits with bounded pinyin recall and ranks before truncation', async () => {
+  const literal = { id: 'literal', title: 'CPLXT', url: 'https://literal.example', lastVisitTime: 1 };
+  const chinese = { id: 'chinese', title: '产品路线图', url: 'https://chinese.example', lastVisitTime: 2 };
+  const searches: chrome.history.HistoryQuery[] = [];
+  chrome.history.search = async query => {
+    searches.push(query);
+    return query.text ? [literal] : [literal, chinese,
+      ...Array.from({ length: 998 }, (_, i) => ({ id: `other-${i}`, title: 'Unrelated', url: `https://example.com/${i}` }))];
+  };
+  const result = await searchHistory({ query: 'cplxt', scope: 'all' }, historySender());
+  assert.deepEqual(result.items.map(item => item.id), ['literal', 'chinese']);
+  assert.equal(result.limited, true);
+  assert.deepEqual(searches, [{ text: 'cplxt', startTime: 0, maxResults: 100 }, { text: '', startTime: 0, maxResults: 1000 }]);
+  chrome.history.search = async query => query.text ? [] : [chinese];
+  assert.deepEqual((await searchHistory({ query: 'chanpinluxiantu', scope: 'week' }, historySender())).items.map(item => item.id), ['chinese']);
+  assert.deepEqual((await searchHistory({ query: 'chanpin missing', scope: 'all' }, historySender())).items, []);
   assert.deepEqual(usage, []);
 });
 

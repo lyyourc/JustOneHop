@@ -98,6 +98,10 @@ Whether searching open tabs, bookmarks, history, or browser settings, simply typ
 | Recover an accidentally closed tab | `reopen` or `undo close` | Restores the most recently closed tab or window |
 | Tidy open tabs | `close tabs to the right` | Safely closes eligible tabs to the right |
 
+Chinese content also supports **toneless pinyin and consecutive initials**: type `chanpinluxiantu`, `cplxt`, or `notion luxian` to find “产品路线图”. Use at least two letters, separate mixed Chinese, English, pinyin, and number terms with spaces, and type `v` for `ü`. Literal matches stay ahead of phonetic matches regardless of learned preferences. Tab Switcher supports the same matching and highlights the original Chinese characters.
+
+History keeps Chrome's literal search and supplements it with pinyin matches from the latest 1,000 pages in the selected time range. A notice appears when the search reaches its limit; use the original Chinese text to find older pages.
+
 #### Exact Project Matching
 
 When you type a project name like `justonehop`, JustOneHop recognizes when the word matches the final path segment of a URL. It prioritizes the repository root over deeper subpages. When you want a specific document, simply add another keyword like `justonehop testing`.
@@ -107,6 +111,7 @@ When you type a project name like `justonehop`, JustOneHop recognizes when the w
 After successfully using a query such as `github`, type `g` in the main search to see the remaining letters as a faint hint. Suggestions come from successful local selections, URL navigation, and web searches, with frequency and recency taken into account.
 
 - Press **Tab** or **→** at the end of the input, or click **Complete** in the footer, to fill the suggested query and keep typing.
+- **Continue Search**: After opening a tab, bookmark, or history result from a nonempty main search with at least two distinct available pages, reopening within 10 minutes in the same browser window suggests that query even when the input is empty. Accept with the usual completion keys or the footer’s **Continue Search** button. Matching prefixes prioritize it; unrelated input uses normal completion. Only the latest qualifying query per window is retained, until expiry, reset, or browser restart. Commands, direct URL navigation, Google searches, and incognito do not create this hint.
 - Until accepted, results match only what you typed. **Enter** still executes the selected result; **↑ / ↓** only changes the selected result.
 - Without a hint, Tab moves focus as usual; **Shift+Tab** always moves focus backward. Moving the caret, selecting text, composing with an IME, or deleting text keeps completion out of the way.
 - Suggestions stay on-device, exclude destructive commands, and are disabled in incognito. **Settings → Reset Ranking** clears the shared query and ranking history. Merely typing or accepting a hint does not save a query.

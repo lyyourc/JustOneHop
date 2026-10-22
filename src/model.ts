@@ -5,6 +5,7 @@ import { addressActions, pageNavigationEntry } from './addressPresentation';
 import { chromePages } from './chromePages';
 import Fuse, { type Expression } from 'fuse.js';
 import { termMatches } from './searchMatch';
+import { pinyinKeywords } from './pinyinMatch';
 import { usageTarget } from './usage';
 import { safeBookmarkUrl } from './bookmarks';
 import type { ActionId, BookmarkItem, ChromePageAction, Entry, Snapshot, TabItem } from './types';
@@ -234,7 +235,8 @@ function buildSearchIndex(items: Entry[]) {
   const index = items.map(item => {
     const title = normalizeSearch(item.title);
     const label = normalizeSearch(entryTitle(item));
-    const aliases = item.kind === 'command' ? (item.aliases ?? commandAliases[item.action] ?? []).map(normalizeSearch) : [];
+    const aliases = item.kind === 'command' ? (item.aliases ?? commandAliases[item.action] ?? []).map(normalizeSearch)
+      .filter(alias => !pinyinAliases.has(alias)) : [];
     // A service is often named by its domain while its page title is localized.
     // A complete terminal path segment identifies the page itself; ancestor
     // segments and query strings remain auxiliary metadata without typo tolerance.
@@ -247,15 +249,17 @@ function buildSearchIndex(items: Entry[]) {
       } catch { /* No URL identity. */ }
     }
     const names = [title, label, ...aliases, ...(hostname ? [hostname] : [])];
+    const categoryText = categoryTerms(item.category), keywords = normalizeSearch(`${item.keywords} ${item.groupTitle || ''}`);
+    const subtitle = item.kind === 'command' ? '' : normalizeSearch(item.subtitle);
     return {
+      pinyin: [...names, categoryText, keywords, subtitle].flatMap(pinyinKeywords),
       kind: item.kind, pinned: item.kind === 'tab' && !!item.pinned, action: item.action, danger: item.danger, title, label, aliases, names, pageName,
       wordNames: names.map(name => name.split(/[^\p{L}\p{N}]+/u).join(' ')),
-      categoryText: categoryTerms(item.category), keywords: normalizeSearch(`${item.keywords} ${item.groupTitle || ''}`),
-      subtitle: item.kind === 'command' ? '' : normalizeSearch(item.subtitle),
+      categoryText, keywords, subtitle,
     };
   });
   const fuse = new Fuse(index, {
-    keys: [{ name: 'title', weight: 3 }, { name: 'label', weight: 3 }, { name: 'categoryText', weight: 1 }, { name: 'aliases', weight: 3 }, { name: 'keywords', weight: 1 }, { name: 'subtitle', weight: 0.5 }],
+    keys: [{ name: 'title', weight: 3 }, { name: 'label', weight: 3 }, { name: 'categoryText', weight: 1 }, { name: 'aliases', weight: 3 }, { name: 'keywords', weight: 1 }, { name: 'subtitle', weight: 0.5 }, { name: 'pinyin', weight: 0.5 }],
     threshold: 0.35, ignoreLocation: true, minMatchCharLength: 1, includeScore: true,
   });
   return { language: t('languageTag'), index, fuse };
@@ -280,7 +284,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
   }
   const { index, fuse } = prepared;
   const matches = fuse.search(terms.length === 1 ? terms[0] : {
-    $and: terms.map((term): Expression => ({ $or: [{ title: term }, { label: term }, { categoryText: term }, { aliases: term }, { keywords: term }, { subtitle: term }] })),
+    $and: terms.map((term): Expression => ({ $or: [{ title: term }, { label: term }, { categoryText: term }, { aliases: term }, { keywords: term }, { subtitle: term }, { pinyin: term }] })),
   });
   const explicitClose = hasIntentPrefix(terms, ['close'], 3) || hasIntentPrefix(terms, ['guanbi'], 4) || normalized.includes('关闭');
   const bookmarkPrefix = /^book[a-z]*$/.test(bookmarkIntent) && 'bookmark'.startsWith(bookmarkIntent);
@@ -302,6 +306,8 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
     if (item.wordNames.some(name => terms.every(term => name.startsWith(term) || name.includes(` ${term}`)))) return 3;
     if (names.some(name => terms.every(term => name.includes(term)))) return 4;
     if (terms.every(term => [...names, item.categoryText, item.keywords, item.subtitle].some(field => field.includes(term)))) return 5;
+    if (terms.every(term => [...names, item.categoryText, item.keywords, item.subtitle]
+      .some(field => termMatches(field, term, false).length > 0))) return 5.5;
     // A typo of a complete command name is clearer than the same word buried
     // in a longer command ("setings": Settings before Chrome Settings).
     if (item.kind === 'command' && terms.length === 1 && /^[a-z]{4,}$/.test(normalized) &&
@@ -320,7 +326,7 @@ export function search(items: Entry[], query: string, usageScores: ReadonlyMap<s
       ['close', 'closeOthers', 'closeRight', 'closeGroup'].includes(item.action) && explicitClose)) && terms.every(term =>
     // Metadata is searchable, but must not manufacture typo matches. Only
     // visible names and natural-language command aliases receive typo tolerance.
-    item.keywords.includes(term) || item.subtitle.includes(term) || item.categoryText.includes(term) ||
+    [item.keywords, item.subtitle, item.categoryText].some(field => termMatches(field, term, false).length > 0) ||
     item.title.includes(term) || termMatches(item.title, term).length > 0 || item.aliases.some(alias =>
       termMatches(alias, term, !pinyinAliases.has(alias)).length > 0)))
     .map(result => ({ ...result, tier: tier(result.item), usage: usageScores.get(usageTarget(items[result.refIndex])) || 0,

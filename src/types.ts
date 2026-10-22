@@ -31,7 +31,9 @@ export interface TuckRecoveryItem {
     tabs: { id: number; title: string; url: string }[] }[];
 }
 export interface TabGroupItem { id: number; windowId: number; title: string; color: chrome.tabGroups.TabGroup['color']; collapsed: boolean }
+export interface SearchContinuation { query: string; target: string; at: number }
 export interface Snapshot {
+  searchContinuation?: SearchContinuation;
   incognito?: boolean;
   groups?: TabGroupItem[];
   windowId: number;
@@ -51,6 +53,7 @@ export interface PaletteState {
 }
 export interface ExecutionOutcome { message?: string }
 export interface Execution {
+  continueSearch?: boolean;
   paletteState?: PaletteState;
   action: ActionId | 'settings';
   settingsSection?: SettingsSection;

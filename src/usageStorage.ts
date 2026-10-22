@@ -1,4 +1,5 @@
 import { addUsage, normalizeUsage, usageQuery, USAGE_STORAGE_KEY } from './usage';
+import { forgetSearchContinuations } from './searchContinuation';
 
 // Only the service worker writes history. Serialize read-modify-write operations
 // so simultaneous palettes cannot overwrite each other's successful selections.
@@ -27,6 +28,7 @@ export async function forgetUsage(target: string | string[], query?: string): Pr
   const normalized = query === undefined ? undefined : usageQuery(query);
   if (normalized !== undefined && normalized.length > 200) throw new Error('Invalid usage query');
   return enqueue(async () => {
+    await forgetSearchContinuations(identities, normalized);
     const stored = await chrome.storage.local.get(USAGE_STORAGE_KEY);
     const history = normalizeUsage(stored[USAGE_STORAGE_KEY]);
     await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: history.filter(record =>
@@ -34,4 +36,7 @@ export async function forgetUsage(target: string | string[], query?: string): Pr
   });
 }
 
-export const resetUsage = () => enqueue(() => chrome.storage.local.remove(USAGE_STORAGE_KEY));
+export const resetUsage = () => enqueue(async () => {
+  await forgetSearchContinuations();
+  await chrome.storage.local.remove(USAGE_STORAGE_KEY);
+});
