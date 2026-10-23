@@ -33,6 +33,8 @@
   "searchIconPreview": { "message": "Badge preview" },
   "searchIconPreviewReady": { "message": "Image ready. Wear badge to apply." },
   "searchIconDefault": { "message": "Restore Default Badge" },
+  "searchIconRestore": { "message": "Restore" },
+  "searchIconEmojiOpened": { "message": "Emoji Finder opened" },
   "searchIconDefaultHint": { "message": "Use the original JustOneHop logo." },
   "searchIconSave": { "message": "Wear Badge" },
   "searchIconSaved": { "message": "Hop badge updated" },
@@ -383,7 +385,7 @@
   "paletteHotkey": {
     "message": "Open / Close JustOneHop"
   },
-  "paletteHotkeyHint": { "message": "The only shortcut you need to remember. Search for any feature from here." },
+  "paletteHotkeyHint": { "message": "The only shortcut you need to remember." },
   "hotkeyHint": {
     "message": "Change the shortcut for JustOneHop in Chrome’s extension shortcuts."
   },

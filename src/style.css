@@ -109,7 +109,7 @@
   background: var(--bar); border: var(--search-border-width) solid transparent; z-index: -1;
   transition: background-color var(--motion-surface) ease, border-color var(--motion-surface) ease, box-shadow var(--motion-surface) ease;
 }
-.search-bar:focus-within::before, .storage-search:focus-within::before {
+.search-bar:not(.search-bar-filled):focus-within::before, .storage-search:focus-within::before {
   background: var(--bg); border-color: var(--accent);
   box-shadow: var(--search-shadow);
 }
@@ -130,6 +130,8 @@
 .justonehop-app :where(.search-icon-emoji, .group-field input, .group-field select, .settings-category-select select, .binding-code-field textarea):focus { outline: none; }
 .justonehop-app .search-icon-emoji { width: var(--emoji-input-width); height: var(--control-height); text-align: center; font-size: var(--type-title); }
 .justonehop-app .search-icon-emoji[aria-invalid="true"] { border-color: var(--danger); }
+.search-icon-emoji-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.search-icon-emoji-link:focus-visible { outline: var(--focus-width) solid var(--focus-color); outline-offset: var(--focus-outset); }
 .search-icon-error { color: var(--danger); font-size: var(--type-caption); }
 .search-icon-settings .setting-copy { min-width: 0; }
 .search-icon-settings .search-icon-emoji { flex-shrink: 0; }
@@ -188,17 +190,21 @@
 .current-badge { font-size: var(--type-meta); font-weight: var(--weight-regular); white-space: nowrap; color: var(--muted); }
 .tucked-badge { font-size: var(--type-meta); white-space: nowrap; color: var(--muted); }
 
-.footer { position: relative; z-index: 4; height: var(--footer-height); display: flex; align-items: center; gap: var(--space-inset); padding: 0 var(--space-menu); background: var(--footer); border-top: var(--border-width) solid var(--line); }
+.footer, .palette-footer { position: relative; z-index: 4; height: var(--footer-height); display: flex; align-items: center; gap: var(--space-4); padding: 0 var(--space-menu); background: var(--footer); border-top: var(--border-width) solid var(--line); flex-shrink: 0; }
 .navigation-hint { display: inline-flex; align-items: center; gap: var(--space-2); color: inherit; font: inherit; white-space: nowrap; flex-shrink: 0; }
 .navigation-key { display: inline-flex; align-items: center; gap: var(--space-1); }
 .justonehop-app kbd { font-family: inherit; font-size: var(--keycap-type-size); font-weight: var(--weight-medium); min-width: var(--keycap-size); height: var(--keycap-size); padding: 0 var(--keycap-padding); display: inline-flex; justify-content: center; align-items: center; border-radius: var(--radius-keycap); border: var(--border-width) solid var(--key-border); background: var(--key); color: var(--muted); white-space: nowrap; line-height: 1; font-variant-numeric: tabular-nums; }
 .key-chord { display: inline-flex; align-items: center; gap: var(--space-1); }
 .footer-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-compact); flex-shrink: 0; }
-.footer-actions button { display: flex; align-items: center; gap: var(--space-2); font-size: var(--footer-label-size); border-radius: var(--radius-control); padding: var(--space-1) var(--space-2); transition: background-color var(--motion-feedback) ease; }
-.footer-actions button:hover:not(:disabled):not([aria-disabled="true"]), .footer-actions button.pressed:not(:disabled):not([aria-disabled="true"]) { background: var(--selected);  }
-.primary-action, .secondary-action { font-weight: var(--weight-medium); }
+.footer-actions button { display: flex; align-items: center; gap: var(--space-2); font-size: var(--footer-label-size); line-height: var(--leading-compact); border-radius: var(--radius-compact); padding: var(--space-1) var(--space-2); transition: background-color var(--motion-feedback) ease, color var(--motion-feedback) ease; }
+.footer-actions button:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--selected); }
+.footer-actions button:active:not(:disabled):not([aria-disabled="true"]) { background: color-mix(in srgb, var(--selected) 80%, var(--accent)); }
+.footer-actions button.pressed:not(:disabled):not([aria-disabled="true"]) { background: var(--selected); color: var(--accent); }
+.primary-action, .secondary-action, .actions-button { font-weight: var(--weight-medium); }
 .primary-action { min-width: 0; color: var(--accent); }
 .primary-action.danger { color: var(--danger); }
+.primary-action.danger:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--icon-danger-surface); }
+.primary-action.danger:active:not(:disabled):not([aria-disabled="true"]) { background: color-mix(in srgb, var(--icon-danger-surface) 80%, var(--danger)); }
 .footer-separator { height: var(--space-menu); width: var(--border-width); background: var(--border); }
 .secondary-compact-icon { display: none; }
 .secondary-trailing-icon { display: flex; flex-shrink: 0; }
@@ -211,8 +217,9 @@
 /* One location pattern in every layer: control, title, optional context.
    Transient status replaces context, keeping navigation and actions stationary. */
 .palette-footer-location { display: flex; align-items: center; gap: var(--space-2); min-width: 0; flex: 1; color: var(--muted); }
-.footer-navigation { width: var(--footer-navigation-size); height: var(--footer-navigation-size); display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-compact); color: var(--muted); }
+.footer-navigation { width: var(--footer-navigation-size); height: var(--footer-navigation-size); display: grid; place-items: center; flex-shrink: 0; border-radius: var(--radius-compact); color: var(--muted); transition: background-color var(--motion-feedback) ease, color var(--motion-feedback) ease; }
 .footer-navigation:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--selected); color: var(--text); }
+.footer-navigation:active:not(:disabled):not([aria-disabled="true"]) { background: color-mix(in srgb, var(--selected) 80%, var(--accent)); }
 .palette-footer-title { display: flex; align-items: center; min-width: 0; color: var(--muted); font-size: var(--footer-label-size); font-weight: var(--weight-medium); }
 .footer-title-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-footer-context, .palette-footer-status { display: flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--muted); font-size: var(--footer-context-size); white-space: nowrap; }
@@ -297,7 +304,7 @@ body.justonehop-popup { margin: 0; width: var(--panel-width); height: var(--pane
 .justonehop-app[data-theme="light"] { color-scheme: light; }
 .justonehop-app[data-theme="dark"] { color-scheme: dark; }
 .help-body { flex: 1; min-height: 0; margin: 0; padding: var(--content-inset); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--border) transparent; overflow-wrap: anywhere; }
-.help-body:focus-visible, .storage-detail:focus-visible, .recent-list:focus-visible, .tuck-recovery [role="listbox"]:focus-visible, .preview-info:focus-visible { outline: var(--focus-width) solid var(--focus-color); outline-offset: var(--focus-inset); }
+.help-body:focus-visible, .storage-detail:focus-visible, .tuck-recovery [role="listbox"]:focus-visible, .preview-info:focus-visible { outline: var(--focus-width) solid var(--focus-color); outline-offset: var(--focus-inset); }
 .help-body .help-intro { margin: 0 0 var(--section-gap); font-size: var(--type-body); line-height: var(--leading-body); color: var(--muted); }
 
 /* GitHub guide banner */
@@ -567,7 +574,6 @@ body.switcher-popup { margin: 0; width: 100%; height: 100vh; background: var(--p
 .bookmark-confirm-details li { margin: var(--space-1) 0; }
 .bookmark-confirm .confirm-controls { flex-shrink: 0; }
 
-.palette-footer { flex-shrink: 0; gap: var(--space-4); }
 .binding-surface { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 
 /* Non-interactive content keeps focus in its keyboard layer, outside the Tab order. */

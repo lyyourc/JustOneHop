@@ -26,7 +26,19 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await surface.getByRole('tab', { name: 'Keyboard', exact: true }).press('ArrowUp');
   await expect(appearance).toBeFocused();
   const theme = surface.getByRole('combobox', { name: 'Theme', exact: true });
-  await appearance.press('Tab'); await expect(language).toBeFocused();
+  for (const name of ['Keyboard', 'Labs', 'Help']) {
+    await ui.keyboard.press('Tab'); await expect(surface.getByRole('tab', { name, exact: true })).toBeFocused();
+    await expect(appearance).toHaveAttribute('aria-selected', 'true');
+  }
+  for (const name of ['Labs', 'Keyboard', 'Appearance']) {
+    await ui.keyboard.press('Shift+Tab'); await expect(surface.getByRole('tab', { name, exact: true })).toBeFocused();
+  }
+  await appearance.press('Tab'); await ui.keyboard.press('Enter');
+  await expect(surface.getByRole('tab', { name: 'Keyboard', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await ui.keyboard.press('Shift+Tab'); await ui.keyboard.press('Space');
+  await expect(appearance).toHaveAttribute('aria-selected', 'true');
+  for (let step = 0; step < 4; step++) await ui.keyboard.press('Tab');
+  await expect(language).toBeFocused();
   await language.press('Tab'); await expect(theme).toBeFocused();
   await theme.press('Enter'); await theme.press('End'); await theme.press('Enter');
   await expect(theme).toHaveText('Dark');
@@ -39,7 +51,8 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await surface.getByRole('tab', { name: 'Labs', exact: true }).click();
   await expect(settings.locator('.footer-title-label')).toHaveText('Settings · Labs');
   await search.fill('auto tuck');
-  await expect(settings.locator('.settings-body h2')).toHaveText('Labs');
+  await expect(settings.locator('.settings-body h2')).toHaveCount(0);
+  await expect(surface.getByRole('tab', { name: 'Labs', exact: true })).toHaveAttribute('aria-selected', 'true');
   await search.press('Escape');
   const tuck = surface.locator('[data-setting="tabs"]');
   const ranking = surface.locator('[data-setting="ranking"]');
@@ -73,21 +86,27 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
     expect(await node.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   }
   await surface.getByRole('tab', { name: 'Keyboard', exact: true }).click();
-  await expect(surface.locator('[data-setting="keyboard"] p')).toHaveText('The only shortcut you need to remember. Search for any feature from here.');
+  await expect(surface.locator('[data-setting="keyboard"] p')).toHaveText('The only shortcut you need to remember.');
   expect(await surface.locator('[data-setting="keyboard"]').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   await settings.screenshot({ path: test.info().outputPath('settings-keyboard.png') });
   await appearance.click();
+  await search.fill('choose your own');
+  await expect(settings.locator('[data-setting]')).toHaveCount(0);
+  await search.fill('choose image');
+  await expect(settings.locator('[data-setting]')).toHaveCount(1);
+  await expect(settings.locator('[data-setting="searchIcon"]')).toBeVisible();
+  await search.press('Escape');
   const change = surface.getByRole('button', { name: 'Wear Badge' });
   await change.click();
   const emoji = surface.getByRole('textbox', { name: 'Emoji', exact: true });
-  await expect(emoji).toBeFocused(); await emoji.fill('🌱');
+  await expect(surface.getByRole('button', { name: 'Choose Image', exact: true })).toBeFocused(); await emoji.fill('🌱');
   await expect(settings.locator('.search-bar')).toHaveCount(1);
   await expect(settings.locator('.palette-footer')).toHaveCount(1);
   await expect(settings.locator('.task-header')).toHaveCount(0);
   await search.fill('language');
-  await expect(settings.locator('.settings-body h2')).toHaveText('Appearance');
+  await expect(settings.locator('.settings-body h2')).toHaveCount(0);
   await expect(surface.getByRole('combobox', { name: 'Language', exact: true })).toBeVisible();
-  await expect(surface.getByRole('tab', { selected: true })).toHaveCount(0);
+  await expect(appearance).toHaveAttribute('aria-selected', 'true');
   await expect(emoji).not.toBeVisible();
   await search.press('Escape');
   await expect(search).toHaveValue(''); await expect(emoji).toHaveValue('🌱');
@@ -135,7 +154,10 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await settings.screenshot({ path: test.info().outputPath('settings-help.png') });
   await search.fill('theme');
   await expect(theme).toBeVisible();
+  await expect(appearance).toHaveAttribute('aria-selected', 'true');
+  await expect(settings.locator('.settings-body h2')).toHaveCount(0);
   await search.press('Escape');
+  await expect(help).toHaveAttribute('aria-selected', 'true');
   await expect(surface.getByRole('article', { name: 'Help', exact: true })).toBeVisible();
   await surface.locator('.settings-footer').getByRole('button', { name: 'Back', exact: true }).click();
   await expect(surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeFocused();
@@ -145,6 +167,9 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   if (!overlay) await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   const categories = surface.getByRole('combobox', { name: 'Settings categories' });
   await expect(categories).toBeVisible();
+  await categories.selectOption('help');
+  await search.fill('theme'); await expect(categories).toHaveValue('appearance');
+  await search.press('Escape'); await expect(categories).toHaveValue('help');
   await categories.selectOption('appearance'); await change.click();
   await expect(search).toBeInViewport();
   await expect(surface.getByRole('button', { name: 'Wear Badge' })).toBeInViewport();

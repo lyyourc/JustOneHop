@@ -1,5 +1,5 @@
 import { BackLayer, useNavigateBack } from './Navigation';
-import { BindingNavigation } from './BindingNavigation';
+import { OverlayRetention } from './OverlayRetention';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink } from 'lucide-react';
 import { t } from './i18n';
@@ -17,7 +17,7 @@ export function bindingCode() {
 export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boolean }) {
   const page = useContext(SettingsPage);
   const navigateBack = useNavigateBack();
-  const retainGuide = useContext(BindingNavigation);
+  const retainGuide = useContext(OverlayRetention);
   const feedback = useOperationFeedback();
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);

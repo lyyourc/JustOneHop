@@ -18,7 +18,7 @@ export function PaletteFooter({ navigation, title, context, status, primary, sec
   title?: string;
   context?: ReactNode;
   status?: ReactNode;
-  primary?: { label: string; shortLabel?: string; keys: string[]; disabled?: boolean; danger?: boolean; onAction: () => void };
+  primary?: { label: string; shortLabel?: string; keys: string[]; disabled?: boolean; danger?: boolean; buttonRef?: Ref<HTMLButtonElement>; onAction: () => void };
   secondary?: { label: string; shortLabel?: string; keys: string[]; icon?: ReactNode; trailingIcon?: ReactNode; disabled?: boolean; onAction: () => void };
   actions?: { open: boolean; disabled?: boolean; onToggle: () => void };
   isMac?: boolean;
@@ -59,7 +59,7 @@ export function PaletteFooter({ navigation, title, context, status, primary, sec
       </div> : null}
     </div>
     <div className="footer-actions">
-      {primary ? <button className={`primary-action ${primary.danger ? 'danger' : ''}`} disabled={primary.disabled} onKeyDown={buttonKeyboard} onClick={primary.onAction} title={`${describeShortcut(formatShortcut(primary.keys))} — ${primary.label}`} aria-label={primary.label}>
+      {primary ? <button ref={primary.buttonRef} className={`primary-action ${primary.danger ? 'danger' : ''}`} disabled={primary.disabled} onKeyDown={buttonKeyboard} onClick={primary.onAction} title={`${describeShortcut(formatShortcut(primary.keys))} — ${primary.label}`} aria-label={primary.label}>
         <span className="primary-label">{primary.shortLabel || primary.label}</span><span className="key-chord"><kbd>{formatShortcut(primary.keys)}</kbd></span>
       </button> : null}
       {secondary ? <button className={`secondary-action ${secondary.icon ? 'has-compact-icon' : ''}`} disabled={secondary.disabled} onKeyDown={buttonKeyboard} onClick={secondary.onAction} title={secondary.keys.length ? `${describeShortcut(formatShortcut(secondary.keys))} — ${secondary.label}` : secondary.label} aria-label={secondary.label}>

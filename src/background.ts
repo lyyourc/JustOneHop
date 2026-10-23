@@ -51,7 +51,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, respond) => {
     if (request.type === 'reset-usage') return resetUsage();
     if (request.type === 'forget-usage') return forgetUsage(request.payload?.target, request.payload?.query);
     if (request.type === 'open-help-url') {
-      const url = typeof request.url === 'string' && /^https:\/\/github\.com\/lyyourc\/JustOneHop/i.test(request.url)
+      const url = typeof request.url === 'string' && (request.url === 'https://emoji.muan.co/' || /^https:\/\/github\.com\/lyyourc\/JustOneHop/i.test(request.url))
         ? request.url
         : 'https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md';
       const targetWindow = sender.tab?.windowId;

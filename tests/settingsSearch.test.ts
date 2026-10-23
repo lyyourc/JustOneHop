@@ -11,7 +11,11 @@ test('settings search finds individual rows by bilingual labels, descriptions an
     ['徽章', ['searchIcon']], ['badge', ['searchIcon']],
     ['7 days', ['tabs']], ['自定义', ['searchIcon', 'keyboard']], ['12 hours', ['tabs']], ['时长', ['tabs']], ['页面始终保持打开', ['tabs']], ['search 排序', ['ranking']],
     ['userscript', []], ['scripts', []], ['脚本', []], ['ctrl tab', ['binding']], ['hotkey', ['keyboard']],
-    ['实验性功能', ['tabs', 'ranking']], ['preferences', ['language', 'theme', 'searchIcon']],
+    ['实验室', ['tabs', 'ranking']], ['labs', ['tabs', 'ranking']],
+    ['preferences', []], ['experimental features', []],
+    ['choose the language used', []], ['choose your own', []], ['Search for any feature from here', []],
+    ['wear badge', ['searchIcon']], ['choose image', ['searchIcon']], ['restore', ['searchIcon']],
+    ['选择图片', ['searchIcon']], ['恢复', ['searchIcon', 'tabs']], ['how it works', ['tabs']],
     ['keyboard', ['keyboard', 'binding']], ['theme ranking', []], ['[.*]', []],
   ] as const) assert.deepEqual([...matchingSettings(query)], rows, query);
 });

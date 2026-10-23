@@ -12,6 +12,23 @@ for (const overlay of [false, true]) {
     const hint = surface.locator('.query-completion');
     const complete = surface.getByRole('button', { name: 'Complete', exact: true });
     const start = async () => { await input.fill(''); await input.fill('g'); await expect(hint).toHaveText('github'); };
+    const capsule = surface.locator('.search-bar');
+    const border = () => capsule.evaluate(node => getComputedStyle(node, '::before').borderColor);
+    for (const theme of ['light', 'dark']) {
+      await palette.provideStorage({ preferences: { language: 'en', theme } });
+      await input.fill('');
+      await expect(input).toBeFocused();
+      await expect.poll(border).not.toBe('rgba(0, 0, 0, 0)');
+      await input.press('g');
+      await expect(input).toBeFocused();
+      await expect.poll(border).toBe('rgba(0, 0, 0, 0)');
+      await expect.poll(() => capsule.evaluate(node => getComputedStyle(node, '::before').boxShadow)).toBe('none');
+      await input.press('Tab'); await expect(input).toHaveValue('github');
+      await expect.poll(border).toBe('rgba(0, 0, 0, 0)');
+      await surface.locator('.search-dismiss').click();
+      await expect(input).toHaveValue(''); await expect(input).toBeFocused();
+      await expect.poll(border).not.toBe('rgba(0, 0, 0, 0)');
+    }
     await start();
     await expect(input).toHaveValue('g');
     await expect(surface.locator('.result.tab')).toHaveCount(2);

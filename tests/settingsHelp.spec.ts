@@ -36,14 +36,41 @@ test.describe(() => {
     await overlay.locator('.settings-button').click();
     await overlay.getByRole('tab', { name: '外观', exact: true }).click();
     await overlay.getByRole('button', { name: '佩戴徽章' }).click();
+    const emoji = overlay.getByRole('textbox', { name: 'Emoji', exact: true });
+    await emoji.fill('🌱');
+    await context.route('https://emoji.muan.co/', route => route.fulfill({ contentType: 'text/html', body: '<title>Emoji copy destination</title>' }));
+    const pickerOpened = context.waitForEvent('page');
+    await overlay.getByRole('link', { name: 'Emoji', exact: true }).click();
+    const picker = await pickerOpened;
+    await expect(picker).toHaveURL('https://emoji.muan.co/');
+    await expect.poll(() => worker.evaluate(async () => (await chrome.tabs.query({ active: true })).some(tab => tab.url === 'https://emoji.muan.co/'))).toBe(true);
+    await worker.evaluate(async id => { await chrome.tabs.update(id, { active: true }); }, tabId);
+    await source.bringToFront();
+    await expect(emoji).toBeVisible(); await expect(emoji).toHaveValue('🌱');
+    const pickerId = await worker.evaluate(async () => (await chrome.tabs.query({ url: 'https://emoji.muan.co/' }))[0].id!);
+    const revisitPicker = async (draft: string) => {
+      await worker.evaluate(async id => { await chrome.tabs.update(id, { active: true }); }, pickerId);
+      await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, pickerId)).toBe(true);
+      await worker.evaluate(async id => { await chrome.tabs.update(id, { active: true }); }, tabId);
+      await source.bringToFront();
+      await expect(emoji).toBeVisible(); await expect(emoji).toHaveValue(draft);
+    };
+    await revisitPicker('🌱');
+    await revisitPicker('🌱');
+    await emoji.press('Escape');
+    await overlay.getByRole('button', { name: '佩戴徽章' }).click();
+    await emoji.fill('🌻');
+    await revisitPicker('🌻');
+    await revisitPicker('🌻');
+    await picker.close();
     const preview = overlay.locator('.search-icon-preview img');
     const images: string[] | undefined = process.env.JUSTONEHOP_TEST_IMAGES ? JSON.parse(process.env.JUSTONEHOP_TEST_IMAGES) : undefined;
     for (let attempt = 0; attempt < (images?.length ?? 12); attempt++) {
       await test.step(`overlay upload ${attempt + 1}`, async () => {
         const path = images?.[attempt] ?? (attempt % 2 ? process.env.JUSTONEHOP_TEST_JPEG : process.env.JUSTONEHOP_TEST_ICON);
-        const previous = await preview.elementHandle();
+        const previous = attempt ? await preview.elementHandle() : null;
         await overlay.locator('input[type=file]').setInputFiles(path || resolve(`dist/icon${attempt % 2 ? 48 : 16}.png`));
-        await expect.poll(() => previous!.evaluate(node => node.isConnected)).toBe(false);
+        if (previous) await expect.poll(() => previous.evaluate(node => node.isConnected)).toBe(false);
         await expect(overlay.getByRole('button', { name: '选择图片' })).toBeEnabled();
         await expect(preview).toBeVisible();
         await expect.poll(() => preview.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth === 64 && node.naturalHeight === 64)).toBe(true);
@@ -62,15 +89,25 @@ test.describe(() => {
     await expect(overlay.locator('.recent-search-activate img')).toBeVisible();
     await overlay.locator('.recent-search-activate').click();
     await expect(overlay.locator('.recent-search-field input')).toBeFocused();
+    const away = await context.newPage(); await away.goto(`${origin}/After-badge`);
+    await expect(source.locator('#justonehop-command-palette')).not.toBeAttached();
+    await away.close();
     await source.close();
     await second.reload();
     await expect(second.locator('.search-focus img')).toBeVisible();
     await second.locator('.settings-button').click();
     await second.getByRole('tab', { name: '外观', exact: true }).click();
     await second.getByRole('button', { name: '佩戴徽章' }).click();
-    await second.getByRole('button', { name: '恢复默认徽章' }).click();
+    await second.getByRole('button', { name: '恢复', exact: true }).click();
     await second.getByRole('button', { name: '佩戴徽章' }).click();
     await expect(ui.locator('.search-focus .brand-logo')).toBeVisible();
+    await second.getByRole('button', { name: '佩戴徽章' }).click();
+    await context.route('https://emoji.muan.co/', route => route.fulfill({ contentType: 'text/html', body: '<title>Emoji copy destination</title>' }));
+    const opened = context.waitForEvent('page');
+    await second.getByRole('link', { name: 'Emoji', exact: true }).click();
+    const emojiSite = await opened;
+    await expect(emojiSite).toHaveURL('https://emoji.muan.co/');
+    await emojiSite.close();
     await second.close();
   });
 });
@@ -448,7 +485,7 @@ test.describe(() => {
     const categoryTab = ui.getByRole('tab', { name: category, exact: true });
     await categoryTab.click();
     await header.locator('.search-focus').click();
-    const controls = [header.locator('.search-dismiss'), categoryTab, ...fields,
+    const controls = [header.locator('.search-dismiss'), ...['Appearance', 'Keyboard', 'Labs', 'Help'].map(name => ui.getByRole('tab', { name, exact: true })), ...fields,
       ui.locator('.footer-back'), header.locator('.search-focus'), settingsSearch];
     for (const control of controls) { await ui.keyboard.press('Tab'); await expect(control).toBeFocused(); }
     await ui.keyboard.press('Shift+Tab');
@@ -460,7 +497,7 @@ test.describe(() => {
   }
   await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await settingsSearch.fill('lang');
-  await expect(ui.locator('.settings-body h2')).toHaveText(['Appearance']);
+  await expect(ui.locator('.settings-body h2')).toHaveCount(0);
   await expect(ui.locator('[data-setting]')).toHaveCount(1);
   await expect(ui.locator('[data-setting="language"] label mark')).toHaveText('Lang');
   await settingsSearch.fill('主题');
@@ -471,7 +508,7 @@ test.describe(() => {
   await expect(header.locator('.search-dismiss')).toHaveAccessibleName('Clear search');
   await ui.keyboard.press('Tab');
   await expect(ui.getByRole('tab', { name: 'Appearance', exact: true })).toBeFocused();
-  await ui.keyboard.press('Tab');
+  for (let step = 0; step < 4; step++) await ui.keyboard.press('Tab');
   await expect(theme).toBeFocused();
   await settingsSearch.fill('7 days');
   await expect(ui.locator('[data-setting]')).toHaveCount(1);
@@ -884,6 +921,35 @@ test.describe(() => {
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, commands: true } });
+  test('Hop Badge Escape returns one level inside the closed webpage overlay', async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Escape-badge`);
+    await worker.evaluate(async () => {
+      const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+      await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+    });
+    const cdp = await context.newCDPSession(page);
+    const ax = async () => {
+      const { frameTree } = await cdp.send('Page.getFrameTree');
+      const frameId = frameTree.childFrames?.find(child => child.frame.url === 'about:blank')?.frame.id;
+      return (await cdp.send('Accessibility.getFullAXTree', { frameId })).nodes;
+    };
+    const focused = async (name: string) => (await ax()).some(node => node.name?.value === name && node.properties?.some(prop => prop.name === 'focused' && prop.value.value === true));
+    await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
+    await page.keyboard.type('hop badge');
+    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value?.includes('Hop Badge') && node.properties?.some(prop => prop.name === 'selected' && prop.value.value === true))).toBe(true);
+    await page.keyboard.press('Enter');
+    await expect.poll(() => focused('Wear Badge')).toBe(true);
+    await page.keyboard.press('Enter');
+    await expect.poll(() => focused('Choose Image')).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect.poll(() => focused('Wear Badge')).toBe(true);
+    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'heading' && node.name?.value === 'Hop Badge')).toBe(false);
+    await expect(page.locator('#justonehop-command-palette')).toBeAttached();
+    await page.keyboard.press('Escape');
+    await expect.poll(() => focused('Search commands, tabs, bookmarks, and history')).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
+  });
   test('English palette launch overlay Escape returns one level from binding setup', async () => {
   const page = await context.newPage(); await page.goto(`${origin}/Escape-binding`);
   await worker.evaluate(async () => {

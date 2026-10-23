@@ -127,6 +127,9 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const [query, setQuery] = useState('');
   const searching = !!query.trim();
   const matches = new Set([...matchingSettings(query)].filter(row => searching || settingCategory[row] === category));
+  const resultCategories = new Set([...matches].map(row => settingCategory[row]));
+  const highlightedCategory = searching && resultCategories.size && !resultCategories.has(category)
+    ? settingsCategories.find(item => resultCategories.has(item))! : category;
   const helpCategory = category === 'help' && !detail;
   const detailVisible = (!!detail || helpCategory) && !searching;
   const categoryIcons = { appearance: Paintbrush, keyboard: Keyboard, experimentalFeatures: FlaskConical, help: BookOpen };
@@ -238,16 +241,15 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
     <div className="settings-workspace">
       <nav ref={categories} className="settings-sidebar" aria-label={t('settingsCategories')}>
         <label className="settings-category-select">{t('settingsCategories')}
-          <select aria-label={t('settingsCategories')} value={searching ? '' : category} onChange={event => selectCategory(event.target.value as SettingsCategory)}>
-            {searching ? <option value="" disabled>{t('searchSettings')}</option> : null}
+          <select aria-label={t('settingsCategories')} value={highlightedCategory} onChange={event => selectCategory(event.target.value as SettingsCategory)}>
             {settingsCategories.map(item => <option key={item} value={item}>{categoryLabel(item)}</option>)}
           </select>
         </label>
         <div className="settings-category-list" role="tablist" aria-label={t('settingsCategories')} aria-orientation="vertical">
           {settingsCategories.map(item => {
             const Icon = categoryIcons[item];
-            return <button key={item} type="button" role="tab" aria-selected={!searching && category === item}
-              aria-controls="settings-content" tabIndex={category === item ? 0 : -1} onClick={() => selectCategory(item)}
+            return <button key={item} type="button" role="tab" aria-selected={highlightedCategory === item}
+              aria-controls="settings-content" onClick={() => selectCategory(item)}
               onKeyDown={event => {
                 if (event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.repeat) {
                   if (event.key === 'Enter' || event.key === ' ') event.preventDefault();
@@ -271,7 +273,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
       </SettingsPage.Provider> : null}
     <div className="settings-body" ref={body} hidden={detailVisible} inert={detailVisible}>
       {matches.has('language') || matches.has('theme') || matches.has('searchIcon') ? <>
-        {searching ? <h2><Paintbrush size={14} />{highlight(t('appearance'))}</h2> : null}
         <div className="settings-group settings-appearance">
           {matches.has('language') ? <div data-setting="language">
             <div className="setting-row">
@@ -294,7 +295,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         </div>
       </> : null}
       {matches.has('keyboard') || matches.has('binding') ? <>
-        {searching ? <h2><Keyboard size={14} />{highlight(t('keyboard'))}</h2> : null}
         <div className="settings-group settings-keyboard">
           {matches.has('keyboard') ? <div className="setting-row hotkey-row" data-setting="keyboard">
             <div className="setting-copy"><label>{highlight(t('paletteHotkey'))}</label><p>{highlight(t('paletteHotkeyHint'))}</p></div>
@@ -308,7 +308,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         </div>
       </> : null}
       {matches.has('tabs') || matches.has('ranking') ? <>
-        {searching ? <h2><FlaskConical size={14} />{highlight(categoryLabel('experimentalFeatures'))}</h2> : null}
         <div className="settings-group settings-experiments">
           {matches.has('tabs') ? <div data-setting="tabs">
             <div className="setting-row tuck-heading">
@@ -368,7 +367,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         </div>
       </> : null}
       {searching && matches.has('help') ? <>
-        <h2><BookOpen size={14} />{highlight(t('help'))}</h2>
         <div className="settings-group"><div className="setting-row" data-setting="help">
           <div className="setting-copy"><label>{highlight(t('help'))}</label><p>{highlight(t('helpHint'))}</p></div>
           <button className="surface-button" onClick={() => openDetail('help')}>{highlight(t('openHelp'))}</button>

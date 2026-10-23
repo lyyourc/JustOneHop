@@ -10,6 +10,12 @@ test('Chinese recent bridge UI embedded switcher mouse selection and narrow geom
     ? { ok: true, data: undefined } : undefined });
   const surface = ui.frameLocator('.justonehop-frame');
   await expect(surface.getByRole('listbox')).toBeFocused(); await expect(surface.getByRole('combobox')).toBeDisabled();
+  await expect(surface.getByRole('listbox')).toHaveCSS('outline-style', 'none');
+  await ui.keyboard.press('ArrowUp');
+  await expect(surface.getByRole('option', { selected: true })).toContainText('Bridge A');
+  await expect(surface.getByRole('listbox')).toHaveCSS('outline-style', 'none');
+  await ui.keyboard.press('ArrowDown');
+  await expect(surface.getByRole('option', { selected: true })).toContainText('Bridge B');
   // The isolated UI can focus before the entrance scale animation finishes.
   await expect.poll(() => surface.locator('.palette').evaluate(node =>
     node.getAnimations().every(animation => animation.playState === 'finished'))).toBe(true);

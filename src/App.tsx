@@ -420,7 +420,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
       onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label={t('extensionName')} aria-busy={busy}>
       <span className="sr-only" id="justonehop-navigation">{t('navigationHelp')}</span>
       <div className={`main-surface ${actionTarget || bookmarkRemoval || groupRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval || groupRemoval ? true : undefined}>
-        <header className="search-bar">
+        <header className={`search-bar${query.length ? ' search-bar-filled' : ''}`}>
           <SearchFocusButton input={input} disabled={busy} />
           <div className="query-input">
             {completion.value ? <div className="query-completion" aria-hidden="true"><span style={{ transform: `translateX(-${completion.scroll}px)` }}><span className="query-completion-prefix">{query}</span>{completion.value.slice(query.length)}</span></div> : null}

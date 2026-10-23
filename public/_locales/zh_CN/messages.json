@@ -33,6 +33,8 @@
   "searchIconPreview": { "message": "佩戴效果预览" },
   "searchIconPreviewReady": { "message": "图片已就绪，佩戴后生效" },
   "searchIconDefault": { "message": "恢复默认徽章" },
+  "searchIconRestore": { "message": "恢复" },
+  "searchIconEmojiOpened": { "message": "已打开 Emoji Finder" },
   "searchIconDefaultHint": { "message": "使用 JustOneHop 原生 Logo 徽章。" },
   "searchIconSave": { "message": "佩戴徽章" },
   "searchIconSaved": { "message": "瞬移徽章已佩戴" },
@@ -383,7 +385,7 @@
   "paletteHotkey": {
     "message": "打开 / 关闭小范围瞬移"
   },
-  "paletteHotkeyHint": { "message": "只需记住这个快捷键，即可搜索并使用所有功能。" },
+  "paletteHotkeyHint": { "message": "只需记住这个快捷键。" },
   "hotkeyHint": {
     "message": "如需自定义快捷键，可在 Chrome 扩展快捷键设置页中修改。"
   },

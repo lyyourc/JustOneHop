@@ -51,30 +51,46 @@ test('overlay keeps each preview visible across repeated PNG and JPEG uploads', 
 
 test('search icon editor supports keyboard Emoji, image previews, failures and narrow layouts', async ({ palette }) => {
   const { ui } = palette;
-  await palette.open({ locale: 'en-US' });
+  await palette.open({ locale: 'en-US', reply: request => request.type === 'open-help-url' ? { ok: true, data: undefined } : undefined });
   const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
   await search.fill('emoji'); await search.press('Enter');
   const change = ui.getByRole('button', { name: 'Wear Badge' });
   await expect(change).toBeFocused(); await change.press('Enter');
   const emoji = ui.getByRole('textbox', { name: 'Emoji', exact: true });
-  await expect(emoji).toBeFocused();
+  const chooseImage = ui.getByRole('button', { name: 'Choose Image', exact: true });
+  await expect(chooseImage).toBeFocused();
+  await chooseImage.press('Shift+Tab'); await expect(emoji).toBeFocused();
   await expect(emoji).toHaveCSS('border-width', '1px');
   await expect(emoji).toHaveCSS('border-radius', '8px');
   await expect(emoji).toHaveCSS('font-size', '20px');
   await expect(emoji).toHaveCSS('outline-style', 'none');
   await expect(ui.locator('.search-icon-settings .search-bar, .search-icon-settings .search-focus, .search-icon-settings .footer-back')).toHaveCount(0);
   await expect(ui.getByRole('heading', { name: 'Hop Badge', exact: true })).toBeVisible();
-  const defaults = ui.getByRole('button', { name: 'Restore Default Badge', exact: true });
+  const defaults = ui.getByRole('button', { name: 'Restore', exact: true });
   await expect(defaults.locator('kbd')).toHaveCount(0);
   await expect(defaults.locator('.brand-logo')).toBeVisible();
   await expect(defaults).toHaveAttribute('title', 'Restore Default Badge');
   const back = ui.locator('.settings-footer').getByRole('button', { name: 'Back', exact: true });
   await expect(back).toHaveCount(1);
-  await emoji.press('Shift+Tab'); await expect(ui.getByRole('tab', { name: 'Appearance', exact: true })).toBeFocused();
+  await expect(emoji).toHaveValue('');
+  await expect(emoji).not.toHaveAttribute('placeholder');
+  const emojiLink = ui.getByRole('link', { name: 'Emoji', exact: true });
+  await expect(emojiLink).toHaveAttribute('href', 'https://emoji.muan.co/');
+  await emoji.press('Shift+Tab'); await expect(emojiLink).toBeFocused();
+  await emojiLink.press('Enter');
+  await expect.poll(() => palette.requests.filter(request => request.type === 'open-help-url')).toEqual([
+    { source: 'justonehop', type: 'open-help-url', url: 'https://emoji.muan.co/' },
+  ]);
+  await expect(ui.locator('.search-icon-settings')).toBeVisible();
+  await emojiLink.click();
+  await expect.poll(() => palette.requests.filter(request => request.type === 'open-help-url')).toHaveLength(2);
+  await emojiLink.press('Shift+Tab'); await expect(ui.getByRole('tab', { name: 'Help', exact: true })).toBeFocused();
   await back.focus();
   await back.press('Shift+Enter'); await expect(ui.locator('.search-icon-settings')).toBeVisible();
   await back.press('Enter'); await expect(change).toBeFocused();
-  await change.click(); await expect(emoji).toBeFocused();
+  await change.click(); await expect(chooseImage).toBeFocused();
+  await ui.keyboard.press('Escape'); await expect(change).toBeFocused();
+  await change.press('Enter'); await expect(chooseImage).toBeFocused();
   for (const colorScheme of ['light', 'dark'] as const) {
     await ui.emulateMedia({ colorScheme });
     await ui.locator('.settings-view').screenshot({ path: test.info().outputPath(`search-icon-task-${colorScheme}.png`) });
@@ -105,10 +121,12 @@ test('search icon editor supports keyboard Emoji, image previews, failures and n
   const file = ui.locator('input[type=file]');
   await file.setInputFiles({ name: 'bad.png', mimeType: 'image/png', buffer: Buffer.from('<svg/>') });
   await expect(ui.getByRole('alert')).toContainText('Could not read image');
+  await expect(chooseImage).toBeFocused();
   await expect(ui.locator('.search-icon-preview')).toContainText('👩🏽‍💻');
   for (const format of ['png', 'jpeg', 'webp'] as const) {
     const buffer = await sharp({ create: { width: 120, height: 60, channels: 4, background: '#ff0000' } }).toFormat(format).toBuffer();
     await file.setInputFiles({ name: `icon.${format}`, mimeType: `image/${format}`, buffer });
+    await expect(ui.getByRole('button', { name: 'Wear Badge', exact: true })).toBeFocused();
     const image = ui.locator('.search-icon-preview img');
     await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth === 64)).toBe(true);
     const encoded = (await image.getAttribute('src'))!.split(',')[1];
@@ -124,11 +142,12 @@ test('search icon editor supports keyboard Emoji, image previews, failures and n
   await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('search-icon-narrow.png') });
   await expect(ui.getByRole('button', { name: 'Wear Badge' })).toBeInViewport();
   await expect(back).toBeInViewport();
-  await ui.getByRole('button', { name: 'Wear Badge' }).click();
+  await expect(ui.getByRole('button', { name: 'Wear Badge' })).toBeFocused();
+  await ui.keyboard.press('Enter');
   await expect(change).toBeFocused();
   await expect(ui.locator('.search-focus img')).toBeVisible();
   await change.click();
-  await ui.getByRole('button', { name: 'Restore Default Badge' }).click();
+  await ui.getByRole('button', { name: 'Restore', exact: true }).click();
   await expect(ui.locator('.search-icon-preview .brand-logo')).toBeVisible();
   await ui.keyboard.press('Enter');
   await expect(ui.locator('.search-focus .brand-logo')).toBeVisible();

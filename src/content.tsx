@@ -3,7 +3,7 @@ import { usageReady } from './usageState';
 import { t } from './i18n';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from './App';
-import { BindingNavigation } from './BindingNavigation';
+import { OverlayRetention } from './OverlayRetention';
 import { flushSync } from 'react-dom';
 import { RecentOverlay, type RecentOverlaySession } from './RecentOverlay';
 import styles from './style.css';
@@ -17,13 +17,14 @@ if (!scope[marker]) {
   let root: Root | null = null;
   let recentSession: string | undefined;
   let previousFocus: HTMLElement | null = null;
-  let retainBindingGuide = false;
-  const retainGuide = () => {
-    retainBindingGuide = true;
-    return () => { retainBindingGuide = false; };
+  const retainedTasks = new Set<symbol>();
+  const retainOverlay = () => {
+    const task = Symbol();
+    retainedTasks.add(task);
+    return () => { retainedTasks.delete(task); };
   };
   const close = () => {
-    retainBindingGuide = false;
+    retainedTasks.clear();
     try {
       if (recentSession) void chrome.runtime.sendMessage({ source: 'justonehop-recent', type: 'cancel-overlay', session: recentSession }).catch(() => {});
     } catch { /* Extension reload invalidates the old content-script context. */ }
@@ -78,7 +79,7 @@ if (!scope[marker]) {
     frameShadow.append(surface);
     root = createRoot(surface);
     dialog.showModal();
-    flushSync(() => root!.render(recent ? <RecentOverlay initial={recent} onClose={close} /> : <BindingNavigation.Provider value={retainGuide}><App mode="overlay" onClose={close} /></BindingNavigation.Provider>));
+    flushSync(() => root!.render(recent ? <RecentOverlay initial={recent} onClose={close} /> : <OverlayRetention.Provider value={retainOverlay}><App mode="overlay" onClose={close} /></OverlayRetention.Provider>));
     dialog.addEventListener('cancel', event => event.preventDefault());
     // React handles keys first; then prevent page-level bubbling shortcuts.
     dialog.addEventListener('keydown', event => event.stopPropagation());
@@ -93,6 +94,9 @@ if (!scope[marker]) {
         try {
           if (!document.hidden && !document.hasFocus()) window.focus();
           if (document.hidden || !document.hasFocus() || !message.tabs?.length) { respond(false); return; }
+          // A retained editor must survive the switcher's host handoff as well as
+          // tab deactivation. Let the existing native switcher fallback take over.
+          if (host && retainedTasks.size) { respond(false); return; }
           if (host) close();
           open(message); respond(true);
         } catch { close(); respond(false); }
@@ -102,7 +106,7 @@ if (!scope[marker]) {
     if (message?.source !== 'justonehop') return;
     if (message.type === 'ping') { respond(true); return; }
     if (message.type === 'source-deactivated') {
-      if (host && !retainBindingGuide) close();
+      if (host && !retainedTasks.size) close();
       return;
     }
     if (message.type === 'close-for-reload') { if (host) close(); respond(true); return; }

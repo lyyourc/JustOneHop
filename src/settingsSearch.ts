@@ -4,14 +4,14 @@ import type { MessageKey } from './i18n';
 import { termMatches } from './searchMatch';
 
 const fields = {
-  language: ['appearance', 'preferences', 'language', 'languageHint', 'systemLanguage', 'followSystem'],
-  theme: ['preferences', 'appearance', 'theme', 'themeHint', 'followSystem', 'lightTheme', 'darkTheme'],
-  searchIcon: ['preferences', 'appearance', 'searchIcon', 'searchIconHint', 'searchIconImage'],
+  language: ['appearance', 'language', 'systemLanguage', 'followSystem'],
+  theme: ['appearance', 'theme', 'followSystem', 'lightTheme', 'darkTheme'],
+  searchIcon: ['appearance', 'searchIcon', 'searchIconHint', 'searchIconChange', 'searchIconEmojiHint', 'searchIconImage', 'searchIconImageHint', 'searchIconUpload', 'searchIconDefault', 'searchIconDefaultHint', 'searchIconRestore'],
   help: ['help', 'helpHint', 'openHelp'],
-  keyboard: ['keyboard', 'keyboardShortcuts', 'paletteHotkey', 'paletteHotkeyHint', 'hotkeyHint', 'changeHotkey'],
-  binding: ['keyboard', 'keyboardShortcuts', 'ctrlTabSetting', 'bindingHint', 'bindCtrlTab', 'setUpShortcut'],
-  tabs: ['experimentalFeatures', 'settingsLabs', 'autoTuck', 'autoTuckHint', 'autoTuckOffHint', 'tuckAfter', 'tuckScheduleHint', 'tuckTimingHint', 'tuckProtectedHint'],
-  ranking: ['experimentalFeatures', 'settingsLabs', 'searchRanking', 'searchRankingHint', 'searchRankingResetHint', 'resetSearchRanking'],
+  keyboard: ['keyboard', 'paletteHotkey', 'paletteHotkeyHint', 'hotkeyHint', 'changeHotkey'],
+  binding: ['keyboard', 'ctrlTabSetting', 'bindingHint', 'bindCtrlTab', 'setUpShortcut'],
+  tabs: ['settingsLabs', 'autoTuck', 'autoTuckHint', 'autoTuckOffHint', 'tuckRules', 'tuckAfter', 'tuckScheduleHint', 'tuckTimingHint', 'tuckProtectedHint'],
+  ranking: ['settingsLabs', 'searchRanking', 'searchRankingHint', 'searchRankingResetHint', 'resetSearchRanking'],
 } satisfies Record<string, MessageKey[]>;
 
 export type SettingRow = keyof typeof fields;
