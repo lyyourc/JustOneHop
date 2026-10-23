@@ -100,8 +100,7 @@ export function SearchIconSettings({ value, onBack }: { value?: string; onBack: 
       </div>
       {!valid ? <p className="search-icon-error" role="alert">{t('errorSearchIconEmoji')}</p> : null}
     </div>
-    <SettingsPageFooter title={t('searchIcon')}
-      navigation={page ? { kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: back } : undefined}
+    <SettingsPageFooter hints title={t('searchIcon')}
       primary={{ buttonRef: wearBadge, label: t('searchIconSave'), keys: ['↵'], disabled: busy || !valid || draft === value, onAction: () => void save() }} />
   </section></BackLayer>;
 }

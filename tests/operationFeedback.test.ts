@@ -51,6 +51,26 @@ test('old completions cannot replace a newer operation, even after dismissal', c
   feedback.dispose();
 });
 
+test('silent success clears pending or retry errors without clearing newer feedback', context => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const feedback = createOperationFeedback();
+  const first = feedback.begin('Working');
+  context.mock.timers.tick(150);
+  feedback.success(first, null);
+  assert.equal(feedback.getSnapshot(), null);
+  const failed = feedback.begin('Working');
+  feedback.error(failed, 'Save failed');
+  const retry = feedback.begin('Retrying');
+  feedback.success(retry, null);
+  context.mock.timers.tick(5000);
+  assert.equal(feedback.getSnapshot(), null);
+  const newer = feedback.begin('New operation');
+  feedback.success(newer, 'Saved');
+  feedback.success(retry, null);
+  assert.equal(feedback.getSnapshot()?.message, 'Saved');
+  feedback.dispose();
+});
+
 test('view subscription changes retain the session result and disposal cancels timers', context => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const feedback = createOperationFeedback();

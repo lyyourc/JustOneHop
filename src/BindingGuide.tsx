@@ -1,4 +1,4 @@
-import { BackLayer, useNavigateBack } from './Navigation';
+import { BackLayer } from './Navigation';
 import { OverlayRetention } from './OverlayRetention';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink } from 'lucide-react';
@@ -16,24 +16,35 @@ export function bindingCode() {
 
 export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boolean }) {
   const page = useContext(SettingsPage);
-  const navigateBack = useNavigateBack();
   const retainGuide = useContext(OverlayRetention);
   const feedback = useOperationFeedback();
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState('');
-  const back = useRef<HTMLButtonElement>(null);
+  const primary = useRef<HTMLButtonElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const caret = useRef<[number, number] | null>(null);
   const revision = useRef(0);
   const pending = useRef(false);
+  const restoreAfterCopy = useRef(false);
   const wasMenu = useRef(false);
   useLayoutEffect(() => retainGuide(), [retainGuide]);
   useEffect(() => () => { revision.current++; }, []);
-  function focusPrimary() { back.current?.closest('.palette')?.querySelector<HTMLButtonElement>('.primary-action')?.focus(); }
+  function focusPrimary() { primary.current?.focus(); }
   useLayoutEffect(() => { focusPrimary(); }, [page?.footer, page?.active]);
   useEffect(() => { if (page && !page.active) setMenu(false); }, [page?.active]);
+  useLayoutEffect(() => {
+    if (busy || !restoreAfterCopy.current) return;
+    restoreAfterCopy.current = false;
+    const button = primary.current;
+    if (!button || (page && !page.active)) return;
+    const active = (button.getRootNode() as Document | ShadowRoot).activeElement;
+    if (!active || active === button.ownerDocument.body || active === button.closest('.binding-view')) {
+      if (caret.current && field.current) { field.current.focus(); field.current.setSelectionRange(...caret.current); }
+      else focusPrimary();
+    }
+  }, [busy, page?.active]);
   useLayoutEffect(() => {
     if (!menu && wasMenu.current) {
       if (caret.current && field.current) { field.current.focus(); field.current.setSelectionRange(...caret.current); }
@@ -57,15 +68,16 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
   }
   function leave() { if (menu) setMenu(false); else { revision.current++; onBack(); } }
   function openBindingShortcuts() {
-    const page = back.current?.ownerDocument;
-    const transient = back.current?.closest('.justonehop-app.popup') &&
+    const page = primary.current?.ownerDocument;
+    const transient = primary.current?.closest('.justonehop-app.popup') &&
       (page?.location.hash.startsWith('#window=') || chrome.extension.getViews({ type: 'popup' }).includes(page?.defaultView as Window));
     return openShortcuts(Boolean(transient));
   }
   async function perform(action: 'copy' | 'shortcuts' | 'both') {
-    const anchor = back.current;
+    const anchor = primary.current;
     if (!anchor || pending.current) return;
     const version = revision.current;
+    restoreAfterCopy.current = action !== 'shortcuts';
     pending.current = true; setBusy(true); setMenu(false);
     const operation = feedback.begin(t('running'));
     let copied = false;
@@ -95,7 +107,7 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
     }
     if (!['BUTTON', 'TEXTAREA'].includes((event.target as HTMLElement).tagName)) { event.preventDefault(); void perform('both'); }
   }}>
-    {!page ? <TaskHeader buttonRef={back} /> : null}
+    {!page ? <TaskHeader /> : null}
     <div className={`binding-surface ${menu ? 'subdued' : ''}`} inert={menu ? true : undefined}>
       <div className="binding-body">
         <h1 className="task-title">{t('bindCtrlTab')}</h1>
@@ -109,10 +121,9 @@ export function BindingGuide({ onBack, isMac }: { onBack: () => void; isMac: boo
     {menu ? <ActionMenu id="binding-actions" isMac={isMac} title={<span>{t('bindCtrlTab')}</span>}
       actions={actions} query={query} onQueryChange={value => { setQuery(value); setSelection(''); }} selectedId={selected?.id}
       onSelectionChange={setSelection} onAction={id => void perform(id as 'copy' | 'shortcuts')} onClose={() => setMenu(false)} /> : null}
-    <SettingsPageFooter isMac={isMac} title={t('bindCtrlTab')}
-      navigation={page ? { kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, buttonRef: back, onAction: navigateBack } : undefined}
-      primary={menu ? { label: selected?.title || t('actions'), keys: ['↵'], disabled: busy || !selected, onAction: () => { if (selected) void perform(selected.id as 'copy' | 'shortcuts'); } }
-        : { label: t('bindingCopyOpen'), keys: ['↵'], disabled: busy, onAction: () => void perform('both') }}
+    <SettingsPageFooter isMac={isMac} hints title={t('bindCtrlTab')}
+      primary={menu ? { buttonRef: primary, label: selected?.title || t('actions'), keys: ['↵'], disabled: busy || !selected, onAction: () => { if (selected) void perform(selected.id as 'copy' | 'shortcuts'); } }
+        : { buttonRef: primary, label: t('bindingCopyOpen'), keys: ['↵'], disabled: busy, onAction: () => void perform('both') }}
       actions={{ open: menu, disabled: busy, onToggle: toggleMenu }} />
   </section></BackLayer>;
 }

@@ -23,10 +23,12 @@ test('Chinese storage list UI shows supplied copy success, details, names and re
   await expect(surface.locator('.operation-feedback')).toContainText('已复制值');
   await expect(surface.locator('.storage-row mark')).toHaveText('config'); await input.press('Enter');
   await expect.poll(palette.copies).toEqual(['', raw]); await expect(input).toBeFocused();
+  await expect(surface.locator('.storage-view')).toHaveAttribute('aria-busy', 'false');
   await input.press('Meta+k'); const actionInput = surface.locator('.action-search input');
   await actionInput.press('Control+n'); await expect(surface.locator('.action-row[aria-selected="true"]')).toContainText('复制名称');
   await actionInput.press('Enter'); await expect.poll(palette.copies).toEqual(['', raw, 'app.config']);
   await expect(input).toHaveValue('config');
+  await expect(surface.locator('.storage-view')).toHaveAttribute('aria-busy', 'false');
   await input.press('Meta+k'); await actionInput.fill('details'); await actionInput.press('Enter');
   await expect(surface.locator('.storage-value')).toHaveText(JSON.stringify(JSON.parse(raw), null, 2));
   await expect(surface.locator('.storage-detail')).toBeFocused();
@@ -83,13 +85,13 @@ test('Chinese storage and Tab Group UI layers preserve actual embedded palette g
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
       };
       const rect = panel.getBoundingClientRect(); const title = box('.result .entry-title'); const footerTitle = box('.palette-footer-title');
-      const footerType = getComputedStyle(panel.querySelector('.palette-footer-title')!); const contextType = getComputedStyle(panel.querySelector('.palette-footer-context')!);
+      const footerType = getComputedStyle(panel.querySelector('.palette-footer-title')!);
       return { panel: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, footer: box('.palette-footer'),
         search: box('.search-bar, .storage-search'), input: box('.search-bar input, .storage-search input'), row: box('.result'),
-        icon: box('.result .entry-icon'), title: { x: title.x, y: title.y, height: title.height }, navigation: box('.footer-navigation'),
+        icon: box('.result .entry-icon'), title: { x: title.x, y: title.y, height: title.height }, navigation: box('.footer-hint-pet'),
         footerTitle: { x: footerTitle.x, y: footerTitle.y, height: footerTitle.height },
         footerType: { size: footerType.fontSize, weight: footerType.fontWeight, color: footerType.color },
-        contextType: { size: contextType.fontSize, weight: contextType.fontWeight, lineHeight: contextType.lineHeight, color: contextType.color } };
+        textSlot: box('.palette-footer-text') };
     });
   }
   for (const size of [{ width: 750, height: 760 }, { width: 390, height: 600 }, { width: 390, height: 440 }]) {
@@ -97,22 +99,30 @@ test('Chinese storage and Tab Group UI layers preserve actual embedded palette g
     const main = await geometry(); expect(main.footer.height).toBe(44); expect(main.search.height).toBe(56);
     expect(main.row.y - main.search.y - main.search.height).toBe(4); expect(main.row.height).toBe(40); expect(main.panel.height).toBeLessThanOrEqual(516);
     await root.press('Enter'); await expect(surface.locator('.storage-row')).toHaveCount(1); const storage = await geometry();
-    for (const key of ['panel', 'footer', 'search', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(storage[key]).toEqual(main[key]);
+    for (const key of ['panel', 'footer', 'search', 'icon', 'title', 'navigation', 'footerTitle', 'footerType'] as const) expect(storage[key]).toEqual(main[key]);
+    expect(storage.textSlot.x).toBe(main.textSlot.x);
+    await expect(surface.locator('.storage-search .search-focus')).toHaveAttribute('class', /is-back/);
+    await expect(surface.locator('.footer-back')).toHaveCount(0);
+    await surface.locator('.footer-hint-pet').click();
+    await expect(surface.locator('.footer-hint-bubble .navigation-key')).toHaveText(['Ctrl+P上一个', 'Ctrl+N下一个']);
+    await surface.locator('.footer-hint-pet').click();
     expect(storage.row.x).toBe(main.row.x); expect(storage.row.y).toBe(main.row.y); expect(storage.row.height).toBe(main.row.height);
     if (size.width > 520) expect(storage.row.width).toBeLessThan(main.row.width); else expect(storage.row.width).toBe(main.row.width);
     expect(storage.input.x).toBe(main.input.x); expect(storage.input.y).toBe(main.input.y);
     await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport();
     expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-    await expect(surface.locator('.storage-search .search-dismiss')).toHaveText('esc'); await surface.locator('.storage-search .search-dismiss').click();
+    await expect(surface.locator('.storage-search .search-dismiss')).toHaveText('esc'); await surface.locator('.storage-search .search-focus.is-back').click();
     await expect(root).toBeFocused(); await expect(root).toHaveValue('local storage');
     await root.fill('Layout Group Unique'); await expect(surface.getByRole('option').filter({ hasText: 'Layout Group Unique' }).first()).toBeVisible();
     const groupMain = await geometry(); await surface.getByRole('option').filter({ hasText: 'Layout Group Unique' }).first().click();
     await expect(surface.locator('.group-view .result')).toHaveCount(2); await expect(surface.locator('.group-view .current-badge')).toHaveCount(1);
     await expect(surface.locator('[id="group-tab:1"] .current-badge')).toHaveCount(1); const group = await geometry();
-    for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(group[key]).toEqual(groupMain[key]);
+    for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType'] as const) expect(group[key]).toEqual(groupMain[key]);
     expect(group.input.x).toBe(groupMain.input.x); expect(group.input.y).toBe(groupMain.input.y);
     await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport(); await expect(surface.locator('.group-view .search-dismiss')).toHaveText('esc');
-    await surface.locator('.group-view .search-dismiss').click(); await expect(root).toBeFocused();
+    expect(group.textSlot.x).toBe(groupMain.textSlot.x);
+    await expect(surface.locator('.group-view .footer-back')).toHaveCount(0);
+    await surface.locator('.group-view .search-focus.is-back').press('Enter'); await expect(root).toBeFocused();
   }
   await ui.setViewportSize({ width: 750, height: 760 }); await surface.locator('.settings-button').click();
   await expect(surface.locator('.settings-search input')).toBeFocused(); expect((await surface.locator('.settings-search').boundingBox())!.height).toBe(56);

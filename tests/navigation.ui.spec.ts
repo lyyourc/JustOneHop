@@ -40,13 +40,14 @@ test('Raycast navigation pages, jumps to home endpoints and restores caret when 
   await expect(actionInput).toBeFocused();
   const menu = ui.getByRole('dialog', { name: '操作菜单', exact: true });
   await ui.keyboard.press('Tab');
-  await expect(menu.locator('.search-dismiss')).toBeFocused();
+  await expect(actionInput).toBeFocused();
+  await expect(menu.locator('.search-dismiss, [data-focus-search]')).toHaveCount(0);
   await ui.keyboard.press('Tab');
-  await expect(menu.locator('[data-focus-search]')).toBeFocused();
+  await expect(actionInput).toBeFocused();
   await ui.keyboard.press('Tab');
   await expect(actionInput).toBeFocused();
   await ui.keyboard.press('Shift+Tab');
-  await expect(menu.locator('[data-focus-search]')).toBeFocused();
+  await expect(actionInput).toBeFocused();
   await ui.keyboard.press('Meta+k');
   await expect(input).toBeFocused();
   expect(await input.evaluate((element: HTMLInputElement) => [element.selectionStart, element.selectionEnd])).toEqual([2, 5]);
@@ -135,7 +136,7 @@ test('English Backspace returns from empty searches while preserving text editin
   const actions = ui.getByRole('combobox', { name: 'Search actions' });
   await actions.fill('copy'); await actions.press('Backspace'); await expect(actions).toHaveValue('cop');
   await actions.fill(''); await actions.press('Backspace'); await expect(code).toBeFocused();
-  await ui.locator('.settings-footer .footer-back').focus(); await ui.keyboard.press('Backspace'); await expect(setup).toBeFocused();
+  await ui.locator('.settings-search .search-focus.is-back').focus(); await ui.keyboard.press('Backspace'); await expect(setup).toBeFocused();
   await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   const language = ui.getByRole('combobox', { name: 'Language', exact: true });
   await language.press('Enter'); await language.press('Backspace'); await expect(language).toHaveAttribute('aria-expanded', 'false');

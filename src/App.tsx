@@ -64,6 +64,9 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   const [helpOpen, setHelpOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false);
+  const pageOpen = settingsOpen || historyOpen || helpOpen || groupId !== undefined || !!recoveryId || bindingOpen || !!storage;
+  const pageWasOpen = useRef(false);
+  useLayoutEffect(() => { pageWasOpen.current = pageOpen; }, [pageOpen]);
   const [data, setData] = useState<Snapshot | null>(null);
   const [showLoading, setShowLoading] = useState(false);
   const [query, setQuery] = useState(initialState?.query ?? '');
@@ -420,7 +423,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
       onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label={t('extensionName')} aria-busy={busy}>
       <span className="sr-only" id="justonehop-navigation">{t('navigationHelp')}</span>
       <div className={`main-surface ${actionTarget || bookmarkRemoval || groupRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval || groupRemoval ? true : undefined}>
-        <header className={`search-bar${query.length ? ' search-bar-filled' : ''}`}>
+        <header className={`search-bar${query.length ? ' search-bar-filled' : ''}${pageWasOpen.current ? ' returning-from-page' : ''}`}>
           <SearchFocusButton input={input} disabled={busy} />
           <div className="query-input">
             {completion.value ? <div className="query-completion" aria-hidden="true"><span style={{ transform: `translateX(-${completion.scroll}px)` }}><span className="query-completion-prefix">{query}</span>{completion.value.slice(query.length)}</span></div> : null}
@@ -462,8 +465,9 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
       {error ? <div className="error-banner" role="alert"><AlertCircle size={15} /><span>{errorMessage(new Error(error))}</span>
         {!data ? <button onClick={() => { setError(''); void refreshSnapshot().catch(reason => setError(errorMessage(reason))); }}>{t('retry')}</button> : null}</div> : null}
       <PaletteFooter isMac={isMac}
+        title={t('extensionName')}
         navigation={{ kind: 'settings', label: t('settings'), tooltip: `${t('settings')} (${mod},)`, disabled: busy || !!bookmarkRemoval || !!groupRemoval, onAction: () => openSettings() }}
-        title={t('extensionName')} context={<NavigationHint />}
+        hints={<NavigationHint />}
         status={newAddressAction && selected?.disabled ? <span role="status">{t('addressPinned')}</span>
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>

@@ -478,7 +478,7 @@ test('English auto tuck duration saves on selection and a native alarm applies i
   const before = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
   await duration.click();
   await ui.getByRole('option', { name: '1 hour', exact: true }).click();
-  await ui.locator('.palette-footer').getByRole('button', { name: 'Back', exact: true }).click();
+  await ui.locator('.settings-search').getByRole('button', { name: 'Back', exact: true }).click();
   await search.fill('auto tuck'); await search.press('Enter');
   await expect(duration).toHaveText('1 hour');
   await expect(ui.getByRole('button', { name: 'Save duration', exact: true })).toHaveCount(0);

@@ -65,7 +65,7 @@ for (const variant of ['English', 'fallback', 'Taiwan']) {
     await input.press('Enter');
     await expect(ui.getByRole('alert')).toContainText(chinese ? '没有可以恢复的标签页。' : 'No recently closed tabs to restore.');
     if (variant === 'English') await test.step('Language override localizes errors and system mode follows Chrome', async () => {
-      const settings = ui.locator('.palette-footer .footer-navigation.settings-button');
+      const settings = ui.locator('.palette-footer .settings-button');
       await expect(settings).toHaveAccessibleName('Settings');
       await settings.click();
       await ui.getByRole('combobox', { name: 'Language', exact: true }).click();
@@ -332,7 +332,7 @@ test.describe(() => {
   await search.fill('close tab'); await expect(surface.locator('.result.command .entry-shortcut').first()).toHaveText('⌘W');
   await search.fill('reload'); await expect(surface.locator('.result.command .entry-shortcut').first()).toHaveText('⌘R');
   await search.fill('settings'); await search.press('Meta+,');
-  await expect(surface.locator('.settings-view .palette-footer-title')).toHaveText('Settings · Appearance');
+  await expect(surface.locator('.settings-view .palette-footer-title')).toHaveText('Settings');
 });
 });
 

@@ -395,7 +395,7 @@ test.describe(() => {
       Reflect.deleteProperty(document, 'hidden');
       document.dispatchEvent(new Event('visibilitychange'));
     } }), id);
-    await surface.locator('.footer-back').click();
+    await surface.locator('.settings-search .search-focus.is-back').click();
     await expect(search).toHaveValue('settings');
     await expect(search).toBeFocused();
     await worker.evaluate(async () => { await chrome.tabs.create({ url: 'about:blank', active: true }); });
@@ -561,7 +561,7 @@ for (const host of ['overlay', 'native'] as const) test.describe('headed', { tag
     await page.keyboard.press('Tab');
     await expect(settingsInput).toBeFocused(); await expect(settingsInput).toHaveValue('theme');
     await page.keyboard.press('Shift+Tab');
-    await expect(surface.getByRole('button', { name: 'Focus search', exact: true })).toBeFocused();
+    await expect(surface.locator('.settings-search .search-focus.is-back')).toBeFocused();
     await expect(surface.locator('.search-focus-hint')).toHaveCount(0);
     await page.keyboard.press('Tab'); await expect(settingsInput).toBeFocused();
     await page.keyboard.press('Escape');

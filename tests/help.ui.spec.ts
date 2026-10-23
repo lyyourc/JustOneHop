@@ -44,7 +44,7 @@ test('Help document entry and return context zh-CN UI with supplied shortcut and
   await expect(ui.locator('.help-github-card')).toHaveCSS('outline-width', '2px');
   await ui.keyboard.press('Enter');
   await expect.poll(() => palette.requests.filter(request => request.type === 'open-help-url')).toHaveLength(2);
-  await ui.keyboard.press('Tab'); await expect(ui.locator('.footer-back')).toBeFocused();
+  await ui.keyboard.press('Tab'); await expect(ui.locator('.help-view .footer-hint-pet')).toBeFocused();
   await ui.keyboard.press('Shift+Tab'); await expect(ui.locator('.help-github-card')).toBeFocused();
   await ui.keyboard.press('Shift+Tab'); await expect(article).toBeFocused(); await article.press('Escape');
   await expect(input).toBeFocused(); await expect(input).toHaveValue('help');
@@ -62,10 +62,10 @@ test('Help document entry and return context zh-CN UI with supplied shortcut and
   await expect(helpSearch).toHaveCount(0);
   await expect(article).toContainText('Alt+Space');
   expect((await ui.locator('.palette-footer').boundingBox())!.y).toBe(originalFooter!.y);
-  await ui.locator('.footer-back').click(); await expect(settingsSearch).toHaveValue('help');
+  await ui.locator('.settings-search .search-focus.is-back').click(); await expect(settingsSearch).toHaveValue('help');
   await expect(ui.getByRole('button', { name: '查看帮助' })).toBeFocused();
   await ui.keyboard.press('Enter'); await expect(article).toBeFocused();
-  await ui.locator('.footer-back').focus(); await ui.keyboard.press('Backspace'); await expect(ui.getByRole('button', { name: '查看帮助' })).toBeFocused();
+  await ui.locator('.settings-search .search-focus.is-back').focus(); await ui.keyboard.press('Backspace'); await expect(ui.getByRole('button', { name: '查看帮助' })).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(settingsSearch).toHaveValue('');
   await ui.keyboard.press('Escape'); await expect(input).toBeFocused();
   await input.fill('使用说明'); await ui.locator('.result').first().click(); await expect(helpSearch).toBeFocused();
@@ -79,7 +79,7 @@ test('Help document entry and return context zh-CN UI with supplied shortcut and
     const footer = await ui.locator('.palette-footer').boundingBox();
     expect(footer!.height).toBe(44); expect(footer!.y + footer!.height).toBeLessThanOrEqual(400);
   }
-  await ui.locator('.footer-back').click(); await expect(input).toBeFocused(); await expect(input).toHaveValue('使用说明');
+  await ui.locator('.help-search .search-focus.is-back').click(); await expect(input).toBeFocused(); await expect(input).toHaveValue('使用说明');
   await ui.keyboard.press('Meta+k'); await ui.locator('.action-row').first().click(); await expect(helpSearch).toBeFocused();
   await helpSearch.fill('cookie'); await ui.locator('.help-search .search-clear').click();
   await expect(helpSearch).toBeFocused(); await expect(helpSearch).toHaveValue('');

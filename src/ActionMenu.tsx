@@ -17,7 +17,7 @@ export function ActionMenu({ id, title, actions, query, onQueryChange, selectedI
   const selected = actions.find(action => action.id === selectedId) || actions[0];
   useLayoutEffect(() => { input.current?.focus(); }, []);
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [selected?.id]);
-  return <BackLayer onBack={onClose}>
+  return <BackLayer onBack={onClose} modal>
     <button className="action-scrim" tabIndex={-1} aria-label={t('backToResults')} onClick={onClose} />
     <div tabIndex={-1} className="action-menu" role="dialog" aria-label={t('actionMenu')} aria-modal="true" onKeyDown={event => {
       event.stopPropagation();

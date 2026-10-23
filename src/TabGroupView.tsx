@@ -4,7 +4,8 @@ import { keepsPaletteOpen } from './paletteActions';
 import { Layers, PanelTop, Save, X } from 'lucide-react';
 import { groupActions } from './groupActions';
 import { GroupConfirmation } from './GroupConfirmation';
-import { BackLayer } from './Navigation';
+import { BackLayer, useNavigateBack } from './Navigation';
+import { NavigationHint } from './Shortcut';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { TaskHeader } from './TaskHeader';
@@ -72,14 +73,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
   function toggleMenu() {
     if (!busy) { rememberCaret(); setMenu(!menu); setActionQuery(''); setActionId(''); }
   }
-  /** The footer breadcrumb mirrors Escape: it leaves exactly the deepest layer. */
-  function back() {
-    if (groupRemoval) { setGroupRemoval(null); return; }
-    if (bookmarkRemoval) { setBookmarkRemoval(null); return; }
-    if (menu) { setMenu(false); return; }
-    if (editor) { if (initialEditor) onBack(); else setEditor(undefined); return; }
-    onBack();
-  }
+  const back = useNavigateBack();
   async function run(id: string, target: Entry | undefined = selected, confirmed?: Entry) {
     if (busy || executing.current || !group || ((bookmarkRemoval || groupRemoval) && !confirmed)) return;
     if (id === 'closeGroup' && !confirmed) {
@@ -140,7 +134,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
         <h1 className="task-title">{t('groupRename')}</h1>
         <label className="group-field">{t('groupName')}<input ref={nameInput} value={name} onChange={event => setName(event.target.value)} disabled={busy} /></label>
       </div> : <>
-        <div className="search-bar"><SearchFocusButton input={input} disabled={busy} /><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
+        <div className="search-bar"><SearchFocusButton input={input} disabled={busy} onBack={back} /><input ref={input} data-back-on-empty value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('groupSearch')} aria-label={t('groupSearch')} role="combobox" aria-expanded="true" aria-controls="justonehop-group-tabs" aria-activedescendant={selected ? `group-${selected.id}` : undefined} disabled={busy} />
           <SearchDismissButton label={t('back')} query={query} input={input} disabled={busy} onClear={() => { setQuery(''); setSelection(''); }} /></div>
         <div ref={list} className="results" id="justonehop-group-tabs" role="listbox" aria-label={t('resultsLabel')}>
@@ -166,7 +160,7 @@ export function TabGroupView({ groupId, data, isMac, onBack, onClose, onExecute,
     </div>
     {refreshError ? <div className="error-banner" role="alert">{refreshError}</div> : null}
     <PaletteFooter isMac={isMac}
-      navigation={editor ? undefined : { kind: 'back', label: `${t('back')} · ${groupLabel}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
+      hints={editor ? true : <NavigationHint />}
       title={groupLabel}
       context={!editor && group ? countMessage('groupTabOne', 'groupTabCount', members.length) : undefined}
       status={selection === null && !editor ? <span role="status">{t('chooseNextTab')}</span> : undefined}

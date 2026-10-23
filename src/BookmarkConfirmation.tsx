@@ -11,7 +11,7 @@ export function BookmarkConfirmation({ target, onCancel, onConfirm }: {
   const cancel = useRef<HTMLButtonElement>(null);
   const confirm = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => { cancel.current?.focus(); }, []);
-  return <BackLayer onBack={onCancel}>
+  return <BackLayer onBack={onCancel} modal>
     <button className="action-scrim" aria-label={t('backToResults')} tabIndex={-1} onClick={onCancel} />
     <div className="action-menu bookmark-confirm" role="alertdialog" aria-modal="true"
       aria-labelledby="bookmark-delete-title" aria-describedby="bookmark-delete-detail" onKeyDown={event => {

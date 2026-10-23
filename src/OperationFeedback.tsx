@@ -16,7 +16,7 @@ export function useOperationFeedback() {
   if (!feedback) throw new Error('Missing OperationFeedbackProvider');
   return {
     ...feedback,
-    async run<T>(operation: () => Promise<T>, success: string | ((result: T) => string), failure?: string) {
+    async run<T>(operation: () => Promise<T>, success: string | null | ((result: T) => string | null), failure?: string) {
       const id = feedback.begin(t('operationPending'));
       try {
         const result = await operation();
@@ -28,6 +28,14 @@ export function useOperationFeedback() {
       }
     },
   };
+}
+
+const subscribeEmpty = () => () => {};
+const emptySnapshot = () => null;
+
+export function useOperationFeedbackActive() {
+  const feedback = useContext(FeedbackContext);
+  return !!useSyncExternalStore(feedback?.subscribe ?? subscribeEmpty, feedback?.getSnapshot ?? emptySnapshot);
 }
 
 function FeedbackStatus({ feedback }: { feedback: ReturnType<typeof createOperationFeedback> }) {

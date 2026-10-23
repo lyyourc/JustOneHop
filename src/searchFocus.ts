@@ -5,8 +5,8 @@ export function hasControlFocus(scope: HTMLElement): boolean {
     !focused.hasAttribute('disabled') && (focused.matches('input, textarea, select, button, a[href], [contenteditable="true"]') || focused.tabIndex >= 0);
 }
 
-export function availableSearchButton(root: HTMLElement): HTMLButtonElement | undefined {
+export function availableSearchInput(root: HTMLElement): HTMLInputElement | undefined {
   const dialog = [...root.querySelectorAll<HTMLElement>('[aria-modal="true"]')].at(-1);
-  return [...(dialog || root).querySelectorAll<HTMLButtonElement>('[data-focus-search]')]
+  return [...(dialog || root).querySelectorAll<HTMLInputElement>('input[data-back-on-empty]')]
     .find(node => !node.disabled && !node.closest('[inert]') && node.getClientRects().length > 0);
 }

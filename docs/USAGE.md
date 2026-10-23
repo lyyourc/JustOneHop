@@ -32,7 +32,7 @@ Whether you prefer the speed of keyboard shortcuts, the comfort of your trackpad
   - [Two-Pane Side-by-Side Preview](#two-pane-side-by-side-preview)
   - [Permissions & Privacy](#permissions--privacy)
 - [7. Navigation, Gestures & Panel Placement](#7-navigation-gestures--panel-placement)
-  - [The 44px Footer & Breadcrumbs](#the-44px-footer--breadcrumbs)
+  - [The 44px Footer & Navigation](#the-44px-footer--navigation)
   - [Multi-Level Back & Trackpad Swiping](#multi-level-back--trackpad-swiping)
   - [In-Page Overlay vs. Dedicated Window](#in-page-overlay-vs-dedicated-window)
 - [8. Local Learning & Habit Memory](#8-local-learning--habit-memory)
@@ -299,20 +299,20 @@ JustOneHop is crafted with obsessive attention to UI ergonomics.
 
 ### Settings Categories & Search
 
-Open Settings from the footer gear or search for `settings`. Use the left sidebar to choose **Appearance**, **Keyboard**, **Labs**, or **Help**; on narrow screens, use the category selector. Appearance opens by default and contains Language, Theme, and Search Bar Icon. Help opens the help content directly. The top search stays available across categories and settings subpages, and searches all settings. Category switching does not add extra Back steps; settings subpages use the footer Back arrow or `Esc`.
+Open Settings by clicking **JustOneHop** in the main footer or searching for `settings`. Use the left sidebar to choose **Appearance**, **Keyboard**, **Labs**, or **Help**; on narrow screens, use the category selector. Appearance opens by default and contains Language, Theme, and Search Bar Icon. Help opens the help content directly. The top search stays available across categories and settings subpages, and searches all settings. Category switching does not add extra Back steps. Click the rotated badge at the left of Settings search or press `Esc` to return one level; an open menu or confirmation closes first. Click the input itself to search.
 
 Typing temporarily shows matching settings. Clear the query to restore the previous category or subpage and its draft; opening a result subpage and returning preserves your search context. To customize the search icon, open **Appearance → Search Bar Icon** and save explicitly. Temporary searches preserve the draft, while leaving the icon page through Back, category navigation, or another destination discards unsaved changes. Categories, search, fields, and actions are available by mouse or keyboard (`Tab` / `Shift+Tab` to move focus).
 
-### The 44px Footer & Breadcrumbs
+### The 44px Footer & Navigation
 
-At the bottom of every view sits an elegant 44px footer:
-- **Left**: Clear breadcrumbs showing where you are (`Home > Settings > Appearance`), along with a clickable Back arrow.
+At the bottom of every view sits a 44px footer:
+- **Left**: The current location. Settings categories and subpages all show **Settings**; use the sidebar to switch categories and the rotated badge beside Settings search to return. History, storage, tab groups, and in-panel Help also use a rotated top Back badge, as do task pages. Click the footer bunny to show or hide navigation hints; hints disappear when the bunny retreats. Appearance settings can hide the bunny. The standalone Help window keeps its Close control, while Tab Switcher keeps its dedicated search and cancel actions.
 - **Right**: Contextual actions matching your current selection (e.g. `Open Here`, `New Tab`, `Actions (⌘K)`).
 
 ### Multi-Level Back & Trackpad Swiping
 
 Navigating deep menus shouldn't feel like a trap:
-- Press **`Esc`** or click the back arrow to retreat exactly one level, perfectly restoring your previous query, cursor position, and scroll offset.
+- Press **`Esc`** or click the view’s Back control to retreat exactly one level, perfectly restoring your previous query, cursor position, and scroll offset.
 - When the search box is empty, pressing **`Backspace`** also navigates back one level.
 - **Two-Finger Trackpad Swipe (macOS)**: Swipe right with two fingers on your trackpad to smoothly slide back to the previous screen.
 
@@ -344,14 +344,14 @@ The more you use JustOneHop, the more attuned it becomes to your habits:
 | Action | Mouse | macOS Shortcut | Windows / Linux |
 | --- | --- | --- | --- |
 | **Open / Close Palette** | Click toolbar icon | `⌘ + Shift + P` | `Ctrl + Shift + P` |
-| **Close or Step Back** | Click Back arrow / `esc` badge | `Esc` (or `Backspace` if search empty) | `Esc` (or `Backspace`) |
+| **Close or Step Back** | Click Back control / `esc` badge | `Esc` (or `Backspace` if search empty) | `Esc` (or `Backspace`) |
 | **Select Next / Previous** | Scroll or click row | `↓` / `↑` (or `Ctrl+N` / `Ctrl+P`) | `↓` / `↑` (or `Ctrl+N` / `Ctrl+P`) |
 | **Jump to Top / Bottom** | Click top/bottom | `⌘ + ↑` / `⌘ + ↓` | `Ctrl + Home` / `Ctrl + End` |
 | **Page Up / Page Down** | Scroll wheel | `⌥ + ↑` / `⌥ + ↓` (or `PageUp`/`Down`) | `Alt + ↑` / `Alt + ↓` |
 | **Execute Selected Item** | Click row | `Enter` | `Enter` |
 | **Open in New Tab** | Click "New Tab" in footer | `⌘ + Enter` | `Alt + Enter` |
 | **Open Actions Menu** | Right-click row / Click "Actions" | `⌘ + K` | `Ctrl + K` |
-| **Open Settings** | Click gear icon in footer | `⌘ + ,` | `Ctrl + ,` |
+| **Open Settings** | Click JustOneHop in the main footer | `⌘ + ,` | `Ctrl + ,` |
 | **Forget Search Preference** | Click `×` on history badge | `Shift + Backspace` | `Shift + Backspace` |
 | **Swipe Back (Trackpad)** | Two-finger swipe right | — | — |
 

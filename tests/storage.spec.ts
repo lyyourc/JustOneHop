@@ -429,8 +429,9 @@ test.describe(() => {
   const surface = await openStorageOverlay(page);
   await surface.locator('.search-bar input').fill('local storage'); await page.keyboard.press('Enter');
   const search = surface.locator('.storage-search input');
-  // A secondary list names its layer at the left of the footer and spends nothing on the ↑↓ hint.
-  await expect(surface.locator('.palette-footer .navigation-hint')).toHaveCount(0);
+  // List navigation hints are available through the pet and hidden initially.
+  await expect(surface.locator('.palette-footer .navigation-hint')).toBeHidden();
+  await expect(surface.locator('.palette-footer .footer-hint-pet')).toBeVisible();
   await expect(surface.locator('.palette-footer-title')).toHaveText('Local Storage');
   await expect(surface.locator('.storage-row')).toHaveCount(26);
   const locationTitle = await surface.locator('.palette-footer-title').boundingBox();
@@ -538,7 +539,7 @@ test.describe(() => {
     expect(await value.evaluate(node => node.scrollTop)).toBe(previewScroll);
     expect(await surface.locator('.palette-footer').boundingBox()).toEqual(footerBox);
     expect(await surface.locator('.storage-search').boundingBox()).toEqual(searchBox);
-    await value.press('Tab'); await expect(surface.locator('.palette-footer .footer-back')).toBeFocused();
+    await value.press('Tab'); await expect(surface.locator('.palette-footer .footer-hint-pet')).toBeFocused();
     await list.evaluate(node => { node.scrollTop = 0; });
     await value.evaluate(node => { node.scrollTop = 0; });
     for (const theme of ['light', 'dark'] as const) {
@@ -550,7 +551,7 @@ test.describe(() => {
   await search.fill('missing-key');
   await expect(preview).toHaveCount(0);
   await expect(surface.locator('.palette-footer .primary-action')).toBeDisabled();
-  await surface.locator('.palette-footer .footer-back').click();
+  await surface.locator('.storage-search .search-focus.is-back').click();
   await expect(surface.locator('.search-bar input')).toHaveValue('local storage');
 });
 });

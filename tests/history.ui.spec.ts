@@ -83,7 +83,7 @@ test('History intent: bilingual commands enter an empty all-time search and rest
     await expect(ui.getByText('Enter a title or URL to search history', { exact: true })).toBeVisible();
     if (query === 'history') await ui.locator('.palette').screenshot({ path: test.info().outputPath('history-empty.png') });
     if (query === '历史') await history.press('Escape');
-    else await ui.locator('.history-view .footer-back').click();
+    else await ui.locator('.history-view .search-focus.is-back').click();
     await expect(input).toBeFocused(); await expect(input).toHaveValue(query);
     await expect(ui.locator('#justonehop-search-all-history')).toHaveAttribute('aria-selected', 'true');
   }

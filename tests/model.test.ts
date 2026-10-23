@@ -17,8 +17,9 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one search index contains every source while cold home contains only eight safe defaults', () => {
   const items = entries(data);
-  assert.equal(items.length, 34);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 30);
+  assert.equal(items.length, 35);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 31);
+  assert.equal(search(items, 'hide pet')[0].id, 'command:settings:hidePet');
   const home = homeEntries(items);
   assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
   assert.ok(home.every(entry => entry.kind === 'command' && !entry.danger && !entry.searchOnly));

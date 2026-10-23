@@ -91,7 +91,7 @@ export function TuckRecoveryView({ item, windowId, isMac, onBack, onComplete }: 
       </div>
       <p className="setting-note">{t('tuckRecoveryForgetHint')}</p>
     </div>
-    <PaletteFooter isMac={isMac}
+    <PaletteFooter isMac={isMac} hints
       title={t('reviewTuck')} context={item?.title}
       primary={{ label: action?.title || t('runCommand'), keys: ['↵'], disabled: busy || !action, danger: !!action?.danger, onAction: () => void run(action?.id || 'back') }}
       actions={{ open: menu, disabled: busy, onToggle: toggleMenu }} />

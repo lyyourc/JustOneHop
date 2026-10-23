@@ -65,7 +65,7 @@ test('History search: seventh entry follows six results and real visits support 
 
     await ui.setViewportSize({ width: 390, height: 600 });
     await expect(historySearch).toBeVisible();
-    await expect(ui.locator('.history-view .footer-back')).toBeVisible();
+    await expect(ui.locator('.history-view .search-focus.is-back')).toBeVisible();
     expect(await ui.locator('.history-view').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
     await ui.locator('.history-view').screenshot({ path: test.info().outputPath('history-full-narrow.png') });
     await ui.setViewportSize({ width: 1100, height: 760 });
@@ -73,9 +73,9 @@ test('History search: seventh entry follows six results and real visits support 
     await expect(search).toBeFocused(); await expect(search).toHaveValue(query);
     await expect(allHistory).toHaveAttribute('aria-selected', 'true');
     expect(await search.evaluate(el => [(el as HTMLInputElement).selectionStart, (el as HTMLInputElement).selectionEnd])).toEqual([0, 1]);
-    // Mouse entry and footer return preserve the same root context.
+    // Mouse entry and header return preserve the same root context.
     await allHistory.click(); await expect(historySearch).toBeFocused();
-    await ui.locator('.history-view .footer-back').click();
+    await ui.locator('.history-view .search-focus.is-back').click();
     await expect(search).toBeFocused(); await expect(search).toHaveValue(query);
     // This scenario follows a new tab; the default current-tab path is covered by Saved pages.
     await ui.locator('.result.history').filter({ hasText: `${query}-mouse` }).hover();

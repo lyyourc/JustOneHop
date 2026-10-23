@@ -61,12 +61,15 @@ test('light and dark surfaces, compact rows and bottom action search fit without
   await expect(input).toHaveValue('Design System');
   await input.fill('标签切换器'); await input.press('Enter');
   await expectIconSpacing(ui.locator('.recent-switcher .search-bar'), 8, 8);
+  expect(await ui.locator('.recent-switcher .footer-title-label').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await expect(ui.locator('.recent-switcher .palette-footer-pet')).toHaveCount(0);
   await ui.locator('.recent-search-activate').click();
   await expect(ui.locator('.recent-search-field input')).toBeFocused();
 });
 
 for (const language of ['Chinese', 'English']) test(`${language} quiet layout exposes Ctrl P N navigation in results and actions at narrow widths`, async ({ palette }) => {
   const { ui } = palette;
+  await ui.clock.install();
   await palette.open({ locale: language === 'English' ? 'en-US' : 'zh-CN', snapshot: { tabs: [snapshotTab(2, 'Navigation-fixture')] } });
   const chinese = language === 'Chinese';
   const input = ui.getByRole('combobox');
@@ -77,7 +80,13 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await expect(ui.locator('.section-start')).toHaveCount(0);
   await expect(ui.locator('.suggested-label')).toHaveCount(0);
   await expect(ui.locator('.palette-footer .footer-divider')).toHaveCount(0);
-  await expect(ui.locator('.palette-footer-context')).toHaveCSS('margin-left', '16px');
+  await expect(ui.locator('.footer-hint-pet')).toBeVisible();
+  await expect(ui.locator('.navigation-hint')).toBeHidden();
+  const petBefore = await ui.locator('.footer-hint-pet').boundingBox();
+  await ui.locator('.footer-hint-pet').click();
+  await expect(ui.locator('.navigation-hint')).toBeVisible();
+  expect(await ui.locator('.footer-hint-pet').boundingBox()).toEqual(petBefore);
+  await expect(ui.locator('.footer-hint')).toHaveAttribute('data-floating', 'false');
   const hintChords = ui.locator('.navigation-hint .key-chord');
   await expect(hintChords.nth(0).locator('kbd')).toHaveText(['Ctrl+P']);
   await expect(hintChords.nth(1).locator('kbd')).toHaveText(['Ctrl+N']);
@@ -86,7 +95,7 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await expect(ui.locator('.actions-button')).toHaveAttribute('title', /Command \+ K/);
   // Supporting shortcuts use the same text metrics as other footer context.
   const hintKey = await hintChords.first().locator('kbd').first().evaluate(node => {
-    const key = getComputedStyle(node), context = getComputedStyle(node.closest('.palette-footer-context')!);
+    const key = getComputedStyle(node), context = getComputedStyle(node.closest('.footer-hint-bubble')!);
     return { size: key.fontSize, weight: key.fontWeight, lineHeight: key.lineHeight, color: key.color,
       contextSize: context.fontSize, contextWeight: context.fontWeight, contextLineHeight: context.lineHeight, contextColor: context.color,
       border: key.borderTopWidth, background: key.backgroundColor, height: node.getBoundingClientRect().height };
@@ -127,10 +136,12 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await expect(secondary).toHaveAccessibleName(chinese ? '在新标签页打开' : 'Open in New Tab');
   await expect(secondary).toHaveAttribute('title', /在新标签页打开|Open in New Tab/);
   await ui.evaluate(() => { document.body.style.width = '100%'; });
+  await ui.mouse.move(0, 0);
+  await ui.clock.runFor(3000);
   for (const width of [750, 620, 750]) {
     await ui.setViewportSize({ width, height: 600 });
-    if (width === 620) await expect(ui.locator('.navigation-hint')).toBeHidden();
-    else await expect(ui.locator('.navigation-hint')).toBeVisible();
+    await expect(ui.locator('.navigation-hint')).toBeHidden();
+    await expect(ui.locator('.footer-hint-pet')).toBeVisible();
     const left = (await ui.locator('.palette-footer-location').boundingBox())!;
     const right = (await ui.locator('.footer-actions').boundingBox())!;
     expect(right.x - left.x - left.width).toBeGreaterThanOrEqual(16);
@@ -153,8 +164,26 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await ui.setViewportSize({ width: 390, height: 600 });
   await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   await expect(ui.locator('.navigation-hint')).toBeHidden();
+  const actionsBeforeHint = await ui.locator('.footer-actions').boundingBox();
+  const narrowPetBefore = await ui.locator('.footer-hint-pet').boundingBox();
+  await ui.locator('.footer-hint-pet').click();
+  await expect(ui.locator('.footer-hint-bubble')).toBeInViewport({ ratio: 1 });
+  expect(await ui.locator('.footer-actions').boundingBox()).toEqual(actionsBeforeHint);
+  await primary.click({ trial: true });
+  await secondary.click({ trial: true });
+  const petBox = (await ui.locator('.footer-hint-pet').boundingBox())!;
+  const hintBox = (await ui.locator('.footer-hint-bubble').boundingBox())!;
+  expect(petBox).toEqual(narrowPetBefore);
+  expect(hintBox.y + hintBox.height).toBeLessThanOrEqual(petBox.y);
+  const footerBox = (await ui.locator('.palette-footer').boundingBox())!;
+  expect(petBox.y).toBeGreaterThanOrEqual(footerBox.y);
+  expect(petBox.y + petBox.height).toBeLessThanOrEqual(footerBox.y + footerBox.height);
+  await ui.locator('.palette').screenshot({ path: test.info().outputPath(`home-hint-${language.toLowerCase()}-narrow.png`) });
+  await ui.mouse.move(0, 0);
+  await ui.clock.runFor(3000);
+  await expect(ui.locator('.footer-hint-pet')).toHaveAttribute('aria-expanded', 'false');
   await expect(ui.locator('.palette-footer-title')).toHaveText(chinese ? '小范围瞬移' : 'JustOneHop');
-  await expect(ui.locator('.footer-navigation')).toHaveAccessibleName(chinese ? '设置' : 'Settings');
+  await expect(ui.locator('.settings-button')).toHaveAccessibleName(chinese ? '设置' : 'Settings');
   expect(await ui.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   const locationBox = await ui.locator('.palette-footer-location').boundingBox(), actionsBox = await ui.locator('.footer-actions').boundingBox();
   expect(locationBox!.x + locationBox!.width).toBeLessThanOrEqual(actionsBox!.x);

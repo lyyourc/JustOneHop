@@ -6,7 +6,6 @@ import { SearchDismissButton } from './SearchDismissButton';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { BookOpen, Check, ChevronDown, ExternalLink, FlaskConical, Keyboard, Paintbrush, RotateCw, Search } from 'lucide-react';
 import { SettingsPage } from './SettingsPage';
-import { HighlightedText } from './HighlightedText';
 import { matchingSettings, settingCategory, settingsCategories, type SettingRow, type SettingsCategory } from './settingsSearch';
 import { PaletteFooter } from './PaletteFooter';
 import { useOperationFeedback } from './OperationFeedback';
@@ -24,8 +23,8 @@ const tuckDuration = (hours: number) => hours % 24 === 0
   ? t(hours === 24 ? 'tuckDay' : 'tuckDays', String(hours / 24))
   : t(hours === 1 ? 'tuckHour' : 'tuckHours', String(hours));
 
-function Choice<T extends string>({ label, value, options, onChange, query }: {
-  label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; query: string;
+function Choice<T extends string>({ label, value, options, onChange }: {
+  label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -79,13 +78,13 @@ function Choice<T extends string>({ label, value, options, onChange, query }: {
     <button ref={button} className="choice-trigger" role="combobox" aria-label={label}
       aria-expanded={open} aria-controls={id} aria-haspopup="listbox" aria-activedescendant={open ? `${id}-${index}` : undefined}
       onClick={() => { setOpen(!open); setIndex(selected); }}>
-      <span><HighlightedText text={options[selected].label} query={query} allowTypos={false} /></span><ChevronDown size={14} />
+      <span>{options[selected].label}</span><ChevronDown size={14} />
     </button>
     {open ? <div className={`choice-menu ${above ? 'above' : ''}`} style={{ maxHeight: menuHeight, overflowY: 'auto' }} role="listbox" id={id} aria-label={label}>
       {options.map((option, at) => <div key={option.value} id={`${id}-${at}`} role="option" aria-selected={value === option.value}
         className={`choice-option ${at === index ? 'highlighted' : ''}`} onMouseMove={() => setIndex(at)}
         onMouseDown={event => event.preventDefault()} onClick={() => choose(at)}>
-        <span><HighlightedText text={option.label} query={query} allowTypos={false} /></span>{value === option.value ? <Check size={14} /> : null}
+        <span>{option.label}</span>{value === option.value ? <Check size={14} /> : null}
       </div>)}
     </div> : null}
   </div></BackLayer>;
@@ -133,10 +132,8 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const helpCategory = category === 'help' && !detail;
   const detailVisible = (!!detail || helpCategory) && !searching;
   const categoryIcons = { appearance: Paintbrush, keyboard: Keyboard, experimentalFeatures: FlaskConical, help: BookOpen };
-  const location = `${t('settings')} · ${categoryLabel(category)}${detailVisible && detail && detail !== category ? ` · ${t(detail === 'binding' ? 'bindCtrlTab' : detail)}` : ''}`;
   const paletteHotkeyHelp = `${shortcut ? describeShortcut(shortcut) : t('notAssigned')} — ${t('paletteHotkey')}. ${t('hotkeyHint')}`;
   const bindingHelp = `${tabSwitcherShortcut ? describeShortcut(tabSwitcherShortcut) : t('notAssigned')} — ${t('bindingHint')}`;
-  const highlight = (text: string) => <HighlightedText text={text} query={query} allowTypos={false} />;
   function openDetail(next: 'binding' | 'searchIcon' | 'help') {
     feedback.dismiss();
     detailReturn.current = { query, category, scroll: body.current?.scrollTop ?? 0, selection: [input.current?.selectionStart ?? 0, input.current?.selectionEnd ?? 0] };
@@ -207,6 +204,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
     await feedback.run(() => savePreferences(patch), () => {
       if (patch.language) return t('languageSaved', patch.language === 'system' ? t('followSystem') : patch.language === 'zh' ? '简体中文' : 'English');
       if (patch.theme) return t('themeSaved', t(patch.theme === 'system' ? 'followSystem' : patch.theme === 'light' ? 'lightTheme' : 'darkTheme'));
+      if (patch.hidePet !== undefined) return null;
       if (patch.autoTuck !== undefined) return t(patch.autoTuck ? 'autoTuckEnabled' : 'autoTuckDisabled');
       return t('tuckDurationSaved', tuckDuration(patch.autoTuckAfterHours!));
     }, t('errorSaveSettings'));
@@ -232,7 +230,7 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
   const tuckRulesButton = <button className="tuck-rules" aria-expanded={tuckRulesOpen} aria-controls={tuckRulesId} onClick={() => setTuckRulesOpen(value => !value)}>{t('tuckRules')}<ChevronDown size={12} /></button>;
   return <BackLayer onBack={onBack}><BackLayer active={searching} onBack={clearSearch}><section tabIndex={-1} className="palette settings-view settings-page" aria-label={t('settings')}>
     <header className="search-bar settings-search">
-      <SearchFocusButton input={input} />
+      <SearchFocusButton input={input} onBack={back} />
       <input ref={input} data-back-on-empty aria-label={t('searchSettings')} placeholder={t('searchSettingsPlaceholder')}
         value={query} onChange={event => updateQuery(event.target.value)}
         onKeyDown={event => { if (event.key === 'Enter') event.stopPropagation(); }} autoComplete="off" spellCheck={false} />
@@ -266,53 +264,58 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
         </div>
       </nav>
       <div id="settings-content" className="settings-content">
-      {detail || helpCategory ? <SettingsPage.Provider value={{ active: detailVisible, title: location, footer }}>
+      {detail || helpCategory ? <SettingsPage.Provider value={{ active: detailVisible, footer }}>
         <div key={detailRevision} className="settings-detail" hidden={!detailVisible} inert={!detailVisible}>
-          {iconOpen ? <SearchIconSettings value={preferences.searchIcon} onBack={closeDetail} /> : helpOpen || helpCategory ? <HelpView shortcut={shortcut} onBack={helpCategory ? onBack : closeDetail} /> : bindingOpen ? <BindingGuide onBack={closeDetail} isMac={isMac} /> : null}
+          {iconOpen ? <SearchIconSettings value={preferences.searchIcon} onBack={closeDetail} /> : helpOpen || helpCategory ? <HelpView shortcut={shortcut} onBack={helpCategory ? onBack : closeDetail} autoFocus={!helpCategory} /> : bindingOpen ? <BindingGuide onBack={closeDetail} isMac={isMac} /> : null}
         </div>
       </SettingsPage.Provider> : null}
     <div className="settings-body" ref={body} hidden={detailVisible} inert={detailVisible}>
-      {matches.has('language') || matches.has('theme') || matches.has('searchIcon') ? <>
+      {matches.has('language') || matches.has('theme') || matches.has('searchIcon') || matches.has('hidePet') ? <>
         <div className="settings-group settings-appearance">
           {matches.has('language') ? <div data-setting="language">
             <div className="setting-row">
-              <div className="setting-copy"><label>{highlight(t('language'))}</label>{preferences.language === 'system' ? <p>{highlight(t('systemLanguage', systemLanguage() === 'zh' ? '简体中文' : 'English'))}</p> : null}</div>
-              <Choice query={query} label={t('language')} value={preferences.language} onChange={language => void change({ language })}
+              <div className="setting-copy"><label>{t('language')}</label>{preferences.language === 'system' ? <p>{t('systemLanguage', systemLanguage() === 'zh' ? '简体中文' : 'English')}</p> : null}</div>
+              <Choice label={t('language')} value={preferences.language} onChange={language => void change({ language })}
                 options={[{ value: 'system', label: t('followSystem') }, { value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }]} />
             </div>
           </div> : null}
           {matches.has('theme') ? <div data-setting="theme">
             <div className="setting-row">
-              <div className="setting-copy"><label>{highlight(t('theme'))}</label></div>
-              <Choice query={query} label={t('theme')} value={preferences.theme} onChange={theme => void change({ theme })}
+              <div className="setting-copy"><label>{t('theme')}</label></div>
+              <Choice label={t('theme')} value={preferences.theme} onChange={theme => void change({ theme })}
                 options={[{ value: 'system', label: t('followSystem') }, { value: 'light', label: t('lightTheme') }, { value: 'dark', label: t('darkTheme') }]} />
             </div>
           </div> : null}
           {matches.has('searchIcon') ? <div className="setting-row" data-setting="searchIcon">
-            <div className="setting-copy"><label>{highlight(t('searchIcon'))}</label><p>{highlight(t('searchIconHint'))}</p></div>
-            <button className="surface-button" aria-label={t('searchIconChange')} onClick={() => openDetail('searchIcon')}><SearchIcon />{highlight(t('searchIconChange'))}</button>
+            <div className="setting-copy"><label>{t('searchIcon')}</label><p>{t('searchIconHint')}</p></div>
+            <button className="surface-button" aria-label={t('searchIconChange')} onClick={() => openDetail('searchIcon')}><SearchIcon />{t('searchIconChange')}</button>
+          </div> : null}
+          {matches.has('hidePet') ? <div className="setting-row" data-setting="hidePet">
+            <div className="setting-copy"><label>{t('hidePet')}</label><p>{t('hidePetHint')}</p></div>
+            <button className="setting-toggle" role="switch" aria-label={t('hidePet')} aria-checked={!!preferences.hidePet}
+              onClick={() => void change({ hidePet: !preferences.hidePet })}><span /></button>
           </div> : null}
         </div>
       </> : null}
       {matches.has('keyboard') || matches.has('binding') ? <>
         <div className="settings-group settings-keyboard">
           {matches.has('keyboard') ? <div className="setting-row hotkey-row" data-setting="keyboard">
-            <div className="setting-copy"><label>{highlight(t('paletteHotkey'))}</label><p>{highlight(t('paletteHotkeyHint'))}</p></div>
+            <div className="setting-copy"><label>{t('paletteHotkey')}</label><p>{t('paletteHotkeyHint')}</p></div>
             <div className="hotkey-controls"><kbd className="hotkey-value" title={paletteHotkeyHelp} aria-label={paletteHotkeyHelp}>{shortcut || t('notAssigned')}</kbd>
-              <button className="hotkey-change" onClick={() => void changeHotkey()}>{highlight(t('changeHotkey'))}<ExternalLink size={12} /></button>
+              <button className="hotkey-change" onClick={() => void changeHotkey()}>{t('changeHotkey')}<ExternalLink size={12} /></button>
             </div>
           </div> : null}
-          {matches.has('binding') ? <div className="setting-row" data-setting="binding"><div className="setting-copy"><label>{highlight(t('ctrlTabSetting'))}</label><p>{highlight(t('bindingHint'))}</p></div>
+          {matches.has('binding') ? <div className="setting-row" data-setting="binding"><div className="setting-copy"><label>{t('ctrlTabSetting')}</label><p>{t('bindingHint')}</p></div>
             <div className="hotkey-controls"><kbd className="hotkey-value" title={bindingHelp} aria-label={bindingHelp}>{tabSwitcherShortcut || t('notAssigned')}</kbd>
-              <button className="surface-button" onClick={() => openDetail('binding')}>{highlight(t('setUpShortcut'))}</button></div></div> : null}
+              <button className="surface-button" onClick={() => openDetail('binding')}>{t('setUpShortcut')}</button></div></div> : null}
         </div>
       </> : null}
       {matches.has('tabs') || matches.has('ranking') ? <>
         <div className="settings-group settings-experiments">
           {matches.has('tabs') ? <div data-setting="tabs">
             <div className="setting-row tuck-heading">
-              <div className="setting-copy"><label htmlFor={tuckToggle}>{highlight(t('autoTuck'))}</label>
-                <p className="tuck-description" id={tuckHint}>{highlight(t('autoTuckHint'))}</p>
+              <div className="setting-copy"><label htmlFor={tuckToggle}>{t('autoTuck')}</label>
+                <p className="tuck-description" id={tuckHint}>{t('autoTuckHint')}</p>
               </div>
               <button id={tuckToggle} className="setting-toggle" role="switch" aria-label={t('autoTuck')} aria-checked={preferences.autoTuck}
                 aria-describedby={tuckHint} aria-disabled={tuckSaving} onClick={() => void toggleAutoTuck()}><span /></button>
@@ -323,8 +326,8 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
             </div> : null}
             {preferences.autoTuck ? <fieldset className="tuck-settings" disabled={tuckSaving}>
               <div className="setting-row">
-                <div className="setting-copy tuck-duration-label"><label>{highlight(t('tuckAfter'))}</label></div>
-                <Choice query={query} label={t('tuckAfter')} value={String(tuckHours)} onChange={value => void saveTuckDuration(value)}
+                <div className="setting-copy tuck-duration-label"><label>{t('tuckAfter')}</label></div>
+                <Choice label={t('tuckAfter')} value={String(tuckHours)} onChange={value => void saveTuckDuration(value)}
                   options={tuckOptions.map(hours => ({ value: String(hours), label: tuckDuration(hours) }))} />
               </div>
               <div className="tuck-status-copy" aria-live="polite">
@@ -353,23 +356,23 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
             <div className="tuck-rules-section">
               {!preferences.autoTuck ? tuckRulesButton : null}
               <ul className="tuck-rules-copy" id={tuckRulesId} hidden={!tuckRulesOpen}>
-                <li>{highlight(t('tuckTimingHint'))}</li><li>{highlight(t('tuckScheduleHint'))}</li><li>{highlight(t('tuckProtectedHint'))}</li><li>{highlight(t('autoTuckOffHint'))}</li>
+                <li>{t('tuckTimingHint')}</li><li>{t('tuckScheduleHint')}</li><li>{t('tuckProtectedHint')}</li><li>{t('autoTuckOffHint')}</li>
               </ul>
             </div>
           </div> : null}
           {matches.has('ranking') ? <div data-setting="ranking">
-            <div className="setting-copy"><label>{highlight(t('searchRanking'))}</label><p>{highlight(t('searchRankingHint'))}</p></div>
+            <div className="setting-copy"><label>{t('searchRanking')}</label><p>{t('searchRankingHint')}</p></div>
             <div className="setting-action-row">
-              <p>{highlight(t('searchRankingResetHint'))}</p>
-              <button className="ranking-reset" onClick={() => void resetRanking()} aria-disabled={rankingReset === 'busy'}>{highlight(t('resetSearchRanking'))}</button>
+              <p>{t('searchRankingResetHint')}</p>
+              <button className="ranking-reset" onClick={() => void resetRanking()} aria-disabled={rankingReset === 'busy'}>{t('resetSearchRanking')}</button>
             </div>
           </div> : null}
         </div>
       </> : null}
       {searching && matches.has('help') ? <>
         <div className="settings-group"><div className="setting-row" data-setting="help">
-          <div className="setting-copy"><label>{highlight(t('help'))}</label><p>{highlight(t('helpHint'))}</p></div>
-          <button className="surface-button" onClick={() => openDetail('help')}>{highlight(t('openHelp'))}</button>
+          <div className="setting-copy"><label>{t('help')}</label><p>{t('helpHint')}</p></div>
+          <button className="surface-button" onClick={() => openDetail('help')}>{t('openHelp')}</button>
         </div></div>
       </> : null}
       {!matches.size ? <div className="empty"><Search size={26} /><strong role="status">{t('noResults')}</strong>
@@ -378,12 +381,6 @@ export function Settings({ preferences, shortcut, tabSwitcherShortcut, onBack, o
       </div>
     </div>
     <div className="settings-footer" ref={setFooter} />
-    {!detailVisible ? <PaletteFooter title={searching ? `${t('settings')} · ${t('searchSettings')}` : location}
-      navigation={{ kind: 'back', label: t('back'), tooltip: `${t('back')} · Esc`, onAction: back }}
-      context={<span className="settings-navigation" title={t('settingsNavigationHelp')} aria-label={t('settingsNavigationHelp')}>
-        <span className="navigation-key"><span className="key-chord"><kbd>Tab</kbd></span><span>{t('nextControl')}</span></span>
-        <span aria-hidden="true">·</span>
-        <span className="navigation-key"><span className="key-chord"><kbd>Shift+Tab</kbd></span><span>{t('previousControl')}</span></span>
-      </span>} /> : null}
+    {!detailVisible ? <PaletteFooter title={t('settings')} hints={true} /> : null}
   </section></BackLayer></BackLayer>;
 }

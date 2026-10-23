@@ -8,6 +8,11 @@ test('missing or invalid saved preferences fall back per field', () => {
   assert.deepEqual(normalizePreferences({ language: 'zh', theme: 'unknown' }), { language: 'zh', theme: 'system', autoTuck: false, autoTuckAfterHours: 168 });
 });
 
+test('pet remains visible by default and hiding is explicitly saved', () => {
+  for (const hidePet of [undefined, null, false, 'true', 1]) assert.equal(normalizePreferences({ hidePet }).hidePet, undefined);
+  assert.equal(normalizePreferences({ hidePet: true }).hidePet, true);
+});
+
 test('automatic tucking is opt-in, including when reading old or invalid settings', () => {
   for (const value of [undefined, null, false, 'true', 1]) {
     assert.equal(normalizePreferences({ autoTuck: value }).autoTuck, false);

@@ -159,8 +159,8 @@ test.describe(() => {
   await search.press('Backspace'); await expect(root).toBeFocused();
   await expect(root).toHaveValue('Research');
   await root.fill('Reading'); await ui.getByRole('option').filter({ hasText: 'Tab Group: Reading' }).click();
-  // The footer chevron is the mouse path out of a layer: one click returns to the search that opened it.
-  await ui.locator('.palette-footer .footer-back').click();
+  // The header Back button returns to the search that opened this layer in one click.
+  await ui.locator('.group-view .search-focus.is-back').click();
   await expect(root).toBeFocused(); await expect(root).toHaveValue('Reading');
   await root.fill('Reading'); await ui.getByRole('option').filter({ hasText: 'Tab Group: Reading' }).click();
   await action('Close Tab');

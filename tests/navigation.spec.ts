@@ -358,10 +358,11 @@ test.describe(() => {
     await expectChromePageLoaded(destination, { url: 'chrome://extensions/shortcuts', root: 'extensions-keyboard-shortcuts' });
     const selfId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.id!);
     const before = await worker.evaluate(async ({ windowId, selfId }) => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).filter(id => id !== selfId).sort((a, b) => a - b), { windowId: owner, selfId });
-    const settings = ui.locator('.palette-footer .footer-navigation.settings-button');
+    const settings = ui.locator('.palette-footer .settings-button');
     await expect(settings).toHaveAccessibleName('Settings');
     await settings.click();
     await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+    await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
     await ui.getByRole('button', { name: 'Change in Chrome', exact: true }).click();
     await expect.poll(() => ui.isClosed()).toBe(true);
     await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, shortcuts.id!)).toBe(true);

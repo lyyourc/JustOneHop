@@ -307,7 +307,7 @@ test.describe(() => {
     await article.press('ArrowDown'); await expect.poll(() => article.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
     await article.press('Home');
     await article.press('Tab'); await expect(ui.locator('.help-github-card')).toBeFocused();
-    await ui.keyboard.press('Tab'); await expect(ui.locator('.footer-back')).toBeFocused();
+    await ui.keyboard.press('Tab'); await expect(ui.locator('.help-view .footer-hint-pet')).toBeFocused();
     await ui.keyboard.press('Shift+Tab'); await expect(ui.locator('.help-github-card')).toBeFocused();
     await ui.keyboard.press('Shift+Tab'); await expect(article).toBeFocused();
     await article.press('Escape');
@@ -315,7 +315,7 @@ test.describe(() => {
     expect(await input.evaluate(el => [(el as HTMLInputElement).selectionStart, (el as HTMLInputElement).selectionEnd])).toEqual([0, 1]);
     await expect(ui.locator('.result[aria-selected="true"]')).toContainText(helpName);
 
-    // Mouse entry and footer return use the same document as keyboard search.
+    // Mouse entry and Settings top Back use the same document as keyboard search.
     await ui.locator('.settings-button').click();
     await expect(ui.getByRole('tab', { name: helpName, exact: true })).toBeVisible();
     const settingsSearch = ui.getByRole('textbox', { name: english ? 'Search settings' : '搜索设置', exact: true });
@@ -326,7 +326,7 @@ test.describe(() => {
     await expect(settingsSearch).toBeVisible();
     await expect(article).toContainText(shortcut);
     expect((await ui.locator('.settings-footer .palette-footer').boundingBox())!.y).toBe(originalFooter!.y);
-    await ui.locator('.settings-footer .footer-back').click();
+    await ui.locator('.settings-search .search-focus.is-back').click();
     await expect(settingsSearch).toHaveValue(english ? '帮助' : 'help');
     await expect(ui.getByRole('button', { name: readName })).toBeFocused();
     await ui.keyboard.press('Enter'); await expect(article).toBeFocused();
@@ -348,7 +348,7 @@ test.describe(() => {
       expect(footer!.height).toBe(44); expect(footer!.y + footer!.height).toBeLessThanOrEqual(400);
       await ui.locator('.palette').screenshot({ path: test.info().outputPath(`help-${locale}-${theme}-narrow.png`) });
     }
-    await ui.locator('.footer-back').click();
+    await ui.locator('.help-search .search-focus.is-back').click();
     await expect(input).toBeFocused(); await expect(input).toHaveValue('使用说明');
     await ui.keyboard.press('Meta+k');
     await ui.locator('.action-row').first().click();
@@ -402,7 +402,7 @@ test.describe(() => {
   await expect(ui.locator('[id="justonehop-command:help"]')).toHaveAttribute('aria-selected', 'true');
   await input.press('Enter');
   await expect(ui.locator('.help-view')).toBeVisible();
-  await ui.locator('.help-view .footer-back').click();
+  await ui.locator('.help-search .search-focus.is-back').click();
   await expect(input).toBeFocused();
   await input.fill('设置');
   await expect(ui.locator('.result').first()).toContainText('Settings');
@@ -434,14 +434,14 @@ test.describe(() => {
   expect(headerBox!.height).toBe(mainHeader!.height);
   expect(headerBox!.y).toBe(mainHeader!.y);
   const settingsSearch = ui.getByRole('textbox', { name: 'Search settings', exact: true });
-  await header.locator('.search-focus').click();
+  await settingsSearch.click();
   await expect(settingsSearch).toBeFocused();
-  await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText('Settings · Appearance');
+  await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText('Settings');
   const settingsFooter = await ui.locator('.settings-view .palette-footer').boundingBox();
   expect(settingsFooter!.y).toBe(mainFooter!.y);
   expect(settingsFooter!.height).toBe(44);
   await expect(settingsSearch).toBeFocused();
-  await ui.locator('.settings-view .footer-back').click();
+  await ui.locator('.settings-search .search-focus.is-back').click();
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('设置');
   await input.press('Enter');
@@ -471,27 +471,32 @@ test.describe(() => {
   await expect(changeButton).toHaveCSS('font-weight', '500');
   await expect(ui.locator('.settings-page .footer-divider')).toHaveCount(0);
   const navigation = ui.locator('.settings-navigation');
+  await expect(navigation).not.toBeVisible();
+  await ui.getByRole('button', { name: 'Show keyboard hints', exact: true }).click();
+  await expect(navigation).toBeVisible();
   await expect(navigation.locator('.navigation-key')).toHaveText(['TabNext', 'Shift+TabPrevious']);
   await expect(navigation.locator('kbd')).toHaveText(['Tab', 'Shift+Tab']);
   await expect(navigation).toHaveAttribute('title', 'Tab moves to the next control; Shift+Tab moves to the previous control.');
+  await ui.mouse.move(0, 0);
+  await expect(navigation).toBeHidden();
   await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('settings-light.png') });
   // Each category keeps its full visible Tab chain, including category navigation.
   for (const [category, fields] of [
-    ['Appearance', [language, theme, ui.getByRole('button', { name: 'Wear Badge' })]],
+    ['Appearance', [language, theme, ui.getByRole('button', { name: 'Wear Badge' }), ui.getByRole('switch', { name: 'Hide Pet' })]],
     ['Keyboard', [changeButton, ui.getByRole('button', { name: 'Set Up', exact: true })]],
     ['Labs', [experiments.getByRole('switch'), experiments.getByRole('button', { name: 'How it works' }), experiments.getByRole('button', { name: 'Reset Ranking' })]],
   ] as const) {
     const categoryTab = ui.getByRole('tab', { name: category, exact: true });
     await categoryTab.click();
-    await header.locator('.search-focus').click();
+    await settingsSearch.click();
     const controls = [header.locator('.search-dismiss'), ...['Appearance', 'Keyboard', 'Labs', 'Help'].map(name => ui.getByRole('tab', { name, exact: true })), ...fields,
-      ui.locator('.footer-back'), header.locator('.search-focus'), settingsSearch];
+      ui.locator('.settings-view .footer-hint-pet'), header.locator('.search-focus.is-back'), settingsSearch];
     for (const control of controls) { await ui.keyboard.press('Tab'); await expect(control).toBeFocused(); }
     await ui.keyboard.press('Shift+Tab');
-    await expect(header.locator('.search-focus')).toBeFocused();
+    await expect(header.locator('.search-focus.is-back')).toBeFocused();
     await ui.keyboard.press('Shift+Tab');
-    await expect(ui.locator('.footer-back')).toBeFocused();
+    await expect(ui.locator('.settings-view .footer-hint-pet')).toBeFocused();
     await ui.keyboard.press('Tab');
     await ui.keyboard.press('Tab');
   }
@@ -499,7 +504,8 @@ test.describe(() => {
   await settingsSearch.fill('lang');
   await expect(ui.locator('.settings-body h2')).toHaveCount(0);
   await expect(ui.locator('[data-setting]')).toHaveCount(1);
-  await expect(ui.locator('[data-setting="language"] label mark')).toHaveText('Lang');
+  await expect(ui.locator('[data-setting="language"] label')).toHaveText('Language');
+  await expect(ui.locator('.settings-body mark')).toHaveCount(0);
   await settingsSearch.fill('主题');
   await expect(theme).toBeVisible();
   await expect(language).toHaveCount(0);
@@ -550,7 +556,11 @@ test.describe(() => {
   expect(await ui.locator('.settings-body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   const palette = await ui.locator('.palette').boundingBox();
   expect(palette!.y + palette!.height).toBeLessThanOrEqual(400);
+  await expect(navigation).toBeHidden();
+  await ui.getByRole('button', { name: 'Show keyboard hints', exact: true }).click();
   await expect(navigation).toBeVisible();
+  await ui.mouse.move(0, 0);
+  await expect(navigation).toBeHidden();
   const footer = await ui.locator('.settings-view .palette-footer').boundingBox();
   expect(footer!.height).toBe(44);
   expect(footer!.y + footer!.height).toBeLessThanOrEqual(palette!.y + palette!.height);
@@ -614,14 +624,12 @@ test.describe(() => {
   await expect.poll(async () => (await ax()).find(n => n.role?.value === 'textbox')?.value?.value).toBe('them');
   await page.keyboard.press('Meta+a');
   await page.keyboard.press('Backspace');
-  await page.keyboard.press('Shift+Tab'); // Search focus logo
-  await page.keyboard.press('Shift+Tab'); // Footer back
+  await page.keyboard.press('Shift+Tab'); // Settings top Back badge
   await expect.poll(async () => (await ax()).some(n => n.role?.value === 'button' && n.name?.value === '返回' && n.properties?.some(p => p.name === 'focused' && p.value.value === true))).toBe(true);
-  await page.keyboard.press('Tab'); // Search focus logo
   await page.keyboard.press('Tab'); // Search
   await page.keyboard.press('Tab'); // Search Escape button
   await page.keyboard.press('Tab'); // Appearance category
-  await page.keyboard.press('Tab'); // Language
+  for (let step = 0; step < 4; step++) await page.keyboard.press('Tab'); // Remaining categories, then Language
   await page.keyboard.press('Enter');
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
@@ -678,7 +686,7 @@ for (const host of ['overlay', 'native'] as const) test.describe('headed', { tag
         await expect.poll(activeTab).toBe(shortcutsId);
       }
       await source.bringToFront();
-      await surface.locator('.settings-footer .footer-back').click();
+      await surface.locator('.settings-search .search-focus.is-back').click();
       await shortcuts.bringToFront();
       await expect.poll(activeTab).toBe(shortcutsId);
       await source.bringToFront();
@@ -723,7 +731,7 @@ test.describe(() => {
       settingIds.push(...await ui.locator('[data-setting]').evaluateAll(rows => rows.map(row => row.getAttribute('data-setting')!)));
       await expect(ui.getByRole('button', { name: 'Manage Scripts', exact: true })).toHaveCount(0);
     }
-    expect(settingIds).toEqual(['language', 'theme', 'searchIcon', 'keyboard', 'binding', 'tabs', 'ranking']);
+    expect(settingIds).toEqual(['language', 'theme', 'searchIcon', 'hidePet', 'keyboard', 'binding', 'tabs', 'ranking']);
     const settings = ui.getByRole('textbox', { name: 'Search settings', exact: true });
     await settings.fill('scripts'); await expect(ui.locator('[data-setting]')).toHaveCount(0);
     await settings.fill('ctrl tab');
@@ -731,7 +739,7 @@ test.describe(() => {
     await setup.click();
     await expect(ui.getByRole('region', { name: 'Set Up Ctrl+Tab', exact: true })).toBeVisible();
     await expect(ui.locator('.binding-code-field textarea')).toHaveAttribute('readonly', '');
-    await ui.locator('.settings-footer .footer-back').click();
+    await ui.locator('.settings-search .search-focus.is-back').click();
     await expect(settings).toHaveValue('ctrl tab'); await expect(setup).toBeFocused();
     await ui.keyboard.press('Escape'); await expect(settings).toHaveValue(''); await expect(settings).toBeFocused();
     await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
@@ -758,7 +766,7 @@ test.describe(() => {
   await ui.locator('.settings-button').click();
   await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
   await ui.getByRole('button', { name: 'Set Up', exact: true }).click();
-  await expect(ui.locator('.palette-footer-title').filter({ hasText: 'Set Up Ctrl+Tab' })).toBeVisible();
+  await expect(ui.locator('.settings-footer .palette-footer-title')).toHaveText('Settings');
   await expect(ui.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
   await expect(ui.getByRole('textbox', { name: 'JavaScript code' })).toHaveAttribute('readonly', '');
   await expect(ui.locator('.binding-view .settings-header')).toHaveCount(0);
@@ -768,10 +776,10 @@ test.describe(() => {
   await expect(ui.locator('.binding-body')).toBeVisible();
   await ui.locator('.palette-footer .actions-button').click();
   await ui.getByRole('dialog').getByRole('option', { name: /^Copy Code/ }).click();
-  await expect(ui.getByRole('status')).toContainText('Code copied');
+  await expect(ui.locator('.operation-feedback[role="status"]')).toContainText('Code copied');
   const code = await ui.evaluate(() => navigator.clipboard.readText());
   expect(code).not.toMatch(/[\r\n]/);
-  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings · Keyboard · Set Up Ctrl+Tab');
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings');
   const calls: unknown[] = [];
   new Function('chrome', code)({ developerPrivate: { updateExtensionCommand: (value: unknown) => calls.push(value) } });
   expect(calls).toEqual([
@@ -786,9 +794,9 @@ test.describe(() => {
   await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('binding-guide.png') });
   await ui.locator('.palette-footer .actions-button').click();
   await expect(ui.getByRole('dialog').getByRole('option', { name: 'Delete', exact: true })).toHaveCount(0);
-  await ui.locator('.settings-footer .footer-back').click();
+  await ui.locator('.settings-search .search-focus.is-back').click();
   await expect(ui.locator('.action-menu')).toHaveCount(0);
-  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings · Keyboard · Set Up Ctrl+Tab');
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings');
   await ui.evaluate(() => navigator.clipboard.writeText('before combined action'));
   await copy.focus();
   const created = context.waitForEvent('page');
@@ -797,7 +805,7 @@ test.describe(() => {
   expect(ui.isClosed()).toBe(false);
   await ui.bringToFront();
   await expect(ui.locator('.binding-guide')).toBeVisible();
-  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings · Keyboard · Set Up Ctrl+Tab');
+  await expect(ui.locator('.palette-footer-title')).toHaveText('Settings');
   expect(await ui.evaluate(() => navigator.clipboard.readText())).toBe(code);
   await ui.locator('.palette-footer .actions-button').click();
   await ui.getByRole('dialog').getByRole('option', { name: /Open Chrome Shortcuts/ }).click();

@@ -17,11 +17,11 @@ export function createOperationFeedback() {
       timer = setTimeout(() => { if (id === version) publish({ kind: 'pending', message }); }, 150);
       return id;
     },
-    success(id: number, message: string) {
+    success(id: number, message: string | null) {
       if (id !== version) return;
       cancelTimer();
-      publish({ kind: 'success', message });
-      timer = setTimeout(() => publish(null), 4000);
+      publish(message === null ? null : { kind: 'success', message });
+      if (message !== null) timer = setTimeout(() => publish(null), 4000);
     },
     error(id: number, message: string) {
       if (id !== version) return;

@@ -2,6 +2,184 @@ import { test, expect, fixtureOrigin, snapshotTab } from './support/paletteUI';
 
 test.use({ viewport: { width: 1100, height: 760 }, reducedMotion: 'reduce' });
 
+test('pet visibility saves and settings search separates modules with an animated back badge', async ({ palette }) => {
+  const { ui } = palette;
+  await palette.open({ locale: 'en-US' });
+  await ui.emulateMedia({ reducedMotion: 'no-preference' });
+  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+  await search.fill('hide pet'); await search.press('Enter');
+  const toggle = ui.getByRole('switch', { name: 'Hide Pet', exact: true });
+  await expect(toggle).toBeFocused();
+  const badge = ui.locator('.settings-search .brand-logo');
+  await expect(badge).toHaveCSS('transition-property', 'transform');
+  await expect(badge).toHaveCSS('transform', 'matrix(0, 1, -1, 0, 0, 0)');
+  palette.failNextSave();
+  await toggle.click();
+  await expect(ui.locator('.operation-feedback')).toContainText('Could not save settings');
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(ui.locator('.footer-hint-pet')).toBeVisible();
+  await toggle.press('Space');
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect(ui.locator('.footer-hint-pet')).toHaveCount(0);
+  await expect(ui.locator('.operation-feedback')).toBeEmpty();
+  await ui.keyboard.press('Escape');
+  await expect(ui.locator('.footer-hint-pet')).toHaveCount(0);
+  await ui.reload();
+  await ui.locator('.settings-button').click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await ui.getByRole('button', { name: 'Wear Badge', exact: true }).click();
+  await expect(ui.locator('.footer-hint-pet')).toHaveCount(0);
+  await ui.keyboard.press('Escape');
+  await toggle.click();
+  await expect(ui.locator('.footer-hint-pet')).toBeVisible();
+  const settingsSearch = ui.getByRole('textbox', { name: 'Search settings', exact: true });
+  await settingsSearch.fill('t');
+  await expect(ui.locator('.settings-body mark')).toHaveCount(0);
+  const setup = ui.getByRole('button', { name: 'Set Up', exact: true });
+  await expect(setup).toHaveText('Set Up');
+  expect(await setup.evaluate(node => node.childNodes.length)).toBe(1);
+  const theme = ui.getByRole('combobox', { name: 'Theme', exact: true });
+  await theme.click();
+  await expect(ui.getByRole('option', { name: 'Light', exact: true })).toHaveText('Light');
+  await expect(ui.locator('.choice-menu mark')).toHaveCount(0);
+  await theme.press('Escape');
+  for (const width of [750, 390]) {
+    await ui.setViewportSize({ width, height: 600 });
+    await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '100%'; });
+    const cards = ui.locator('.settings-body > .settings-group');
+    expect(await cards.count()).toBeGreaterThan(1);
+    const boxes = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i].top - boxes[i - 1].bottom).toBe(12);
+  }
+  await ui.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(badge).toHaveCSS('transition-duration', '0s');
+});
+
+for (const overlay of [false, true]) test(`footer shares stable pet, hint and feedback slots in ${overlay ? 'overlay' : 'window'}`, async ({ palette }) => {
+  const { ui } = palette;
+  await ui.clock.install();
+  await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}) });
+  const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
+  await surface.locator('.settings-button').click();
+  const pet = surface.locator('.footer-hint-pet');
+  const bubble = surface.locator('.footer-hint-bubble');
+  const message = surface.locator('.operation-feedback-message');
+  const toggle = surface.getByRole('switch', { name: 'Hide Pet', exact: true });
+  const textSlot = surface.locator('.palette-footer-text');
+  const title = surface.locator('.palette-footer-title');
+  const initialTitle = await title.boundingBox();
+  const initialPet = (await pet.boundingBox())!;
+  await pet.click();
+  await expect(bubble).toBeVisible();
+  const initialHint = (await bubble.boundingBox())!;
+  const aligned = async () => {
+    const box = (await message.boundingBox())!;
+    expect(box.x).toBeCloseTo(initialHint.x, 1);
+    expect(box.y + box.height / 2).toBeCloseTo(initialPet.y + initialPet.height / 2, 1);
+    expect(await title.boundingBox()).toEqual(initialTitle);
+    await expect(bubble).toBeHidden();
+  };
+  const initialSlot = await textSlot.boundingBox();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect(pet).toHaveCount(0);
+  await expect(message).toHaveCount(0);
+  expect(await textSlot.boundingBox()).toEqual(initialSlot);
+  palette.holdNextSave();
+  await toggle.press('Space');
+  await ui.clock.runFor(200);
+  await expect(message).toHaveText('Working…');
+  palette.completeSave();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(message).toHaveCount(0);
+  expect(await pet.boundingBox()).toEqual(initialPet);
+  expect(await textSlot.boundingBox()).toEqual(initialSlot);
+  await pet.click();
+  await expect(bubble).toBeVisible();
+  expect((await bubble.boundingBox())!.x).toBe(initialHint.x);
+
+  const theme = surface.getByRole('combobox', { name: 'Theme', exact: true });
+  await theme.click();
+  await surface.getByRole('option', { name: 'Dark', exact: true }).click();
+  await expect(message).toHaveText('Theme set to Dark');
+  await aligned();
+  await pet.hover();
+  await ui.clock.runFor(4100);
+  await expect(message).toHaveCount(0);
+  await expect(bubble).toBeVisible();
+  await ui.mouse.move(0, 0);
+  await ui.clock.runFor(3000);
+  await expect(bubble).toBeHidden();
+
+  palette.failNextSave();
+  await toggle.click();
+  await expect(surface.getByRole('alert')).toContainText('Could not save settings');
+  await pet.press('Enter');
+  await pet.hover();
+  await ui.clock.runFor(8000);
+  await aligned();
+  await surface.getByRole('button', { name: 'Dismiss message' }).press('Enter');
+  await expect(bubble).toBeVisible();
+
+  await ui.setViewportSize({ width: 390, height: 600 });
+  if (!overlay) await surface.locator('.justonehop-app').evaluate(node => {
+    node.classList.replace('popup', 'overlay'); node.ownerDocument.body.style.width = '100%';
+  });
+  await surface.getByRole('button', { name: 'Wear Badge', exact: true }).click();
+  const actions = surface.locator('.footer-actions');
+  const actionsBefore = await actions.boundingBox();
+  const slotBefore = await textSlot.boundingBox();
+  await surface.getByRole('textbox', { name: 'Emoji', exact: true }).fill('🐰');
+  palette.failNextSave();
+  await actions.getByRole('button').first().click();
+  await expect(surface.getByRole('alert')).toBeVisible();
+  await pet.click();
+  await expect(bubble).toBeHidden();
+  expect(await actions.boundingBox()).toEqual(actionsBefore);
+  expect(await textSlot.boundingBox()).toEqual(slotBefore);
+  const messageBox = (await message.boundingBox())!;
+  expect(messageBox.width).toBeGreaterThan(0);
+  expect(messageBox.x).toBeCloseTo(slotBefore!.x, 1);
+  expect(messageBox.x + messageBox.width).toBeLessThanOrEqual(actionsBefore!.x);
+  await actions.getByRole('button').first().click({ trial: true });
+  expect((await surface.locator('.palette-footer').boundingBox())!.height).toBe(44);
+});
+
+for (const overlay of [false, true]) test(`settings badge rotates back home in ${overlay ? 'overlay' : 'window'}`, async ({ palette }) => {
+  const { ui } = palette;
+  await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}) });
+  const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
+  await ui.emulateMedia({ reducedMotion: 'no-preference' });
+  for (const custom of [false, true]) {
+    if (custom) await palette.provideStorage({ preferences: { language: 'en', theme: 'system', autoTuck: false, autoTuckAfterHours: 168, searchIcon: '🐰' } });
+    await surface.locator('.settings-button').click();
+    const icon = custom ? '.custom-search-icon' : '.brand-logo';
+    await expect(surface.locator(`.settings-search ${icon}`)).toHaveCSS('transform', 'matrix(0, 1, -1, 0, 0, 0)');
+    await ui.evaluate(overlay => {
+      // Observe sandboxed overlay DOM from the host script realm.
+      const frame = document.querySelector('#justonehop-command-palette')?.shadowRoot?.querySelector('iframe');
+      const node = (overlay ? frame!.contentDocument!.body.shadowRoot! : document).querySelector('.justonehop-app')!;
+      node.removeAttribute('data-return-rotation');
+      node.addEventListener('transitionrun', event => {
+        const target = event.target as HTMLElement;
+        if (!target.matches('.search-bar .search-focus :is(.brand-logo, .custom-search-icon)')) return;
+        const animation = target.getAnimations().find(animation => (animation as CSSTransition).transitionProperty === 'transform');
+        const frames = (animation?.effect as KeyframeEffect | null)?.getKeyframes();
+        if (frames) node.setAttribute('data-return-rotation', JSON.stringify(frames.map(frame => frame.transform)));
+      });
+    }, overlay);
+    if (custom) await ui.keyboard.press('Escape');
+    else await surface.locator('.settings-search .search-focus').click();
+    await expect(surface.locator('.justonehop-app')).toHaveAttribute('data-return-rotation', '["rotate(90deg)","rotate(0deg)"]');
+    await expect(surface.locator(`.search-bar ${icon}`)).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+    await expect(surface.locator('.search-bar input')).toBeFocused();
+  }
+  await ui.emulateMedia({ reducedMotion: 'reduce' });
+  await surface.locator('.settings-button').click();
+  await ui.keyboard.press('Escape');
+  await expect(surface.locator('.search-bar .custom-search-icon')).toHaveCSS('transition-duration', '0s');
+});
+
 test('English settings report failed saves and allow retry without losing current preferences', async ({ palette }) => {
   const { ui } = palette;
   await palette.open({ locale: 'en-US' });
@@ -105,7 +283,7 @@ test('English interaction polish settings choices accept Control navigation with
   const currentTheme = await theme.innerText();
   await theme.click();
   await theme.press('Control+n');
-  await ui.locator('.settings-page .palette-footer .footer-back').click();
+  await ui.locator('.settings-search .search-focus.is-back').click();
   await expect(theme).toHaveAttribute('aria-expanded', 'false');
   await expect(theme).toBeFocused();
   await expect(theme).toHaveText(currentTheme);

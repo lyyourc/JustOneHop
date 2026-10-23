@@ -1,4 +1,5 @@
-import { BackLayer } from './Navigation';
+import { BackLayer, useNavigateBack } from './Navigation';
+import { NavigationHint } from './Shortcut';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { ActionMenu } from './ActionMenu';
@@ -101,7 +102,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
     if (!menu && !detail) caret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
     setMenu(!menu); setActionQuery(''); setActionSelection('');
   }
-  function back() { if (menu) setMenu(false); else if (detail) setDetail(null); else onBack(); }
+  const back = useNavigateBack();
   async function act(id: string, targetEntry = current) {
     if (busy || executing.current || (id !== 'refresh' && !targetEntry)) return;
     setMenu(false);
@@ -166,7 +167,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       {detail ? <div className="storage-detail" ref={detailBody} tabIndex={0} aria-label={t('viewDetails')}>
         <StorageValue entry={detail} />
       </div> : <>
-        <div className="storage-search"><SearchFocusButton input={input} /><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
+        <div className="storage-search"><SearchFocusButton input={input} onBack={back} /><input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('storageSearch')} aria-label={t('storageSearchLabel')} role="combobox" aria-expanded="true" aria-controls="storage-results" aria-autocomplete="list"
           aria-activedescendant={selected ? `storage-row-${rows.indexOf(selected)}` : undefined} aria-describedby="storage-navigation" autoComplete="off" spellCheck={false} />
           <SearchDismissButton label={t('back')} query={query} input={input} onClear={() => { setQuery(''); setSelection(''); }} /></div>
@@ -200,7 +201,7 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       query={actionQuery} onQueryChange={value => { setActionQuery(value); setActionSelection(''); }}
       selectedId={activeAction?.id} onSelectionChange={setActionSelection} onAction={id => void act(id)} onClose={() => setMenu(false)} /> : null}
     <PaletteFooter isMac={isMac}
-      navigation={detail ? undefined : { kind: 'back', label: `${t('back')} · ${title}`, tooltip: `${t('back')} (Esc)`, onAction: back }}
+      hints={detail ? true : <NavigationHint />}
       title={title}
       context={<span className="storage-origin" title={request.expectedUrl}>{request.expectedUrl.replace(/^https?:\/\//, '').split('/')[0] || request.expectedUrl}</span>}
       primary={{ label: menu ? activeAction?.title || t('copyValue') : t('copyValue'), keys: ['↵'], disabled: busy || (menu ? !activeAction : !current), onAction: () => void act(menu ? activeAction?.id || '' : 'value') }}

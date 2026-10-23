@@ -1,16 +1,16 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { availableSearchButton, hasControlFocus } from './searchFocus';
+import { availableSearchInput, hasControlFocus } from './searchFocus';
 import { useWheelBack } from './useWheelBack';
 import { t } from './i18n';
 
-type Layer = { depth: number; closes: boolean; back: () => void };
+type Layer = { depth: number; modal: boolean; closes: boolean; back: () => void };
 const Layers = createContext<Map<symbol, Layer> | null>(null);
 const Depth = createContext(0);
 
 function topLayer(layers: Map<symbol, Layer>) {
   return [...layers.values()].reduce<Layer | undefined>((selected, layer) =>
-    !selected || layer.depth > selected.depth ? layer : selected, undefined);
+    !selected || (layer.modal !== selected.modal ? layer.modal : layer.depth > selected.depth) ? layer : selected, undefined);
 }
 
 /** Mouse dismissal uses the same innermost layer as Escape. */
@@ -44,10 +44,10 @@ export function NavigationRoot({ children }: { children: ReactNode }) {
     const navigateBack = (event: KeyboardEvent) => {
       if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
         const root = surface.current!;
-        const button = availableSearchButton(root);
-        if (button && !hasControlFocus(root)) {
+        const input = availableSearchInput(root);
+        if (input && !hasControlFocus(root)) {
           event.preventDefault(); event.stopImmediatePropagation();
-          if (!event.repeat) button.click();
+          if (!event.repeat) input.focus({ preventScroll: true });
           return;
         }
       }
@@ -78,7 +78,7 @@ export function NavigationRoot({ children }: { children: ReactNode }) {
 }
 
 /** Depth follows the rendered hierarchy, never effect/registration order. */
-export function BackLayer({ onBack, active = true, closes, children }: { onBack: () => void; active?: boolean; closes?: boolean; children: ReactNode }) {
+export function BackLayer({ onBack, active = true, closes, modal = false, children }: { onBack: () => void; active?: boolean; closes?: boolean; modal?: boolean; children: ReactNode }) {
   const layers = useContext(Layers);
   const parentDepth = useContext(Depth);
   const depth = parentDepth + (active ? 1 : 0);
@@ -88,8 +88,8 @@ export function BackLayer({ onBack, active = true, closes, children }: { onBack:
     if (!layers) throw new Error('BackLayer requires NavigationRoot');
     if (!active) return;
     const id = Symbol();
-    layers.set(id, { depth, closes: closes ?? depth === 1, back: () => callback.current() });
+    layers.set(id, { depth, modal, closes: closes ?? depth === 1, back: () => callback.current() });
     return () => { layers.delete(id); };
-  }, [layers, depth, active, closes]);
+  }, [layers, depth, active, closes, modal]);
   return <Depth.Provider value={depth}>{children}</Depth.Provider>;
 }

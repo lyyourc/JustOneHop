@@ -1,7 +1,9 @@
-import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react';
-import { ChevronLeft, Settings2 } from 'lucide-react';
+import { useSyncExternalStore, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { t } from './i18n';
-import { OperationFeedbackStatus } from './OperationFeedback';
+import { OperationFeedbackStatus, useOperationFeedbackActive } from './OperationFeedback';
+import { FooterHint } from './FooterHint';
+import { getPreferences, subscribePreferences } from './preferences';
 import { describeShortcut, formatShortcut } from './Shortcut';
 
 function buttonKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
@@ -13,9 +15,10 @@ function buttonKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
 
 /** Left: one navigation control, the current location, then quiet context or status.
  *  Right: the primary action and action menu. Every layer uses the same slots. */
-export function PaletteFooter({ navigation, title, context, status, primary, secondary, actions, isMac = false }: {
+export function PaletteFooter({ navigation, title, hints, context, status, primary, secondary, actions, isMac = false }: {
   navigation?: { kind: 'settings' | 'back'; label: string; tooltip: string; disabled?: boolean; buttonRef?: Ref<HTMLButtonElement>; onAction: () => void };
   title?: string;
+  hints?: ReactNode | boolean;
   context?: ReactNode;
   status?: ReactNode;
   primary?: { label: string; shortLabel?: string; keys: string[]; disabled?: boolean; danger?: boolean; buttonRef?: Ref<HTMLButtonElement>; onAction: () => void };
@@ -23,40 +26,54 @@ export function PaletteFooter({ navigation, title, context, status, primary, sec
   actions?: { open: boolean; disabled?: boolean; onToggle: () => void };
   isMac?: boolean;
 }) {
+  const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
   const footer = useRef<HTMLElement>(null);
+  const [textSlot, setTextSlot] = useState<HTMLDivElement | null>(null);
+  const feedbackActive = useOperationFeedbackActive();
+  const [modalOpen, setModalOpen] = useState(false);
+  useLayoutEffect(() => {
+    const scope = footer.current!.closest('.justonehop-app')!;
+    const update = () => setModalOpen(!!scope.querySelector('[aria-modal="true"]'));
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(scope, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-modal'] });
+    return () => observer.disconnect();
+  }, []);
   useLayoutEffect(() => {
     const root = footer.current!;
-    const location = root.querySelector<HTMLElement>('.palette-footer-location')!;
+    const location = root.querySelector<HTMLElement>('.palette-footer-text')!;
     const context = root.querySelector<HTMLElement>('.palette-footer-context');
     const content = context?.firstElementChild as HTMLElement | null;
     if (!context || !content) return;
-    const title = root.querySelector<HTMLElement>('.footer-title-label');
-    const navigation = root.querySelector<HTMLElement>('.footer-navigation');
     const fitContext = () => {
-      const style = root.ownerDocument.defaultView!.getComputedStyle(location);
-      const gap = parseFloat(style.columnGap) || 0;
-      const required = (navigation?.offsetWidth || 0) + (title?.scrollWidth || 0) + content.getBoundingClientRect().width
-        + gap * (Number(!!navigation) + Number(!!title)) + (title ? 16 : 0);
-      context.toggleAttribute('data-overflow', required > location.clientWidth);
+      context.toggleAttribute('data-overflow', content.getBoundingClientRect().width > location.clientWidth);
     };
     fitContext();
     const observer = new ResizeObserver(fitContext);
-    for (const element of [location, content, title]) if (element) observer.observe(element);
+    for (const element of [location, content]) observer.observe(element);
     return () => observer.disconnect();
   });
-  const NavigationIcon = navigation?.kind === 'back' ? ChevronLeft : Settings2;
-  return <footer ref={footer} className="footer palette-footer">
+  return <footer ref={footer} className="footer palette-footer" data-pet-layout={!!hints}>
     <div className="palette-footer-location">
-      {navigation ? <button ref={navigation.buttonRef} className={`footer-navigation ${navigation.kind === 'back' ? 'footer-back' : 'settings-button'}`}
-        onMouseDown={event => { if (navigation.kind === 'back') { event.preventDefault(); event.stopPropagation(); } }}
+      {navigation?.kind === 'back' ? <button ref={navigation.buttonRef} className="footer-navigation footer-back"
+        onMouseDown={event => { event.preventDefault(); event.stopPropagation(); }}
         onKeyDown={buttonKeyboard} onClick={navigation.onAction} disabled={navigation.disabled} aria-label={navigation.label} title={navigation.tooltip}>
-        <NavigationIcon size={15} aria-hidden="true" />
+        <ChevronLeft size={15} aria-hidden="true" />
       </button> : null}
-      {title ? <div className="palette-footer-title"><span className="footer-title-label">{title}</span></div> : null}
-      <OperationFeedbackStatus />
-      {status || context ? <div className={status ? 'palette-footer-status' : 'palette-footer-context'}>
-        {status || <span className="palette-footer-context-content">{context}</span>}
+      {title ? <div className="palette-footer-title">
+        {navigation?.kind === 'settings' ? <button ref={navigation.buttonRef} className="footer-title-label settings-button"
+          onKeyDown={buttonKeyboard} onClick={navigation.onAction} disabled={navigation.disabled} aria-label={navigation.label} title={navigation.tooltip}>{title}</button>
+          : <span className="footer-title-label" title={title}>{title}</span>}
       </div> : null}
+      {hints ? <div className="palette-footer-pet" inert={modalOpen}>
+        {!preferences.hidePet ? <FooterHint textSlot={textSlot} suppressed={feedbackActive || !!status || modalOpen}>{typeof hints === 'boolean' ? undefined : hints}</FooterHint> : null}
+      </div> : null}
+      <div ref={setTextSlot} className="palette-footer-text">
+        <OperationFeedbackStatus />
+        {status || context ? <div className={status ? 'palette-footer-status' : 'palette-footer-context'}>
+          {status || <span className="palette-footer-context-content">{context}</span>}
+        </div> : null}
+      </div>
     </div>
     <div className="footer-actions">
       {primary ? <button ref={primary.buttonRef} className={`primary-action ${primary.danger ? 'danger' : ''}`} disabled={primary.disabled} onKeyDown={buttonKeyboard} onClick={primary.onAction} title={`${describeShortcut(formatShortcut(primary.keys))} — ${primary.label}`} aria-label={primary.label}>

@@ -7,8 +7,8 @@ import { queryUsage, rankingInfo, usageTarget } from './usage';
 import { ExternalLink, LoaderCircle } from 'lucide-react';
 import { addressActions, pageNavigationEntry } from './addressPresentation';
 import { addressNewTabShortcut } from './address';
-import { matchesShortcut, shortcutKeys } from './Shortcut';
-import { BackLayer } from './Navigation';
+import { matchesShortcut, shortcutKeys, NavigationHint } from './Shortcut';
+import { BackLayer, useNavigateBack } from './Navigation';
 import { SearchFocusButton } from './SearchFocusButton';
 import { SearchDismissButton } from './SearchDismissButton';
 import { PaletteFooter } from './PaletteFooter';
@@ -25,6 +25,7 @@ import type { Entry, Snapshot } from './types';
 export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
   initialQuery: string; data: Snapshot; isMac: boolean; onBack: () => void; onClose: () => void;
 }) {
+  const back = useNavigateBack();
   const [query, setQuery] = useState(initialQuery);
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
   const [frozenRanking, setFrozenRanking] = useState<{ query: string; scores: ReadonlyMap<string, number> } | null>(null);
@@ -141,7 +142,7 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
     }
   }}>
     <div className="main-surface" inert={menu ? true : undefined}>
-      <header className="search-bar"><SearchFocusButton input={input} disabled={busy} />
+      <header className="search-bar"><SearchFocusButton input={input} disabled={busy} onBack={back} />
         <input data-back-on-empty ref={input} value={query} onChange={event => { setQuery(event.target.value); setSelection(''); }}
           placeholder={t('historySearchLabel')} aria-label={t('historySearchLabel')} role="combobox" aria-autocomplete="list" aria-expanded="true"
           aria-controls="justonehop-history-results" aria-activedescendant={selected ? `justonehop-${selected.id}` : undefined} autoComplete="off" spellCheck={false} disabled={busy} />
@@ -157,7 +158,7 @@ export function HistoryView({ initialQuery, data, isMac, onBack, onClose }: {
         {!pending && outcome.limited ? <p className="more-hint">{t('historyLimitedHint')}</p> : null}
       </div>
     </div>
-    <PaletteFooter isMac={isMac} navigation={{ kind: 'back', label: `${t('back')} · ${t('historyKind')}`, tooltip: `${t('back')} (Esc)`, onAction: () => menu ? setMenu(false) : onBack() }}
+    <PaletteFooter isMac={isMac} hints={<NavigationHint />}
       title={t('historyKind')} context={t('historyAllTime')} status={!menu && selected?.disabled ? <span role="status">{t('addressPinned')}</span> : undefined}
       primary={{ label: menu ? chosen?.title || t('openCurrentTab') : t('openCurrentTab'), shortLabel: !menu || chosen?.id === `${selected?.id}:current` ? t('footerOpenCurrentTab') : chosen?.newTab ? t('footerOpenNewTab') : undefined, keys: ['↵'], disabled: unavailable || !selected || (menu ? !chosen || chosen.disabled : selected.disabled), onAction: () => menu ? void runAction(chosen?.id) : void open() }}
       secondary={!menu && newTabAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: unavailable, onAction: () => void open(newTabAction) } : undefined}

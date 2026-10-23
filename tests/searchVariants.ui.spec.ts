@@ -25,7 +25,7 @@ test(`${locale === 'en-US' ? 'English' : 'Chinese'} categorized candidates UI sh
   await search.fill('restore'); await expect(first.locator('.entry-shortcut kbd')).toHaveText(['⌘⇧T']);
   await search.fill('settings'); await expect(first.locator('.entry-shortcut kbd')).toHaveText(['⌘,']);
   await search.press('Meta+k'); await expect(ui.locator('.action-row .entry-shortcut kbd')).toHaveText(['⌘,']);
-  await ui.keyboard.press('Meta+,'); await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText(en ? 'Settings · Appearance' : '设置 · 外观');
+  await ui.keyboard.press('Meta+,'); await expect(ui.locator('.settings-view .palette-footer-title')).toHaveText(en ? 'Settings' : '设置');
   await ui.keyboard.press('Escape'); await search.fill('ctrl tab'); await search.press('Meta+ArrowUp');
   await expect(ui.locator('[id="justonehop-command:settings:binding"]')).toHaveAttribute('aria-selected', 'true');
   await search.press('Enter'); const setup = ui.locator('[data-setting=binding] button');

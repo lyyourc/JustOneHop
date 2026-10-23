@@ -38,15 +38,15 @@ test.describe(() => {
       const title = box('.result .entry-title');
       const footerTitle = box('.palette-footer-title');
       const footerType = getComputedStyle(panel.querySelector('.palette-footer-title')!);
-      const contextType = getComputedStyle(panel.querySelector('.palette-footer-context')!);
+      const textSlot = box('.palette-footer-text');
       return {
         panel: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
         footer: box('.palette-footer'), search: box('.search-bar, .storage-search'),
         input: box('.search-bar input, .storage-search input'), row: box('.result'),
         icon: box('.result .entry-icon'), title: { x: title.x, y: title.y, height: title.height },
-        navigation: box('.footer-navigation'), footerTitle: { x: footerTitle.x, y: footerTitle.y, height: footerTitle.height },
+        navigation: box('.footer-hint-pet'), footerTitle: { x: footerTitle.x, y: footerTitle.y, height: footerTitle.height },
         footerType: { size: footerType.fontSize, weight: footerType.fontWeight, color: footerType.color },
-        contextType: { size: contextType.fontSize, weight: contextType.fontWeight, lineHeight: contextType.lineHeight, color: contextType.color },
+        textStart: { x: textSlot.x, y: textSlot.y, height: textSlot.height },
       };
     });
   }
@@ -66,7 +66,7 @@ test.describe(() => {
     await expect(surface.locator('.storage-row')).toHaveCount(1);
     const storage = await geometry();
     await surface.locator('.palette-footer').screenshot({ path: test.info().outputPath(`footer-storage-${language}-${size.width}x${size.height}.png`) });
-    for (const key of ['panel', 'footer', 'search', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(storage[key]).toEqual(main[key]);
+    for (const key of ['panel', 'footer', 'search', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'textStart'] as const) expect(storage[key]).toEqual(main[key]);
     expect(storage.row.x).toBe(main.row.x); expect(storage.row.y).toBe(main.row.y); expect(storage.row.height).toBe(main.row.height);
     if (size.width > 520) expect(storage.row.width).toBeLessThan(main.row.width);
     else expect(storage.row.width).toBe(main.row.width);
@@ -85,7 +85,7 @@ test.describe(() => {
     await expect(surface.locator('.group-view .current-badge')).toHaveCount(1);
     await expect(surface.locator(`[id="group-tab:${sourceId}"] .current-badge`)).toHaveCount(1);
     const group = await geometry();
-    for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'contextType'] as const) expect(group[key]).toEqual(groupMain[key]);
+    for (const key of ['panel', 'footer', 'search', 'row', 'icon', 'title', 'navigation', 'footerTitle', 'footerType', 'textStart'] as const) expect(group[key]).toEqual(groupMain[key]);
     expect(group.input.x).toBe(groupMain.input.x);
     expect(group.input.y).toBe(groupMain.input.y);
     await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport();

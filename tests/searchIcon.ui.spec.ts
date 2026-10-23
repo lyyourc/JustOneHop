@@ -70,7 +70,7 @@ test('search icon editor supports keyboard Emoji, image previews, failures and n
   await expect(defaults.locator('kbd')).toHaveCount(0);
   await expect(defaults.locator('.brand-logo')).toBeVisible();
   await expect(defaults).toHaveAttribute('title', 'Restore Default Badge');
-  const back = ui.locator('.settings-footer').getByRole('button', { name: 'Back', exact: true });
+  const back = ui.locator('.settings-search .search-focus.is-back');
   await expect(back).toHaveCount(1);
   await expect(emoji).toHaveValue('');
   await expect(emoji).not.toHaveAttribute('placeholder');

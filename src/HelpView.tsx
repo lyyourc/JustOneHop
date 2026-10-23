@@ -12,7 +12,7 @@ import { openHelpUrl } from './api';
 
 const GITHUB_DOCS_URL = 'https://github.com/lyyourc/JustOneHop/blob/main/docs/USAGE.md';
 
-export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () => void; shortcut: string; standalone?: boolean }) {
+export function HelpView({ onBack, shortcut, standalone = false, autoFocus = true }: { onBack: () => void; shortcut: string; standalone?: boolean; autoFocus?: boolean }) {
   const page = useContext(SettingsPage);
   const [query, setQuery] = useState('');
   const input = useRef<HTMLInputElement>(null);
@@ -21,7 +21,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
   const backLabel = t(standalone ? 'closeHelp' : 'back');
   const shortcutLabel = shortcut ? `${shortcut} (${describeShortcut(shortcut)})` : t('notAssigned');
   const sections = matchingHelp(query, shortcutLabel);
-  useEffect(() => { if (page) article.current?.focus(); else input.current?.focus(); }, []);
+  useEffect(() => { if (autoFocus) { if (page) article.current?.focus(); else input.current?.focus(); } }, []);
   useEffect(() => { article.current?.scrollTo({ top: 0 }); }, [query]);
   function clearSearch() { setQuery(''); input.current?.focus(); }
   function openGitHubDocs(event?: React.MouseEvent | React.KeyboardEvent) {
@@ -46,7 +46,7 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
     controls[(at + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
   }}>
     {!page ? <header className="search-bar help-search">
-      <SearchFocusButton input={input} />
+      <SearchFocusButton input={input} onBack={standalone ? undefined : navigateBack} />
       <input ref={input} data-back-on-empty value={query} onChange={event => setQuery(event.target.value)}
         aria-label={t('searchHelp')} placeholder={t('searchHelpPlaceholder')} aria-controls="justonehop-help-content"
         autoComplete="off" spellCheck={false} />
@@ -86,7 +86,6 @@ export function HelpView({ onBack, shortcut, standalone = false }: { onBack: () 
       {!sections.length ? <div className="empty"><Search size={26} /><strong>{t('noResults')}</strong>
         <button className="surface-button" onClick={clearSearch}>{t('clearSettingsSearch')}</button></div> : null}
     </article>
-    <SettingsPageFooter navigation={standalone ? undefined : { kind: 'back', label: backLabel, tooltip: `${backLabel} (Esc)`, onAction: navigateBack }}
-      title={t('help')} primary={standalone ? { label: backLabel, keys: ['esc'], onAction: navigateBack } : undefined} />
+    <SettingsPageFooter hints title={t('help')} primary={standalone ? { label: backLabel, keys: ['esc'], onAction: navigateBack } : undefined} />
   </section></BackLayer>;
 }
