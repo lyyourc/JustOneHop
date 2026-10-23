@@ -22,6 +22,13 @@ test.describe(() => {
     return source.id!;
   }, origin);
   const surface = await openStorageOverlay(page);
+  for (const theme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: theme });
+    expect(await page.locator('#justonehop-command-palette').evaluate(host =>
+      getComputedStyle(host.shadowRoot!.querySelector('dialog')!, '::backdrop').backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+    await expect(surface.locator('.overlay')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
   const root = surface.locator('.search-bar input');
   await expect(surface.locator('.result.tab')).toHaveCount(0);
   await root.fill('Layout');
@@ -98,6 +105,8 @@ test.describe(() => {
   await expect(settingsInput).toBeFocused();
   expect((await surface.locator('.settings-search').boundingBox())!.height).toBe(56);
   await surface.locator('.palette').screenshot({ path: test.info().outputPath(`compact-search-settings-${language}.png`) });
+  await surface.locator('.overlay').click({ position: { x: 2, y: 2 } });
+  await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });
 

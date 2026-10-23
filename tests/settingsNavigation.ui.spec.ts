@@ -11,6 +11,10 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await homePet.click();
   await expect(surface.locator('.footer-hint-bubble')).toBeVisible();
   await expect(surface.locator('.footer-hint-bubble .navigation-key')).toHaveText(['Ctrl+PPrevious', 'Ctrl+NNext']);
+  expect(await surface.locator('.navigation-hint').evaluate(node => {
+    const [previous, dot, next] = Array.from(node.children, child => child.getBoundingClientRect());
+    return [dot.left - previous.right, next.left - dot.right];
+  })).toEqual([4, 4]);
   await surface.locator('.palette').screenshot({ path: test.info().outputPath('home-hint-expanded.png') });
   await ui.mouse.move(0, 0);
   await ui.clock.runFor(3000);
@@ -47,6 +51,10 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await expect(pet).toHaveAttribute('aria-expanded', 'true');
   await expect(bubble).toBeVisible();
   await expect(bubble.locator('.navigation-key')).toHaveText(['TabNext', 'Shift+TabPrevious']);
+  expect(await bubble.locator('.settings-navigation').evaluate(node => {
+    const [next, dot, previous] = Array.from(node.children, child => child.getBoundingClientRect());
+    return [dot.left - next.right, previous.left - dot.right];
+  })).toEqual([4, 4]);
   expect(await settings.locator('.palette-footer').boundingBox()).toEqual(footerBefore);
   expect(await settings.locator('.palette-footer-title').boundingBox()).toEqual(pathBefore);
   await settings.screenshot({ path: test.info().outputPath('settings-hint-expanded.png') });

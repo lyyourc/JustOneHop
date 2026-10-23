@@ -30,10 +30,11 @@ export function Shortcut({ binding, isMac }: { binding: string; isMac: boolean }
   return <span className="key-chord entry-shortcut" title={description} aria-label={description}><kbd>{formatShortcut(keys)}</kbd></span>;
 }
 
-export function NavigationHint() {
-  return <span className="navigation-hint" title={t('navigationHelp')} aria-label={t('navigationHelp')}>
-    <span className="navigation-key"><span className="key-chord"><kbd>Ctrl+P</kbd></span><span className="navigation-label">{t('previousControl')}</span></span>
+export function NavigationHint({ controls = false }: { controls?: boolean }) {
+  const help = t(controls ? 'settingsNavigationHelp' : 'navigationHelp');
+  return <span className={`navigation-hint${controls ? ' settings-navigation' : ''}`} title={help} aria-label={help}>
+    <span className="navigation-key"><span className="key-chord"><kbd>{controls ? 'Tab' : 'Ctrl+P'}</kbd></span><span className="navigation-label">{t(controls ? 'nextControl' : 'previousControl')}</span></span>
     <span aria-hidden="true">·</span>
-    <span className="navigation-key"><span className="key-chord"><kbd>Ctrl+N</kbd></span><span className="navigation-label">{t('nextControl')}</span></span>
+    <span className="navigation-key"><span className="key-chord"><kbd>{controls ? 'Shift+Tab' : 'Ctrl+N'}</kbd></span><span className="navigation-label">{t(controls ? 'previousControl' : 'nextControl')}</span></span>
   </span>;
 }

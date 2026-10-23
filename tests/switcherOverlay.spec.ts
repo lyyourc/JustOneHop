@@ -480,6 +480,12 @@ test.describe(() => {
   await f.a.keyboard.down('Control'); await f.open();
   const surface = f.a.frameLocator('.justonehop-frame');
   await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
+  for (const theme of ['light', 'dark']) {
+    await surface.locator('.recent-overlay').evaluate((node, value) => { node.setAttribute('data-theme', value); }, theme);
+    await expect(surface.locator('.recent-overlay')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    expect(await f.a.locator('#justonehop-command-palette').evaluate(host =>
+      getComputedStyle(host.shadowRoot!.querySelector('dialog')!, '::backdrop').backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  }
   const list = surface.getByRole('listbox');
   const input = surface.getByRole('combobox');
   await expect(list).toBeFocused(); await expect(input).toBeDisabled();
@@ -510,6 +516,12 @@ test.describe(() => {
   expect(await f.active()).toBe(f.ids.source);
   await surface.locator('.search-dismiss').click();
   await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
+  expect(await f.active()).toBe(f.ids.source);
+  await f.a.keyboard.down('Control'); await f.open();
+  await expect(surface.locator('.recent-overlay')).toHaveCSS('opacity', '1');
+  await surface.locator('.recent-overlay').click({ position: { x: 2, y: 2 } });
+  await expect(f.a.locator('#justonehop-command-palette')).not.toBeAttached();
+  await f.a.keyboard.up('Control');
   expect(await f.active()).toBe(f.ids.source);
 });
 });

@@ -19,6 +19,31 @@ async function expectIconSpacing(bar: Locator, expectedLeft: number, expectedRig
 
 test.use({ viewport: { width: 1100, height: 760 }, reducedMotion: 'reduce' });
 
+for (const overlay of [false, true]) test(`search capsule focus follows empty input across pages in ${overlay ? 'overlay' : 'window'}`, async ({ palette }) => {
+  const { ui } = palette;
+  await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}), reply: request =>
+    request.type === 'read-page-storage' ? { ok: true, data: { kind: request.payload.kind, url: `${fixtureOrigin}/source`, entries: [] } } : undefined });
+  const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
+  async function checkCapsule(header: Locator) {
+    const input = header.locator('input');
+    const border = () => header.evaluate(node => node.ownerDocument.defaultView!.getComputedStyle(node, '::before').borderTopColor);
+    await input.fill('');
+    await expect.poll(border).not.toBe('rgba(0, 0, 0, 0)');
+    await input.fill('test');
+    await expect(input).toBeFocused();
+    await expect.poll(border).toBe('rgba(0, 0, 0, 0)');
+    await input.fill('');
+    await expect.poll(border).not.toBe('rgba(0, 0, 0, 0)');
+  }
+  await checkCapsule(surface.locator('.search-bar'));
+  await surface.locator('.settings-button').click();
+  await checkCapsule(surface.locator('.settings-search'));
+  await surface.locator('.settings-search .search-focus').click();
+  await surface.locator('.search-bar input').fill('local storage');
+  await surface.locator('.search-bar input').press('Enter');
+  await checkCapsule(surface.locator('.storage-search'));
+});
+
 test('light and dark surfaces, compact rows and bottom action search fit without clipping', async ({ palette }) => {
   const { ui } = palette;
   await palette.open({ snapshot: {
@@ -184,6 +209,11 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await expect(ui.locator('.footer-hint-pet')).toHaveAttribute('aria-expanded', 'false');
   await expect(ui.locator('.palette-footer-title')).toHaveText(chinese ? '小范围瞬移' : 'JustOneHop');
   await expect(ui.locator('.settings-button')).toHaveAccessibleName(chinese ? '设置' : 'Settings');
+  await ui.locator('.footer-hint-pet').focus();
+  await ui.keyboard.press('Shift+Tab');
+  await expect(ui.locator('.settings-button')).toBeFocused();
+  await expect(ui.locator('.settings-button')).toHaveCSS('outline-width', '2px');
+  await expect(ui.locator('.palette-footer-location')).toHaveCSS('overflow', 'visible');
   expect(await ui.locator('.footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
   const locationBox = await ui.locator('.palette-footer-location').boundingBox(), actionsBox = await ui.locator('.footer-actions').boundingBox();
   expect(locationBox!.x + locationBox!.width).toBeLessThanOrEqual(actionsBox!.x);

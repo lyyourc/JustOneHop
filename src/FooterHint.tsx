@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from './i18n';
+import { NavigationHint } from './Shortcut';
 
 const IDLE_PEEK_INTERVAL_MS = 8000;
 const RETREAT_DELAY_MS = 3000;
@@ -164,11 +165,7 @@ export function FooterHint({ children, textSlot, suppressed }: { children?: Reac
       </div>
       {textSlot ? createPortal(<div ref={bubble} id={id} className="footer-hint-bubble" data-expanded={expanded} data-floating={floating}
         style={{ '--hint-shift': `${shift}px` } as CSSProperties} aria-hidden={!expanded} inert={!expanded}>
-            {children || <span className="settings-navigation" title={t('settingsNavigationHelp')} aria-label={t('settingsNavigationHelp')}>
-              <span className="navigation-key"><kbd>Tab</kbd><span>{t('nextControl')}</span></span>
-              <span aria-hidden="true">·</span>
-              <span className="navigation-key"><kbd>Shift+Tab</kbd><span>{t('previousControl')}</span></span>
-            </span>}
+        {children || <NavigationHint controls />}
       </div>, textSlot) : null}
     </div>;
 }
