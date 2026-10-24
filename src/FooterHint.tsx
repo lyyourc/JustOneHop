@@ -101,8 +101,9 @@ export function FooterHint({ children, textSlot, suppressed }: { children?: Reac
     const fit = () => {
       const bounds = footer.getBoundingClientRect(), origin = textSlot.getBoundingClientRect();
       const width = content.scrollWidth;
+      const trigger = button.current!.getBoundingClientRect();
       setFloating(width > origin.width);
-      setShift(Math.max(bounds.left + 8 - origin.left, Math.min(0, bounds.right - 8 - origin.left - width)));
+      setShift(Math.max(bounds.left + 8 - origin.left, Math.min(trigger.left - origin.left, bounds.right - 8 - origin.left - width)));
     };
     fit();
     const observer = new ResizeObserver(fit);

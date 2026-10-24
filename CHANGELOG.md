@@ -20,6 +20,8 @@ Feature-frozen release candidate prepared on 2026-10-24. Not submitted to the Ch
 
 ### Fixed / 修复
 
+- Anchor narrow-window keyboard hints to the pet, keep search focus guidance separate from input text, and allow the switcher shortcut from a native command palette. Use “宠物” consistently in Chinese settings. / 窄屏键盘提示贴近宠物入口，搜索聚焦引导与输入内容分开排布；原生命令面板内可继续唤起标签切换器，中文设置统一使用「宠物」。
+
 - Preserve tab order across automatic tucking batches and improve recovery after browser restarts, partial failures, and manual group changes. / 保留自动收起跨批次的标签顺序，完善浏览器重启、部分失败与手动分组变更后的恢复处理。
 - Refine narrow-window layout, menu focus, search hints, and transparent panel backdrops. / 修正窄窗口布局、菜单焦点、搜索提示与面板透明背景。
 

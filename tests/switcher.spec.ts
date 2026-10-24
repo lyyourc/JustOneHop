@@ -706,6 +706,27 @@ test.describe(() => {
 
 test.describe('headed', { tag: '@headed' }, () => {
 test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
+test('release native palette hands the switcher shortcut to its source window', async () => {
+  const { source, palette } = await openNativePalette();
+  const target = await worker.evaluate(async ({ windowId, base }) => (await chrome.tabs.create({ windowId, url: `${base}/Shortcut-target`, active: false })).id!, { windowId: source.windowId, base: origin });
+  await palette.keyboard.down('Control');
+  const created = context.waitForEvent('page', { predicate: page => page.url().includes('switcher.html?'), timeout: 5000 });
+  const dispatched = worker.evaluate(async () => {
+    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+    await Promise.all(callbacks.map(callback => callback('switch-recent')));
+  });
+  const [switcher] = await Promise.all([created, dispatched]);
+  await expect(switcher.locator('.recent-switcher')).toBeVisible();
+  await expect(switcher.locator(`#recent-${source.tabId} .current-badge`)).toHaveText('Current');
+  await switcher.locator('.recent-search-activate').click();
+  const search = switcher.getByRole('combobox');
+  await search.fill('Shortcut target');
+  await switcher.keyboard.up('Control');
+  await expect(switcher.locator(`#recent-${target}`)).toHaveAttribute('aria-selected', 'true');
+  await search.press('Enter');
+  await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, target)).toBe(true);
+  await expect.poll(() => switcher.isClosed()).toBe(true);
+});
 test('Embedded Tab Switcher native palette returns to parent and confirms only in its source window', async () => {
     const target = await worker.evaluate(async base => {
       const tab = await chrome.tabs.create({ url: `${base}/Embedded-native-target`, active: false });

@@ -1,11 +1,13 @@
 import { errorMessage, t } from './i18n';
 import { nativePanelBounds } from './panelGeometry';
+import { paletteSender } from './paletteWindow';
 // The page owns key-up until the independent window has installed its listeners.
 // An actual observed release is buffered; elapsed time never implies a release.
 interface Session {
   id: string;
   offset: number;
   source?: chrome.tabs.Tab;
+  focusWindow?: number;
   popup?: number;
   tabs: chrome.tabs.Tab[];
   released: boolean;
@@ -29,7 +31,7 @@ function clear(session: Session, close = true) {
 }
 async function sourceStillFocused(session: Session) {
   if (current !== session || !session.source?.id) return false;
-  const [tab, owner] = await Promise.all([chrome.tabs.get(session.source.id), chrome.windows.get(session.source.windowId)]);
+  const [tab, owner] = await Promise.all([chrome.tabs.get(session.source.id), chrome.windows.get(session.focusWindow ?? session.source.windowId)]);
   return current === session && tab.active && tab.windowId === session.source.windowId && owner.focused;
 }
 export async function openRecentSwitcher(command: string) {
@@ -44,8 +46,20 @@ export async function openRecentSwitcher(command: string) {
   const session: Session = { id: crypto.randomUUID(), offset: direction, tabs: [], released: false, ready: false, handingOff: false };
   current = session;
   try {
-    const owner = await chrome.windows.getLastFocused({ windowTypes: ['normal'] });
-    if (!owner.focused || owner.id === undefined) { clear(session); return; }
+    const focused = await chrome.windows.getLastFocused();
+    if (!focused.focused || focused.id === undefined) { clear(session); return; }
+    let owner = focused;
+    if (focused.type !== 'normal') {
+      const [tab] = await chrome.tabs.query({ windowId: focused.id, active: true });
+      if (!tab?.url?.startsWith(chrome.runtime.getURL('popup.html#window='))) { clear(session); return; }
+      // Resolve only our live palette session. An unrelated popup must never
+      // launch a switcher in the last normal window behind it.
+      const sender = await paletteSender({ id: chrome.runtime.id, url: tab.url, tab });
+      if (!sender.tab || sender.tab.id === tab.id) { clear(session); return; }
+      session.focusWindow = focused.id;
+      owner = await chrome.windows.get(sender.tab.windowId);
+      if (owner.type !== 'normal') { clear(session); return; }
+    }
     const [all, bindings] = await Promise.all([chrome.tabs.query({ windowId: owner.id }), chrome.commands.getAll()]);
     session.source = all.find(tab => tab.active);
     if (session.source?.id === undefined || current !== session) { clear(session); return; }
@@ -69,7 +83,7 @@ export async function openRecentSwitcher(command: string) {
     }
     // The source page retains focus for the whole selection. Native pages,
     // missing activeTab access, and Chrome UI focus keep the window fallback.
-    if (/^https?:/.test(source.url || '')) {
+    if (session.focusWindow === undefined && /^https?:/.test(source.url || '')) {
       try {
         const installed = await chrome.tabs.sendMessage(source.id!, { source: 'justonehop', type: 'ping' }, { frameId: 0 }).catch(() => false);
         if (installed !== true) await chrome.scripting.executeScript({ target: { tabId: source.id! }, files: ['content.js'] });
@@ -144,7 +158,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 });
 chrome.windows.onFocusChanged.addListener(id => {
   const session = current;
-  if (session?.source && !session.handingOff && id !== session.source.windowId) clear(session);
+  if (session?.source && !session.handingOff && id !== (session.focusWindow ?? session.source.windowId)) clear(session);
 });
 chrome.windows.onRemoved.addListener(id => {
   if (current && id === current.popup) clear(current, false);
