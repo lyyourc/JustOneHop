@@ -228,7 +228,7 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ### 版本与上架状态
 
-**当前阶段：`0.3.0` 作为 Chrome Web Store 待上架版本，功能已冻结，沿用原标记 1.0.0 构建的完整自动化验证；0.3.0 仅修改版本元数据，其余包内文件逐字节一致，已通过打包校验（2026-10-24）。** 本次准备已完成 `justonehop-0.3.0.zip` 及其逐文件审计（见 `releases/justonehop-0.3.0-package-audit.json` 与 `releases/justonehop-0.3.0-notes.md`），未创建远端 Release；已于 2026-10-24 提交 Chrome Web Store 审核，后台确认 `Pending Review`，选择审核通过后自动发布。发布范围为 Public / All regions / Free，当前分类为 Tools。广泛网站权限触发了可能延长审核的提示，权限用途说明已核对。
+**当前阶段：`0.3.0` 作为 Chrome Web Store 待上架版本，功能已冻结，沿用原标记 1.0.0 构建的完整自动化验证；0.3.0 仅修改版本元数据，其余包内文件逐字节一致，已通过打包校验（2026-10-24）。** 本次准备已完成 `justonehop-0.3.0.zip` 及其逐文件审计（见 `releases/justonehop-0.3.0-package-audit.json` 与 `releases/justonehop-0.3.0-notes.md`），已于 2026-10-24 发布 GitHub Release（`v0.3.0`）并提交 Chrome Web Store 审核，后台确认 `Pending Review`，选择审核通过后自动发布。发布范围为 Public / All regions / Free，当前分类为 Tools。广泛网站权限触发了可能延长审核的提示，权限用途说明已核对。
 
 `package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 统一使用三段数字版本 `0.3.0`；Git tag 与 GitHub Release 使用 `v0.3.0`，发布包附件名为 `justonehop-0.3.0.zip`。后续新增功能递增次版本，修复递增补丁版本。上传前核对后台已有版本；待上传版本必须高于已发布版本。本次已核对原草稿为 0.1.0，尚无已发布版本。
 
