@@ -5,7 +5,7 @@
 - Product: JustOneHop (小范围瞬移), a Chrome extension
 - Developer: lyyourc
 - Privacy contact: [liangyida42@gmail.com](mailto:liangyida42@gmail.com)
-- Effective date: October 19, 2026 (2026-10-19)
+- Effective date: October 24, 2026 (2026-10-24)
 
 ## 1. Scope
 
@@ -31,10 +31,11 @@ This policy covers the extension itself. Websites you choose to visit, Google Se
 
 The extension uses Chrome's local extension storage and session storage. It does not use `chrome.storage.sync` to synchronize this data across devices.
 
-- **Preferences:** Language, theme, and the Auto Tuck setting remain locally until changed or extension data is removed.
-- **Search ranking records:** Some successful selections store a normalized search term, target identifier, weight, and last-used time. Targets may include a full webpage URL, including query parameters and fragments, a bookmark ID, or a command ID. Home-screen selections may also be recorded. These records are used only for local ranking, with a maximum of 500 valid records. Records older than 90 days no longer affect ranking; subsequent recording or forgetting operations clean up old stored records. There is no background job guaranteeing physical deletion on day 90. Reading history or a failed open does not create a selection record. Direct URL navigation and Google searches do not write these learning records.
+- **Preferences:** Language, theme, Auto Tuck settings, and footer-pet visibility remain locally until changed or extension data is removed. A custom search icon stores the chosen Emoji or a locally resized static PNG. Images are processed on-device; the original file and its path are not stored by the extension or uploaded. Restoring the default removes the saved custom icon.
+- **Search ranking and query-completion records:** Some successful selections store a normalized search term, its display spelling when different, target identifier, weight, and last-used time. Targets may include a full webpage URL, including query parameters and fragments, a bookmark ID, or a command ID. Home-screen selections may also be recorded. These records support local ranking and query completion, sharing a maximum of 2,000 valid records. Records older than 90 days no longer affect ranking or completion; subsequent recording or forgetting operations clean up old stored records. There is no background job guaranteeing physical deletion on day 90. Reading history or a failed open does not create a selection record. Successful direct URL navigation and Google searches may store the entered query for completion, without boosting search-result rankings or storing the destination as a ranking target.
 - **Auto Tuck timing:** While Auto Tuck is enabled, full URLs and last-used times for eligible tabs are stored locally. Turning Auto Tuck off clears timing records once cleanup completes.
 - **Group recovery records:** Manual or automatic tucking stores group names, colors, full member URLs, and the full URLs of other HTTP/HTTPS tabs in the same window to verify group ownership after a browser restart. Unresolved records may be retained without a fixed expiry. Turning Auto Tuck off does not guarantee removal of every unresolved recovery record.
+- **Continue Search:** A successful qualifying page search stores its query, selected target (which may include a full URL or bookmark ID), and timestamp in Chrome session storage, indexed by browser window. Only the latest qualifying query per window is offered, for 10 minutes. Expired records are ignored and cleaned up on subsequent writes; browser restart clears session storage. Reset removes all continuation records, and forgetting a matching query/target removes the corresponding record.
 - **Session state:** Panel source information, tab/window/group identifiers, switching state, and tuck undo information support the current runtime session. Some stays in memory and some uses Chrome session storage. Closing a panel removes its corresponding panel session record.
 - **Website storage viewer contents:** Retrieved names, values, and attributes are processed in the current viewer's memory, are not written to the extension's persistent storage, and are not sent to the developer. After the viewer closes, the extension no longer retains its copy of that viewer's contents. If you copy a value, it enters the system clipboard. Closing the panel does not clear the clipboard; the operating system or clipboard tools may retain copies.
 
@@ -58,12 +59,12 @@ The extension uses Chrome's favicon interface, not a third-party icon service. E
 
 ## 6. Your controls
 
-- Use Reset search ranking in settings to clear learned ranking records, or the ranking explanation control on a result to forget the relevant preference. There is currently no separate switch to disable learning. Later eligible successful actions may create new records.
+- Use Reset search ranking in settings to clear the shared ranking/completion history and Continue Search records, or the forget control on a learned result to remove the relevant preference and matching continuation record. There is currently no separate switch to disable learning. Later eligible successful actions may create new records.
 - Turn off Auto Tuck to stop automatic tucking and trigger its cleanup. For a recovery record awaiting confirmation, use the action to stop recovering that record. This removes the record without closing pages or deleting the native group.
 - Revoke website access in Chrome's extension settings. Resetting search ranking does not revoke permissions or clear preferences or all group recovery records.
 - Removing the extension from Chrome removes that installation's local extension storage. There is no additional server copy held by the developer to request deletion of. Uninstalling does not reverse actions already taken on Chrome bookmarks, tabs, history, or groups, clear the system clipboard, or delete copies retained by other tools.
 
-If you allow the extension in incognito windows, it does not query ordinary browsing history or record search selection learning in those windows. Tucking excludes incognito tabs. Other features you actively use there still process the data needed to perform the requested action.
+If you allow the extension in incognito windows, it does not query ordinary browsing history, record search selection learning or completion queries, or offer completion and Continue Search hints in those windows. Tucking excludes incognito tabs. Other features you actively use there still process the data needed to perform the requested action.
 
 ## 7. Contact and policy updates
 
