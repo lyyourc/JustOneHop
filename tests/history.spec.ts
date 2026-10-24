@@ -149,9 +149,12 @@ test.describe(() => {
     await expect(ui.locator('.history-view .result.history')).toHaveCount(1);
     await expect(ui.locator('.history-view .entry-title')).toHaveText(`${query} older`);
     const scopes = await worker.evaluate(() => (globalThis as unknown as { __historyScopes: { text: string; startTime?: number }[] }).__historyScopes);
-    expect(scopes.map(scope => scope.text)).toEqual([query, query]);
+    // Each scope includes a literal lookup and a bounded pinyin scan.
+    expect(scopes.map(scope => scope.text)).toEqual([query, '', query, '']);
     expect(scopes[0].startTime).toBeGreaterThan(Date.now() - 8 * 24 * 60 * 60 * 1000);
-    expect(scopes[1].startTime).toBe(0);
+    expect(scopes[1].startTime).toBe(scopes[0].startTime);
+    expect(scopes[2].startTime).toBe(0);
+    expect(scopes[3].startTime).toBe(0);
     const opened = context.waitForEvent('page');
     await ui.getByRole('button', { name: '在新标签页打开', exact: true }).click();
     const page = await opened;

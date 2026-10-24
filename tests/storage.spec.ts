@@ -354,7 +354,8 @@ test.describe(() => {
   await search.fill('no-such-command');
   await expect(surface.locator('[id^="justonehop-command:"]')).toHaveCount(0);
   await expect(surface.locator('[id^="justonehop-google:"]')).toHaveCount(1);
-  await surface.locator('.palette-footer-title').click();
+  // The footer title now opens Settings; click unused result space to blur instead.
+  await surface.locator('#justonehop-results').click({ position: { x: 12, y: 100 } });
   await page.keyboard.press('Escape'); await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
 });
 });

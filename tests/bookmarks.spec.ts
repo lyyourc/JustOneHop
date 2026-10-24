@@ -232,7 +232,7 @@ test.describe(() => {
         // Right-click and footer Actions must expose the same item-specific action.
         await row.click({ button: 'right' });
         await expect(remove.locator(':scope > span')).toHaveText(label);
-        await ui.getByRole('button', { name: english ? 'Back' : '返回', exact: true }).click();
+        await ui.locator('.action-scrim').click({ position: { x: 4, y: 4 } });
         await expect(input).toBeFocused();
         await expect(row).toHaveAttribute('aria-selected', 'true');
         await ui.getByRole('button', { name: english ? 'Open action menu' : '打开操作菜单' }).click();

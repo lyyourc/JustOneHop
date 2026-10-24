@@ -195,6 +195,7 @@ test.describe(() => {
   await observer.getByRole('combobox').fill('iam');
   await expect(observer.locator('.result').first()).toContainText('EchoTech IAM');
   await ui.getByRole('button', { name: 'Settings', exact: true }).click();
+  await ui.getByRole('textbox', { name: 'Search settings', exact: true }).fill('search ranking');
   await ui.getByRole('button', { name: 'Reset Ranking', exact: true }).click();
   await expect(ui.getByRole('status')).toContainText('Default ordering restored');
   await expect(observer.locator('.result').first()).toContainText('EchoTech IAM');
@@ -748,8 +749,11 @@ test.describe(() => {
     await expect.poll(ids).toEqual(learnedOrder);
     // Reset Ranking is the explicit exception to the mounted home snapshot.
     await surface.getByRole('button', { name: chinese ? '设置' : 'Settings', exact: true }).click();
+    const settingsSearch = surface.getByRole('textbox', { name: chinese ? '搜索设置' : 'Search settings', exact: true });
+    await settingsSearch.fill('search ranking');
     await surface.getByRole('button', { name: chinese ? '重置搜索排序' : 'Reset Ranking', exact: true }).click();
     await expect(surface.getByRole('status')).toBeVisible();
+    await page.keyboard.press('Escape'); await expect(settingsSearch).toHaveValue('');
     await page.keyboard.press('Escape');
     await expect.poll(ids).toEqual(defaults);
     await expect(surface.locator('button.ranking-forget')).toHaveCount(0);

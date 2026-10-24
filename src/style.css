@@ -213,7 +213,9 @@
 .footer-actions button:active:not(:disabled):not([aria-disabled="true"]) { background: color-mix(in srgb, var(--selected) 80%, var(--accent)); }
 .footer-actions button.pressed:not(:disabled):not([aria-disabled="true"]) { background: var(--selected); color: var(--accent); }
 .primary-action, .secondary-action, .actions-button { font-weight: var(--weight-medium); }
-.primary-action { min-width: 0; color: var(--accent); }
+/* Both action labels may yield space while their shortcuts remain visible. */
+.primary-action, .secondary-action { min-width: 0; }
+.primary-action { color: var(--accent); }
 .primary-action.danger { color: var(--danger); }
 .primary-action.danger:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--icon-danger-surface); }
 .primary-action.danger:active:not(:disabled):not([aria-disabled="true"]) { background: color-mix(in srgb, var(--icon-danger-surface) 80%, var(--danger)); }

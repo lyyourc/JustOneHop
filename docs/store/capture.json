@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-24T06:15:03.411Z",
+  "generatedAt": "2026-10-24T06:26:53.123Z",
   "version": "1.0.0",
   "source": "Packaged extension files loaded without modification into temporary profiles. Demonstration titles, URLs, and recreated site icons served locally through Playwright routing without external network requests. The action menu is captured as rendered, including its normal scrolling; the switcher DOM excludes the extension page. Browser chrome and webpage backgrounds are composed for presentation; the small promotional tile uses an illustrative search card.",
   "screenshots": [

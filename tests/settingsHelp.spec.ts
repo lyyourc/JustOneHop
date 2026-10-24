@@ -219,6 +219,7 @@ test.describe(() => {
     await search.press('Tab'); await page.keyboard.press('Tab'); await expect(article).toBeFocused();
     await article.press('PageDown'); await expect.poll(() => article.evaluate(node => node.scrollTop)).toBeGreaterThan(0);
     await article.press('Tab'); await expect(page.locator('.help-github-card')).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(page.locator('.footer-hint-pet')).toBeFocused();
     await page.keyboard.press('Tab'); await expect(page.locator('.primary-action')).toBeFocused();
     await page.setViewportSize({ width: 390, height: 400 });
     for (const theme of ['light', 'dark']) {

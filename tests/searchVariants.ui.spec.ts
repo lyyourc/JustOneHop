@@ -80,7 +80,7 @@ test('bookmark result item zh-CN UI restores selection after provided removal re
     snapshot.bookmarks.splice(0, snapshot.bookmarks.length, ...(index === 0 ? [second, neighbor] : [neighbor]));
     if (index === 0) {
       await row.click({ button: 'right' }); await expect(remove.locator(':scope > span')).toHaveText('取消收藏');
-      await ui.getByRole('button', { name: '返回', exact: true }).click();
+      await ui.locator('.action-scrim').click({ position: { x: 4, y: 4 } });
       await expect(input).toBeFocused(); await expect(row).toHaveAttribute('aria-selected', 'true');
       await ui.getByRole('button', { name: '打开操作菜单' }).click();
       await expect(remove.locator(':scope > span')).toHaveText('取消收藏');

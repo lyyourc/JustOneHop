@@ -93,6 +93,8 @@ for (const overlay of [false, true]) {
       expect(await surface.locator('.palette').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
       await surface.locator('.palette').screenshot({ path: test.info().outputPath(`completion-${theme}.png`) });
     }
+    await complete.click(); await expect(input).toHaveValue('github'); await expect(input).toBeFocused();
+    await start();
     await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
     const targetId = await surface.locator('.result[aria-selected="true"]').getAttribute('id');
     await input.press('Enter');

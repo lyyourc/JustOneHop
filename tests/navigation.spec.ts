@@ -160,7 +160,7 @@ test.describe(() => {
           padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft],
           afterKind: node.getBoundingClientRect().left >= kind.getBoundingClientRect().right };
       });
-      expect(typography).toMatchObject({ size: width > 520 ? '11px' : '10px', weight: '400',
+      expect(typography).toMatchObject({ size: '11px', weight: '400',
         background: 'rgba(0, 0, 0, 0)', border: '0px', radius: '0px', padding: ['0px', '0px', '0px', '0px'], afterKind: true });
       expect(typography.size).toBe(typography.timeSize);
       expect(typography.weight).toBe(typography.timeWeight);

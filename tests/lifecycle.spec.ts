@@ -396,6 +396,8 @@ test.describe(() => {
       document.dispatchEvent(new Event('visibilitychange'));
     } }), id);
     await surface.locator('.settings-search .search-focus.is-back').click();
+    await expect(settings).toHaveValue('');
+    await surface.locator('.settings-search .search-focus.is-back').click();
     await expect(search).toHaveValue('settings');
     await expect(search).toBeFocused();
     await worker.evaluate(async () => { await chrome.tabs.create({ url: 'about:blank', active: true }); });
@@ -539,12 +541,12 @@ for (const host of ['overlay', 'native'] as const) test.describe('headed', { tag
     await input.press('Meta+k');
     const menu = surface.getByRole('combobox', { name: 'Search actions', exact: true });
     await expect(menu).toBeFocused();
-    const menuButton = surface.locator('.action-menu [data-focus-search]');
-    await menuButton.focus(); await page.keyboard.press('Enter');
-    await expect(menu).toBeFocused();
+    // The menu's plain input has no focus icon; Tab remains trapped inside it.
+    await expect(surface.locator('.action-menu [data-focus-search]')).toHaveCount(0);
+    await menu.press('Shift+Tab'); await expect(menu).toBeFocused();
+    await menu.press('Tab'); await expect(menu).toBeFocused();
     await menu.evaluate(node => node.ownerDocument.body.focus());
-    await expect(surface.locator('.action-menu .search-focus-hint')).toBeVisible();
-    await expectCenteredHint();
+    await expect(surface.locator('.action-menu .search-focus-hint')).toHaveCount(0);
     await page.keyboard.press('Tab');
     await expect(menu).toBeFocused();
     await expect(surface.locator('.action-menu')).toBeVisible();
@@ -564,6 +566,7 @@ for (const host of ['overlay', 'native'] as const) test.describe('headed', { tag
     await expect(surface.locator('.settings-search .search-focus.is-back')).toBeFocused();
     await expect(surface.locator('.search-focus-hint')).toHaveCount(0);
     await page.keyboard.press('Tab'); await expect(settingsInput).toBeFocused();
+    await page.keyboard.press('Escape'); await expect(settingsInput).toHaveValue('');
     await page.keyboard.press('Escape');
     await expect(input).toHaveValue('new tab');
     await page.keyboard.press('Escape').catch(error => { if (!page.isClosed()) throw error; });
