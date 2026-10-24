@@ -1,47 +1,75 @@
 {
-  "generatedAt": "2026-10-24T06:27:15.654Z",
+  "generatedAt": "2026-10-24T08:27:10.084Z",
   "files": [
     {
       "filename": "zh-1-search.png",
       "width": 1280,
       "height": 800,
-      "bytes": 231147,
-      "sha256": "7cacd7939e5745168712894d789cde0c7e7c80e221fffc6f7b0070c9394613d9"
+      "bytes": 236684,
+      "sha256": "7ec2dc65c4def69789326fdb250e9f7e63e9eda9940f82104e0e111f44750eb9"
     },
     {
       "filename": "zh-2-switcher.png",
       "width": 1280,
       "height": 800,
-      "bytes": 231588,
-      "sha256": "615e7f057e1894a6dda7097ae11c57a9a4a8f12d95801f16e9a91f5aba229d81"
+      "bytes": 230656,
+      "sha256": "48105b17c03486f9a4797a7058b56ea8ee28fd60a77fca420f572340cdaeefda"
     },
     {
       "filename": "zh-3-actions.png",
       "width": 1280,
       "height": 800,
-      "bytes": 241456,
-      "sha256": "679211a6f27601d382d36ab131984e0329e515d17957de57c0e974715e9a57e0"
+      "bytes": 244927,
+      "sha256": "13286319bb65588ca35007f3ea54db53189c25192f12859a2089de41af6d0f74"
+    },
+    {
+      "filename": "zh-4-storage.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 195946,
+      "sha256": "b65bccd886643da92e67004e4699d7a649c447e09a218476a4ce58530d7b8fdc"
+    },
+    {
+      "filename": "zh-5-settings.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 209528,
+      "sha256": "cd4386fa8ff77287ba25437eb9f88fdd503781167372286f5e5a7eaec0b6d4ee"
     },
     {
       "filename": "en-1-search.png",
       "width": 1280,
       "height": 800,
-      "bytes": 221419,
-      "sha256": "2f6f264d11ec3d2c3960aa24283e1c5c577e69fc28e5c87e599241206e3ee6b9"
+      "bytes": 228949,
+      "sha256": "b9c21a9932a95312ddff3fad7def6cf43eef14bc241b860f8a8c7862b375d94a"
     },
     {
       "filename": "en-2-switcher.png",
       "width": 1280,
       "height": 800,
-      "bytes": 218977,
-      "sha256": "5eaf94d98648c077f0976fc2b7cf63c8fdc250255d13ccceeda9dc82b7141848"
+      "bytes": 219540,
+      "sha256": "e41f494f704d5fd66ee6ccec1a8c6482fab564715d54c0a7b62c0ed45da7e1bb"
     },
     {
       "filename": "en-3-actions.png",
       "width": 1280,
       "height": 800,
-      "bytes": 222175,
-      "sha256": "5a091ffe6f9a74ef9f96272493eabe4555fedd8e4f28816f2bd2221ed1809a1a"
+      "bytes": 225965,
+      "sha256": "01678e193caee35659157b81bd751070a6a97be8832d7a9f8a62aa1b9dbda252"
+    },
+    {
+      "filename": "en-4-storage.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 193283,
+      "sha256": "0bdb6f744ae3316abeceaaa86eb41beb0bbe77dc50362707c6bf261dd52b1ddf"
+    },
+    {
+      "filename": "en-5-settings.png",
+      "width": 1280,
+      "height": 800,
+      "bytes": 198450,
+      "sha256": "441b30fefdce419df742e36986dbb601df003048888c83ff98431ea59f8d27ed"
     },
     {
       "filename": "en-promo-440x280.png",
@@ -54,8 +82,8 @@
       "filename": "en-promo-1400x560.png",
       "width": 1400,
       "height": 560,
-      "bytes": 282156,
-      "sha256": "9039fcca0c30945e6c524ba1ba2f200ca55d510275f9cdece9a9964b75b10035"
+      "bytes": 281440,
+      "sha256": "6538cb545e66cd2301db1c5bf1632cbfd556f220ff6284d0bcd84fa74860441f"
     },
     {
       "filename": "promo-440x280.png",
@@ -68,8 +96,8 @@
       "filename": "promo-1400x560.png",
       "width": 1400,
       "height": 560,
-      "bytes": 282156,
-      "sha256": "9039fcca0c30945e6c524ba1ba2f200ca55d510275f9cdece9a9964b75b10035"
+      "bytes": 281440,
+      "sha256": "6538cb545e66cd2301db1c5bf1632cbfd556f220ff6284d0bcd84fa74860441f"
     },
     {
       "filename": "store-icon-128.png",

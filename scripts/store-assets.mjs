@@ -133,7 +133,7 @@ const scenes = {
 const evidence = {
   generatedAt: new Date().toISOString(),
   version: JSON.parse(await readFile(join(root, 'dist/manifest.json'), 'utf8')).version,
-  source: 'Packaged extension files loaded without modification into temporary profiles. Demonstration titles, URLs, and recreated site icons served locally through Playwright routing without external network requests. The action menu is captured as rendered, including its normal scrolling; the switcher DOM excludes the extension page. Browser chrome and webpage backgrounds are composed for presentation; the small promotional tile uses an illustrative search card.',
+  source: 'Local dist extension files loaded into temporary profiles. Demonstration titles, URLs, learning records, storage values, and recreated site icons are fixtures. Runtime chrome.tabs.get/query are overridden to bind the capture page to a demo source tab and omit the capture tab; chrome.scripting.executeScript is overridden to return demo storage entries. These screenshots show the real rendered interface with mocked browser data and do not constitute integration test evidence. Browser chrome and webpage backgrounds are composed for presentation; the small promotional tile uses an illustrative search card.',
   screenshots: [],
   errors: [],
 };
@@ -173,12 +173,47 @@ if (!process.argv.includes('--render-only')) {
       });
 
       const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
-      await worker.evaluate(async language => chrome.storage.local.set({ preferences: { language, theme: 'light', autoTuck: false } }), lang);
+      await worker.evaluate(async language => chrome.storage.local.set({
+        preferences: { language, theme: 'light', autoTuck: false },
+        searchUsage: [
+          { query: 'claude code', queryText: 'claude code', target: 'tab:https://github.com/anthropics/claude-code', weight: 3, lastUsed: Date.now() },
+          { query: 'claude', queryText: 'claude', target: 'tab:https://claude.ai/chat/mcp-server-guide', weight: 2, lastUsed: Date.now() },
+        ],
+      }), lang);
 
-      for (const [, pageUrl, title, mode, pinned] of scenes[lang]) {
+      let sourceTabId;
+      for (const [key, pageUrl, title, mode, pinned] of scenes[lang]) {
         const page = await context.newPage();
         await page.goto(pageUrl, { waitUntil: 'networkidle' });
         await page.waitForTimeout(100);
+        if (key === 'github') {
+          await page.evaluate(language => {
+            localStorage.setItem('claude.mcp.config', JSON.stringify({
+              server: 'filesystem',
+              transport: 'stdio',
+              tools: ['read_file', 'edit_file', 'search_code'],
+              timeoutMs: 15000,
+              workspace: language === 'zh' ? '/Users/dev/justonehop' : '/Users/dev/claude-code',
+            }));
+            localStorage.setItem('claude.session.state', JSON.stringify({
+              branch: 'main',
+              model: 'claude-sonnet-4',
+              streaming: true,
+              contextTokens: 18420,
+            }));
+            localStorage.setItem('gh.repo.preferences', JSON.stringify({
+              diffView: 'split',
+              wordWrap: true,
+              showWhitespace: false,
+            }));
+            localStorage.setItem('justonehop.theme', 'system');
+            localStorage.setItem('justonehop.shortcut', 'Command+Shift+P');
+          }, lang);
+          sourceTabId = await worker.evaluate(async url => {
+            const [tab] = await chrome.tabs.query({ url });
+            return tab?.id;
+          }, pageUrl);
+        }
         if (pinned) {
           await worker.evaluate(async url => {
             const [tab] = await chrome.tabs.query({ url });
@@ -211,21 +246,66 @@ if (!process.argv.includes('--render-only')) {
       const t = key => messages[lang][key].message;
       await ui.emulateMedia({ colorScheme: 'light' });
       await ui.goto(popup, { waitUntil: 'networkidle' });
+      await worker.evaluate(async ({ popupUrl, sourceId, language }) => {
+        const [popupTab] = await chrome.tabs.query({ url: popupUrl });
+        if (!popupTab?.id || !sourceId) return;
+        const popupId = popupTab.id;
+        const origGet = chrome.tabs.get.bind(chrome.tabs);
+        const origQuery = chrome.tabs.query.bind(chrome.tabs);
+        chrome.tabs.get = async id => {
+          const tab = await origGet(id === popupId ? sourceId : id);
+          return id === popupId || id === sourceId ? { ...tab, active: true } : tab;
+        };
+        chrome.tabs.query = async info => {
+          const list = await origQuery(info);
+          return list.filter(t => t.id !== popupId).map(t => (t.id === sourceId ? { ...t, active: true } : { ...t, active: false }));
+        };
+        const demoEntries = [
+          {
+            id: 'claude.mcp.config',
+            name: 'claude.mcp.config',
+            value: JSON.stringify({
+              server: 'filesystem',
+              transport: 'stdio',
+              tools: ['read_file', 'edit_file', 'search_code'],
+              timeoutMs: 15000,
+              workspace: language === 'zh' ? '/Users/dev/justonehop' : '/Users/dev/claude-code',
+            }),
+          },
+          {
+            id: 'claude.session.state',
+            name: 'claude.session.state',
+            value: JSON.stringify({ branch: 'main', model: 'claude-sonnet-4', streaming: true, contextTokens: 18420 }),
+          },
+          {
+            id: 'gh.repo.preferences',
+            name: 'gh.repo.preferences',
+            value: JSON.stringify({ diffView: 'split', wordWrap: true, showWhitespace: false }),
+          },
+          { id: 'justonehop.shortcut', name: 'justonehop.shortcut', value: 'Command+Shift+P' },
+          { id: 'justonehop.theme', name: 'justonehop.theme', value: 'system' },
+        ];
+        chrome.scripting.executeScript = async ({ args }) => [{
+          result: { url: args?.[1] || 'https://github.com/anthropics/claude-code', entries: demoEntries },
+        }];
+      }, { popupUrl: popup, sourceId: sourceTabId, language: lang });
+      await ui.reload({ waitUntil: 'networkidle' });
       await ui.waitForTimeout(250);
       const input = () => ui.getByRole('combobox').first();
       const capture = async name => {
         await ui.mouse.move(749, 515);
         await ui.waitForTimeout(150);
-        await ui.locator('.palette').screenshot({ path: join(raw, `${lang}-${name}.png`), animations: 'disabled' });
-        evidence.screenshots.push({ language: lang, scene: name, text: await ui.locator('.palette').innerText() });
+        await ui.locator('.palette').first().screenshot({ path: join(raw, `${lang}-${name}.png`), animations: 'disabled' });
+        evidence.screenshots.push({ language: lang, scene: name, text: await ui.locator('.palette').first().innerText() });
         console.log(`Captured ${lang}/${name}`);
       };
 
-      // 1. Unified search (Light Mode)
+      // 1. Unified search + inline query completion + learned ranking (Light Mode)
       await input().fill('claude');
       await expect(ui.locator('.result.tab').first()).toBeVisible();
       await expect(ui.locator('.result.bookmark').first()).toBeVisible();
       await expect(ui.locator('.result.history').first()).toBeVisible();
+      await expect(ui.locator('.query-completion')).toBeVisible();
       await capture('search');
 
       // 2. Capture the current action menu, preserving all real items and scrolling.
@@ -234,7 +314,16 @@ if (!process.argv.includes('--render-only')) {
       await capture('actions');
       await ui.keyboard.press('Escape');
 
-      // 3. Recent Tab Switcher in Native Dark Mode!
+      // 3. Categorized Settings & Custom Search Icon (Light Mode)
+      await input().fill('settings');
+      await ui.locator('[id="justonehop-command:settings"]').first().click();
+      await expect(ui.locator('.settings-view')).toBeVisible();
+      await ui.locator('[data-setting="searchIcon"] button').click();
+      await expect(ui.locator('.search-icon-settings')).toBeVisible();
+      await ui.locator('.search-icon-emoji').fill('🚀');
+      await capture('settings');
+
+      // 4. Recent Tab Switcher in Native Dark Mode!
       await worker.evaluate(async language => chrome.storage.local.set({ preferences: { language, theme: 'dark', autoTuck: false } }), lang);
       await ui.emulateMedia({ colorScheme: 'dark' });
       await ui.reload({ waitUntil: 'networkidle' });
@@ -242,15 +331,16 @@ if (!process.argv.includes('--render-only')) {
       await input().fill('tab switcher');
       await ui.locator('.result').filter({ hasText: t('recentSwitcher') }).first().click();
       await expect(ui.locator('.recent-switcher')).toBeVisible();
-      // Remove self popup.html tab row so only the 7 real web tabs are displayed with an empty, natural search box
-      await ui.locator('.recent-switcher .result').evaluateAll(rows => {
-        for (const row of rows) {
-          if (row.textContent?.includes('chrome-extension://') || row.textContent?.includes('popup.html')) {
-            row.remove();
-          }
-        }
-      });
       await capture('switcher');
+
+      // 5. Read-Only Site Storage Inspector in Native Dark Mode!
+      await ui.reload({ waitUntil: 'networkidle' });
+      await ui.waitForTimeout(200);
+      await input().fill('local storage');
+      await ui.locator('[id="justonehop-command:localStorage"]').first().click();
+      await expect(ui.locator('.storage-view')).toBeVisible();
+      await expect(ui.locator('.storage-row').first()).toBeVisible();
+      await capture('storage');
     } finally {
       if (context) await context.close();
       await rm(profile, { recursive: true, force: true });
@@ -271,25 +361,41 @@ const slides = {
     {
       scene: 'search',
       theme: 'light',
-      heading: '标签页、书签、历史记录，一个框全搜到',
-      subtitle: '开再多网页也不用眯着眼找标签，按快捷键或点工具栏图标，输入关键词直接切过去。',
-      pills: ['⌘Shift+P 随时唤起', '标签页 · 书签 · 历史', '鼠标与键盘皆顺手'],
+      heading: '标签页、书签、历史与命令，一个框全搜到',
+      subtitle: '支持中文全拼与首字母检索、本机历史查询补全；无论习惯键盘快捷键还是鼠标点选都自然顺手。',
+      pills: ['⌘Shift+P 随时唤起', '拼音检索 · 智能补全', '鼠标与键盘皆顺手'],
       activeUrl: 'github.com/anthropics/claude-code',
     },
     {
       scene: 'switcher',
       theme: 'dark',
       heading: '像 Alt+Tab 一样，切回刚才看的网页',
-      subtitle: '按最近访问顺序（MRU）排列当前窗口标签页，松开按键即切换；浅色与深色外观自动跟随 Chrome。',
-      pills: ['最近使用顺序排列', '打字即可缩小范围', '原生深色模式适配'],
+      subtitle: '按最近访问顺序（MRU）穿梭已打开标签页，松开按键即切换；内置向导帮助配置 Ctrl+Tab。',
+      pills: ['最近访问顺序 (MRU)', '支持绑定 Ctrl+Tab', '随时打字或拼音筛选'],
       activeUrl: 'github.com/anthropics/claude-code',
     },
     {
       scene: 'actions',
       theme: 'light',
-      heading: '右键或按 ⌘K，顺手固定、静音、复制链接',
-      subtitle: '在任意结果上直接执行操作，做完后面板保持打开并自动选中下一项，方便一次清理多个标签页。',
-      pills: ['复制链接 · 固定 · 静音', '内置添加与移除书签', '连续整理不自动关面板'],
+      heading: '右键或按 ⌘K，一口气连续整理多个标签页',
+      subtitle: '复制链接、固定、静音、收藏、移入标签组或收起网页；多数操作保留所选项，移除结果后选中相邻项。',
+      pills: ['连续整理不关面板', '原生标签组与一键收起', '固定 · 静音 · 复制链接'],
+      activeUrl: 'github.com/anthropics/claude-code',
+    },
+    {
+      scene: 'storage',
+      theme: 'dark',
+      heading: '免开笨重 DevTools，秒看 Storage 与 Cookie',
+      subtitle: '输入 local storage、session storage 或 cookie，双栏只读查看键名与格式化 JSON，按回车一键复制。',
+      pills: ['双栏键值与 JSON 预览', '回车一键复制原始值', '按站点独立申请授权'],
+      activeUrl: 'github.com/anthropics/claude-code',
+    },
+    {
+      scene: 'settings',
+      theme: 'light',
+      heading: '定制「瞬移徽章」、分类设置与闲置自动收起',
+      subtitle: '用 Emoji 或本地图片打造专属搜索栏徽章；设置按外观、键盘、实验室、使用帮助分类并支持全局搜索。',
+      pills: ['Emoji 与图片瞬移徽章', '跨分类搜索与逐层返回', '100% 本地运行零遥测'],
       activeUrl: 'github.com/anthropics/claude-code',
     },
   ],
@@ -297,25 +403,41 @@ const slides = {
     {
       scene: 'search',
       theme: 'light',
-      heading: 'Search tabs, bookmarks & history in one box',
-      subtitle: 'Stop squinting at tiny tabs. Press the shortcut or click the toolbar icon to jump straight to any page.',
-      pills: ['⌘Shift+P Anywhere', 'Tabs · Bookmarks · History', 'Mouse & Keyboard Friendly'],
+      heading: 'Search tabs, bookmarks, history & actions in one box',
+      subtitle: 'Jump straight to any page or browser command with instant local query completion—natural with keyboard or mouse.',
+      pills: ['⌘Shift+P Anywhere', 'Smart Query Completion', 'Mouse & Keyboard Friendly'],
       activeUrl: 'github.com/anthropics/claude-code',
     },
     {
       scene: 'switcher',
       theme: 'dark',
       heading: 'Switch between recent tabs like Alt+Tab',
-      subtitle: 'Cycles through open tabs in most-recently-used order. Automatically matches Chrome Light and Dark themes.',
-      pills: ['MRU Tab Order', 'Type Anytime to Filter', 'Native Dark Theme'],
+      subtitle: 'Cycle through open tabs in most-recently-used order (includes a Ctrl+Tab setup guide), or type anytime to filter.',
+      pills: ['MRU Tab Order', 'Ctrl+Tab Setup Guide', 'Type Anytime to Filter'],
       activeUrl: 'github.com/anthropics/claude-code',
     },
     {
       scene: 'actions',
       theme: 'light',
-      heading: 'Right-click or press ⌘K to pin, mute & copy links',
-      subtitle: 'Run quick tab actions right from the list. The panel stays open so you can tidy several tabs in a row.',
-      pills: ['Copy URL · Pin · Mute', 'Add or Remove Bookmarks', 'Continuous Tab Housekeeping'],
+      heading: 'Right-click or press ⌘K to tidy tabs in a row',
+      subtitle: 'Copy URLs, pin, mute, bookmark, manage Tab Groups, or tuck tabs away. Most actions preserve selection; removed results advance to an adjacent item.',
+      pills: ['Continuous Tab Tidy', 'Tab Groups & Tuck Away', 'Copy URL · Pin · Mute'],
+      activeUrl: 'github.com/anthropics/claude-code',
+    },
+    {
+      scene: 'storage',
+      theme: 'dark',
+      heading: 'Inspect Storage & Cookies without opening DevTools',
+      subtitle: 'Type “local storage”, “session storage”, or “cookie” for a fast read-only viewer with formatted JSON and one-key copy.',
+      pills: ['Side-by-Side JSON Viewer', 'One-Key Raw Value Copy', 'Per-Site Cookie Access'],
+      activeUrl: 'github.com/anthropics/claude-code',
+    },
+    {
+      scene: 'settings',
+      theme: 'light',
+      heading: 'Custom Hop Badge, Auto-Tuck & searchable settings',
+      subtitle: 'Wear an Emoji or custom image on your search bar, configure idle Auto-Tuck in Labs, and search across all settings.',
+      pills: ['Emoji & Image Hop Badge', 'Searchable Settings', '100% Local & Private'],
       activeUrl: 'github.com/anthropics/claude-code',
     },
   ],
@@ -1275,11 +1397,11 @@ try {
             </div>
             <div class="mq-copy">
               <h1>Search open tabs, bookmarks,<br>and history in one place.</h1>
-              <p>A Chrome-native command palette with Alt+Tab style recent tab switching, quick tab actions, and automatic Light &amp; Dark themes.</p>
+              <p>A human-first command palette for Chrome with Alt+Tab recent switching, continuous tab tidy, tab tucking, and instant storage inspection.</p>
               <div class="mq-badges">
-                <span class="mq-badge"><i></i>Unified Search</span>
-                <span class="mq-badge"><i></i>Recent Tab Switcher</span>
-                <span class="mq-badge"><i></i>Light &amp; Dark Themes</span>
+                <span class="mq-badge"><i></i>Smart Completion</span>
+                <span class="mq-badge"><i></i>Alt+Tab Switcher</span>
+                <span class="mq-badge"><i></i>100% Local</span>
               </div>
             </div>
           </section>
@@ -1321,6 +1443,7 @@ const files = [];
 for (const item of allTracked) {
   const bytes = await readFile(join(output, item.filename));
   const meta = await sharp(bytes).metadata();
+  await sharp(bytes).raw().toBuffer(); // Validate the full PNG stream, not only its header.
   if (meta.width !== item.width || meta.height !== item.height || meta.format !== 'png') {
     throw new Error(`Invalid dimensions: ${item.filename}`);
   }
