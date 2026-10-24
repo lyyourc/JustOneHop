@@ -11,7 +11,7 @@
 | 字段 | 填写内容 | 说明 |
 | --- | --- | --- |
 | **扩展名称 (Name)** | `JustOneHop`（默认语言） / `小范围瞬移`（中文） | 英文首字母大写；中文名统一 |
-| **适用版本** | `1.0.0` | 功能冻结，实机反馈修复包已通过全量验证并完成校验；尚未提交商店 |
+| **适用版本** | `0.3.0` | 功能冻结，实机反馈修复包已通过全量验证并完成校验；尚未提交商店 |
 | **扩展 ID** | `mbofggnjaoneioopfbpheapgphmkclbo` | 商店官方分配唯一标识 |
 | **开发者账号** | `lyyourc` | 个人开发者 |
 | **支持与隐私邮箱** | `liangyida42@gmail.com` | 已验证联系邮箱 |
@@ -207,9 +207,11 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ### 版本与发布状态
 
-**当前阶段：1.0.0 功能冻结，实机反馈修复包已通过完整自动化验证与包校验（2026-10-24）。** 仅调整发布元数据、事实性披露、商店素材和验证所需修复；新功能移至后续版本。本次不创建远端 Release、不上传或提交商店。CHANGELOG 保留 `Unreleased`；正式发布另行确定日期。商店线上／审核中／草稿版本尚未核对，不能将本地准备状态当作已上线。
+版本调整说明：候选由 1.0.0 改为 0.3.0，仅版本元数据变化；已有全量报告及素材采集记录保留原始版本，重新打包后逐文件核对行为产物一致。
 
-`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 使用相同的三段数字版本，例如 `1.0.0`；Git tag 与 GitHub Release 使用 `v1.0.0`，附件名为 `justonehop-1.0.0.zip`。新增功能递增次版本，修复递增补丁版本；上传版本须高于商店后台已有版本。
+**当前阶段：0.3.0 功能冻结，实机反馈修复包已通过完整自动化验证与包校验（2026-10-24）。** 仅调整发布元数据、事实性披露、商店素材和验证所需修复；新功能移至后续版本。本次不创建远端 Release、不上传或提交商店。CHANGELOG 保留 `Unreleased`；正式发布另行确定日期。商店线上／审核中／草稿版本尚未核对，不能将本地准备状态当作已上线。
+
+`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 使用相同的三段数字版本，例如 `0.3.0`；Git tag 与 GitHub Release 使用 `v0.3.0`，附件名为 `justonehop-0.3.0.zip`。新增功能递增次版本，修复递增补丁版本；上传版本须高于商店后台已有版本。
 
 [CHANGELOG](../CHANGELOG.md) 按版本维护用户可见变化。准备中的版本标记 `Unreleased`；确定发布时改为 GitHub 发布日期（`YYYY-MM-DD`）。GitHub 发布与商店审核是独立状态：GitHub Release 可先提供下载，说明中明确商店尚未提交、审核中或已上线；只有后台和公开页确认后才标记商店上线。审核期间商店仍显示上一版不属于版本错误。
 
@@ -249,31 +251,31 @@ npm run package:store
 
 ### Git tag 与 GitHub Release
 
-以下以 `1.0.0` 为例，仅在发布提交已审阅、工作区干净且验证完成后执行：
+以下以 `0.3.0` 为例，仅在发布提交已审阅、工作区干净且验证完成后执行：
 
 ```sh
-npm run release:check -- v1.0.0
+npm run release:check -- v0.3.0
 npx tsx scripts/package-store.ts
-unzip -p releases/justonehop-1.0.0.zip manifest.json
-shasum -a 256 releases/justonehop-1.0.0.zip
-git tag -a v1.0.0 -m "JustOneHop 1.0.0"
+unzip -p releases/justonehop-0.3.0.zip manifest.json
+shasum -a 256 releases/justonehop-0.3.0.zip
+git tag -a v0.3.0 -m "JustOneHop 0.3.0"
 git push origin HEAD
-git push origin v1.0.0
+git push origin v0.3.0
 ```
 
 tag 必须指向与已验证发布产物对应的源码提交；若与受测 commit 不同，须已完成测试指南规定的差异与产物等价核对。已推送 tag 不移动；发布后修订递增版本。等待该提交／tag 的 Validate CI 通过后创建 Release，不额外触发全量 E2E。
 
-准备发布说明文件（例如系统临时目录中的 `justonehop-1.0.0-notes.md`），包含 CHANGELOG 的本版本内容、源码 commit、ZIP SHA-256、实际验证范围和商店状态。先创建草稿检查附件与说明，再发布：
+准备发布说明文件（例如系统临时目录中的 `justonehop-0.3.0-notes.md`），包含 CHANGELOG 的本版本内容、源码 commit、ZIP SHA-256、实际验证范围和商店状态。先创建草稿检查附件与说明，再发布：
 
 ```sh
-gh release create v1.0.0 releases/justonehop-1.0.0.zip \
-  --verify-tag --draft --title "JustOneHop 1.0.0" \
-  --notes-file /tmp/justonehop-1.0.0-notes.md
-gh release view v1.0.0
-gh release edit v1.0.0 --draft=false
+gh release create v0.3.0 releases/justonehop-0.3.0.zip \
+  --verify-tag --draft --title "JustOneHop 0.3.0" \
+  --notes-file /tmp/justonehop-0.3.0-notes.md
+gh release view v0.3.0
+gh release edit v0.3.0 --draft=false
 ```
 
-GitHub 自动生成的源码归档不是商店上传包；使用附加的 `justonehop-1.0.0.zip`。这些命令是发布步骤，不由本地打包命令自动执行。
+GitHub 自动生成的源码归档不是商店上传包；使用附加的 `justonehop-0.3.0.zip`。这些命令是发布步骤，不由本地打包命令自动执行。
 
 ### 商店提交与上线确认
 

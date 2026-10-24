@@ -2,7 +2,7 @@
 
 User-visible changes are grouped by release. Git tags use `v<version>`; extension manifests and store packages use `<version>`. GitHub release dates do not imply Chrome Web Store approval. See the [release guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单).
 
-## [1.0.0] - Unreleased
+## [0.3.0] - Unreleased
 
 Feature-frozen release candidate prepared on 2026-10-24. Not submitted to the Chrome Web Store; the date will be finalized on publication. / 2026-10-24 冻结功能并准备发布候选；尚未提交 Chrome Web Store，正式发布时再确定日期。
 
