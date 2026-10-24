@@ -2,6 +2,27 @@
 
 User-visible changes are grouped by release. Git tags use `v<version>`; extension manifests and store packages use `<version>`. GitHub release dates do not imply Chrome Web Store approval. See the [release guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单).
 
+## [1.0.0] - Unreleased
+
+Feature-frozen release candidate prepared on 2026-10-24. Not submitted to the Chrome Web Store; the date will be finalized on publication. / 2026-10-24 冻结功能并准备发布候选；尚未提交 Chrome Web Store，正式发布时再确定日期。
+
+### Added / 新增
+
+- Find Chinese titles and commands with full pinyin, initials, or mixed Chinese/English queries. History supplements literal search with pinyin matches from the latest 1,000 pages in the selected time range. / 支持中文全拼、首字母和中英文混合检索；历史在字面搜索之外，补充所选时间范围最近 1,000 个页面的拼音匹配。
+- Complete queries from successful local searches, and continue the latest qualifying page search in the same window within 10 minutes. Both offer keyboard and footer-button entry points. / 根据本机成功搜索补全查询，并可在同窗口 10 分钟内继续最近一次符合条件的页面搜索；均提供键盘与底栏按钮入口。
+- Customize the search icon with an Emoji or a local image, with preview, explicit save, and restore-default controls. / 使用 Emoji 或本地图片自定义搜索图标，支持预览、保存与恢复默认。
+
+### Changed / 改进
+
+- Group settings into Appearance, Shortcuts, Experimental, and Help, with search across categories and consistent return navigation that preserves input and drafts. / 设置按外观、快捷键、实验室与帮助分类，支持跨分类搜索，返回时保留输入上下文和草稿。
+- Unify secondary-page navigation, keyboard focus, footer actions, and feedback across the webpage overlay and standalone window. Footer hints can be shown or hidden through the pet control. / 统一网页浮层与独立窗口的二级导航、键盘焦点、底栏操作与反馈，可通过小动物控件显示或隐藏操作提示。
+- Keep up to 2,000 local search records for ranking and completion, with reset and forget controls. / 本地排序与补全共用最多 2,000 条搜索记录，保留重置与遗忘入口。
+
+### Fixed / 修复
+
+- Preserve tab order across automatic tucking batches and improve recovery after browser restarts, partial failures, and manual group changes. / 保留自动收起跨批次的标签顺序，完善浏览器重启、部分失败与手动分组变更后的恢复处理。
+- Refine narrow-window layout, menu focus, search hints, and transparent panel backdrops. / 修正窄窗口布局、菜单焦点、搜索提示与面板透明背景。
+
 ## [0.2.1] - 2026-10-22
 
 ### Fixed / 修复

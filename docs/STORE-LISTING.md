@@ -11,7 +11,7 @@
 | 字段 | 填写内容 | 说明 |
 | --- | --- | --- |
 | **扩展名称 (Name)** | `JustOneHop`（默认语言） / `小范围瞬移`（中文） | 英文首字母大写；中文名统一 |
-| **适用版本** | `0.1.0` | 对应 `manifest.json` |
+| **适用版本** | `1.0.0` | 功能冻结，准备提审包；尚未提交商店 |
 | **扩展 ID** | `mbofggnjaoneioopfbpheapgphmkclbo` | 商店官方分配唯一标识 |
 | **开发者账号** | `lyyourc` | 个人开发者 |
 | **支持与隐私邮箱** | `liangyida42@gmail.com` | 已验证联系邮箱 |
@@ -30,7 +30,7 @@
 JustOneHop
 ```
 
-### Short Description (Paste-ready, 128 characters)
+### Short Description (Paste-ready, within 128 characters)
 ```text
 A human-first command palette for Chrome. Search tabs, bookmarks, and history, and run actions naturally with keyboard or mouse.
 ```
@@ -42,22 +42,24 @@ When you have dozens of tabs open, finding the page you were just looking at sho
 Click the toolbar icon or press Command+Shift+P on macOS (Ctrl+Shift+P on Windows/Linux). Everything works naturally with your mouse, keyboard shortcuts, or both—without memorizing cryptic prefixes or command modes.
 
 Key features:
+• Chinese pinyin search: Find Chinese titles with full pinyin or initials, including mixed Chinese/English queries. History pinyin matching covers the latest 1,000 pages in your selected time range; use literal text for older pages.
+• Pick up your search: Complete queries from successful local searches using Tab, the right arrow, or the footer button. Continue the latest qualifying page search in the same window within 10 minutes.
 • Search tabs, bookmarks & history together: Find open tabs, saved bookmarks, and recent 7-day history from a single search bar, or expand to Search All History with one click.
 • Switch recent tabs like Alt+Tab: Open the built-in Tab Switcher to cycle through open tabs in most-recently-used (MRU) order. Hold and release the shortcut to jump, or type anytime to filter by title or domain.
 • Tidy tabs without losing your place: Right-click a tab result or press Command+K to copy its URL, pin or unpin, mute, reload, add or remove a bookmark, or close the tab. Most organizing actions keep the panel open and preserve the selected item; when a result is removed, an adjacent item is smoothly selected.
 • Manage Chrome Tab Groups: Search, inspect, expand/collapse, rename, ungroup, or close entire native tab groups with clear confirmation dialogs.
-• Tab Tucking (Declutter without closing): Slide idle tabs into a neat, native collapsed group (Tucked · N) without closing them or losing form states. Easily untuck individual tabs or undo the whole batch.
+• Tuck tabs away: Move tabs into the native collapsed group “Tuck Away” without closing them. Find a page to bring it back, or undo the latest batch. Optional Auto Tuck in Settings → Experimental runs when the computer is idle or Chrome has remained unfocused for 30 minutes.
 • Everyday commands in plain words: Type “new tab”, “reopen closed tab”, “downloads”, “extensions”, “passwords”, or “dark mode” to run browser actions directly—no special syntax required.
-• Chrome-native Light & Dark themes: Built around Chrome's CR2023 design language, automatically matching your system appearance.
+• Make it your own: Choose Light, Dark, or System appearance, and set an Emoji or local image as your search icon. Settings are searchable by category.
 • Read-only site storage viewer: Search “local storage”, “session storage”, or “cookies” to inspect keys and formatted JSON for the current page without opening heavy DevTools. Cookie inspection requests host access strictly per site.
 
 Local & private by design:
 • Tab, bookmark, and history searches run locally on your device—no account, developer server, telemetry, or tracking. When you explicitly choose Google Search or open a URL, your browser connects to that website directly.
-• Preferences and search ranking records stay on your device and are never synced to the cloud. Ranking records may include search terms and full URLs; you can click the × icon on any result or use “Reset search ranking” in Settings to clear them at any time.
+• Preferences, custom icons, and search records stay on your device and are never synced to the cloud. Ranking and completion share up to 2,000 records, which may include search terms and full URLs. Use a learned result’s forget control or “Reset search ranking” in Settings; reset also clears completion history and Continue Search hints.
 • Site storage values are read only in memory while viewing; copied values are placed on your system clipboard. See the linked Privacy Policy for full details.
 
 Usage notes:
-Regular webpages use a centered in-page overlay; restricted pages where Chrome blocks content scripts (such as chrome:// pages or the Chrome Web Store) automatically open in a lightweight companion window. Shortcuts can be customized in chrome://extensions/shortcuts; setting up Ctrl+Tab takes just 10 seconds via our built-in guided helper.
+Regular webpages use a centered in-page overlay; restricted pages where Chrome blocks content scripts (such as chrome:// pages or the Chrome Web Store) automatically open in a lightweight companion window. Shortcuts can be customized in chrome://extensions/shortcuts; the optional built-in Ctrl+Tab guide explains the extra setup needed for that shortcut.
 ```
 
 ---
@@ -81,22 +83,24 @@ Regular webpages use a centered in-page overlay; restricted pages where Chrome b
 点击工具栏图标，或按 ⌘Shift+P（Windows/Linux 为 Ctrl+Shift+P）即可打开。无论是直接用鼠标点选、习惯键盘快捷键，还是两者混用都很顺手，不需要背诵任何搜索前缀或命令语法。
 
 核心功能：
+• 中文拼音检索：支持全拼、首字母及中英文混合搜索。历史拼音匹配覆盖所选时间范围最近 1000 个页面，更早的页面可用中文原文查找。
+• 接着上次搜：根据本机成功搜索提供查询补全，支持 Tab、右方向键或底栏按钮接受。同窗口 10 分钟内，还可继续最近一次符合条件的页面搜索。
 • 统一搜索标签页、书签与历史记录：同时检索当前窗口已打开的标签页、收藏夹书签与最近 7 天浏览历史，也可一键展开搜索全部历史。
 • 像 Alt+Tab 一样切换最近标签页：内置最近标签切换器（Tab Switcher），按最近访问顺序（MRU）排列标签页。支持按住快捷键松手即切，或直接打字按标题、域名筛选。
-• 右键或按 ⌘K 连续整理标签页：在标签页结果上打开操作菜单，即可复制链接、固定／取消固定、静音、刷新、添加或移除书签、关闭标签页。整理操作后面板保持打开并自动选中相邻项，方便连续整理多个页面。
+• 右键或按 ⌘K 连续整理标签页：在标签页结果上打开操作菜单，即可复制链接、固定／取消固定、静音、刷新、添加或移除书签、关闭标签页。整理操作后面板保持打开并保留所选项；移除结果后选择相邻项，方便连续整理多个页面。
 • 原生标签组管理：直接搜索组名进入成员列表，支持展开／折叠、重命名、解散分组（保留所有页面）或安全关闭整个分组。
-• 智能标签收起 (Tab Tucking)：把暂时不看的页面移入 Chrome 原生折叠组（如“已收起 · 4”），不关闭页面也不丢表单，随时一键搜出恢复或撤销整批收起。
+• 标签收起：把暂时不看的页面移入 Chrome 原生折叠组「收起来」，不关闭页面。搜索页面即可找回，也可撤销最近一批收起。在设置 → 实验室开启自动收起后，电脑空闲或 Chrome 连续失焦 30 分钟时可执行整理。
 • 日常中英文口语直达命令：直接输入“新建标签页”“恢复关闭的标签页”“历史记录”“下载”“扩展”“深色模式”或“new tab”“downloads”“settings”即可执行，无需输入模式前缀。
-• Chrome 原生深浅色外观：界面遵循 Chrome CR2023 设计语言，浅色与深色模式自动跟随系统或手动切换。
+• 自定义外观：深浅色可跟随系统或手动切换，支持用 Emoji 或本地图片设置搜索图标；设置按分类组织，并可直接搜索。
 • 只读网站存储查看器：输入“local storage”“session storage”或“cookie”，免开 F12 DevTools，直接在双栏视图中格式化查看并复制当前网页的存储键值；读取 Cookie 时仅按当前站点申请授权。
 
 隐私与本地运行：
 • 标签页、书签和历史检索全部在本机完成，无需注册账号，无开发者后端或遥测，绝不向开发者上传浏览数据。主动执行 Google 搜索或打开网址时，浏览器会直接访问相应网站。
-• 偏好设置与搜索排序记录仅保存在本机，不通过云端同步。受到本地学习前移的结果会展示小钟表图标，点击 × 或按 Shift+Backspace 即可随时遗忘；也可在设置中使用“重置搜索排序”一键清除。
+• 偏好、自定义图标和搜索记录仅保存在本机，不通过云端同步。排序与补全共用最多 2000 条记录，可能包含搜索词和完整网址。可通过已学习结果的遗忘入口或 Shift+Backspace 清除对应记录；设置中的「重置搜索排序」同时清除补全历史与继续搜索提示。
 • 网站存储查看器中的内容仅在当前面板内存中只读展示，不写入持久存储；你主动复制的内容会进入系统剪贴板。完整说明请参阅隐私政策链接。
 
 使用说明：
-普通网页以居中浮层展示；在 Chrome 内置页、应用商店等限制脚本注入的页面会自动切换为独立窗口。地址栏持有焦点时，点击搜索框即可开始输入。快捷键可在 Chrome 扩展快捷键设置中修改；Ctrl+Tab 切换可通过内置引导 10 秒快速配置。
+普通网页以居中浮层展示；在 Chrome 内置页、应用商店等限制脚本注入的页面会自动切换为独立窗口。地址栏持有焦点时，点击搜索框即可开始输入。快捷键可在 Chrome 扩展快捷键设置中修改；如需使用 Ctrl+Tab，可按内置指南完成额外配置。
 ```
 
 ---
@@ -127,7 +131,7 @@ Provide a local command palette for finding and acting on browser content: searc
 | `bookmarks` | Search the user's bookmark titles, URLs, and folders, and create or remove native bookmarks when the user requests those actions. |
 | `history` | Query recent history and user-requested full-history searches to find pages. The extension does not persist a copy of the entire history database or modify it. Successful selections may contribute a search term and URL to local ranking records. |
 | `sessions` | Restore the most recently closed tab or window when requested by the user. |
-| `storage` | Store preferences, search ranking records, and tuck timing/recovery records locally, and keep temporary panel and tuck state in session storage. No chrome.storage.sync is used. |
+| `storage` | Store preferences (including a custom search icon), local ranking and query-completion records, and tuck timing/recovery records. Session storage holds temporary panel/tuck state and a per-window Continue Search query, target, and timestamp. No chrome.storage.sync is used. |
 | `favicon` | Display site icons using Chrome's native favicon interface without any third-party icon service. |
 | `tabGroups` | Display and manage native Chrome tab groups and move tabs into or out of collapsed groups for manual tucking and optional Auto Tuck. |
 | `alarms` | Schedule Auto Tuck scans and cleanup retries, and periodically synchronize the toolbar icon with the system color scheme. |
@@ -177,19 +181,22 @@ Open 3-4 ordinary HTTPS websites in a Chrome window. Click the JustOneHop toolba
 Bookmark one of your test pages. Summon the palette again and search for it to see the native bookmark result. Type "history" to test the 7-day and full-history search capabilities.
 
 3. Continuous Tab Actions:
-In the search results, right-click any tab or press Command+K (Ctrl+K) to open the action menu. Try pinning/unpinning, muting, or copying the clean URL. Notice that the palette remains open and automatically selects the adjacent tab so multiple tabs can be organized consecutively.
+In the search results, right-click any tab or press Command+K (Ctrl+K) to open the action menu. Try pinning/unpinning, muting, or copying the clean URL. The palette keeps the selected item for organizing actions; removing a result selects an adjacent item so you can continue.
 
 4. Tab Switcher (Alt+Tab style):
 Search for "tab switcher" in the palette, or use the default shortcut (Control+J on macOS / Ctrl+, on Windows/Linux). Hold the modifier key, tap through recent tabs, and release the modifier to switch. Alternatively, click the search bar or press Command+F to filter tabs on the fly.
 
 5. Tab Tucking:
-With an unpinned tab active, summon the palette and search for "tuck tab". The tab will be safely moved into a collapsed native Chrome Tab Group ("Tucked · 1") without closing the page. Type "undo tuck" to restore it.
+With an unpinned tab active, summon the palette and search for "tuck tab". The tab will be safely moved into a collapsed native Chrome Tab Group ("Tuck Away") without closing the page. Type "undo tuck" to restore it.
 
 6. Site Storage & Cookie Inspector:
 On an ordinary HTTPS website, summon the palette and search for "local storage", "session storage", or "cookie". The viewer renders keys on the left and formatted JSON values on the right. Press Enter to copy the raw value. If cookie access is missing, click the explicit grant button to trigger Chrome's host permission dialog. All data is read-only and processed solely in memory.
 
 7. Standalone Window Fallback:
-Navigate to a restricted page such as chrome://extensions or chrome://settings and summon the palette. JustOneHop automatically opens in a lightweight companion window centered in the viewport, ensuring uninterrupted service.
+Navigate to a restricted page such as chrome://extensions or chrome://settings and summon the palette. JustOneHop automatically opens in a lightweight companion window positioned relative to the source browser window. Ordinary webpage overlays are positioned relative to the page viewport.
+
+8. Local Search Hints and Appearance:
+After successfully opening results from a query, type a prefix of that query and accept the local hint with Tab or the footer button. A qualifying page search with at least two distinct available pages can also be continued within 10 minutes in the same window. Reset search ranking in Settings clears these records. Search Settings for the search icon editor, choose an Emoji or local PNG/JPEG/WebP, preview and save; Restore Default removes the custom icon. Nothing is uploaded.
 
 Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 ```
@@ -200,7 +207,9 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ### 版本与发布状态
 
-`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 使用相同的三段数字版本，例如 `0.2.0`；Git tag 与 GitHub Release 使用 `v0.2.0`，附件名为 `justonehop-0.2.0.zip`。新增功能递增次版本，修复递增补丁版本；上传版本须高于商店后台已有版本。
+**当前阶段：1.0.0 功能冻结与本地发布准备（2026-10-24）。** 仅调整发布元数据、事实性披露、商店素材和验证所需修复；新功能移至后续版本。本次不创建远端 Release、不上传或提交商店。CHANGELOG 保留 `Unreleased`；正式发布另行确定日期。商店线上／审核中／草稿版本尚未核对，不能将本地准备状态当作已上线。
+
+`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 使用相同的三段数字版本，例如 `1.0.0`；Git tag 与 GitHub Release 使用 `v1.0.0`，附件名为 `justonehop-1.0.0.zip`。新增功能递增次版本，修复递增补丁版本；上传版本须高于商店后台已有版本。
 
 [CHANGELOG](../CHANGELOG.md) 按版本维护用户可见变化。准备中的版本标记 `Unreleased`；确定发布时改为 GitHub 发布日期（`YYYY-MM-DD`）。GitHub 发布与商店审核是独立状态：GitHub Release 可先提供下载，说明中明确商店尚未提交、审核中或已上线；只有后台和公开页确认后才标记商店上线。审核期间商店仍显示上一版不属于版本错误。
 
@@ -240,31 +249,31 @@ npm run package:store
 
 ### Git tag 与 GitHub Release
 
-以下以 `0.2.0` 为例，仅在发布提交已审阅、工作区干净且验证完成后执行：
+以下以 `1.0.0` 为例，仅在发布提交已审阅、工作区干净且验证完成后执行：
 
 ```sh
-npm run release:check -- v0.2.0
+npm run release:check -- v1.0.0
 npx tsx scripts/package-store.ts
-unzip -p releases/justonehop-0.2.0.zip manifest.json
-shasum -a 256 releases/justonehop-0.2.0.zip
-git tag -a v0.2.0 -m "JustOneHop 0.2.0"
+unzip -p releases/justonehop-1.0.0.zip manifest.json
+shasum -a 256 releases/justonehop-1.0.0.zip
+git tag -a v1.0.0 -m "JustOneHop 1.0.0"
 git push origin HEAD
-git push origin v0.2.0
+git push origin v1.0.0
 ```
 
 tag 必须指向与已验证发布产物对应的源码提交；若与受测 commit 不同，须已完成测试指南规定的差异与产物等价核对。已推送 tag 不移动；发布后修订递增版本。等待该提交／tag 的 Validate CI 通过后创建 Release，不额外触发全量 E2E。
 
-准备发布说明文件（例如系统临时目录中的 `justonehop-0.2.0-notes.md`），包含 CHANGELOG 的本版本内容、源码 commit、ZIP SHA-256、实际验证范围和商店状态。先创建草稿检查附件与说明，再发布：
+准备发布说明文件（例如系统临时目录中的 `justonehop-1.0.0-notes.md`），包含 CHANGELOG 的本版本内容、源码 commit、ZIP SHA-256、实际验证范围和商店状态。先创建草稿检查附件与说明，再发布：
 
 ```sh
-gh release create v0.2.0 releases/justonehop-0.2.0.zip \
-  --verify-tag --draft --title "JustOneHop 0.2.0" \
-  --notes-file /tmp/justonehop-0.2.0-notes.md
-gh release view v0.2.0
-gh release edit v0.2.0 --draft=false
+gh release create v1.0.0 releases/justonehop-1.0.0.zip \
+  --verify-tag --draft --title "JustOneHop 1.0.0" \
+  --notes-file /tmp/justonehop-1.0.0-notes.md
+gh release view v1.0.0
+gh release edit v1.0.0 --draft=false
 ```
 
-GitHub 自动生成的源码归档不是商店上传包；使用附加的 `justonehop-0.2.0.zip`。这些命令是发布步骤，不由本地打包命令自动执行。
+GitHub 自动生成的源码归档不是商店上传包；使用附加的 `justonehop-1.0.0.zip`。这些命令是发布步骤，不由本地打包命令自动执行。
 
 ### 商店提交与上线确认
 

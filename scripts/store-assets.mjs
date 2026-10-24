@@ -133,7 +133,7 @@ const scenes = {
 const evidence = {
   generatedAt: new Date().toISOString(),
   version: JSON.parse(await readFile(join(root, 'dist/manifest.json'), 'utf8')).version,
-  source: 'Packaged extension files loaded without modification into temporary profiles. Demonstration titles, URLs, and recreated site icons served locally through Playwright routing without external network requests. Before capture, the action menu DOM is reduced to seven core actions and the switcher DOM excludes the extension page. Browser chrome and webpage backgrounds are composed for presentation; the small promotional tile uses an illustrative search card.',
+  source: 'Packaged extension files loaded without modification into temporary profiles. Demonstration titles, URLs, and recreated site icons served locally through Playwright routing without external network requests. The action menu is captured as rendered, including its normal scrolling; the switcher DOM excludes the extension page. Browser chrome and webpage backgrounds are composed for presentation; the small promotional tile uses an illustrative search card.',
   screenshots: [],
   errors: [],
 };
@@ -228,16 +228,9 @@ if (!process.argv.includes('--render-only')) {
       await expect(ui.locator('.result.history').first()).toBeVisible();
       await capture('search');
 
-      // 2. Action menu on a tab result (Light Mode, showing the 7 core tab actions cleanly without half-clipped scroll overflow)
+      // 2. Capture the current action menu, preserving all real items and scrolling.
       await ui.locator('.result.tab').nth(1).click({ button: 'right' });
       await expect(ui.locator('.action-menu')).toBeVisible();
-      await ui.locator('.action-row').evaluateAll((els, tuckLabel) => {
-        for (const el of els) {
-          if (el.textContent?.includes(tuckLabel)) el.remove();
-        }
-        const remaining = Array.from(document.querySelectorAll('.action-menu .action-row'));
-        for (const extra of remaining.slice(7)) extra.remove();
-      }, t('tuck'));
       await capture('actions');
       await ui.keyboard.press('Escape');
 

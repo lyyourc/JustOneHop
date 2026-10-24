@@ -1,75 +1,75 @@
 {
-  "generatedAt": "2026-10-19T15:13:19.765Z",
+  "generatedAt": "2026-10-24T06:15:28.992Z",
   "files": [
     {
       "filename": "zh-1-search.png",
       "width": 1280,
       "height": 800,
-      "bytes": 234519,
-      "sha256": "375cec3c165f5fc098253c85d88cedfbdf7f14d6fe446a821760ec472b789a6c"
+      "bytes": 231147,
+      "sha256": "7cacd7939e5745168712894d789cde0c7e7c80e221fffc6f7b0070c9394613d9"
     },
     {
       "filename": "zh-2-switcher.png",
       "width": 1280,
       "height": 800,
-      "bytes": 231456,
-      "sha256": "4836aca122ca2b279acd5cdadf0f028a7dca55a7abbff209f867a34ce0957079"
+      "bytes": 231588,
+      "sha256": "615e7f057e1894a6dda7097ae11c57a9a4a8f12d95801f16e9a91f5aba229d81"
     },
     {
       "filename": "zh-3-actions.png",
       "width": 1280,
       "height": 800,
-      "bytes": 248821,
-      "sha256": "a8e3a8d152c511fa2fe4fcc683ebf14af70377b4da5a6de863be2f06c0f24a65"
+      "bytes": 241456,
+      "sha256": "679211a6f27601d382d36ab131984e0329e515d17957de57c0e974715e9a57e0"
     },
     {
       "filename": "en-1-search.png",
       "width": 1280,
       "height": 800,
-      "bytes": 225599,
-      "sha256": "f5951fe211aaea2f8e6602953f0ea1054e994489f4e52cdd50d7dadc5900f931"
+      "bytes": 221419,
+      "sha256": "2f6f264d11ec3d2c3960aa24283e1c5c577e69fc28e5c87e599241206e3ee6b9"
     },
     {
       "filename": "en-2-switcher.png",
       "width": 1280,
       "height": 800,
-      "bytes": 219016,
-      "sha256": "a707c29ec05e284cb1eea6b111c75926d29c61e8274b4b1ec58f466870cf8e36"
+      "bytes": 218977,
+      "sha256": "5eaf94d98648c077f0976fc2b7cf63c8fdc250255d13ccceeda9dc82b7141848"
     },
     {
       "filename": "en-3-actions.png",
       "width": 1280,
       "height": 800,
-      "bytes": 230487,
-      "sha256": "798f231fa6c6c6d9bc62ec6c1c2e6607baea67ba7e82be0cc5dc69d1c910b5d3"
+      "bytes": 222175,
+      "sha256": "5a091ffe6f9a74ef9f96272493eabe4555fedd8e4f28816f2bd2221ed1809a1a"
     },
     {
       "filename": "en-promo-440x280.png",
       "width": 440,
       "height": 280,
-      "bytes": 43187,
-      "sha256": "3b82836ca94b196ed818d5cbd70a722cf647765a5c797f66258360ab3ca47783"
+      "bytes": 43277,
+      "sha256": "f23dd198aed930932bea566c8e7d324eedc94a9ca196cdceb818015b152c7742"
     },
     {
       "filename": "en-promo-1400x560.png",
       "width": 1400,
       "height": 560,
-      "bytes": 285069,
-      "sha256": "078690dd99799b97615dbf4893b6f5d0a8c3aab6dc125ff0ca90a909aa411064"
+      "bytes": 282156,
+      "sha256": "9039fcca0c30945e6c524ba1ba2f200ca55d510275f9cdece9a9964b75b10035"
     },
     {
       "filename": "promo-440x280.png",
       "width": 440,
       "height": 280,
-      "bytes": 43187,
-      "sha256": "3b82836ca94b196ed818d5cbd70a722cf647765a5c797f66258360ab3ca47783"
+      "bytes": 43277,
+      "sha256": "f23dd198aed930932bea566c8e7d324eedc94a9ca196cdceb818015b152c7742"
     },
     {
       "filename": "promo-1400x560.png",
       "width": 1400,
       "height": 560,
-      "bytes": 285069,
-      "sha256": "078690dd99799b97615dbf4893b6f5d0a8c3aab6dc125ff0ca90a909aa411064"
+      "bytes": 282156,
+      "sha256": "9039fcca0c30945e6c524ba1ba2f200ca55d510275f9cdece9a9964b75b10035"
     },
     {
       "filename": "store-icon-128.png",
