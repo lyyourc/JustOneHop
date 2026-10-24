@@ -424,7 +424,13 @@ test.describe(() => {
     expect(await page.locator('#justonehop-command-palette').evaluate(node => node.shadowRoot)).toBeNull();
     await expect.poll(async () => (await ax()).some(node => node.role?.value === 'combobox' && node.properties?.some(property => property.name === 'focused' && property.value.value === true))).toBe(true);
     await page.keyboard.type('downloads');
-    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option' && node.name?.value.includes('Chrome Pages: Downloads'))).toBe(true);
+    // Intermediate query results can already contain Downloads while the final
+    // history request still disables execution. Wait for the user-visible ready
+    // state, not merely the presence of a matching row.
+    await expect.poll(async () => (await ax()).some(node => node.role?.value === 'option'
+      && node.name?.value.includes('Chrome Pages: Downloads')
+      && node.properties?.some(property => property.name === 'selected' && property.value.value === true)
+      && !node.properties?.some(property => property.name === 'disabled' && property.value.value === true))).toBe(true);
     const created = context.waitForEvent('page');
     await page.keyboard.press('Enter');
     await expectChromePageLoaded(await created, { url: 'chrome://downloads/', root: 'downloads-manager' });
