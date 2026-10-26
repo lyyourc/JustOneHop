@@ -8,6 +8,8 @@
 
 [English](README.md) · 简体中文
 
+**[从 Chrome 应用商店安装](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo)** · v0.3.0 · 免费 · Chrome 127+
+
 **顺应直觉、贴合 Chrome 原生体验的命令面板。**
 
 标签页开多了找不着、书签和历史分散在不同入口？按一下 **`⌘Shift+P`**（Windows/Linux 为 `Ctrl+Shift+P`），在一个搜索框里同时找齐**已打开的标签页、书签、浏览历史、标签组和常用操作**——用鼠标点选、按快捷键，或中途混用都自然顺手。
@@ -39,7 +41,7 @@
 
 ![最近标签切换演示](docs/demo/zh-switcher.gif)
 
-- **按住选、松手即切**：按住 `Control+J`（内置向导支持 10 秒配置为 **`Ctrl+Tab`**），按**最近访问顺序（MRU）**穿梭，松开修饰键立即切换。
+- **按住选、松手即切**：按住 `Control+J`（可按内置指南配置为 **`Ctrl+Tab`**），按**最近访问顺序（MRU）**穿梭，松开修饰键立即切换。
 - **随时打字筛选**：切换途中点搜索框或按 `⌘F`，即可松开按键，输入标题或网址快速缩小范围。
 - **纯鼠标也好用**：随时可从面板首页点进 `Tab Switcher`，用鼠标或回车从容选择。
 
@@ -47,7 +49,7 @@
 
 ![标签整理与操作菜单演示](docs/demo/zh-actions.gif)
 
-- **连续整理不中断（右键 / `⌘K`）**：对任意标签页一键复制链接、固定、静音、收藏或关闭。操作后面板**保持打开并自动选中下一项**，一口气清理多个标签页。
+- **连续整理不中断（右键 / `⌘K`）**：对任意标签页一键复制链接、固定、静音、收藏或关闭。操作后面板**保持打开并保留当前选择**；所选标签被移除后再选中下一项，可连续整理多个标签页。
 - **原生标签组与闲置收起**：直接搜索并展开、改名、解散或关闭标签组（自动保护固定页）。开启「自动收起」后，电脑空闲时会将久未访问的标签页移入原生折叠组，不关网页也能让标签栏保持清爽。
 - **免开 DevTools 看存储**：搜 `local storage`、`session storage` 或 `cookie`，双栏只读查看格式化 JSON 并一键复制（Cookie 权限仅按站点独立申请）。
 
@@ -71,12 +73,15 @@
 
 ## 安装方式
 
-### 方式一：Chrome 应用商店 / 发行包
+### 方式一：Chrome 应用商店（推荐）
 
-- **Chrome 应用商店**：[小范围瞬移 · JustOneHop](https://chromewebstore.google.com/detail/justonehop/mbofggnjaoneioopfbpheapgphmkclbo)
-- **GitHub Releases**：在 [Releases 页面](https://github.com/lyyourc/JustOneHop/releases) 下载最新构建包，或查看 [更新日志](CHANGELOG.md)（当前源码版本：`0.2.1`）。
+**v0.3.0 已通过审核并正式上架。** 打开[小范围瞬移 · JustOneHop 商店页面](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo)，点击 **「添加至 Chrome」** 即可安装。需要 Chrome 127+。
 
-### 方式二：从源码本地构建
+### 方式二：手动安装发行包
+
+从 [GitHub Release v0.3.0](https://github.com/lyyourc/JustOneHop/releases/tag/v0.3.0) 下载 `justonehop-0.3.0.zip` 并解压，在 `chrome://extensions` 开启 **「开发者模式」**，点击 **「加载已解压的扩展程序」**，选择包含 `manifest.json` 的解压目录。GitHub 自动生成的源码归档不是可安装的扩展包。版本变化见[更新日志](CHANGELOG.md)。
+
+### 方式三：从源码本地构建
 
 需要 Node.js / npm 与 Chrome 127+：
 

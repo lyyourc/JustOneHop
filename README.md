@@ -8,6 +8,8 @@
 
 English · [简体中文](README.zh-CN.md)
 
+**[Install from the Chrome Web Store](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo)** · v0.3.0 · Free · Chrome 127+
+
 **A human-first, Chrome-native command palette.**
 
 Too many tabs open, with bookmarks and history scattered across different menus? Press **`⌘Shift+P`** (`Ctrl+Shift+P` on Windows/Linux) to search **open tabs, bookmarks, browsing history, tab groups, and browser actions** from a single box—effortless with your mouse, keyboard, or both.
@@ -39,7 +41,7 @@ Too many tabs open, with bookmarks and history scattered across different menus?
 
 ![Recent Tab Switcher Demo](docs/demo/en-switcher.gif)
 
-- **Hold & release**: Hold `Control+J` (or set up **`Ctrl+Tab`** in 10 seconds with the built-in guide), cycle through tabs in **most recently used (MRU)** order, and release the modifier key to switch.
+- **Hold & release**: Hold `Control+J` (or configure **`Ctrl+Tab`** using the built-in guide), cycle through tabs in **most recently used (MRU)** order, and release the modifier key to switch.
 - **Filter anytime**: Click the search bar or press `⌘F` while switching to release the keys and filter by title or URL.
 - **Mouse-friendly**: Also available right from the home list whenever you prefer clicking.
 
@@ -47,7 +49,7 @@ Too many tabs open, with bookmarks and history scattered across different menus?
 
 ![Tab Actions Demo](docs/demo/en-actions.gif)
 
-- **Tidy tabs in a row (Right-click / `⌘K`)**: Copy URLs, pin, mute, bookmark, or close tabs from the Actions menu. The palette **stays open and selects the next item**, so you can clean up multiple tabs without reopening it.
+- **Tidy tabs in a row (Right-click / `⌘K`)**: Copy URLs, pin, mute, bookmark, or close tabs from the Actions menu. The palette **stays open and preserves your selection**, moving to the next item when the selected tab is removed, so you can clean up multiple tabs without reopening it.
 - **Native Tab Groups & Auto-Tuck**: Search and expand, rename, ungroup, or close tab groups directly (pinned tabs stay protected). Enable **Auto-Tuck** in Settings to slide inactive tabs into native collapsed groups while your computer is idle—decluttering your tab strip without closing pages.
 - **Inspect Storage without DevTools**: Search `local storage`, `session storage`, or `cookie` for a side-by-side, read-only JSON viewer with one-key copy (cookie access is requested per site).
 
@@ -71,12 +73,15 @@ Too many tabs open, with bookmarks and history scattered across different menus?
 
 ## Installation
 
-### Option 1: Chrome Web Store / Releases
+### Option 1: Chrome Web Store (Recommended)
 
-- **Chrome Web Store**: [JustOneHop on Chrome Web Store](https://chromewebstore.google.com/detail/justonehop/mbofggnjaoneioopfbpheapgphmkclbo)
-- **GitHub Releases**: Download the latest package from [GitHub Releases](https://github.com/lyyourc/JustOneHop/releases) or check the [Changelog](CHANGELOG.md) (current source version: `0.2.1`).
+**v0.3.0 is published and available to everyone.** Open [JustOneHop on the Chrome Web Store](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo) and click **Add to Chrome**. Requires Chrome 127+.
 
-### Option 2: Build from Source
+### Option 2: Install a Release Package Manually
+
+Download `justonehop-0.3.0.zip` from [GitHub Release v0.3.0](https://github.com/lyyourc/JustOneHop/releases/tag/v0.3.0), extract it, then open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**. Select the extracted folder containing `manifest.json`. GitHub's automatic source archives are not installable extension packages. See the [Changelog](CHANGELOG.md) for changes.
+
+### Option 3: Build from Source
 
 Requires Node.js / npm and Chrome 127+:
 

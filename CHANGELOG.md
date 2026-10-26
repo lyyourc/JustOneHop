@@ -4,7 +4,7 @@ User-visible changes are grouped by release. Git tags use `v<version>`; extensio
 
 ## [0.3.0] - 2026-10-24
 
-Submitted to the Chrome Web Store for review (`Pending Review`, auto-publish on approval); GitHub release published on 2026-10-24. / 2026-10-24 发布 GitHub Release 并已提交 Chrome Web Store 审核（`Pending Review`，审核通过后自动发布）。
+Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo); the developer dashboard confirmed `Published` and public availability on 2026-10-26. GitHub release published on 2026-10-24. / 已通过审核并在 Chrome Web Store 公开上架，2026-10-26 确认后台状态为 `Published`；GitHub Release 发布于 2026-10-24。
 
 ### Added / 新增
 

@@ -11,7 +11,7 @@
 | 字段 | 填写内容 | 说明 |
 | --- | --- | --- |
 | **扩展名称 (Name)** | `JustOneHop`（默认语言） / `小范围瞬移`（中文） | 英文首字母大写；中文名统一 |
-| **待上架版本** | `0.3.0` | 功能冻结，已提交审核（Pending Review），审核通过后自动发布 |
+| **已上架版本** | `0.3.0` | 2026-10-26 确认后台为 Published，已公开上架 |
 | **扩展 ID** | `mbofggnjaoneioopfbpheapgphmkclbo` | 商店官方分配唯一标识 |
 | **开发者账号** | `lyyourc` | 个人开发者 |
 | **支持与隐私邮箱** | `liangyida42@gmail.com` | 已验证联系邮箱 |
@@ -228,9 +228,9 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ### 版本与上架状态
 
-**当前阶段：`0.3.0` 作为 Chrome Web Store 待上架版本，功能已冻结，沿用原标记 1.0.0 构建的完整自动化验证；0.3.0 仅修改版本元数据，其余包内文件逐字节一致，已通过打包校验（2026-10-24）。** 本次准备已完成 `justonehop-0.3.0.zip` 及其逐文件审计（见 `releases/justonehop-0.3.0-package-audit.json` 与 `releases/justonehop-0.3.0-notes.md`），已于 2026-10-24 发布 GitHub Release（`v0.3.0`）并提交 Chrome Web Store 审核，后台确认 `Pending Review`，选择审核通过后自动发布。发布范围为 Public / All regions / Free，当前分类为 Tools。广泛网站权限触发了可能延长审核的提示，权限用途说明已核对。
+**当前阶段：`0.3.0` 已通过 Chrome Web Store 审核并公开上架。** 功能已冻结，沿用原标记 1.0.0 构建的完整自动化验证；0.3.0 仅修改版本元数据，其余包内文件逐字节一致，已通过打包校验（2026-10-24）。 本次准备已完成 `justonehop-0.3.0.zip` 及其逐文件审计（见 `releases/justonehop-0.3.0-package-audit.json` 与 `releases/justonehop-0.3.0-notes.md`），已于 2026-10-24 发布 GitHub Release（`v0.3.0`）并提交 Chrome Web Store 审核，2026-10-26 确认后台状态为 `Published`，并明确显示已向公众开放。[商店安装入口](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo)。发布范围为 Public / All regions / Free，当前分类为 Tools。
 
-`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 统一使用三段数字版本 `0.3.0`；Git tag 与 GitHub Release 使用 `v0.3.0`，发布包附件名为 `justonehop-0.3.0.zip`。后续新增功能递增次版本，修复递增补丁版本。上传前核对后台已有版本；待上传版本必须高于已发布版本。本次已核对原草稿为 0.1.0，尚无已发布版本。
+`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 统一使用三段数字版本 `0.3.0`；Git tag 与 GitHub Release 使用 `v0.3.0`，发布包附件名为 `justonehop-0.3.0.zip`。后续新增功能递增次版本，修复递增补丁版本。上传前核对后台已有版本；待上传版本必须高于已发布版本。本次上传前原草稿为 0.1.0，彼时无已发布版本；当前已发布版本为 0.3.0。
 
 [CHANGELOG](../CHANGELOG.md) 按版本维护用户可见变化。准备中的版本标记 `Unreleased`；正式发布时改为发布日期（`YYYY-MM-DD`）。GitHub Release 与 Chrome Web Store 审核状态相互独立：只有后台审核通过并公开可访问后，才将商店状态标记为已上线。
 
@@ -290,7 +290,7 @@ gh release edit v0.3.0 --draft=false
 
 GitHub 自动生成的源码归档不是商店上传包；商店提审务必上传 `releases/justonehop-0.3.0.zip`。
 
-### 商店提交状态（2026-10-24）
+### 商店发布状态（2026-10-26 确认）
 
 - [x] 上传 `releases/justonehop-0.3.0.zip`；SHA-256 为 `f7f82eb5a7dfea6c3007ab91998844fdc6c7011cee1513e902d8c79796ca2a0b`，后台包版本确认为 `0.3.0`。
 - [x] 英文、简体中文介绍已保存；`zh-TW` 条目沿用简体中文并明确说明，未声称提供繁体翻译。
@@ -298,7 +298,8 @@ GitHub 自动生成的源码归档不是商店上传包；商店提审务必上�
 - [x] 单一用途、14 项权限理由及广泛主机用途已核对；更新 storage 说明以覆盖图标、补全及继续搜索，保留无远程代码声明及实际数据类别披露。
 - [x] 审核员说明已更新为 464 字符；后台限制为 500 字符。
 - [x] 公开中英文隐私政策已同步至 0.3.0 的数据处理范围（GitHub main 提交 `def2f24bb274a0cf0f0beb58f1778cb9e7a1476e`）；隐私和使用指南可匿名访问。
-- [x] 已提交审核，后台确认 **Pending Review**，审核通过后自动发布。
-- [ ] 审核通过并公开上线后，核对商店页及安装后的扩展版本，再更新验收状态。
+- [x] 2026-10-24 提交审核，选择审核通过后自动发布。
+- [x] 2026-10-26 确认后台为 **Published**，并显示已向公众开放；[商店入口](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo)。
+- [ ] 可选：从商店安装后核对扩展版本及基本操作；本次未新增商店安装实测。
 
-当前是已送审，尚未确认公开上线。提交凭证与包审计保存在本地 `releases/`。
+当前已正式上架。提交时凭证与包审计保存在本地 `releases/`，保留历史送审状态。
