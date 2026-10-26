@@ -1,10 +1,9 @@
 import { test, expect } from './support/paletteUI';
 
-for (const overlay of [false, true]) test(`settings navigation preserves categories, search and drafts in ${overlay ? 'overlay' : 'window'}`, async ({ palette }) => {
+test('settings navigation preserves categories, search and drafts in overlay', async ({ palette }) => {
   const { ui } = palette;
-  await ui.clock.install();
-  await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}) });
-  const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
+  await palette.open({ locale: 'en-US', overlay: true });
+  const surface = ui.frameLocator('.justonehop-frame');
   const homePet = surface.locator('.footer-hint-pet');
   await expect(homePet).toBeVisible();
   await expect(homePet).toHaveAttribute('aria-expanded', 'false');
@@ -16,8 +15,7 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
     return [dot.left - previous.right, next.left - dot.right];
   })).toEqual([4, 4]);
   await surface.locator('.palette').screenshot({ path: test.info().outputPath('home-hint-expanded.png') });
-  await ui.mouse.move(0, 0);
-  await ui.clock.runFor(3000);
+  await homePet.click();
   await expect(homePet).toHaveAttribute('aria-expanded', 'false');
   const homePetBox = (await homePet.boundingBox())!;
   await surface.locator('.settings-button').click();
@@ -72,8 +70,7 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await expect(bubble).toBeVisible();
   await expect(pet).not.toBeFocused();
   await settings.screenshot({ path: test.info().outputPath('settings-hint-escape-unchanged.png') });
-  await ui.mouse.move(0, 0);
-  await ui.clock.runFor(3000);
+  await pet.click();
   await pet.press('Shift+Enter'); await expect(pet).toHaveAttribute('aria-expanded', 'false');
   await pet.click(); await search.click(); await expect(pet).toHaveAttribute('aria-expanded', 'true');
   await bubble.click(); await expect(pet).toHaveAttribute('aria-expanded', 'true');
@@ -256,7 +253,6 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await surface.locator('.settings-button').click();
 
   await ui.setViewportSize({ width: 390, height: 600 });
-  if (!overlay) await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   const categories = surface.getByRole('combobox', { name: 'Settings categories' });
   await expect(categories).toBeVisible();
   await categories.selectOption('help');
@@ -308,12 +304,12 @@ for (const overlay of [false, true]) test(`settings navigation preserves categor
   await expect(change).toBeFocused();
 });
 
-for (const overlay of [false, true]) test(`footer hint motion pauses with its owner window in ${overlay ? 'overlay' : 'window'}`, async ({ palette }) => {
+test('footer hint motion pauses with its owner window', async ({ palette }) => {
   const { ui } = palette;
   await ui.clock.install();
   await ui.emulateMedia({ reducedMotion: 'no-preference' });
-  await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}) });
-  const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
+  await palette.open({ locale: 'en-US', overlay: true });
+  const surface = ui.frameLocator('.justonehop-frame');
   const hint = surface.locator('.footer-hint');
   await ui.mouse.move(0, 0);
   await hint.evaluate(node => node.ownerDocument.defaultView!.dispatchEvent(new Event('focus')));

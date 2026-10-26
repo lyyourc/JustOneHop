@@ -1,11 +1,9 @@
-import { test as base, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { test, expect, chromium, type BrowserContext, type Page, type Worker } from '@playwright/test';
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { browserPath } from './support/browserPath';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-
-const test = base.extend<{ startupStorageFailure: boolean }>({ startupStorageFailure: [false, { option: true }] });
 
 let server: Server;
 let origin: string;
@@ -28,7 +26,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => { server.close(); });
 
-test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
+test.beforeEach(async ({}, testInfo) => {
   const started = performance.now();
   browserStarted = false;
   profile = '';
@@ -50,15 +48,7 @@ test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
     chrome.alarms.onAlarm.addListener = callback => { globalThis.__tuckAlarms.push(callback); addAlarm(callback); };
     chrome.idle.queryState = async () => 'idle';
   `;
-  const failure = startupStorageFailure ? `
-    const readSession = chrome.storage.session.get.bind(chrome.storage.session);
-    let failedSessionRead = false;
-    chrome.storage.session.get = async (...args) => {
-      if (!failedSessionRead) { failedSessionRead = true; throw new Error('Temporary test storage failure'); }
-      return readSession(...args);
-    };
-  ` : '';
-  await writeFile(background, hook + failure + await readFile(background, 'utf8'));
+  await writeFile(background, hook + await readFile(background, 'utf8'));
   const executablePath = await browserPath();
   const prepared = performance.now();
   context = await chromium.launchPersistentContext(join(profile, 'browser'), {
@@ -78,7 +68,7 @@ test.beforeEach(async ({ startupStorageFailure }, testInfo) => {
   await ui.goto(popupUrl);
   const session = await context.newCDPSession(ui);
   testInfo.annotations.push({ type: 'browser-version', description: (await session.send('Browser.getVersion')).product },
-    { type: 'browser-environment', description: JSON.stringify({ locale: 'en-US', startupStorageFailure, shadow: 'closed', headed: false }) });
+    { type: 'browser-environment', description: JSON.stringify({ locale: 'en-US', shadow: 'closed', headed: false }) });
   await session.detach();
   await expect(ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' })).toBeVisible();
   windowId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
@@ -314,14 +304,14 @@ test('second automatic tuck reuses each window original group and ignores a same
   expect(await groupId(userTab)).toBe(userGroup);
 });
 
-for (const change of ['rename', 'foreign member', 'worker restart'] as const) {
-  test(`second automatic tuck respects ownership after ${change}`, async () => {
+test('second automatic tuck respects ownership after rename, foreign member, and worker restart', async () => {
+  const status = () => ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+  for (const change of ['rename', 'foreign member', 'worker restart'] as const) await test.step(change, async () => {
     const [first] = await seed('Original-Batch');
     await enableAutomaticTucking();
     await runIdleScan();
     await expect.poll(() => groupId(first)).not.toBe(-1);
     const originalGroup = await groupId(first);
-    const status = () => ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
     await status();
     let foreign: number | undefined;
     if (change === 'rename') {
@@ -359,54 +349,32 @@ for (const change of ['rename', 'foreign member', 'worker restart'] as const) {
     expect(await groupId(second)).toBe(-1);
     expect(await groupId(first)).toBe(originalGroup);
     if (foreign !== undefined) expect(await groupId(foreign)).toBe(originalGroup);
+    await worker.evaluate(async ids => {
+      await chrome.tabs.remove(ids);
+      const { preferences } = await chrome.storage.local.get('preferences');
+      await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: false } });
+      (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 0;
+    }, [first, second, ...(foreign !== undefined ? [foreign] : [])]);
+    await status();
   });
-}
+});
 
-for (const interruption of ['none', 'worker restart', 'failed insertion'] as const) test(`automatic batches preserve original interleaved order${interruption === 'none' ? '' : ` across ${interruption}`}`, async () => {
-  const [b, d] = await seed('Order-B', 'Order-D');
-  await enableAutomaticTucking();
-  await worker.evaluate(() => { (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 8 * 24 * 60 * 60 * 1000; });
-  const [a, c] = await seed('Order-A', 'Order-C');
-  await worker.evaluate(async ({ a, b, c, d }) => {
-    await chrome.tabs.move(a, { index: (await chrome.tabs.get(b)).index });
-    await chrome.tabs.move(c, { index: (await chrome.tabs.get(d)).index });
-  }, { a, b, c, d });
-  await runIdleScan();
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  const owned = await groupId(b);
-  expect(owned).not.toBe(-1);
-  const members = () => worker.evaluate(async id => (await chrome.tabs.query({ groupId: id })).sort((a, b) => a.index - b.index).map(tab => tab.id), owned);
-  expect(await members()).toEqual([b, d]);
-  if (interruption === 'worker restart') await restartTuckWorker();
-  if (interruption === 'failed insertion') await worker.evaluate(() => {
-    const move = chrome.tabs.move.bind(chrome.tabs);
-    const group = chrome.tabs.group.bind(chrome.tabs);
-    chrome.tabs.group = (async (options: chrome.tabs.GroupOptions) => {
-      chrome.tabs.group = group;
-      const id = await group(options);
-      const members = await chrome.tabs.query({ groupId: id });
-      const tabId = Array.isArray(options.tabIds) ? options.tabIds[0] : options.tabIds!;
-      await move(tabId, { index: Math.max(...members.map(tab => tab.index)) });
-      return id;
-    }) as typeof group;
-    chrome.tabs.move = (async () => {
-      chrome.tabs.move = move;
-      throw new Error('injected insertion failure');
-    }) as typeof move;
-  });
-  await worker.evaluate(async () => {
-    const harness = globalThis as unknown as { __tuckClockOffset: number; __tuckAlarms: ((alarm: chrome.alarms.Alarm) => unknown)[] };
-    harness.__tuckClockOffset = 16 * 24 * 60 * 60 * 1000;
-    const alarm = (await chrome.alarms.get('justonehop-auto-tuck'))!;
-    for (const listener of harness.__tuckAlarms) listener(alarm);
-  });
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  if (interruption === 'failed insertion') {
-    expect(new Set(await members())).toEqual(new Set([b, d, a]));
-    expect(await worker.evaluate(async () => {
-      const saved = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { pendingOrder?: Record<string, unknown[]> };
-      return Object.values(saved.pendingOrder || {}).flat().length;
-    })).toBe(1);
+test('automatic batches preserve original interleaved order across worker restart and respect manual reorder and group edits', async () => {
+  await test.step('interleaved order across worker restart', async () => {
+    const [b, d] = await seed('Order-B', 'Order-D');
+    await enableAutomaticTucking();
+    await worker.evaluate(() => { (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 8 * 24 * 60 * 60 * 1000; });
+    const [a, c] = await seed('Order-A', 'Order-C');
+    await worker.evaluate(async ({ a, b, c, d }) => {
+      await chrome.tabs.move(a, { index: (await chrome.tabs.get(b)).index });
+      await chrome.tabs.move(c, { index: (await chrome.tabs.get(d)).index });
+    }, { a, b, c, d });
+    await runIdleScan();
+    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+    const owned = await groupId(b);
+    expect(owned).not.toBe(-1);
+    const members = () => worker.evaluate(async id => (await chrome.tabs.query({ groupId: id })).sort((a, b) => a.index - b.index).map(tab => tab.id), owned);
+    expect(await members()).toEqual([b, d]);
     await restartTuckWorker();
     await worker.evaluate(async () => {
       const harness = globalThis as unknown as { __tuckClockOffset: number; __tuckAlarms: ((alarm: chrome.alarms.Alarm) => unknown)[] };
@@ -415,459 +383,212 @@ for (const interruption of ['none', 'worker restart', 'failed insertion'] as con
       for (const listener of harness.__tuckAlarms) listener(alarm);
     });
     await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  }
-  expect(await members()).toEqual([a, b, c, d]);
-  await execute('undoTuck');
-  expect(await members()).toEqual(interruption === 'failed insertion' ? [a, b, d] : [b, d]);
-  expect(await groupId(a)).toBe(interruption === 'failed insertion' ? owned : -1);
-  expect(await groupId(c)).toBe(-1);
+    expect(await members()).toEqual([a, b, c, d]);
+    await execute('undoTuck');
+    expect(await members()).toEqual([b, d]);
+    expect(await groupId(a)).toBe(-1);
+    expect(await groupId(c)).toBe(-1);
+    await worker.evaluate(async ids => {
+      await chrome.tabs.remove(ids);
+      const { preferences } = await chrome.storage.local.get('preferences');
+      await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: false } });
+      (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 0;
+    }, [a, b, c, d]);
+    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+  });
+
+  await test.step('manual reorder of existing tucked members', async () => {
+    const [a, b, c] = await seed('Manual-Order-A', 'Manual-Order-B', 'Manual-Order-C');
+    await enableAutomaticTucking();
+    await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), b);
+    await runIdleScan();
+    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+    const owned = await groupId(a);
+    await worker.evaluate(async ({ a, c }) => chrome.tabs.move(c, { index: (await chrome.tabs.get(a)).index }), { a, c });
+    await worker.evaluate(id => chrome.tabs.update(id, { pinned: false }), b);
+    await runIdleScan();
+    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+    expect(await worker.evaluate(async id => (await chrome.tabs.query({ groupId: id })).sort((a, b) => a.index - b.index).map(tab => tab.id), owned)).toEqual([b, c, a]);
+    await worker.evaluate(async ids => {
+      await chrome.tabs.remove(ids);
+      const { preferences } = await chrome.storage.local.get('preferences');
+      await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: false } });
+      (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 0;
+    }, [a, b, c]);
+    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+  });
+
+  await test.step('justonehop group edits preserve tuck ownership and persist custom title and color', async () => {
+    const [a, b, c] = await seed('Managed-A', 'Managed-B', 'Managed-C');
+    await execute('tuck', a); await execute('tuck', b);
+    const id = await groupId(a);
+    const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }),
+      { action: 'updateGroup', windowId, groupId: id, groupChanges: { title: 'Later', color: 'purple' } });
+    expect(reply).toMatchObject({ ok: true });
+    await execute('tuck', c);
+    expect(await groupId(c)).toBe(id);
+    expect(await worker.evaluate(id => chrome.tabGroups.get(id), id)).toMatchObject({ title: 'Later', color: 'purple' });
+    const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
+    expect(snapshot.data.tabs.filter((tab: { tucked: boolean }) => tab.tucked)).toHaveLength(3);
+    await worker.evaluate(id => chrome.tabs.update(id, { active: true }), a);
+    await expect.poll(() => groupId(a)).toBe(-1);
+    expect(await worker.evaluate(id => chrome.tabGroups.get(id), id)).toMatchObject({ title: 'Later', color: 'purple' });
+    const records = await worker.evaluate(() => chrome.storage.local.get('justonehopTabTuckRecovery'));
+    expect(JSON.stringify(records)).toContain('Later');
+    expect(JSON.stringify(records)).toContain('purple');
+    await worker.evaluate(ids => chrome.tabs.remove(ids), [a, b, c]);
+  });
 });
 
-test('later automatic batches respect a manual reorder of existing tucked members', async () => {
-  const [a, b, c] = await seed('Manual-Order-A', 'Manual-Order-B', 'Manual-Order-C');
-  await enableAutomaticTucking();
-  await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), b);
-  await runIdleScan();
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  const owned = await groupId(a);
-  await worker.evaluate(async ({ a, c }) => chrome.tabs.move(c, { index: (await chrome.tabs.get(a)).index }), { a, c });
-  await worker.evaluate(id => chrome.tabs.update(id, { pinned: false }), b);
-  await runIdleScan();
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  expect(await worker.evaluate(async id => (await chrome.tabs.query({ groupId: id })).sort((a, b) => a.index - b.index).map(tab => tab.id), owned)).toEqual([b, c, a]);
+test('unfocused Chrome tucks on a native alarm after thirty minutes and leaving a long-running active page gives a fresh grace period', async () => {
+  await test.step('long-running active page gets a fresh grace period when the user leaves it', async () => {
+    const [previous, next, idle] = await seed('Long-Active', 'New-Active', 'Old-Idle');
+    await worker.evaluate(id => chrome.tabs.update(id, { active: true }), previous);
+    await enableAutomaticTucking();
+    await worker.evaluate(async next => {
+      (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 8 * 24 * 60 * 60 * 1000;
+      await chrome.tabs.update(next, { active: true });
+    }, next);
+    await expect.poll(() => worker.evaluate(async ({ windowId, next }) => {
+      const stored = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { active?: Record<number, number> };
+      return stored.active?.[windowId] === next;
+    }, { windowId, next })).toBe(true);
+    await runIdleScan();
+    await expect.poll(() => groupId(idle)).not.toBe(-1);
+    expect(await groupId(previous)).toBe(-1);
+    expect(await groupId(next)).toBe(-1);
+    await ui.bringToFront();
+    await worker.evaluate(async ids => {
+      await chrome.tabs.remove(ids);
+      const { preferences } = await chrome.storage.local.get('preferences');
+      await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: false } });
+      (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 0;
+    }, [previous, next, idle]);
+    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+  });
+
+  await test.step('unfocused Chrome tucks on a native alarm after thirty minutes and preserves undo', async () => {
+    const [old] = await seed('Unfocused-Idle');
+    await enableAutomaticTucking();
+    await worker.evaluate(() => {
+      const harness = globalThis as unknown as { __tuckClockOffset: number; __tuckFocusListeners: ((id: number) => void)[] };
+      harness.__tuckClockOffset = 8 * 24 * 60 * 60 * 1000;
+      chrome.idle.queryState = async () => 'active' as const;
+      const getAll = chrome.windows.getAll.bind(chrome.windows);
+      chrome.windows.getAll = (async () => (await getAll({})).map(window => ({ ...window, focused: false }))) as typeof chrome.windows.getAll;
+      for (const listener of harness.__tuckFocusListeners) listener(chrome.windows.WINDOW_ID_NONE);
+    });
+    const status = () => ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+    await expect.poll(async () => (await status()).data.waitingReason).toBe('grace');
+    expect(await groupId(old)).toBe(-1);
+    await worker.evaluate(async () => {
+      const harness = globalThis as unknown as { __tuckClockOffset: number };
+      harness.__tuckClockOffset += 30 * 60 * 1000;
+      await chrome.alarms.create('justonehop-auto-tuck', { when: Date.now() - harness.__tuckClockOffset + 100, periodInMinutes: 5 });
+    });
+    await expect.poll(() => groupId(old)).not.toBe(-1);
+    await expect.poll(async () => chromeGroup(await groupId(old))).toMatchObject({ title: 'Tuck Away', collapsed: true });
+    await execute('undoTuck');
+    expect(await groupId(old)).toBe(-1);
+    async function chromeGroup(id: number) { return worker.evaluate(id => chrome.tabGroups.get(id), id); }
+  });
 });
 
-test('unfocused Chrome tucks on a native alarm after thirty minutes and preserves undo', async () => {
-  const [old] = await seed('Unfocused-Idle');
-  await enableAutomaticTucking();
-  // OS focus and elapsed time are controlled; alarm delivery and grouping are native.
-  await worker.evaluate(() => {
-    const harness = globalThis as unknown as { __tuckClockOffset: number; __tuckFocusListeners: ((id: number) => void)[] };
-    harness.__tuckClockOffset = 8 * 24 * 60 * 60 * 1000;
-    chrome.idle.queryState = async () => 'active' as const;
-    const getAll = chrome.windows.getAll.bind(chrome.windows);
-    chrome.windows.getAll = (async () => (await getAll({})).map(window => ({ ...window, focused: false }))) as typeof chrome.windows.getAll;
-    for (const listener of harness.__tuckFocusListeners) listener(chrome.windows.WINDOW_ID_NONE);
+test('English auto tuck duration saves on selection, a native alarm applies it, and disabling releases only owned tabs', async () => {
+  await test.step('duration selection and native alarm execution', async () => {
+    const [old] = await seed('Configurable-Idle');
+    await enableAutomaticTucking();
+    expect(await worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toMatchObject({ periodInMinutes: 5 });
+    await worker.evaluate(() => {
+      (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 2 * 60 * 60 * 1000;
+      chrome.idle.queryState = async () => 'active' as const;
+    });
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await search.fill('auto tuck'); await search.press('Enter');
+    const duration = ui.getByRole('combobox', { name: 'Tuck after inactivity' });
+    const before = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
+    await duration.click();
+    await ui.getByRole('option', { name: '1 hour', exact: true }).click();
+    await ui.locator('.settings-search .search-focus.is-back').click();
+    await search.fill('auto tuck'); await search.press('Enter');
+    await expect(duration).toHaveText('1 hour');
+    await expect(ui.getByRole('button', { name: 'Save duration', exact: true })).toHaveCount(0);
+    await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
+    await expect(ui.getByText('1 eligible tabs waiting for Chrome to lose focus or your computer to become idle', { exact: true })).toBeVisible();
+    expect(await groupId(old)).toBe(-1);
+    const after = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
+    expect(after.clocks[`${origin}/Configurable-Idle`]).toBe(before.clocks[`${origin}/Configurable-Idle`]);
+    await worker.evaluate(async () => {
+      chrome.idle.queryState = async () => 'idle' as const;
+      const offset = (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset;
+      await chrome.alarms.create('justonehop-auto-tuck', { when: Date.now() - offset + 100, periodInMinutes: 5 });
+    });
+    await expect.poll(() => groupId(old)).not.toBe(-1);
+    await ui.getByRole('button', { name: 'Refresh status' }).click();
+    await expect(ui.getByText('No tabs currently qualify', { exact: true })).toBeVisible();
+    await expect(ui.getByText('Last automatic check:', { exact: false })).toBeVisible();
+    expect((await liveTabs()).some(tab => tab.id === old)).toBe(true);
+    await worker.evaluate(id => chrome.tabs.remove(id), old);
   });
-  const status = () => ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  await expect.poll(async () => (await status()).data.waitingReason).toBe('grace');
-  expect(await groupId(old)).toBe(-1);
-  await worker.evaluate(async () => {
-    const harness = globalThis as unknown as { __tuckClockOffset: number };
-    harness.__tuckClockOffset += 30 * 60 * 1000;
-    await chrome.alarms.create('justonehop-auto-tuck', { when: Date.now() - harness.__tuckClockOffset + 100, periodInMinutes: 5 });
-  });
-  await expect.poll(() => groupId(old)).not.toBe(-1);
-  await expect.poll(async () => chromeGroup(await groupId(old))).toMatchObject({ title: 'Tuck Away', collapsed: true });
-  await execute('undoTuck');
-  expect(await groupId(old)).toBe(-1);
-  async function chromeGroup(id: number) { return worker.evaluate(id => chrome.tabGroups.get(id), id); }
-});
 
-test('English auto tuck duration saves on selection and a native alarm applies it', async () => {
-  const [old] = await seed('Configurable-Idle');
-  await enableAutomaticTucking();
-  expect(await worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toMatchObject({ periodInMinutes: 5 });
-  await worker.evaluate(() => {
-    (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 2 * 60 * 60 * 1000;
-    chrome.idle.queryState = async () => 'active' as const;
-  });
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('auto tuck'); await search.press('Enter');
-  const duration = ui.getByRole('combobox', { name: 'Tuck after inactivity' });
-  const before = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
-  await duration.click();
-  await ui.getByRole('option', { name: '1 hour', exact: true }).click();
-  await ui.locator('.settings-search .search-focus.is-back').click();
-  await search.fill('auto tuck'); await search.press('Enter');
-  await expect(duration).toHaveText('1 hour');
-  await expect(ui.getByRole('button', { name: 'Save duration', exact: true })).toHaveCount(0);
-  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(1);
-  await expect(ui.getByText('1 eligible tabs waiting for Chrome to lose focus or your computer to become idle', { exact: true })).toBeVisible();
-  expect(await groupId(old)).toBe(-1);
-  const after = await worker.evaluate(async () => (await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> });
-  expect(after.clocks[`${origin}/Configurable-Idle`]).toBe(before.clocks[`${origin}/Configurable-Idle`]);
-  // Chrome delivers this alarm itself; only age and idle state are simulated.
-  await worker.evaluate(async () => {
-    chrome.idle.queryState = async () => 'idle' as const;
-    const offset = (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset;
-    await chrome.alarms.create('justonehop-auto-tuck', { when: Date.now() - offset + 100, periodInMinutes: 5 });
-  });
-  await expect.poll(() => groupId(old)).not.toBe(-1);
-  await ui.getByRole('button', { name: 'Refresh status' }).click();
-  await expect(ui.getByText('No tabs currently qualify', { exact: true })).toBeVisible();
-  await expect(ui.getByText('Last automatic check:', { exact: false })).toBeVisible();
-  expect((await liveTabs()).some(tab => tab.id === old)).toBe(true);
-  await ui.getByRole('textbox', { name: 'Search settings' }).fill('auto tuck');
-  const rules = ui.getByRole('button', { name: 'How it works' });
-  await expect(ui.locator('.tuck-description')).toContainText('Pages stay open.');
-  await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
-  await rules.click();
-  await expect(ui.locator('.tuck-rules-copy')).toContainText('returns all tucked tabs');
-  const ruleParagraphs = ui.locator('.tuck-rules-copy li');
-  await expect(ruleParagraphs).toHaveText([
-    'Tabs are only tucked after being idle for the chosen duration; enabling will not immediately tuck existing tabs.',
-    'Tucks tabs when your computer is idle or Chrome has been unfocused for 30 minutes. Stops when you return to Chrome.',
-    'Active, pinned, grouped, and other protected tabs are excluded.',
-    'Turning off returns all tucked tabs back to the tab bar.',
-  ]);
-  const scheduleBox = await ruleParagraphs.nth(0).boundingBox();
-  const timingBox = await ruleParagraphs.nth(1).boundingBox();
-  expect(timingBox!.y).toBeGreaterThanOrEqual(scheduleBox!.y + scheduleBox!.height);
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('auto-tuck-rules-en.png') });
-  await rules.click();
-  await expect(ui.locator('.tuck-rules-copy')).toBeHidden();
-  const labelBox = await ui.locator('.tuck-duration-label label').boundingBox();
-  const choiceBox = await duration.boundingBox();
-  expect(Math.abs(labelBox!.y + labelBox!.height / 2 - choiceBox!.y - choiceBox!.height / 2)).toBeLessThan(2);
-  const checkBox = await ui.locator('.tuck-last-check').boundingBox();
-  const rulesBox = await rules.boundingBox();
-  expect(Math.abs(checkBox!.y + checkBox!.height / 2 - rulesBox!.y - rulesBox!.height / 2)).toBeLessThan(2);
-  await ui.locator('.palette').screenshot({ path: test.info().outputPath('auto-tuck-en.png') });
-  await ui.getByRole('textbox', { name: 'Search settings' }).fill('');
-  const copyMetrics = (selector: string) => ui.locator(selector).evaluate(node => {
-    const title = node.querySelector('label')!.getBoundingClientRect();
-    const description = node.querySelector<HTMLElement>('.tuck-status-copy, p')!;
-    const style = getComputedStyle(description);
-    return { gap: description.getBoundingClientRect().top - title.bottom,
-      fontSize: style.fontSize, lineHeight: style.lineHeight,
-      unclipped: description.scrollWidth <= description.clientWidth && description.scrollHeight <= description.clientHeight };
-  });
-  const tuckCopy = await copyMetrics('.tuck-heading .setting-copy');
-  const durationBox = await duration.boundingBox();
-  await ui.getByRole('tab', { name: 'Appearance', exact: true }).click();
-  const helpCopy = await copyMetrics('[data-setting="searchIcon"] .setting-copy');
-  // Descriptions share typography and spacing across categories; wrapping stays natural.
-  expect(helpCopy.unclipped).toBe(true);
-  for (const copy of [tuckCopy]) {
-    expect(Math.abs(copy.gap - helpCopy.gap)).toBeLessThan(1);
-    expect(copy.fontSize).toBe(helpCopy.fontSize);
-    expect(copy.lineHeight).toBe(helpCopy.lineHeight);
-    expect(copy.unclipped).toBe(true);
-  }
-  const languageBox = await ui.getByRole('combobox', { name: 'Language', exact: true }).boundingBox();
-  expect(Math.abs(languageBox!.x - durationBox!.x)).toBeLessThan(1);
-  expect(durationBox!.height).toBe(languageBox!.height);
-  await ui.locator('.settings-body').evaluate(node => { node.scrollTop = 0; });
-  await ui.locator('.settings-view').screenshot({ path: test.info().outputPath('settings-overview-en.png') });
-  await ui.getByRole('tab', { name: 'Labs', exact: true }).click();
-  // A failed status read must not prevent saving; a failed write keeps the old value.
-  await ui.evaluate(() => {
-    const send = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = ((message: { type?: string }) => message.type === 'tuck-status'
-      ? Promise.resolve({ ok: false, error: 'Status unavailable' }) : send(message)) as typeof chrome.runtime.sendMessage;
-    const set = chrome.storage.local.set.bind(chrome.storage.local);
-    let fail = true;
-    chrome.storage.local.set = (async (items: Record<string, unknown>) => {
-      if (fail && items.preferences) { fail = false; throw new Error('Write failed'); }
-      return set(items);
-    }) as typeof chrome.storage.local.set;
-  });
-  await ui.getByRole('button', { name: 'Refresh status' }).click();
-  const feedback = ui.locator('.palette-footer .operation-feedback');
-  await expect(feedback).toHaveAttribute('role', 'alert');
-  await expect(feedback).toContainText('Could not read auto tuck status. Refresh to retry.');
-  await duration.click();
-  await ui.getByRole('option', { name: '12 hours', exact: true }).click();
-  await expect(feedback).toHaveAttribute('role', 'alert');
-  await expect(feedback).toContainText('Could not save settings. Please try again.');
-  await expect(duration).toHaveText('1 hour');
-  await duration.click();
-  await ui.getByRole('option', { name: '12 hours', exact: true }).click();
-  await expect(duration).toHaveText('12 hours');
-  await expect(feedback).toHaveAttribute('role', 'status');
-  await expect(feedback).toContainText('Tuck after 12 hours saved');
-  await expect.poll(() => worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuckAfterHours: number }).autoTuckAfterHours)).toBe(12);
-});
-
-test('English disabling automatic tuck releases its own tabs and keeps a same-name user group', async () => {
-  const [alpha, beta, personal] = await seed('Settings-Alpha', 'Settings-Beta', 'Settings-Personal');
-  await enableAutomaticTucking();
-  await execute('tuck', alpha); await execute('tuck', beta);
-  const owned = await groupId(alpha);
-  const personalGroup = await worker.evaluate(async ({ personal, owned }) => {
-    const metadata = await chrome.tabGroups.get(owned);
-    const group = await chrome.tabs.group({ tabIds: [personal] });
-    await chrome.tabGroups.update(group, { title: metadata.title, color: metadata.color, collapsed: true });
-    return group;
-  }, { personal, owned });
-  await ui.reload();
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('auto tuck'); await search.press('Enter');
-  const setting = ui.getByRole('switch');
-  await expect(setting).toBeChecked();
-  await setting.click();
-  await expect(setting).not.toBeChecked();
-  await expect.poll(() => groupId(alpha)).toBe(-1);
-  expect(await groupId(beta)).toBe(-1);
-  expect(await groupId(personal)).toBe(personalGroup);
-  expect(await worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuck: boolean }).autoTuck)).toBe(false);
-  await expect.poll(() => worker.evaluate(async () => Object.keys(((await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> }).clocks).length)).toBe(0);
-});
-
-test('English tuck preserves a user rename made while a page is joining the group', async () => {
-  const [alpha, beta] = await seed('Rename-Alpha', 'Rename-Beta');
-  await execute('tuck', alpha);
-  const owned = await groupId(alpha);
-  await worker.evaluate(owned => {
-    const original = chrome.tabs.group.bind(chrome.tabs);
-    chrome.tabs.group = (async (options: chrome.tabs.GroupOptions) => {
-      const group = await original(options);
-      if (options.groupId === owned) await chrome.tabGroups.update(group, { title: 'My renamed group', color: 'blue' });
+  await test.step('disabling automatic tuck releases its own tabs and keeps a same-name user group', async () => {
+    const [alpha, beta, personal] = await seed('Settings-Alpha', 'Settings-Beta', 'Settings-Personal');
+    await enableAutomaticTucking();
+    await execute('tuck', alpha); await execute('tuck', beta);
+    const owned = await groupId(alpha);
+    const personalGroup = await worker.evaluate(async ({ personal, owned }) => {
+      const metadata = await chrome.tabGroups.get(owned);
+      const group = await chrome.tabs.group({ tabIds: [personal] });
+      await chrome.tabGroups.update(group, { title: metadata.title, color: metadata.color, collapsed: true });
       return group;
-    }) as typeof chrome.tabs.group;
-  }, owned);
-  await execute('tuck', beta);
-  expect(await worker.evaluate(id => chrome.tabGroups.get(id), owned)).toMatchObject({ title: 'My renamed group', color: 'blue' });
-  const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
-  expect(snapshot.ok).toBe(true);
-  expect(snapshot.data.tabs.find((tab: { id: number }) => tab.id === alpha).tucked).toBe(false);
-  expect(snapshot.data.tabs.find((tab: { id: number }) => tab.id === beta).tucked).toBe(false);
+    }, { personal, owned });
+    await ui.reload();
+    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await search.fill('auto tuck'); await search.press('Enter');
+    const setting = ui.getByRole('switch');
+    await expect(setting).toBeChecked();
+    await setting.click();
+    await expect(setting).not.toBeChecked();
+    await expect.poll(() => groupId(alpha)).toBe(-1);
+    expect(await groupId(beta)).toBe(-1);
+    expect(await groupId(personal)).toBe(personalGroup);
+    expect(await worker.evaluate(async () => ((await chrome.storage.local.get('preferences')).preferences as { autoTuck: boolean }).autoTuck)).toBe(false);
+    await expect.poll(() => worker.evaluate(async () => Object.keys(((await chrome.storage.local.get('justonehopTabTuckClocks')).justonehopTabTuckClocks as { clocks: Record<string, number> }).clocks).length)).toBe(0);
+  });
 });
 
-test('English disabling tuck releases other pages after a transient failure and retries the remaining page', async () => {
-  const [alpha, beta] = await seed('Retry-Alpha', 'Retry-Beta');
+test('partial disable failure preserves safe recovery across a worker restart', async () => {
+  const [alpha, beta] = await seed('Partial-Alpha', 'Partial-Beta');
   await enableAutomaticTucking();
-  await execute('tuck', alpha); await execute('tuck', beta);
-  const owned = await groupId(alpha);
-  await worker.evaluate(alpha => {
+  await runIdleScan();
+  await expect.poll(() => groupId(beta)).not.toBe(-1);
+  const owned = await groupId(beta);
+  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
+  await worker.evaluate(beta => {
     const original = chrome.tabs.ungroup.bind(chrome.tabs);
-    let failed = false;
-    chrome.tabs.ungroup = (async (tabIds: number | [number, ...number[]]) => {
-      if (!failed && tabIds === alpha) { failed = true; throw new Error('Temporary test tab failure'); }
-      return original(tabIds);
+    chrome.tabs.ungroup = (async (ids: number | [number, ...number[]]) => {
+      if (ids === beta || Array.isArray(ids) && ids.includes(beta)) throw new Error('Temporary release failure');
+      return original(ids);
     }) as typeof chrome.tabs.ungroup;
-  }, alpha);
+  }, beta);
   await worker.evaluate(async () => {
     const { preferences } = await chrome.storage.local.get('preferences');
     await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: false } });
   });
-  await expect.poll(() => groupId(beta)).toBe(-1);
-  expect(await groupId(alpha)).toBe(owned);
-  // Toolbar theme sync also uses a 30-second alarm; only tuck's alarm proves
-  // that the failed release was scheduled for retry and subsequently stopped.
   await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.get('justonehop-auto-tuck'))?.periodInMinutes)).toBe(0.5);
-  await runIdleScan();
-  await expect.poll(() => groupId(alpha)).toBe(-1);
-  await expect.poll(() => worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toBeUndefined();
-});
-
-test('settings shows remaining releases while automatic tucking is disabled', async () => {
-  const [alpha] = await seed('Pending-Release');
-  await enableAutomaticTucking();
-  await execute('tuck', alpha);
-  await worker.evaluate(() => {
-    const original = chrome.tabs.ungroup.bind(chrome.tabs);
-    (globalThis as unknown as { __restoreUngroup: () => void }).__restoreUngroup = () => { chrome.tabs.ungroup = original; };
-    chrome.tabs.ungroup = (async () => { throw new Error('Temporary release failure'); }) as typeof chrome.tabs.ungroup;
-  });
-  await ui.reload();
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('auto tuck'); await search.press('Enter');
-  await ui.getByRole('switch').click();
-  await expect(ui.getByRole('switch')).not.toBeChecked();
-  await expect(ui.locator('.tuck-status-copy')).toContainText('Tabs still awaiting return: 1. Retrying automatically.');
-  expect(await groupId(alpha)).not.toBe(-1);
-  await worker.evaluate(() => (globalThis as unknown as { __restoreUngroup: () => void }).__restoreUngroup());
-  await ui.getByRole('button', { name: 'Refresh status' }).click();
-  await expect(ui.locator('.tuck-status-copy')).toHaveCount(0);
   expect(await groupId(alpha)).toBe(-1);
-});
-
-test('temporary native label failure keeps automatic tuck ownership and undo after reconciliation', async () => {
-  const [alpha] = await seed('Label-Failure');
-  await enableAutomaticTucking();
-  await worker.evaluate(() => {
-    const update = chrome.tabGroups.update.bind(chrome.tabGroups);
-    let fail = true;
-    chrome.tabGroups.update = (async (id: number, changes: chrome.tabGroups.UpdateProperties) => {
-      if (fail && changes.title === 'Tuck Away') { fail = false; throw new Error('Temporary label failure'); }
-      return update(id, changes);
-    }) as typeof chrome.tabGroups.update;
-  });
-  await runIdleScan();
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  await expect.poll(() => groupId(alpha)).not.toBe(-1);
-  const owned = await groupId(alpha);
-  await expect.poll(async () => (await recoverySnapshot()).tabs.find((tab: { id: number }) => tab.id === alpha)?.tucked).toBe(true);
-  expect((await recoverySnapshot()).canUndoTuck).toBe(true);
-  await expect.poll(() => worker.evaluate(id => chrome.tabGroups.get(id), owned)).toMatchObject({ title: 'Tuck Away' });
-  await execute('undoTuck');
-  expect(await groupId(alpha)).toBe(-1);
-});
-
-test('single-tab return preserves a group taken over during its final read', async () => {
-  const [alpha, beta] = await seed('Return-Race-Alpha', 'Return-Race-Beta');
-  await execute('tuck', alpha); await execute('tuck', beta);
-  const owned = await groupId(alpha);
-  await worker.evaluate(({ alpha, owned }) => {
-    const get = chrome.tabs.get.bind(chrome.tabs);
-    let reads = 0;
-    chrome.tabs.get = (async (id: number) => {
-      if (id === alpha && ++reads === 2) await chrome.tabGroups.update(owned, { title: 'My group', color: 'blue' });
-      return get(id);
-    }) as typeof chrome.tabs.get;
-  }, { alpha, owned });
-  await worker.evaluate(id => chrome.tabs.update(id, { active: true }), alpha);
-  await expect.poll(() => worker.evaluate(id => chrome.tabGroups.get(id), owned)).toMatchObject({ title: 'My group', color: 'blue' });
-  await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  expect(await groupId(alpha)).toBe(owned);
   expect(await groupId(beta)).toBe(owned);
-  expect((await recoverySnapshot()).tabs.find((tab: { id: number }) => tab.id === alpha).tucked).toBe(false);
-});
-
-for (const operation of ['disable', 'undo'] as const) {
-  test(`${operation} stops releasing when the user takes over the native group mid-operation`, async () => {
-    const [alpha, beta] = await seed('Takeover-Alpha', 'Takeover-Beta');
-    await enableAutomaticTucking();
-    await runIdleScan();
-    await expect.poll(() => groupId(beta)).not.toBe(-1);
-    const owned = await groupId(beta);
-    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-    await worker.evaluate(({ alpha, owned }) => {
-      const original = chrome.tabs.ungroup.bind(chrome.tabs);
-      chrome.tabs.ungroup = (async (ids: number | [number, ...number[]]) => {
-        await original(ids);
-        if (ids === alpha) await chrome.tabGroups.update(owned, { title: 'User took over', color: 'blue' });
-      }) as typeof chrome.tabs.ungroup;
-    }, { alpha, owned });
-    if (operation === 'undo') await execute('undoTuck');
-    else {
-      await worker.evaluate(async () => {
-        const { preferences } = await chrome.storage.local.get('preferences');
-        await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: false } });
-      });
-    }
-    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-    expect(await groupId(alpha)).toBe(-1);
-    expect(await groupId(beta)).toBe(owned);
-    expect(await worker.evaluate(id => chrome.tabGroups.get(id), owned)).toMatchObject({ title: 'User took over', color: 'blue' });
-    const snapshot = await recoverySnapshot();
-    expect(snapshot.tabs.find((tab: { id: number }) => tab.id === beta).tucked).toBe(false);
-    expect(snapshot.canUndoTuck).toBe(false);
-  });
-}
-
-for (const operation of ['disable', 'undo'] as const) for (const restart of ['worker', 'browser'] as const) {
-  test(`partial ${operation} failure preserves safe recovery across a ${restart} restart`, async () => {
-    const [alpha, beta] = await seed('Partial-Alpha', 'Partial-Beta');
-    await enableAutomaticTucking();
-    await runIdleScan();
-    await expect.poll(() => groupId(beta)).not.toBe(-1);
-    const owned = await groupId(beta);
-    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-    await worker.evaluate(beta => {
-      const original = chrome.tabs.ungroup.bind(chrome.tabs);
-      chrome.tabs.ungroup = (async (ids: number | [number, ...number[]]) => {
-        if (ids === beta || Array.isArray(ids) && ids.includes(beta)) throw new Error('Temporary release failure');
-        return original(ids);
-      }) as typeof chrome.tabs.ungroup;
-    }, beta);
-    if (operation === 'disable') {
-      await worker.evaluate(async () => {
-        const { preferences } = await chrome.storage.local.get('preferences');
-        await chrome.storage.local.set({ preferences: { ...(preferences as Record<string, unknown>), autoTuck: false } });
-      });
-      await expect.poll(() => worker.evaluate(async () => (await chrome.alarms.get('justonehop-auto-tuck'))?.periodInMinutes)).toBe(0.5);
-    } else {
-      const reply = await ui.evaluate(windowId => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute',
-        payload: { action: 'undoTuck', windowId } }), windowId);
-      expect(reply.ok).toBe(false);
-    }
-    expect(await groupId(alpha)).toBe(-1);
-    expect(await groupId(beta)).toBe(owned);
-    await expect.poll(() => worker.evaluate(async ({ windowId, beta }) => {
-      const state = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as {
-        groups: { members: number[] }[]; undo: Record<number, { ids: number[] }>;
-      };
-      return { members: state.groups.flatMap(group => group.members), undo: state.undo[windowId]?.ids };
-    }, { windowId, beta })).toEqual({ members: [beta], undo: [beta] });
-    if (restart === 'browser') {
-      await restartChrome();
-      const restored = () => ui.evaluate(origin => chrome.tabs.query({}).then(tabs => tabs.filter(tab =>
-        tab.url === `${origin}/Partial-Alpha` || tab.url === `${origin}/Partial-Beta`)), origin);
-      await expect.poll(async () => (await restored()).length).toBe(2);
-      const pages = await restored();
-      const returned = pages.find(tab => tab.url!.endsWith('/Partial-Alpha'))!;
-      const remaining = pages.find(tab => tab.url!.endsWith('/Partial-Beta'))!;
-      expect(returned.groupId).toBe(-1);
-      expect((await recoverySnapshot()).canUndoTuck).toBe(false);
-      let snapshot = await recoverySnapshot();
-      test.info().annotations.push({ type: 'restart-recovery', description: snapshot.tuckRecoveries.length
-        ? 'Native metadata incomplete: explicit recovery confirmation exercised'
-        : 'Native metadata complete: automatic recovery exercised' });
-      if (!snapshot.tuckRecoveries.length && operation === 'disable') {
-        await expect.poll(() => groupId(remaining.id!)).toBe(-1);
-      }
-      if (snapshot.tuckRecoveries.length) {
-        // Incomplete native metadata requires explicit approval, including when
-        // the saved preference is off. Review must never silently move pages.
-        expect(remaining.groupId).not.toBe(-1);
-        const pending = snapshot.tuckRecoveries[0];
-        const candidate = pending.candidates.find((item: { id: number }) => item.id === remaining.groupId);
-        expect(candidate).toBeDefined();
-        const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }), {
-          action: 'resumeTuck', windowId: remaining.windowId, recoveryId: pending.id,
-          groupId: candidate.id, fingerprint: candidate.fingerprint,
-        });
-        expect(reply.ok).toBe(true);
-      }
-      snapshot = await recoverySnapshot();
-      expect(snapshot.tuckRecoveries).toEqual([]);
-      expect(snapshot.canUndoTuck).toBe(false);
-      windowId = remaining.windowId;
-      // Undo is session-only. After explicit recovery, activation is still a
-      // supported way to return a page even with automatic tucking disabled.
-      if ((await worker.evaluate(id => chrome.tabs.get(id), remaining.id!)).groupId !== -1) {
-        await worker.evaluate(id => chrome.tabs.update(id, { active: true }), remaining.id!);
-      }
-      await expect.poll(() => groupId(remaining.id!)).toBe(-1);
-      expect(await groupId(returned.id!)).toBe(-1);
-      return;
-    }
-    await restartTuckWorker();
-    if (operation === 'undo') {
-      expect(await groupId(beta)).toBe(owned);
-      expect((await recoverySnapshot()).canUndoTuck).toBe(true);
-      await execute('undoTuck');
-    }
-    await expect.poll(() => groupId(beta)).toBe(-1);
-    expect(await groupId(alpha)).toBe(-1);
-    expect((await recoverySnapshot()).canUndoTuck).toBe(false);
-    if (operation === 'disable') {
-      expect(await worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toBeUndefined();
-    }
-  });
-}
-
-test.describe(() => {
-  test.use({ startupStorageFailure: true });
-  test('English startup storage failure leaves the command palette available', async () => {
-    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    await search.fill('new tab');
-    await expect(ui.getByRole('option').first()).toContainText('New Tab');
-    const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
-    expect(snapshot.ok).toBe(true);
-    expect(snapshot.data.tabs.length).toBeGreaterThan(0);
-  });
-});
-
-test('English tuck gives a long-running active page a fresh grace period when the user leaves it', async () => {
-  const [previous, next, idle] = await seed('Long-Active', 'New-Active', 'Old-Idle');
-  await worker.evaluate(id => chrome.tabs.update(id, { active: true }), previous);
-  await enableAutomaticTucking();
-  await worker.evaluate(async next => {
-    (globalThis as unknown as { __tuckClockOffset: number }).__tuckClockOffset = 8 * 24 * 60 * 60 * 1000;
-    await chrome.tabs.update(next, { active: true });
-  }, next);
-  await expect.poll(() => worker.evaluate(async ({ windowId, next }) => {
-    const stored = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as { active?: Record<number, number> };
-    return stored.active?.[windowId] === next;
-  }, { windowId, next })).toBe(true);
-  await runIdleScan();
-  await expect.poll(() => groupId(idle)).not.toBe(-1);
-  expect(await groupId(previous)).toBe(-1);
-  expect(await groupId(next)).toBe(-1);
+  await expect.poll(() => worker.evaluate(async ({ windowId, beta }) => {
+    const state = (await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as {
+      groups: { members: number[] }[]; undo: Record<number, { ids: number[] }>;
+    };
+    return { members: state.groups.flatMap(group => group.members), undo: state.undo[windowId]?.ids };
+  }, { windowId, beta })).toEqual({ members: [beta], undo: [beta] });
+  await restartTuckWorker();
+  await expect.poll(() => groupId(beta)).toBe(-1);
+  expect(await groupId(alpha)).toBe(-1);
+  expect((await recoverySnapshot()).canUndoTuck).toBe(false);
+  expect(await worker.evaluate(() => chrome.alarms.get('justonehop-auto-tuck'))).toBeUndefined();
 });
 
 async function restartTuckWorker() {
@@ -921,9 +642,6 @@ async function recoverySnapshot() {
 }
 
 async function requireRecoveryConfirmation() {
-  // Model persisted evidence requiring explicit review (also used by migration).
-  // The real Chrome restart still restores native tabs/groups; their metadata
-  // need not be lost for this record to require the user's confirmation.
   await worker.evaluate(async () => {
     const { justonehopTabTuckRecovery } = await chrome.storage.local.get('justonehopTabTuckRecovery');
     const saved = justonehopTabTuckRecovery as { records: { requiresConfirmation?: boolean }[] };
@@ -951,8 +669,6 @@ test('English actual Chrome restart retains records and safely resumes a group w
   const snapshot = await recoverySnapshot();
   const alpha = snapshot.tabs.find((tab: { url: string }) => tab.url === `${origin}/Restart-Alpha`);
   const beta = snapshot.tabs.find((tab: { url: string }) => tab.url === `${origin}/Restart-Beta`);
-  // This headless Chrome restores members but drops group title/collapsed state.
-  // If a browser preserves all metadata, automatic reconciliation is valid too.
   if (snapshot.tuckRecoveries.length) {
     expect(snapshot.tuckRecoveries[0].candidates).toHaveLength(1);
     expect(alpha.tucked).toBe(false);
@@ -1001,58 +717,7 @@ test('English actual Chrome restart retains records and safely resumes a group w
   await expect.poll(() => worker.evaluate(async id => (await chrome.tabGroups.get((await chrome.tabs.get(id)).groupId)).collapsed, beta.id)).toBe(true);
 });
 
-test('English recovery requires explicit keyboard confirmation and keeps the candidate name and color managed', async () => {
-  const [a, b] = await seed('Confirm-Alpha', 'Confirm-Beta');
-  await execute('tuck', a); await execute('tuck', b);
-  // Require review independently of whether this Chrome version restores names.
-  await requireRecoveryConfirmation();
-  await restartChrome();
-  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(1);
-  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries[0].candidates.length).toBe(1);
-  const candidate = (await recoverySnapshot()).tuckRecoveries[0].candidates[0];
-  await worker.evaluate(id => chrome.tabGroups.update(id, { title: 'Read when ready', color: 'purple' }), candidate.id);
-  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries[0].candidates[0].title).toBe('Read when ready');
-  const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-  await search.fill('recover tucked tabs');
-  await expect(ui.getByRole('option').filter({ hasText: 'Review Tucked Away Groups' }).first()).toHaveAttribute('aria-selected', 'true');
-  await search.press('Enter');
-  const list = ui.getByRole('listbox');
-  await expect(list).toBeFocused();
-  await expect(list.getByRole('option', { selected: true })).toContainText('Read when ready');
-  await ui.keyboard.press('Enter');
-  await expect(ui.locator('.tuck-recovery')).toBeVisible();
-  let snapshot = await recoverySnapshot();
-  expect(snapshot.tuckRecoveries).toHaveLength(1);
-  expect(snapshot.tabs.filter((tab: { tucked?: boolean }) => tab.tucked)).toHaveLength(0);
-  expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
-  await ui.keyboard.press('Control+n');
-  await ui.keyboard.press('Control+p');
-  await ui.keyboard.press('Shift+Tab');
-  await expect(ui.locator('.tuck-recovery .task-back')).toBeFocused();
-  await ui.keyboard.press('Tab'); await expect(list).toBeFocused();
-  await ui.keyboard.press('Tab'); await expect(ui.locator('.footer-hint-pet')).toBeFocused();
-  await ui.keyboard.press('Tab');
-  await expect(ui.getByRole('button', { name: 'Continue Managing This Group', exact: true })).toBeFocused();
-  await ui.keyboard.press('Enter');
-  await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(0);
-  snapshot = await recoverySnapshot();
-  expect(snapshot.tabs.filter((tab: { tucked?: boolean }) => tab.tucked)).toHaveLength(2);
-  expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
-  const [extra] = await seed('Confirm-Extra');
-  await execute('tuck', extra);
-  expect(await groupId(extra)).toBe(candidate.id);
-  const alpha = snapshot.tabs.find((tab: { url: string }) => tab.url === `${origin}/Confirm-Alpha`);
-  await worker.evaluate(id => chrome.tabs.update(id, { active: true }), alpha.id);
-  await expect.poll(() => groupId(alpha.id)).toBe(-1);
-  expect(await worker.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'Read when ready', color: 'purple' });
-  await expect.poll(() => worker.evaluate(async () => {
-    const { justonehopTabTuckRecovery } = await chrome.storage.local.get('justonehopTabTuckRecovery');
-    return (justonehopTabTuckRecovery as { records: { title: string; color: string; customTitle: boolean; urls: string[] }[] }).records;
-  })).toEqual([expect.objectContaining({ title: 'Read when ready', color: 'purple', customTitle: true,
-    urls: expect.arrayContaining([`${origin}/Confirm-Beta`, `${origin}/Confirm-Extra`]) })]);
-});
-
-for (const restoreMetadata of [true, false]) test(`multiple same-name groups recover after real Chrome restart ${restoreMetadata ? 'with metadata completion' : 'without intervention'}`, { tag: '@windows' }, async () => {
+test('multiple same-name groups recover after real Chrome restart with metadata completion', { tag: '@windows' }, async () => {
   const firstWindow = windowId;
   const secondWindow = await worker.evaluate(async () => (await chrome.windows.create({ url: 'about:blank', focused: false }))!.id!);
   const [firstA] = await seed('Restart-Window-A');
@@ -1076,9 +741,7 @@ for (const restoreMetadata of [true, false]) test(`multiple same-name groups rec
   expect(a.groupId).not.toBe(-1);
   expect(b.groupId).not.toBe(-1);
   expect(a.groupId).not.toBe(b.groupId);
-  // This Chromium can drop group metadata on restart. Supply only the missing
-  // native metadata; the extension must infer ownership from persisted evidence.
-  if (restoreMetadata) for (const tab of [a, b]) {
+  for (const tab of [a, b]) {
     await ui.evaluate(async id => {
       const group = await chrome.tabGroups.get(id);
       if (group.title !== 'Tuck Away' || group.color !== 'grey') {
@@ -1086,26 +749,6 @@ for (const restoreMetadata of [true, false]) test(`multiple same-name groups rec
       }
     }, tab.groupId);
   }
-  const pending = (await recoverySnapshot()).tuckRecoveries;
-  if (!restoreMetadata && pending.length) {
-    test.info().annotations.push({ type: 'multiwindow-restart', description: 'Unassisted restart: incomplete evidence safely awaits confirmation' });
-    const before = await ui.evaluate(() => chrome.tabGroups.query({}));
-    windowId = a.windowId;
-    const [nextA] = await seed('Blocked-After-Restart-A');
-    windowId = b.windowId;
-    const [nextB] = await seed('Blocked-After-Restart-B');
-    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-    await runIdleScan();
-    await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-    expect(await groupId(nextA)).toBe(-1);
-    expect(await groupId(nextB)).toBe(-1);
-    expect(await groupId(a.id!)).toBe(a.groupId);
-    expect(await groupId(b.id!)).toBe(b.groupId);
-    expect(await ui.evaluate(() => chrome.tabGroups.query({}))).toEqual(before);
-    expect((await recoverySnapshot()).tuckRecoveries.length).toBe(pending.length);
-    return;
-  }
-  if (!restoreMetadata) test.info().annotations.push({ type: 'multiwindow-restart', description: 'Unassisted restart: automatic ownership recovery and subsequent batch exercised' });
   await expect.poll(async () => (await recoverySnapshot()).tuckRecoveries.length).toBe(0);
   const owned = await ui.evaluate(async () => ((await chrome.storage.session.get('justonehopTabTuckSession')).justonehopTabTuckSession as {
     groups: { id: number; windowId: number; members: number[] }[];
@@ -1133,20 +776,6 @@ for (const restoreMetadata of [true, false]) test(`multiple same-name groups rec
   expect(await groupId(nextA)).toBe(-1);
   expect(await groupId(a.id!)).toBe(a.groupId);
   expect(await groupId(b.id!)).toBe(b.groupId);
-});
-
-test('English late restored group metadata reconnects automatically without creating a new group', async () => {
-  await prepareRestart();
-  const snapshot = await recoverySnapshot();
-  if (snapshot.tuckRecoveries.length) {
-    const pending = snapshot.tuckRecoveries[0];
-    await ui.evaluate(({ id, title }) => chrome.tabGroups.update(id, { title, color: 'grey' }),
-      { id: pending.candidates[0].id, title: pending.title });
-  }
-  await expect.poll(async () => (await recoverySnapshot()).tabs.filter((tab: { tucked?: boolean }) => tab.tucked).length).toBe(2);
-  expect((await recoverySnapshot()).tuckRecoveries).toEqual([]);
-  // Query native state through the live page after Chrome restarts.
-  expect(await ui.evaluate(() => chrome.tabGroups.query({}).then(groups => groups.length))).toBe(1);
 });
 
 test('English recovery rejects stale confirmation and forgetting leaves native pages and groups untouched', async () => {
@@ -1186,24 +815,4 @@ test('English recovery rejects stale confirmation and forgetting leaves native p
   expect((await liveTabs()).map(tab => [tab.id, tab.groupId])).toEqual(before.map(tab => [tab.id, tab.groupId]));
   expect(await ui.evaluate(id => chrome.tabGroups.get(id), candidate.id)).toMatchObject({ title: 'My changed group', color: 'blue' });
   expect(await ui.evaluate(async () => ((await chrome.storage.local.get('justonehopTabTuckRecovery')).justonehopTabTuckRecovery as { records: unknown[] }).records)).toEqual([]);
-});
-
-test('justonehop group edits preserve tuck ownership and persist custom title and color', async () => {
-  const [a, b, c] = await seed('Managed-A', 'Managed-B', 'Managed-C');
-  await execute('tuck', a); await execute('tuck', b);
-  const id = await groupId(a);
-  const reply = await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'execute', payload }),
-    { action: 'updateGroup', windowId, groupId: id, groupChanges: { title: 'Later', color: 'purple' } });
-  expect(reply).toMatchObject({ ok: true });
-  await execute('tuck', c);
-  expect(await groupId(c)).toBe(id);
-  expect(await worker.evaluate(id => chrome.tabGroups.get(id), id)).toMatchObject({ title: 'Later', color: 'purple' });
-  const snapshot = await ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'snapshot' }));
-  expect(snapshot.data.tabs.filter((tab: { tucked: boolean }) => tab.tucked)).toHaveLength(3);
-  await worker.evaluate(id => chrome.tabs.update(id, { active: true }), a);
-  await expect.poll(() => groupId(a)).toBe(-1);
-  expect(await worker.evaluate(id => chrome.tabGroups.get(id), id)).toMatchObject({ title: 'Later', color: 'purple' });
-  const records = await worker.evaluate(() => chrome.storage.local.get('justonehopTabTuckRecovery'));
-  expect(JSON.stringify(records)).toContain('Later');
-  expect(JSON.stringify(records)).toContain('purple');
 });

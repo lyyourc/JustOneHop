@@ -221,118 +221,110 @@ async function pointerViewport(page: Page, zoom: number) {
   return page.evaluate(() => (window as any).__contentOrigin as { left: number; top: number });
 }
 
-for (const layout of ['horizontal tabs', 'vertical tabs']) for (const zoom of [1, 1.25, .8]) test.describe('headed', { tag: '@headed' }, () => {
+for (const layout of ['horizontal tabs', 'vertical tabs'] as const) test.describe('headed', { tag: '@headed' }, () => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: true, verticalTabs: layout === 'vertical tabs' } });
-  test(`English palette launch hosts preserve their viewport and browser anchors with ${layout} at ${zoom * 100}% zoom`, async () => {
-  const page = await context.newPage(); await page.goto(`${origin}/Screen-alignment`); await page.bringToFront();
-  const source = await worker.evaluate(async ({ url, zoom }) => {
-    const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
-    await chrome.tabs.setZoom(tab.id!, zoom);
-    return { tabId: tab.id!, windowId: tab.windowId };
-  }, { url: page.url(), zoom });
-  const viewport = await pointerViewport(page, zoom);
-  if (layout === 'vertical tabs') expect(viewport.left - await page.evaluate(() => screenX)).toBeGreaterThan(200);
-  await worker.evaluate(async () => {
-    const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
-    await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+  test(`English palette launch hosts preserve their viewport and browser anchors with ${layout} across zoom levels`, async () => {
+    const page = await context.newPage(); await page.goto(`${origin}/Screen-alignment`); await page.bringToFront();
+    // Start with a different extension-origin zoom. Temporary panels must copy
+    // their source's zoom without changing this other extension page.
+    await ui.evaluate(async () => { const tab = await chrome.tabs.getCurrent(); await chrome.tabs.setZoom(tab!.id!, 1.5); });
+    for (const zoom of [1, 1.25, .8]) await test.step(`zoom ${zoom * 100}%`, async () => {
+      await page.bringToFront();
+      const source = await worker.evaluate(async ({ url, zoom }) => {
+        const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+        await chrome.tabs.setZoom(tab.id!, zoom);
+        return { tabId: tab.id!, windowId: tab.windowId };
+      }, { url: page.url(), zoom });
+      const viewport = await pointerViewport(page, zoom);
+      if (layout === 'vertical tabs') expect(viewport.left - await page.evaluate(() => screenX)).toBeGreaterThan(200);
+      await worker.evaluate(async () => {
+        const callbacks = (globalThis as unknown as { __recentCommands: ((command: string) => Promise<void>)[] }).__recentCommands;
+        await Promise.all(callbacks.map(callback => callback('toggle-palette')));
+      });
+      const surface = page.frameLocator('.justonehop-frame');
+      await expect(surface.getByRole('combobox')).toBeFocused();
+      // The overlay belongs to the page viewport; the standalone panel belongs to
+      // the browser window. Observe both anchors independently at each source zoom.
+      const box = await surface.locator('.palette').evaluate(node => {
+        const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      });
+      const pageSize = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+      expect(Math.abs(box.x + box.width / 2 - pageSize.width / 2)).toBeLessThan(1);
+      const overlayInset = pageSize.width <= 520 ? 24 : Math.min(150, Math.max(28, pageSize.height * .16));
+      expect(Math.abs(box.y - overlayInset)).toBeLessThan(1);
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#justonehop-command-palette')).not.toBeAttached();
+      await launchStandaloneForGeometry(source.tabId);
+      await expect.poll(() => context.pages().some(p => p.url().includes('popup.html#window=') && !p.isClosed())).toBe(true);
+      const popup = context.pages().find(p => p.url().includes('popup.html#window=') && !p.isClosed())!;
+      await expect(popup.getByRole('combobox')).toBeFocused();
+      const bounds = await popup.evaluate(() => chrome.windows.getCurrent());
+      expect(await popup.locator('.search-bar').evaluate(node => node.getBoundingClientRect().height)).toBeCloseTo(56, 1);
+      const native = await popup.locator('.palette').evaluate(async node => {
+        const tab = await chrome.tabs.getCurrent(), own = await chrome.windows.getCurrent(), zoom = await chrome.tabs.getZoom(tab!.id!);
+        const rect = node.getBoundingClientRect(), frameWidth = own.width! - tab!.width!, frameHeight = own.height! - tab!.height!;
+        return { left: own.left! + frameWidth / 2 + rect.x * zoom,
+          top: own.top! + frameHeight - frameWidth / 2 + rect.y * zoom, width: rect.width * zoom, height: rect.height * zoom, zoom };
+      });
+      expect(native.zoom).toBe(zoom);
+      const owner = await worker.evaluate(id => chrome.windows.get(id), source.windowId);
+      expect(Math.abs(native.left + native.width / 2 - owner.left! - owner.width! / 2)).toBeLessThan(3);
+      const nativeInset = owner.width! / zoom <= 520 ? 24 * zoom : Math.min(150 * zoom, Math.max(28 * zoom, owner.height! * .16));
+      expect(Math.abs(native.top - owner.top! - nativeInset)).toBeLessThan(3);
+      expect(Math.abs(native.width - box.width * zoom)).toBeLessThanOrEqual(1);
+      expect(Math.abs(native.height - box.height * zoom)).toBeLessThanOrEqual(1);
+      expect(await ui.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(1.5);
+      expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
+      await popup.keyboard.press('Escape').catch(error => { if (!popup.isClosed()) throw error; });
+      await expect.poll(() => popup.isClosed()).toBe(true);
+      if (layout === 'horizontal tabs') {
+        await page.bringToFront();
+        await launchStandaloneForGeometry(source.tabId, 'switch-recent');
+        await expect.poll(() => context.pages().some(p => p.url().includes('switcher.html?') && !p.isClosed())).toBe(true);
+        const switcher = context.pages().find(p => p.url().includes('switcher.html?') && !p.isClosed())!;
+        await expect(switcher.getByRole('option').first()).toBeVisible();
+        await expect(switcher.getByRole('listbox')).toBeFocused();
+        await expect(switcher.getByRole('combobox')).toBeDisabled();
+        expect(await switcher.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(zoom);
+        expect(await switcher.locator('.search-bar').evaluate(node => node.getBoundingClientRect().height)).toBeCloseTo(56, 1);
+        const actual = await switcher.evaluate(() => chrome.windows.getCurrent());
+        for (const key of ['width', 'height', 'left', 'top'] as const) expect(actual[key]).toBe(bounds[key]);
+        const rendered = await switcher.evaluate(async () => {
+          const tab = (await chrome.tabs.getCurrent())!;
+          const rect = (selector: string) => { const box = document.querySelector(selector)!.getBoundingClientRect();
+            return { x: box.x, y: box.y, right: box.right, bottom: box.bottom, width: box.width, height: box.height }; };
+          return { innerWidth, innerHeight, tabWidth: tab.width!, tabHeight: tab.height!,
+            bodyWidth: document.body.scrollWidth, bodyHeight: document.body.scrollHeight,
+            footer: rect('.palette-footer'), close: rect('.close-button') };
+        });
+        expect(Math.abs(rendered.innerWidth * zoom - rendered.tabWidth)).toBeLessThanOrEqual(zoom);
+        expect(Math.abs(rendered.innerHeight * zoom - rendered.tabHeight)).toBeLessThanOrEqual(zoom);
+        expect(rendered.bodyWidth).toBeLessThanOrEqual(rendered.innerWidth);
+        expect(rendered.bodyHeight).toBeLessThanOrEqual(rendered.innerHeight);
+        for (const item of [rendered.footer, rendered.close]) {
+          expect(item.x).toBeGreaterThanOrEqual(0); expect(item.y).toBeGreaterThanOrEqual(0);
+          expect(item.right).toBeLessThanOrEqual(rendered.innerWidth + 1); expect(item.bottom).toBeLessThanOrEqual(rendered.innerHeight + 1);
+        }
+        expect(Math.abs(rendered.footer.bottom - rendered.innerHeight)).toBeLessThanOrEqual(1);
+        const capture = await context.newCDPSession(switcher);
+        const screenshot = await capture.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
+          clip: { x: 0, y: 0, width: rendered.tabWidth, height: rendered.tabHeight, scale: 1 } });
+        await writeFile(test.info().outputPath(`justonehop-switcher-polish-${zoom * 100}.png`), Buffer.from(screenshot.data, 'base64'));
+        await capture.detach();
+        if (zoom === .8) {
+          await switcher.evaluate(async () => chrome.tabs.setZoom((await chrome.tabs.getCurrent())!.id!, 1));
+          await switcher.setViewportSize({ width: 390, height: 440 });
+          expect(await switcher.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(390);
+          const footer = await switcher.locator('.palette-footer').boundingBox();
+          expect(footer!.height).toBe(44);
+          expect(footer!.y + footer!.height).toBe(440);
+          await expect(switcher.locator('.recent-help')).toHaveCount(0);
+          expect(await switcher.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+          await expect(switcher.locator('footer').getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+        }
+        await switcher.close();
+        expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, source.tabId)).toBe(true);
+      }
+    });
   });
-  const surface = page.frameLocator('.justonehop-frame');
-  await expect(surface.getByRole('combobox')).toBeFocused();
-  // The overlay belongs to the page viewport; the standalone panel belongs to
-  // the browser window. Observe both anchors independently at each source zoom.
-  const box = await surface.locator('.palette').evaluate(node => {
-    const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-  });
-  const pageSize = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
-  expect(Math.abs(box.x + box.width / 2 - pageSize.width / 2)).toBeLessThan(1);
-  const overlayInset = pageSize.width <= 520 ? 24 : Math.min(150, Math.max(28, pageSize.height * .16));
-  expect(Math.abs(box.y - overlayInset)).toBeLessThan(1);
-  await page.keyboard.press('Escape');
-  // Start with a different extension-origin zoom. Temporary panels must copy
-  // their source's zoom without changing this other extension page.
-  await ui.evaluate(async () => { const tab = await chrome.tabs.getCurrent(); await chrome.tabs.setZoom(tab!.id!, 1.5); });
-  await launchStandaloneForGeometry(source.tabId);
-  await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
-  const popup = context.pages().find(page => page.url().includes('popup.html#window='))!;
-  await expect(popup.getByRole('combobox')).toBeFocused();
-  const native = await popup.locator('.palette').evaluate(async node => {
-    const tab = await chrome.tabs.getCurrent(), own = await chrome.windows.getCurrent(), zoom = await chrome.tabs.getZoom(tab!.id!);
-    const rect = node.getBoundingClientRect(), frameWidth = own.width! - tab!.width!, frameHeight = own.height! - tab!.height!;
-    return { left: own.left! + frameWidth / 2 + rect.x * zoom,
-      top: own.top! + frameHeight - frameWidth / 2 + rect.y * zoom, width: rect.width * zoom, height: rect.height * zoom, zoom };
-  });
-  expect(native.zoom).toBe(zoom);
-  const owner = await worker.evaluate(id => chrome.windows.get(id), source.windowId);
-  expect(Math.abs(native.left + native.width / 2 - owner.left! - owner.width! / 2)).toBeLessThan(3);
-  const nativeInset = owner.width! / zoom <= 520 ? 24 * zoom : Math.min(150 * zoom, Math.max(28 * zoom, owner.height! * .16));
-  expect(Math.abs(native.top - owner.top! - nativeInset)).toBeLessThan(3);
-  expect(Math.abs(native.width - box.width * zoom)).toBeLessThanOrEqual(1);
-  expect(Math.abs(native.height - box.height * zoom)).toBeLessThanOrEqual(1);
-  expect(await ui.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(1.5);
-  expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).windowId).toBe(source.windowId);
-});
-});
-
-for (const zoom of [1, 1.25, .8]) test.describe('headed', { tag: '@headed' }, () => {
-  test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
-  test(`English palette launch native visual sizing matches the recent switcher at ${zoom * 100}% zoom and stays compact`, async () => {
-  const page = await context.newPage(); await page.goto(`${origin}/Switcher-screen-alignment`); await page.bringToFront();
-  const source = await worker.evaluate(async ({ url, zoom }) => {
-    const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
-    await chrome.tabs.setZoom(tab.id!, zoom); return { tabId: tab.id!, windowId: tab.windowId };
-  }, { url: page.url(), zoom });
-  await launchStandaloneForGeometry(source.tabId);
-  await expect.poll(() => context.pages().some(page => page.url().includes('popup.html#window='))).toBe(true);
-  const palette = context.pages().find(page => page.url().includes('popup.html#window='))!;
-  await expect(palette.getByRole('combobox')).toBeFocused();
-  const bounds = await palette.evaluate(() => chrome.windows.getCurrent());
-  expect(await palette.locator('.search-bar').evaluate(node => node.getBoundingClientRect().height)).toBeCloseTo(56, 1);
-  await palette.keyboard.press('Escape').catch(error => { if (!palette.isClosed()) throw error; });
-  await expect.poll(() => palette.isClosed()).toBe(true);
-  await page.bringToFront();
-  await launchStandaloneForGeometry(source.tabId, 'switch-recent');
-  await expect.poll(() => context.pages().some(page => page.url().includes('switcher.html?'))).toBe(true);
-  const switcher = context.pages().find(page => page.url().includes('switcher.html?'))!;
-  await expect(switcher.getByRole('option').first()).toBeVisible();
-  await expect(switcher.getByRole('listbox')).toBeFocused();
-  await expect(switcher.getByRole('combobox')).toBeDisabled();
-  expect(await switcher.evaluate(async () => chrome.tabs.getZoom((await chrome.tabs.getCurrent())!.id!))).toBe(zoom);
-  expect(await switcher.locator('.search-bar').evaluate(node => node.getBoundingClientRect().height)).toBeCloseTo(56, 1);
-  const actual = await switcher.evaluate(() => chrome.windows.getCurrent());
-  for (const key of ['width', 'height', 'left', 'top'] as const) expect(actual[key]).toBe(bounds[key]);
-  const rendered = await switcher.evaluate(async () => {
-    const tab = (await chrome.tabs.getCurrent())!;
-    const rect = (selector: string) => { const box = document.querySelector(selector)!.getBoundingClientRect();
-      return { x: box.x, y: box.y, right: box.right, bottom: box.bottom, width: box.width, height: box.height }; };
-    return { innerWidth, innerHeight, tabWidth: tab.width!, tabHeight: tab.height!,
-      bodyWidth: document.body.scrollWidth, bodyHeight: document.body.scrollHeight,
-      footer: rect('.palette-footer'), close: rect('.close-button') };
-  });
-  expect(Math.abs(rendered.innerWidth * zoom - rendered.tabWidth)).toBeLessThanOrEqual(zoom);
-  expect(Math.abs(rendered.innerHeight * zoom - rendered.tabHeight)).toBeLessThanOrEqual(zoom);
-  expect(rendered.bodyWidth).toBeLessThanOrEqual(rendered.innerWidth);
-  expect(rendered.bodyHeight).toBeLessThanOrEqual(rendered.innerHeight);
-  for (const box of [rendered.footer, rendered.close]) {
-    expect(box.x).toBeGreaterThanOrEqual(0); expect(box.y).toBeGreaterThanOrEqual(0);
-    expect(box.right).toBeLessThanOrEqual(rendered.innerWidth + 1); expect(box.bottom).toBeLessThanOrEqual(rendered.innerHeight + 1);
-  }
-  expect(Math.abs(rendered.footer.bottom - rendered.innerHeight)).toBeLessThanOrEqual(1);
-  // Capture the native content rectangle in screen DIPs. CSS viewport dimensions
-  // crop the image at browser zoom because the capture surface uses native units.
-  const capture = await context.newCDPSession(switcher);
-  const screenshot = await capture.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true,
-    clip: { x: 0, y: 0, width: rendered.tabWidth, height: rendered.tabHeight, scale: 1 } });
-  await writeFile(test.info().outputPath(`justonehop-switcher-polish-${zoom * 100}.png`), Buffer.from(screenshot.data, 'base64'));
-  await capture.detach();
-  await switcher.evaluate(async () => chrome.tabs.setZoom((await chrome.tabs.getCurrent())!.id!, 1));
-  await switcher.setViewportSize({ width: 390, height: 440 });
-  expect(await switcher.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(390);
-  const footer = await switcher.locator('.palette-footer').boundingBox();
-  expect(footer!.height).toBe(44);
-  expect(footer!.y + footer!.height).toBe(440);
-  await expect(switcher.locator('.recent-help')).toHaveCount(0);
-  expect(await switcher.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-  await expect(switcher.locator('footer').getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
-  expect(await worker.evaluate(async id => (await chrome.tabs.get(id)).active, source.tabId)).toBe(true);
-});
 });

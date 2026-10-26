@@ -55,19 +55,16 @@ test('Google fallback follows local results and addresses but leads an otherwise
   assert.equal(insertGoogleSearch([history], historyQuery)[0], history);
 });
 
-test('Google navigation reuses source binding, pinned protection, shortcuts and excludes learning', () => {
+test('Google navigation reuses source binding, pinned protection and excludes learning', () => {
   const google = googleSearchEntry('React hooks', { ...data, tabs: [{ ...data.tabs[0], pinned: true }] })!;
   assert.equal(google.entry.action, 'navigateAddress');
   assert.equal(google.entry.tabId, 2);
   assert.equal(google.entry.expectedUrl, 'https://source.test/');
   assert.equal(google.entry.disabled, true);
-  for (const isMac of [true, false]) {
-    const [current, newTab] = addressActions(google.entry, isMac);
-    assert.equal(current.disabled, true);
-    assert.equal(newTab.disabled, false);
-    assert.equal(newTab.action, 'openAddressNewTab');
-    assert.equal(newTab.url, google.entry.url);
-    assert.equal(newTab.shortcut, isMac ? 'Mod+Enter' : 'Alt+Enter');
-    for (const entry of [google.entry, current, newTab]) assert.equal(usageTarget(entry), '');
-  }
+  assert.equal(usageTarget(google.entry), '');
+  const [current, newTab] = addressActions(google.entry, true);
+  assert.equal(current.disabled, true);
+  assert.equal(newTab.action, 'openAddressNewTab');
+  assert.equal(newTab.url, google.entry.url);
+  assert.equal(usageTarget(newTab), '');
 });

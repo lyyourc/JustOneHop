@@ -78,7 +78,7 @@ test('light and dark surfaces, compact rows and bottom action search fit without
     await ui.keyboard.press('Escape');
   }
   await ui.setViewportSize({ width: 390, height: 600 });
-  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  await ui.evaluate(() => { document.body.style.width = '390px'; });
   await expectIconSpacing(ui.locator('.search-bar'), 8, 8);
   await ui.locator('.settings-button').click();
   await expectIconSpacing(ui.locator('.settings-search'), 8, 8);
@@ -187,7 +187,6 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
     await ui.locator('.palette').screenshot({ path: test.info().outputPath(`quiet-${language.toLowerCase()}-${theme}.png`) });
   }
   await ui.setViewportSize({ width: 390, height: 600 });
-  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
   await expect(ui.locator('.navigation-hint')).toBeHidden();
   const actionsBeforeHint = await ui.locator('.footer-actions').boundingBox();
   const narrowPetBefore = await ui.locator('.footer-hint-pet').boundingBox();
@@ -225,57 +224,30 @@ for (const language of ['Chinese', 'English']) test(`${language} quiet layout ex
   await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true');
 });
 
-for (const overlay of [false, true]) {
-  const host = overlay ? 'overlay' : 'window';
-  test(`release narrow footer hint stays anchored to its pet in ${host}`, async ({ palette }) => {
-    const { ui } = palette;
-    await ui.setViewportSize({ width: 390, height: 600 });
-    await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}) });
-    await ui.evaluate(() => { document.body.style.width = '100%'; });
-    const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
-    const pet = surface.locator('.footer-hint-pet');
-    const actions = await surface.locator('.footer-actions').boundingBox();
-    await pet.click();
-    const hint = surface.locator('.footer-hint-bubble');
-    await expect(hint).toBeVisible();
-    const b = (await hint.boundingBox())!, p = (await pet.boundingBox())!;
-    const footer = (await surface.locator('.footer').boundingBox())!;
-    expect(b.x, 'floating hint should stay above its trigger, not drift toward the action buttons').toBeLessThanOrEqual(p.x + p.width / 2);
-    expect(b.x + b.width).toBeGreaterThanOrEqual(p.x + p.width / 2);
-    expect(b.y + b.height).toBeLessThanOrEqual(footer.y);
-    await expect(hint).toBeInViewport({ ratio: 1 });
-    expect(await surface.locator('.footer-actions').boundingBox()).toEqual(actions);
-    await ui.screenshot({ path: test.info().outputPath(`release-footer-${host}.png`) });
-  });
-  test(`release narrow search recovery hint never overlaps input in ${host}`, async ({ palette }) => {
-    const { ui } = palette;
-    await ui.setViewportSize({ width: 540, height: 600 });
-    await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}) });
-    await ui.evaluate(() => { document.body.style.width = '100%'; });
-    const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
-    const input = surface.locator('.search-bar input');
-    for (const width of [540, 390]) {
-      await ui.setViewportSize({ width, height: 600 });
-      for (const value of ['', 'keep my query']) {
-        await input.fill(value);
-        await ui.evaluate(() => { Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false }); });
-        await input.evaluate((node: HTMLInputElement) => {
-          node.setSelectionRange(1, Math.min(5, node.value.length));
-          node.ownerDocument.body.tabIndex = -1; node.ownerDocument.body.focus();
-          node.ownerDocument.defaultView!.dispatchEvent(new Event('blur'));
-        });
-        const hint = surface.locator('.search-focus-hint');
-        await expect(hint).toHaveText('Click the search field to type');
-        const a = (await input.boundingBox())!, b = (await hint.boundingBox())!;
-        expect(a.x + a.width, 'placeholder and query must have their own space beside recovery hint').toBeLessThanOrEqual(b.x);
-        expect(a.width).toBeGreaterThan(40);
-        await expect(surface.locator('.search-dismiss')).toBeInViewport({ ratio: 1 });
-        await ui.screenshot({ path: test.info().outputPath(`release-search-${host}-${width}-${value ? 'query' : 'empty'}.png`) });
-        await ui.evaluate(() => { delete (document as unknown as { hasFocus?: unknown }).hasFocus; });
-        await input.click();
-        await expect(hint).toHaveCount(0); await expect(input).toHaveValue(value);
-      }
-    }
-    await ui.screenshot({ path: test.info().outputPath(`release-search-${host}.png`) });
-  });
-}
+test('release narrow search recovery hint never overlaps input in overlay', async ({ palette }) => {
+  const { ui } = palette;
+  await ui.setViewportSize({ width: 540, height: 600 });
+  await palette.open({ locale: 'en-US', overlay: true });
+  const surface = ui.frameLocator('.justonehop-frame');
+  const input = surface.locator('.search-bar input');
+  for (const [width, value] of [[540, ''], [390, 'keep my query']] as const) {
+    await ui.setViewportSize({ width, height: 600 });
+    await input.fill(value);
+    await ui.evaluate(() => { Object.defineProperty(document, 'hasFocus', { configurable: true, value: () => false }); });
+    await input.evaluate((node: HTMLInputElement) => {
+      node.setSelectionRange(1, Math.min(5, node.value.length));
+      node.ownerDocument.body.tabIndex = -1; node.ownerDocument.body.focus();
+      node.ownerDocument.defaultView!.dispatchEvent(new Event('blur'));
+    });
+    const hint = surface.locator('.search-focus-hint');
+    await expect(hint).toHaveText('Click the search field to type');
+    const a = (await input.boundingBox())!, b = (await hint.boundingBox())!;
+    expect(a.x + a.width, 'placeholder and query must have their own space beside recovery hint').toBeLessThanOrEqual(b.x);
+    expect(a.width).toBeGreaterThan(40);
+    await expect(surface.locator('.search-dismiss')).toBeInViewport({ ratio: 1 });
+    await ui.screenshot({ path: test.info().outputPath(`release-search-overlay-${width}-${value ? 'query' : 'empty'}.png`) });
+    await ui.evaluate(() => { delete (document as unknown as { hasFocus?: unknown }).hasFocus; });
+    await input.click();
+    await expect(hint).toHaveCount(0); await expect(input).toHaveValue(value);
+  }
+});

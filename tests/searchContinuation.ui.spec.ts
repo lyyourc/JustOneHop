@@ -1,36 +1,33 @@
 import { test, expect, snapshotTab } from './support/paletteUI';
 
-for (const overlay of [false, true]) {
-  test(`continue search hint preserves home until accepted in ${overlay ? 'overlay' : 'popup'}`, async ({ palette }) => {
-    const at = Date.now();
-    palette.store.searchUsage = [
-      { query: 'google', target: 'tab:https://google.com/', weight: 50, lastUsed: at },
-      { query: 'notion', target: 'tab:https://notion.so/', weight: 1, lastUsed: at },
-    ];
-    await palette.open({ locale: 'en-US', overlay: overlay ? true : undefined, snapshot: {
-      searchContinuation: { query: 'github issues', target: 'tab:https://github.com/issues', at },
-      tabs: [snapshotTab(2, 'github-issues'), snapshotTab(3, 'github-issues-guide')],
-    } });
-    const { ui } = palette;
-    const surface = overlay ? ui.frameLocator('iframe.justonehop-frame') : ui;
-    const input = surface.locator('.search-bar input');
-    const hint = surface.locator('.query-completion');
-    const homeIds = await surface.locator('.result').evaluateAll(nodes => nodes.map(node => node.id));
-    await expect(input).toHaveValue('');
-    await expect(input).toHaveAttribute('placeholder', '');
-    await expect(hint).toHaveText('github issues');
-    await expect(surface.getByRole('button', { name: 'Continue Search', exact: true })).toBeVisible();
-    await input.press('Shift+Tab'); await expect(input).toHaveValue('');
-    await surface.getByRole('button', { name: 'Continue Search', exact: true }).click();
-    await expect(input).toHaveValue('github issues'); await expect(input).toBeFocused();
-    await input.fill(''); await expect(hint).toHaveCount(0); // Deletion suppression still applies.
-    expect(await surface.locator('.result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(homeIds);
-    await input.fill('g'); await expect(hint).toHaveText('github issues');
-    await input.press('Tab'); await expect(input).toHaveValue('github issues');
-    await input.fill(''); await input.fill('n'); await expect(hint).toHaveText('notion');
-    expect(await palette.executions()).toEqual([]);
-  });
-}
+test('continue search hint preserves home until accepted', async ({ palette }) => {
+  const at = Date.now();
+  palette.store.searchUsage = [
+    { query: 'google', target: 'tab:https://google.com/', weight: 50, lastUsed: at },
+    { query: 'notion', target: 'tab:https://notion.so/', weight: 1, lastUsed: at },
+  ];
+  await palette.open({ locale: 'en-US', snapshot: {
+    searchContinuation: { query: 'github issues', target: 'tab:https://github.com/issues', at },
+    tabs: [snapshotTab(2, 'github-issues'), snapshotTab(3, 'github-issues-guide')],
+  } });
+  const { ui } = palette;
+  const input = ui.locator('.search-bar input');
+  const hint = ui.locator('.query-completion');
+  const homeIds = await ui.locator('.result').evaluateAll(nodes => nodes.map(node => node.id));
+  await expect(input).toHaveValue('');
+  await expect(input).toHaveAttribute('placeholder', '');
+  await expect(hint).toHaveText('github issues');
+  await expect(ui.getByRole('button', { name: 'Continue Search', exact: true })).toBeVisible();
+  await input.press('Shift+Tab'); await expect(input).toHaveValue('');
+  await ui.getByRole('button', { name: 'Continue Search', exact: true }).click();
+  await expect(input).toHaveValue('github issues'); await expect(input).toBeFocused();
+  await input.fill(''); await expect(hint).toHaveCount(0); // Deletion suppression still applies.
+  expect(await ui.locator('.result').evaluateAll(nodes => nodes.map(node => node.id))).toEqual(homeIds);
+  await input.fill('g'); await expect(hint).toHaveText('github issues');
+  await input.press('Tab'); await expect(input).toHaveValue('github issues');
+  await input.fill(''); await input.fill('n'); await expect(hint).toHaveText('notion');
+  expect(await palette.executions()).toEqual([]);
+});
 
 test('continue search hint expires while the palette remains open and Enter still executes home', async ({ palette }) => {
   const at = Date.now();

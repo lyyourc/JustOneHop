@@ -82,8 +82,7 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
   await ui.getByRole('combobox').press('Enter');
   await ui.setViewportSize({ width: 390, height: 516 });
-  // The standalone popup defaults to 750px; preserve the original narrow overlay layout fixture.
-  await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '390px'; });
+  await ui.evaluate(() => { document.body.style.width = '100%'; });
   const filter = ui.getByRole('textbox', { name: '搜索设置' });
   await filter.fill('自动收起');
   await filter.press('Tab');
@@ -179,6 +178,7 @@ test('Chinese preset auto tuck duration supports keyboard saving and narrow sett
   await expect(status).not.toContainText('上次尝试失败');
   await expect(status).not.toContainText('等待收起组恢复核对');
   await ui.reload();
+  await ui.evaluate(() => { document.body.style.width = '100%'; });
   await ui.getByRole('combobox').fill('自动收起');
   await expect(ui.getByRole('option').first()).toContainText('自动收起');
   await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');

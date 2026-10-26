@@ -1,6 +1,6 @@
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Execution, PaletteState } from '../src/types.ts';
+import type { Execution } from '../src/types.ts';
 import { USAGE_STORAGE_KEY, type UsageRecord } from '../src/usage.ts';
 
 const event = <T extends unknown[]>() => {
@@ -29,7 +29,6 @@ let beforeToggle: (() => Promise<void>) | undefined;
 let beforeRemove: (() => Promise<void>) | undefined;
 let afterRemove: (() => Promise<void>) | undefined;
 let usageWrite: (() => Promise<void>) | undefined;
-const state: PaletteState = { query: 'tabs', selection: 'command:close', caret: [1, 3], group: { id: 5, query: 'work', selection: 'tab:2', caret: [2, 4] } };
 const sourceSender = () => ({ tab: { ...tabs.find(tab => tab.id === 2)! }, url: 'https://source.example', frameId: 0 });
 function reset() {
   tabs = [
@@ -118,11 +117,11 @@ globalThis.chrome = {
     create: async (options: chrome.tabs.CreateProperties) => { calls.push(['create-tab', options]); return { id: 99, ...options }; },
   },
 } as unknown as typeof chrome;
-const { togglePaletteWindow, paletteSender, getPaletteWindowState, performPaletteAction, closePaletteWindowForShortcut, cancelPaletteContinuation } = await import('../src/paletteWindow.ts');
+const { togglePaletteWindow, paletteSender, getPaletteWindowState, performPaletteAction, closePaletteWindowForShortcut } = await import('../src/paletteWindow.ts');
 const { launchPalette, clearToolbarPopups } = await import('../src/paletteLaunch.ts');
 const nativeSender = () => ({ url: tabs.find(tab => tab.id === 30)!.url, tab: tabs.find(tab => tab.id === 30)! });
 const execute = (action: Execution['action'] = 'close', tabId = 2, sender: chrome.runtime.MessageSender = sourceSender(), acknowledged = () => {}) =>
-  performPaletteAction({ action, windowId: 10, tabId, query: 'close', paletteState: state }, sender, acknowledged);
+  performPaletteAction({ action, windowId: 10, tabId, query: 'close' }, sender, acknowledged);
 
 test('native palette survives leaving Chrome and returning to the same panel without stealing focus', async () => {
   await togglePaletteWindow(tabs[1]);
@@ -179,15 +178,14 @@ test('palette mutation callback and API response preserve the execution outcome'
   assert.deepEqual(await execute({ action: 'closeRight', windowId: 10, tabId: 2 }), outcome);
 });
 
-for (const host of ['page', 'legacy action popup', 'native'] as const) {
+for (const host of ['page', 'native'] as const) {
   for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
-    test(`${host}: ${action} binds navigation to the source without focusing a window or learning`, async () => {
+    test(`${host}: ${action} binds navigation to the source and rejects mismatched or stale source context`, async () => {
       if (host === 'native') {
         tabs[1].url = 'chrome://version/';
         await togglePaletteWindow(tabs[1]);
       }
-      const sender = host === 'native' ? await paletteSender(nativeSender())
-        : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
+      const sender = host === 'native' ? await paletteSender(nativeSender()) : sourceSender();
       const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: tabs[1].url, url: 'https://destination.example/', query: '' };
       calls = [];
       let acknowledged = 0;
@@ -197,41 +195,16 @@ for (const host of ['page', 'legacy action popup', 'native'] as const) {
         : [['create-tab', { windowId: 10, url: 'https://destination.example/', active: true }]]);
       assert.equal(acknowledged, 1);
       assert.deepEqual(usage, []);
-    });
 
-    test(`${host}: ${action} refuses a payload targeting another tab even if it is active`, async () => {
-      if (host === 'native') await togglePaletteWindow(tabs[1]);
-      const sender = host === 'native' ? await paletteSender(nativeSender())
-        : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
-      // An independently valid target cannot replace the host's own source.
       Object.assign(tabs[2], { active: true, url: 'https://source.example' });
       calls = [];
-      let acknowledged = 0;
-      await assert.rejects(performPaletteAction({ action, windowId: 10, tabId: 3, expectedUrl: tabs[2].url,
-        url: 'https://destination.example/', query: 'destination.example' }, sender, () => { acknowledged++; }));
-      assert.deepEqual(calls, []);
-      assert.equal(acknowledged, 0);
-      assert.deepEqual(usage, []);
-    });
-
-    test(`${host}: ${action} rejects stale source state before acknowledging`, async () => {
-      if (host === 'native') await togglePaletteWindow(tabs[1]);
-      const sender = host === 'native' ? await paletteSender(nativeSender())
-        : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
-      const original = { ...tabs[1] };
-      const payload: Execution = { action, windowId: 10, tabId: 2, expectedUrl: original.url, url: 'https://destination.example/', query: 'destination.example' };
-      if (host === 'native') focused = 30;
-      calls = [];
-      let acknowledged = 0;
-      for (const patch of [{ active: false }, { windowId: 20 }, { url: 'https://changed.example/' }, { pendingUrl: 'https://pending.example/' }]) {
-        tabs[1] = { ...original, ...patch };
-        await assert.rejects(performPaletteAction(payload, sender, () => { acknowledged++; }));
-      }
+      await assert.rejects(performPaletteAction({ ...payload, tabId: 3, expectedUrl: tabs[2].url }, sender, () => { acknowledged++; }));
+      tabs[1].active = false;
+      await assert.rejects(performPaletteAction(payload, sender, () => { acknowledged++; }));
       tabs = tabs.filter(tab => tab.id !== 2);
       await assert.rejects(performPaletteAction(payload, sender, () => { acknowledged++; }));
       assert.deepEqual(calls, []);
-      assert.equal(acknowledged, 0);
-      assert.deepEqual(usage, []);
+      assert.equal(acknowledged, 1);
     });
   }
 }
@@ -245,18 +218,6 @@ for (const action of ['openBookmark', 'openHistoryPage'] as const) {
     assert.deepEqual(usage, []);
   });
 }
-
-test('toolbar navigation follows the current active tab and rejects the old payload after activation changes', async () => {
-  const sender = { url: 'chrome-extension://justonehop/popup.html' };
-  tabs[1].active = false;
-  Object.assign(tabs[2], { active: true, url: 'https://source.example' });
-  for (const action of ['navigateAddress', 'openAddressNewTab'] as const) {
-    await assert.rejects(performPaletteAction({ action, windowId: 10, tabId: 2, expectedUrl: tabs[1].url,
-      url: 'https://destination.example/' }, sender, () => assert.fail('stale toolbar request acknowledged')));
-  }
-  assert.deepEqual(calls, []);
-  assert.deepEqual(usage, []);
-});
 
 test('startup clears default and per-tab toolbar popup overrides', async () => {
   await clearToolbarPopups();
@@ -313,14 +274,14 @@ test('concurrent launches do not create duplicate fallback windows', async () =>
   assert.equal(calls.filter(([name]) => name === 'create').length, 1);
 });
 
-for (const host of ['page', 'legacy action popup', 'native'] as const) {
+for (const host of ['page', 'native'] as const) {
   for (const [action, target, removedIds] of [
     ['close', 2, 2], ['closeOthers', 3, [2]], ['closeRight', 1, [2, 3]],
   ] as const) {
-    test(`${host}: ${action} removing the source ends the session even with legacy paletteState`, async () => {
+    test(`${host}: ${action} removing the source ends the session`, async () => {
       if (host === 'native') await togglePaletteWindow(tabs[1]);
       const native = host === 'native' ? nativeSender() : undefined;
-      const sender = native ? await paletteSender(native) : host === 'legacy action popup' ? { url: 'chrome-extension://justonehop/popup.html' } : sourceSender();
+      const sender = native ? await paletteSender(native) : sourceSender();
       calls = [];
       await execute(action, target, sender);
       await tick();
@@ -352,17 +313,24 @@ for (const [action, target] of [['close', 3], ['closeOthers', 2], ['closeRight',
   });
 }
 
-test('source removal without paletteState also closes the native host and cleans the session', async () => {
-  await togglePaletteWindow(tabs[1]);
-  const native = nativeSender();
-  const sender = await paletteSender(native);
-  calls = [];
-  await performPaletteAction({ action: 'close', windowId: 10, tabId: 2 }, sender, () => {});
+test('delayed source removal completing after Escape does not reopen a panel until explicitly launched on the successor', async () => {
+  tabs[0].url = 'chrome://version/';
+  const gate = deferred();
+  const started = deferred();
+  beforeRemove = async () => { started.resolve(); await gate.promise; };
+  const execution = execute('close', 2, sourceSender());
+  await started.promise;
+  await closePaletteWindowForShortcut(tabs[1]);
+  assert.equal(tabs.find(tab => tab.id === 2)?.active, true);
+  gate.resolve();
+  await execution;
   await tick();
-  assert.deepEqual(calls.filter(([name]) => name === 'close-window'), [['close-window', 30]]);
-  assert.equal(stored.justonehopPaletteWindow, undefined);
+  assert.equal(tabs.some(tab => tab.id === 2), false);
+  assert.equal(tabs.find(tab => tab.id === 1)?.active, true);
   assert.equal(calls.some(([name]) => name === 'create'), false);
-  await assert.rejects(paletteSender(native));
+  assert.equal(stored.justonehopPaletteWindow, undefined);
+  await launchPalette(tabs.find(tab => tab.id === 1)!);
+  assert.equal((await paletteSender(nativeSender())).tab?.id, 1);
 });
 
 test('native source removal closes its host before a delayed remove response resolves', async () => {
@@ -459,13 +427,11 @@ test('close validation rejects cross-window source/target and stale group before
   try {
     await assert.rejects(execute('closeOthers', 4), /another window/);
     for (const action of ['close', 'closeOthers', 'closeRight', 'closeGroup'] as const) {
-      for (const paletteState of [undefined, state]) {
-        await assert.rejects(performPaletteAction({ action, windowId: 20, tabId: 4, paletteState }, sourceSender(), () => {}), /another window/);
-      }
+      await assert.rejects(performPaletteAction({ action, windowId: 20, tabId: 4 }, sourceSender(), () => {}), /another window/);
     }
     await assert.rejects(performPaletteAction(null as unknown as Execution, sourceSender(), () => {}), /window/i);
     await assert.rejects(performPaletteAction({ action: 'close', windowId: NaN, tabId: 2 }, sourceSender(), () => {}), /window/i);
-    await assert.rejects(performPaletteAction({ action: 'closeOthers', windowId: 10, tabId: 3, groupId: 99, paletteState: state }, sourceSender(), () => {}), /group/i);
+    await assert.rejects(performPaletteAction({ action: 'closeOthers', windowId: 10, tabId: 3, groupId: 99 }, sourceSender(), () => {}), /group/i);
   } finally { chrome.tabs.query = query; }
   assert.deepEqual(calls, []);
 });
@@ -502,15 +468,6 @@ test('switching to another application during removal does not take focus back',
   beforeRemove = async () => { for (const window of windows) window.focused = false; focusChanged.emit(-1); await tick(); };
   await execute();
   assert.equal(calls.some(([name]) => name === 'create' || name === 'focus'), false);
-});
-
-test('legacy cancellation cannot enable continuation or cancel the browser action', async () => {
-  const sender = { ...sourceSender(), documentId: 'source-document' };
-  await cancelPaletteContinuation(sender);
-  await performPaletteAction({ action: 'close', windowId: 10, tabId: 2, paletteState: state }, sender, () => {});
-  assert.equal(calls.some(([name]) => name === 'create'), false);
-  assert.ok(calls.some(([name]) => name === 'remove'));
-  assert.equal(usage[0].target, 'command:close');
 });
 
 test('native sender and state requests reject invalid token, popup window and source context', async () => {

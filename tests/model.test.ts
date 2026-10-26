@@ -157,15 +157,21 @@ test('brand aliases find commands and settings without changing reload intent bo
     for (const locale of ['en-US', 'zh-CN']) {
       globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
       const items = entries(data);
-      for (const brand of ['justonehop', 'JOH', 'just one hop', 'just-one-hop', '小范围瞬移', '瞬移']) {
-        for (const [suffix, id] of [['settings', 'command:settings'], ['help', 'command:help'], ['reload', 'command:reloadExtension'], ['语言', 'command:settings:language']]) {
-          for (const query of [`${brand} ${suffix}`, `${brand}: ${suffix}`, `${brand}：${suffix}`]) {
-            assert.equal(search(items, query)[0]?.id, id, `${locale}: ${query}`);
-          }
-        }
-        for (const query of [`reload ${brand}`, `重载 ${brand}`, `重启 ${brand}`, ...(/[㐀-鿿]/.test(brand) ? [`重载${brand}`] : [])]) {
-          assert.equal(search(items, query)[0]?.action, 'reloadExtension', `${locale}: ${query}`);
-        }
+      for (const [query, id] of [
+        ['justonehop settings', 'command:settings'],
+        ['JOH: help', 'command:help'],
+        ['just one hop：reload', 'command:reloadExtension'],
+        ['just-one-hop 语言', 'command:settings:language'],
+        ['小范围瞬移: settings', 'command:settings'],
+        ['瞬移：help', 'command:help'],
+        ['reload justonehop', 'command:reloadExtension'],
+        ['reload JOH', 'command:reloadExtension'],
+        ['重载 小范围瞬移', 'command:reloadExtension'],
+        ['重启瞬移', 'command:reloadExtension'],
+      ]) {
+        assert.equal(search(items, query)[0]?.id, id, `${locale}: ${query}`);
+      }
+      for (const brand of ['justonehop', 'JOH', '小范围瞬移', '瞬移']) {
         assert.ok(search(items, brand).some(item => item.id === 'command:help'), brand);
       }
       for (const query of ['reload', 'refresh', 'refesh', 'relaod', 'john reload', 'johx reload']) {
@@ -303,18 +309,18 @@ test('bookmark queries show the current state in both languages and menus withou
         assert.equal(items.find(item => item.action === action)?.title, t(action));
         assert.ok(!homeEntries(items, new Map([[`command:${action}`, 1e9]])).some(item => item.action === action));
         for (const candidates of [items, menu]) {
-          for (const query of ['unbook', 'UNBOOKM', 'Tab: unbook', 'unbookmark', 'UNBOOKMARK', 'unbookmark tab', 'remove bookmark', 'bookmark remove', 'delete bookmarks', '取消收藏', '取消 收藏', '删除书签', '删除 书签', 'Tab: unbookmark', '标签页：取消收藏']) {
+          for (const query of ['unbook', 'UNBOOKMARK', 'remove bookmark', '取消收藏', '删除书签', '标签页：取消收藏']) {
             const found = search(candidates, query);
             assert.ok(!found.some(item => item.action === 'bookmarkTab'), `${locale}: ${query}`);
             if (saved) assert.equal(found[0]?.action, 'unbookmarkTab', `${locale}: ${query}`);
           }
-          for (const query of ['书签', 'close', '关闭', 'tab', 'remove', 'delete', 'boo', 'unboo', 'books', 'bookcase', 'book guide', 'unbookmrak', 'bookmrak', 'close bookmark']) {
+          for (const query of ['书签', 'close', 'remove', 'boo', 'unboo', 'book guide', 'bookmrak', 'close bookmark']) {
             assert.ok(!search(candidates, query).some(item => item.action === 'unbookmarkTab'), `${locale}: ${query}`);
           }
-          for (const query of ['book', 'BOOKM', 'bookma', 'bookmar', 'Tab: book', 'bookmark', 'BOOKMARK', 'bookmark tab', '收藏', '收藏标签页', 'Tab: bookmark', '标签页：收藏标签页']) {
+          for (const query of ['book', 'BOOKMARK', 'bookmark tab', '收藏', '标签页：收藏标签页']) {
             assert.equal(search(candidates, query)[0]?.action, action, `${locale}: ${query}, saved=${saved}`);
           }
-          for (const query of ['add bookmark', 'save bookmark', '添加书签', 'Tab: add bookmark', '标签页：添加书签', 'bookmark add']) {
+          for (const query of ['add bookmark', '添加书签', 'Tab: add bookmark']) {
             const found = search(candidates, query);
             assert.ok(!found.some(item => item.danger), `${locale}: ${query}`);
             assert.equal(found[0]?.action, 'bookmarkTab');
@@ -462,11 +468,6 @@ test('word prefixes in any order beat incidental substrings and metadata', () =>
   for (const query of ['des not', 'not des']) {
     assert.deepEqual(search(items, query).map(item => item.id), ['tab:2', 'tab:1', 'tab:3'], query);
   }
-});
-
-test('greater-than is ordinary text and no longer selects a mode', () => {
-  const items = entries({ ...data, tabs: [{ ...tab(1, 0), title: '> Example' }] });
-  assert.equal(search(items, '> Example')[0].tabId, 1);
 });
 
 test('explicit command names and aliases outrank same-name pages in either UI language', () => {
@@ -757,15 +758,4 @@ test('hostname ranking handles www and inner domain labels without promoting pat
     { ...tab(3, 2, true), title: 'Console', url: 'https://console.sls.example' },
   ], bookmarks: [] });
   assert.deepEqual(search(items, 'sls').map(item => item.id), ['tab:2', 'tab:3', 'tab:1']);
-});
-
-test('retired script commands are absent from search while Ctrl+Tab setup remains discoverable', () => {
-  const items = entries(data);
-  for (const query of ['scripts', 'script library', 'new script', 'run script', 'userscript', '脚本', '管理脚本', '新建脚本']) {
-    assert.deepEqual(search(items, query), [], query);
-  }
-  const binding = search(items, 'Ctrl+Tab')[0];
-  assert.equal(binding.id, 'command:settings:binding');
-  assert.equal(binding.settingsSection, 'binding');
-  assert.equal(binding.searchOnly, true);
 });

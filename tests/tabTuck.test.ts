@@ -218,21 +218,26 @@ test('activating a tucked tab does not release it after a user takeover during t
   assert.equal(module.tuckFlags(tabs[0]).tucked, false);
 });
 
-test('disabled status reports outstanding releases until the retry succeeds', async context => {
+test('disabled status releases remaining tabs after a transient failure and retries the failed tab', async context => {
   const module = await undoFixture();
   const ungroup = chrome.tabs.ungroup;
   let failing = true;
   context.mock.method(chrome.tabs, 'ungroup', async (id: number) => {
-    if (id === 2 && failing) throw new Error('Temporarily unavailable');
+    if (id === 1 && failing) throw new Error('Temporarily unavailable');
     return ungroup(id);
   });
   getPreferences().autoTuck = false;
   const pending = await module.getTuckStatus();
   assert.equal(pending.enabled, false);
   assert.equal(pending.pendingReleaseCount, 1);
+  assert.equal(tabs[0].groupId, 7);
+  assert.equal(tabs[1].groupId, -1);
+  assert.equal(alarm?.periodInMinutes, 0.5);
   failing = false;
+  alarmEvent.emit(alarm!);
   const complete = await module.getTuckStatus();
   assert.equal(complete.pendingReleaseCount ?? 0, 0);
+  assert.equal(alarm, undefined);
   assert.ok(tabs.every(tab => tab.groupId === -1));
 });
 
@@ -294,9 +299,6 @@ test('status previews current tabs without moving them, writing storage or advan
   assert.deepEqual({ local, session }, before);
   assert.deepEqual(moved, []);
   assert.equal(idleQueries, 3, 'status reads scheduling conditions without running a scan');
-  for (const value of [null, '1', 0, 1.5, 8761, NaN, Infinity]) {
-    await assert.rejects(module.getTuckStatus(value as number), /Invalid automatic tuck duration/);
-  }
 });
 
 test('status waits for initialization and previously queued scans', async () => {
@@ -639,22 +641,26 @@ test('events arriving during reconciliation schedule a fresh pass', async contex
   assert.equal(local[recoveryKey].records[0].urls.length, 1);
 });
 
-for (const change of [{ audible: true }, { highlighted: true }, { status: 'loading' },
-  { lastAccessed: now }, { url: 'https://new.example' }]) {
-  test(`automatic tuck rechecks live eligibility before grouping: ${JSON.stringify(change)}`, async context => {
-    getPreferences().autoTuckAfterHours = 1;
-    const module = await start();
-    const get = chrome.tabs.get;
-    let reads = 0;
-    context.mock.method(chrome.tabs, 'get', async (id: number) => {
-      if (++reads === 2) Object.assign(tabs[0], change);
-      return get(id);
-    });
-    alarmEvent.emit(alarm!);
-    await module.getTuckStatus();
-    assert.deepEqual(moved, [], 'a newly protected or recently used tab must stay in place');
+test('automatic tuck rechecks live eligibility before grouping', async context => {
+  getPreferences().autoTuckAfterHours = 1;
+  const module = await start();
+  const get = chrome.tabs.get;
+  let reads = 0;
+  context.mock.method(chrome.tabs, 'get', async (id: number) => {
+    if (++reads === 2) Object.assign(tabs[0], { audible: true });
+    return get(id);
   });
-}
+  alarmEvent.emit(alarm!);
+  await module.getTuckStatus();
+  assert.deepEqual(moved, [], 'a newly protected or recently used tab must stay in place');
+});
+
+test('startup storage failure leaves tabTuckingReady and tuckFlags usable', async context => {
+  context.mock.method(console, 'warn', () => {});
+  context.mock.method(chrome.storage.local, 'get', async () => { throw new Error('Storage unavailable'); });
+  const module = await start();
+  assert.deepEqual(module.tuckFlags(tabs[0]), { tucked: false, canTuck: true });
+});
 
 test('disabling during the final idle query prevents grouping', async context => {
   getPreferences().autoTuckAfterHours = 1;

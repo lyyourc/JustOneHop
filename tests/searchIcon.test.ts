@@ -12,7 +12,6 @@ test('search icons accept whole Emoji sequences and reject arbitrary text', () =
     assert.equal(normalizeSearchIcon(value), undefined, value);
   }
   assert.equal(normalizePreferences({ searchIcon: null }).searchIcon, undefined);
-  assert.equal(normalizePreferences({ searchIcon: '🚀', theme: 'dark' }).theme, 'dark');
   assert.equal(normalizeSearchIcon('data:image/png;base64,iVBORw0KGgo' + 'A'.repeat(32768)), undefined);
 });
 

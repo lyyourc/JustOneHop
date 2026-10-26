@@ -1,4 +1,4 @@
-import { test, expect, fixtureOrigin, snapshotTab } from './support/paletteUI';
+import { test, expect } from './support/paletteUI';
 
 test.use({ viewport: { width: 1100, height: 760 }, reducedMotion: 'reduce' });
 
@@ -45,7 +45,7 @@ test('pet visibility saves and settings search separates modules with an animate
   await theme.press('Escape');
   for (const width of [750, 390]) {
     await ui.setViewportSize({ width, height: 600 });
-    await ui.locator('.justonehop-app').evaluate(node => { node.classList.replace('popup', 'overlay'); document.body.style.width = '100%'; });
+    await ui.evaluate(() => { document.body.style.width = '100%'; });
     const cards = ui.locator('.settings-body > .settings-group');
     expect(await cards.count()).toBeGreaterThan(1);
     const boxes = await cards.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
@@ -55,11 +55,11 @@ test('pet visibility saves and settings search separates modules with an animate
   await expect(badge).toHaveCSS('transition-duration', '0s');
 });
 
-for (const overlay of [false, true]) test(`footer shares stable pet, hint and feedback slots in ${overlay ? 'overlay' : 'window'}`, async ({ palette }) => {
+test('footer shares stable pet, hint and feedback slots with failed and pending saves', async ({ palette }) => {
   const { ui } = palette;
   await ui.clock.install();
-  await palette.open({ locale: 'en-US', ...(overlay ? { overlay: true as const } : {}) });
-  const surface = overlay ? ui.frameLocator('.justonehop-frame') : ui;
+  await palette.open({ locale: 'en-US', overlay: true });
+  const surface = ui.frameLocator('.justonehop-frame');
   await surface.locator('.settings-button').click();
   const pet = surface.locator('.footer-hint-pet');
   const bubble = surface.locator('.footer-hint-bubble');
@@ -121,28 +121,55 @@ for (const overlay of [false, true]) test(`footer shares stable pet, hint and fe
   await surface.getByRole('button', { name: 'Dismiss message' }).press('Enter');
   await expect(bubble).toBeVisible();
 
-  await ui.setViewportSize({ width: 390, height: 600 });
-  if (!overlay) await surface.locator('.justonehop-app').evaluate(node => {
-    node.classList.replace('popup', 'overlay'); node.ownerDocument.body.style.width = '100%';
+  await test.step('narrow Wear Badge footer alignment', async () => {
+    await ui.setViewportSize({ width: 390, height: 600 });
+    await surface.getByRole('button', { name: 'Wear Badge', exact: true }).click();
+    const actions = surface.locator('.footer-actions');
+    const actionsBefore = await actions.boundingBox();
+    const slotBefore = await textSlot.boundingBox();
+    await surface.getByRole('textbox', { name: 'Emoji', exact: true }).fill('🐰');
+    palette.failNextSave();
+    await actions.getByRole('button').first().click();
+    await expect(surface.getByRole('alert')).toBeVisible();
+    await pet.click();
+    await expect(bubble).toBeHidden();
+    expect(await actions.boundingBox()).toEqual(actionsBefore);
+    expect(await textSlot.boundingBox()).toEqual(slotBefore);
+    const messageBox = (await message.boundingBox())!;
+    expect(messageBox.width).toBeGreaterThan(0);
+    expect(messageBox.x).toBeCloseTo(slotBefore!.x, 1);
+    expect(messageBox.x + messageBox.width).toBeLessThanOrEqual(actionsBefore!.x);
+    await actions.getByRole('button').first().click({ trial: true });
+    expect((await surface.locator('.palette-footer').boundingBox())!.height).toBe(44);
+    await ui.keyboard.press('Escape');
   });
-  await surface.getByRole('button', { name: 'Wear Badge', exact: true }).click();
-  const actions = surface.locator('.footer-actions');
-  const actionsBefore = await actions.boundingBox();
-  const slotBefore = await textSlot.boundingBox();
-  await surface.getByRole('textbox', { name: 'Emoji', exact: true }).fill('🐰');
-  palette.failNextSave();
-  await actions.getByRole('button').first().click();
-  await expect(surface.getByRole('alert')).toBeVisible();
-  await pet.click();
-  await expect(bubble).toBeHidden();
-  expect(await actions.boundingBox()).toEqual(actionsBefore);
-  expect(await textSlot.boundingBox()).toEqual(slotBefore);
-  const messageBox = (await message.boundingBox())!;
-  expect(messageBox.width).toBeGreaterThan(0);
-  expect(messageBox.x).toBeCloseTo(slotBefore!.x, 1);
-  expect(messageBox.x + messageBox.width).toBeLessThanOrEqual(actionsBefore!.x);
-  await actions.getByRole('button').first().click({ trial: true });
-  expect((await surface.locator('.palette-footer').boundingBox())!.height).toBe(44);
+
+  await test.step('failed language save retry and held theme save', async () => {
+    palette.failNextSave();
+    const language = surface.getByRole('combobox', { name: 'Language', exact: true });
+    await language.click();
+    await surface.getByRole('option', { name: '简体中文', exact: true }).click();
+    await expect(surface.getByRole('alert')).toContainText('Could not save settings. Please try again.');
+    await expect(language).toContainText('Follow System');
+    const settingsSearch = surface.getByRole('textbox', { name: 'Search settings', exact: true });
+    await settingsSearch.fill('language');
+    await expect(surface.locator('.operation-feedback')).toContainText('Could not save settings. Please try again.');
+    await settingsSearch.fill('');
+    await language.click();
+    await surface.getByRole('option', { name: '简体中文', exact: true }).click();
+    await expect(surface.getByRole('region', { name: '设置', exact: true })).toBeVisible();
+    await expect(surface.getByRole('alert')).toHaveCount(0);
+    await expect(surface.locator('.operation-feedback')).toHaveText('语言已切换为简体中文');
+    palette.holdNextSave();
+    await surface.getByRole('combobox', { name: '主题', exact: true }).click();
+    await surface.getByRole('option', { name: '浅色', exact: true }).click();
+    await ui.clock.runFor(200);
+    await expect(surface.locator('.operation-feedback')).toHaveText('正在执行…');
+    await expect(surface.locator('.justonehop-app')).toHaveAttribute('data-theme', 'dark');
+    palette.completeSave();
+    await expect(surface.locator('.operation-feedback')).toHaveText('主题已切换为浅色');
+    await expect(surface.getByRole('combobox', { name: '主题', exact: true })).toBeFocused();
+  });
 });
 
 for (const overlay of [false, true]) test(`settings badge rotates back home in ${overlay ? 'overlay' : 'window'}`, async ({ palette }) => {
@@ -180,36 +207,6 @@ for (const overlay of [false, true]) test(`settings badge rotates back home in $
   await expect(surface.locator('.search-bar .custom-search-icon')).toHaveCSS('transition-duration', '0s');
 });
 
-test('English settings report failed saves and allow retry without losing current preferences', async ({ palette }) => {
-  const { ui } = palette;
-  await palette.open({ locale: 'en-US' });
-  await ui.locator('.settings-button').click();
-  palette.failNextSave();
-  const language = ui.getByRole('combobox', { name: 'Language', exact: true });
-  await language.click();
-  await ui.getByRole('option', { name: '简体中文', exact: true }).click();
-  await expect(ui.getByRole('alert')).toContainText('Could not save settings. Please try again.');
-  await expect(language).toContainText('Follow System');
-  const settingsSearch = ui.getByRole('textbox', { name: 'Search settings', exact: true });
-  await settingsSearch.fill('language');
-  await expect(ui.locator('.operation-feedback')).toContainText('Could not save settings. Please try again.');
-  await settingsSearch.fill('');
-  await language.click();
-  await ui.getByRole('option', { name: '简体中文', exact: true }).click();
-  await expect(ui.getByRole('region', { name: '设置', exact: true })).toBeVisible();
-  await expect(ui.getByRole('alert')).toHaveCount(0);
-  await expect(ui.locator('.operation-feedback')).toHaveText('语言已切换为简体中文');
-  palette.holdNextSave();
-  await ui.getByRole('tab', { name: '外观', exact: true }).click();
-  await ui.getByRole('combobox', { name: '主题', exact: true }).click();
-  await ui.getByRole('option', { name: '深色', exact: true }).click();
-  await expect(ui.locator('.operation-feedback')).toHaveText('正在执行…');
-  await expect(ui.locator('.justonehop-app')).toHaveAttribute('data-theme', 'system');
-  palette.completeSave();
-  await expect(ui.locator('.operation-feedback')).toHaveText('主题已切换为深色');
-  await expect(ui.getByRole('combobox', { name: '主题', exact: true })).toBeFocused();
-});
-
 test('Chinese command discovery opens each preference at its keyboard control', async ({ palette }) => {
   const { ui } = palette;
   await palette.open();
@@ -241,7 +238,6 @@ test('Chinese command discovery opens each preference at its keyboard control', 
   await expect(ui.locator('.binding-view')).toBeVisible();
   await ui.keyboard.press('Escape'); await expect(ui.locator('[data-setting=binding] button')).toBeFocused();
   await ui.keyboard.press('Escape'); await expect(search).toBeFocused();
-
 });
 
 test('English interaction polish settings choices accept Control navigation without accidental confirmation', async ({ palette }) => {
@@ -308,11 +304,4 @@ test('English interaction polish settings choices accept Control navigation with
   await dismiss.click();
   await expect(ui.locator('.settings-page')).toHaveCount(0);
   await expect(ui.locator('.search-bar input')).toHaveValue('theme');
-  await ui.keyboard.press('Meta+k');
-  await expect(ui.locator('.action-menu')).toBeVisible();
-  await expect(ui.locator('.action-search .search-focus, .action-search .search-dismiss')).toHaveCount(0);
-  await expect(ui.locator('.action-search input')).toBeFocused();
-  await ui.keyboard.press('Escape');
-  await expect(ui.locator('.action-menu')).toHaveCount(0);
-  await expect(ui.locator('.search-bar input')).toBeFocused();
 });

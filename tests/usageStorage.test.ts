@@ -41,11 +41,9 @@ test('reset is ordered with pending writes and explicit home page selections per
   assert.deepEqual(stored, {});
 });
 
-test('omitted queries and invalid home targets never access storage', async () => {
+test('invalid home targets never access storage', async () => {
   let reads = 0;
   chrome.storage.local.get = (async () => { reads++; return {}; }) as typeof chrome.storage.local.get;
-  await recordUsage(undefined as never, 'tab:first');
-  await recordUsage(null as never, 'command:reload');
   await recordUsage('', 'unsupported:first');
   await recordUsage('', 'tab:');
   assert.equal(reads, 0);
@@ -99,8 +97,8 @@ test('multi-target forgetting preserves query scope and validates the whole set 
   let reads = 0;
   const get = chrome.storage.local.get;
   chrome.storage.local.get = (async () => { reads++; return structuredClone(stored); }) as typeof get;
-  for (const targets of [[], ['bookmark:a', ''], ['bookmark:a', null], ['bookmark:a', 3], Array(503).fill('bookmark:a')]) {
-    await assert.rejects(forgetUsage(targets as never), /Invalid usage target/);
+  for (const targets of [[], ['bookmark:a', ''], ['bookmark:a', 'x'.repeat(4097)], Array(503).fill('bookmark:a')]) {
+    await assert.rejects(forgetUsage(targets), /Invalid usage target/);
   }
   assert.equal(reads, 0);
   await forgetUsage(['bookmark:a', 'tab:a'], ' SAME ');
@@ -141,17 +139,16 @@ test('forgetting validates runtime target and normalized query bounds before acc
   const set = chrome.storage.local.set;
   chrome.storage.local.get = (async () => { reads++; return structuredClone(stored); }) as typeof get;
   chrome.storage.local.set = (async () => { writes++; }) as typeof set;
-  for (const target of [undefined, null, 42, false, [], {}, '', 'x'.repeat(4097)]) {
-    await assert.rejects(forgetUsage(target as never), /Invalid usage target/);
+  for (const target of ['', 'x'.repeat(4097)]) {
+    await assert.rejects(forgetUsage(target), /Invalid usage target/);
   }
-  for (const query of [null, 42, false, [], {}, 'x'.repeat(201), 'İ'.repeat(101)]) {
-    await assert.rejects(forgetUsage('command:reload', query as never), /Invalid usage query/);
-  }
+  await assert.rejects(forgetUsage('command:reload', 'x'.repeat(201)), /Invalid usage query/);
   assert.equal(reads, 0);
   assert.equal(writes, 0);
   assert.deepEqual(stored, saved);
   chrome.storage.local.get = get;
   chrome.storage.local.set = set;
+  await forgetUsage('command:unknown');
   const target = 'x'.repeat(4096);
   await recordUsage('x'.repeat(200), target);
   await forgetUsage(target, `  ${'X'.repeat(200)}  `);

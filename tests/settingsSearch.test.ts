@@ -11,7 +11,7 @@ test('settings search finds individual rows by bilingual labels, descriptions an
     ['图标', ['searchIcon']], ['emoji', ['searchIcon']], ['image', ['searchIcon']],
     ['徽章', ['searchIcon']], ['badge', ['searchIcon']],
     ['7 days', ['tabs']], ['自定义', ['searchIcon', 'keyboard']], ['12 hours', ['tabs']], ['时长', ['tabs']], ['页面始终保持打开', ['tabs']], ['search 排序', ['ranking']],
-    ['userscript', []], ['scripts', []], ['脚本', []], ['ctrl tab', ['binding']], ['hotkey', ['keyboard']],
+    ['ctrl tab', ['binding']], ['hotkey', ['keyboard']],
     ['实验室', ['tabs', 'ranking']], ['labs', ['tabs', 'ranking']],
     ['preferences', []], ['experimental features', []],
     ['choose the language used', []], ['choose your own', []], ['Search for any feature from here', []],

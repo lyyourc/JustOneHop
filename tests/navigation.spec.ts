@@ -127,86 +127,6 @@ test('URL actions: English exact copies preserve context and retry without navig
   });
 });
 
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'zh-CN', pageAccess: true, shadow: 'open' } });
-  test('URL actions: Chinese narrow overlay keeps Current plain and text drags separate from clicks', { tag: '@clipboard' }, async () => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    const page = await context.newPage();
-    const sourceUrl = `${origin}/Urlcopy-source?mode=current#source-fragment`;
-    const historyUrl = `${origin}/Urlcopy-archive?mode=history&value=a%2Bb#history-fragment`;
-    await page.goto(sourceUrl);
-    await worker.evaluate(url => chrome.history.addUrl({ url }), historyUrl);
-    const surface = await openStorageOverlay(page);
-    const root = surface.getByRole('combobox', { name: '搜索命令、标签页、书签和历史' });
-    const actions = surface.getByRole('combobox', { name: '搜索操作' });
-    const tabs = () => worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => ({ id: tab.id, url: tab.url, active: tab.active })));
-    const beforeTabs = await tabs();
-    const usage = await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage);
-    await root.fill('Urlcopy');
-    const current = surface.locator('.result.tab').filter({ has: surface.locator('.current-badge') });
-    await expect(current).toHaveCount(1);
-    await expect(surface.locator('#justonehop-results .result.history time')).toHaveCount(1);
-    const badge = current.locator('.current-badge');
-    await expect(badge).toHaveText('当前');
-    for (const width of [750, 390]) {
-      await page.setViewportSize({ width, height: 600 });
-      const typography = await badge.evaluate(node => {
-        const style = getComputedStyle(node);
-        const kind = node.parentElement!.querySelector('.kind-label:not(.current-badge)')!;
-        const time = node.closest('.palette')!.querySelector('.result.history time')!;
-        return { size: style.fontSize, weight: style.fontWeight, color: style.color,
-          timeSize: getComputedStyle(time).fontSize, timeWeight: getComputedStyle(time).fontWeight, timeColor: getComputedStyle(time).color,
-          background: style.backgroundColor, border: style.borderTopWidth, radius: style.borderRadius,
-          padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft],
-          afterKind: node.getBoundingClientRect().left >= kind.getBoundingClientRect().right };
-      });
-      expect(typography).toMatchObject({ size: '11px', weight: '400',
-        background: 'rgba(0, 0, 0, 0)', border: '0px', radius: '0px', padding: ['0px', '0px', '0px', '0px'], afterKind: true });
-      expect(typography.size).toBe(typography.timeSize);
-      expect(typography.weight).toBe(typography.timeWeight);
-      expect(typography.color).toBe(typography.timeColor);
-    }
-    async function copyMouse(input: Locator, row: Locator, url: string) {
-      const query = await input.inputValue();
-      await input.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-      await row.click({ button: 'right' });
-      await expect(actions).toBeFocused(); await actions.fill('copy URL');
-      const copy = surface.locator('.action-row').filter({ hasText: '复制 URL' });
-      await expect(copy).toHaveCount(1); await copy.click();
-      await expect(surface.locator('.action-menu')).toHaveCount(0);
-      await expect(surface.getByText('已复制 URL', { exact: true })).toBeVisible();
-      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
-      await expect(input).toBeFocused(); await expect(input).toHaveValue(query);
-      expect(await input.evaluate((node: HTMLInputElement) => [node.selectionStart, node.selectionEnd])).toEqual([1, 4]);
-      await expect(row).toHaveAttribute('aria-selected', 'true');
-      expect(await tabs()).toEqual(beforeTabs);
-      expect(await worker.evaluate(async () => (await chrome.storage.local.get('searchUsage')).searchUsage)).toEqual(usage);
-    }
-    await copyMouse(root, current, sourceUrl);
-    const mainHistory = surface.locator('#justonehop-results .result.history');
-    await expect(mainHistory).toHaveCount(1);
-    await dragResultText(page, mainHistory);
-    expect(await tabs()).toEqual(beforeTabs);
-    await root.focus();
-    await surface.locator('#justonehop-search-all-history').click();
-    const fullSearch = surface.getByRole('combobox', { name: '搜索浏览历史', exact: true });
-    const history = surface.locator('.history-view .result.history').filter({ hasText: 'Urlcopy-archive' });
-    await expect(history).toHaveCount(1);
-    await dragResultText(page, history);
-    expect(await tabs()).toEqual(beforeTabs);
-    await fullSearch.focus();
-    await copyMouse(fullSearch, history, historyUrl);
-    expect(await surface.locator('.palette-footer').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
-    await expect(surface.locator('.palette-footer .primary-action')).toBeInViewport();
-    await surface.locator('.palette').screenshot({ path: test.info().outputPath('url-copy-history-chinese-narrow.png') });
-    // A selection left in the search input is unrelated to a fresh click on text.
-    await fullSearch.evaluate((node: HTMLInputElement) => node.setSelectionRange(1, 4));
-    await history.locator('.entry-title').click();
-    await expect(page).toHaveURL(historyUrl);
-    await expect(page.locator('.justonehop-frame')).toHaveCount(0);
-  });
-});
-
 // Keep these expectations independent of the production Chrome Pages registry.
 const chromePageCases = [
   { action: 'openExtensions', en: 'Extensions', zh: '扩展管理', url: 'chrome://extensions/', root: 'extensions-manager', aliases: ['extension', 'extensions', '扩展', '插件'], input: 'keyboard' },
@@ -227,58 +147,13 @@ async function expectChromePageLoaded(page: Page, target: { url: string; root: s
   await expect(page.locator('#main-frame-error')).toHaveCount(0);
 }
 
-for (const target of chromePageCases.slice(0, 4)) test.describe(() => {
+for (const [groupName, cases] of [
+  ['keyboard and mouse', chromePageCases.slice(0, 4)],
+  ['footer and menu', chromePageCases.slice(4)],
+] as const) test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test(`Chrome Pages: ${target.en} loads the native page and reuses its exact tab via ${target.input}`, async () => {
-    const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
-    const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    await expect(search).toBeFocused();
-    await ui.keyboard.type(target.aliases[0]);
-    const row = ui.locator(`[id="justonehop-command:${target.action}"]`);
-    if (target.action === 'openHistory') {
-      await expect(ui.locator('#justonehop-search-all-history')).toHaveAttribute('aria-selected', 'true');
-      await expect(row).toHaveAttribute('aria-selected', 'false');
-    } else await expect(row).toHaveAttribute('aria-selected', 'true');
-    await expect(row.locator('.entry-title')).toHaveText(`Chrome Pages: ${target.en}`);
-    const created = context.waitForEvent('page');
-    if (target.input === 'mouse') await row.click();
-    else if (target.input === 'footer') await ui.locator('.palette-footer .primary-action').click();
-    else {
-      if (target.input === 'menu') {
-        await ui.keyboard.press('Meta+k');
-        await expect(ui.getByRole('combobox', { name: 'Search actions' })).toBeFocused();
-        await expect(ui.locator('.action-row')).toHaveCount(1);
-      }
-      await ui.keyboard.press('Enter').catch(error => { if (!ui.isClosed()) throw error; });
-    }
-    const destination = await created;
-    await expectChromePageLoaded(destination, target);
-    await expect.poll(() => ui.isClosed()).toBe(true);
-    const first = await worker.evaluate(async ({ windowId, url }) => (await chrome.tabs.query({ windowId })).filter(tab => tab.url === url), { windowId: owner, url: target.url });
-    expect(first).toHaveLength(1);
-    expect(first[0]).toMatchObject({ active: true, windowId: owner });
-    const beforeReuse = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner);
-
-    const reopened = context.waitForEvent('page');
-    await worker.evaluate(({ windowId, url }) => chrome.tabs.create({ windowId, url, active: true }), { windowId: owner, url: popupUrl });
-    setUI(await reopened);
-    await expect(ui.getByRole('combobox')).toBeFocused();
-    await ui.getByRole('combobox').fill(target.action === 'openHistory' ? 'Chrome Pages: History' : target.aliases[0]);
-    await expect(ui.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
-    await expect(ui.locator('#justonehop-results [role="option"]').first()).toHaveAttribute('id', `justonehop-command:${target.action}`);
-    await expect(ui.locator(`[id="justonehop-command:${target.action}"]`)).toHaveAttribute('aria-selected', 'true');
-    await ui.locator('.palette-footer .primary-action').click();
-    await expect.poll(() => ui.isClosed()).toBe(true);
-    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, first[0].id!)).toBe(true);
-    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner)).toEqual(beforeReuse);
-    await expectChromePageLoaded(destination, target);
-  });
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('Chrome Pages: footer and menu destinations load real WebUI and reuse exact tabs', async () => {
-    for (const target of chromePageCases.slice(4)) await test.step(`${target.en}: open via ${target.input}, then reuse`, async () => {
+  test(`Chrome Pages: ${groupName} destinations load real WebUI and reuse exact tabs`, async () => {
+    for (const target of cases) await test.step(`${target.en}: open via ${target.input}, then reuse`, async () => {
       const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
       const search = ui.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
       await expect(search).toBeFocused();
@@ -327,47 +202,26 @@ test.describe(() => {
       await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, first[0].id!)).toBe(true);
       expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner)).toEqual(beforeReuse);
       await expectChromePageLoaded(destination, target);
+      if (target.action === 'openExtensionShortcuts') {
+        // Also verify Settings -> Keyboard -> Change in Chrome reuses the existing shortcuts tab.
+        const settingsPopup = context.waitForEvent('page');
+        await worker.evaluate(({ windowId, url }) => chrome.tabs.create({ windowId, url, active: true }), { windowId: owner, url: popupUrl });
+        setUI(await settingsPopup);
+        const settings = ui.locator('.palette-footer .settings-button');
+        await expect(settings).toHaveAccessibleName('Settings');
+        await settings.click();
+        await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
+        await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
+        await ui.getByRole('button', { name: 'Change in Chrome', exact: true }).click();
+        await expect.poll(() => ui.isClosed()).toBe(true);
+        await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, first[0].id!)).toBe(true);
+        expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner)).toEqual(beforeReuse);
+        await expectChromePageLoaded(destination, target);
+      }
       // Keep the owner window alive while removing this step's destination.
       setUI(await context.newPage()); await ui.goto(popupUrl);
       await destination.close();
     });
-  });
-});
-
-test.describe(() => {
-  test.use({ environment: { ...defaults, locale: 'en-US' } });
-  test('Chrome Pages: Settings Change in Chrome reuses the existing extension shortcuts tab', async () => {
-    const search = ui.getByRole('combobox');
-    const tabIds = await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id!).sort((a, b) => a - b));
-    for (const query of ['settings', '设置', 'shortcut', '快捷键']) {
-      await search.fill(query);
-      await expect(ui.locator('#justonehop-results [role="option"]').first()).toHaveAttribute('id',
-        query === 'settings' || query === '设置' ? 'justonehop-command:settings' : 'justonehop-command:settings:keyboard');
-      await search.press('Enter');
-      await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
-      await ui.keyboard.press('Escape');
-      await expect(search).toBeFocused();
-      await expect(search).toHaveValue(query);
-    }
-    expect(await worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => tab.id!).sort((a, b) => a - b))).toEqual(tabIds);
-    await search.fill('');
-    const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
-    const created = context.waitForEvent('page');
-    const shortcuts = await worker.evaluate(windowId => chrome.tabs.create({ windowId, url: 'chrome://extensions/shortcuts', active: false }), owner);
-    const destination = await created;
-    await expectChromePageLoaded(destination, { url: 'chrome://extensions/shortcuts', root: 'extensions-keyboard-shortcuts' });
-    const selfId = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.id!);
-    const before = await worker.evaluate(async ({ windowId, selfId }) => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).filter(id => id !== selfId).sort((a, b) => a - b), { windowId: owner, selfId });
-    const settings = ui.locator('.palette-footer .settings-button');
-    await expect(settings).toHaveAccessibleName('Settings');
-    await settings.click();
-    await expect(ui.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
-    await ui.getByRole('tab', { name: 'Keyboard', exact: true }).click();
-    await ui.getByRole('button', { name: 'Change in Chrome', exact: true }).click();
-    await expect.poll(() => ui.isClosed()).toBe(true);
-    await expect.poll(() => worker.evaluate(async id => (await chrome.tabs.get(id)).active, shortcuts.id!)).toBe(true);
-    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner)).toEqual(before);
-    await expectChromePageLoaded(destination, { url: 'chrome://extensions/shortcuts', root: 'extensions-keyboard-shortcuts' });
   });
 });
 
@@ -601,41 +455,6 @@ test.describe(() => {
     );
   });
 
-  test('Address navigation: exact existing results suppress the URL candidate but distinct destinations keep it', async () => {
-    const page = await context.newPage(); await page.goto(`${origin}/Address-dedup-source`);
-    const urls = { tab: `${origin}/Address-dedup-tab`, bookmark: `${origin}/Address-dedup-bookmark`, history: `${origin}/Address-dedup-history` };
-    await worker.evaluate(async urls => {
-      await chrome.tabs.create({ url: urls.tab, active: false });
-      await chrome.bookmarks.create({ title: 'Saved address', url: urls.bookmark });
-      await chrome.history.addUrl({ url: urls.history });
-    }, urls);
-    const surface = await openStorageOverlay(page);
-    const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    const address = surface.locator('#justonehop-results .result').filter({ hasText: 'Go to URL' });
-    for (const kind of ['tab', 'bookmark', 'history'] as const) {
-      await input.fill(urls[kind]);
-      await expect(surface.locator(`#justonehop-results .result.${kind}`)).toHaveCount(1);
-      await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
-      await expect(address).toHaveCount(0);
-    }
-    for (const suffix of ['/different', '?q=1', '#part']) {
-      const target = `${urls.tab}${suffix}`;
-      await input.fill(target);
-      await expect(address).toHaveCount(1);
-      await expect(address).toContainText(target);
-    }
-    await input.fill(`${origin}/Address-dedup-unseen`);
-    await expect(address).toHaveCount(1);
-    await expect(address).toHaveAttribute('aria-selected', 'true');
-    await input.fill(urls.tab);
-    await expect(surface.locator('#justonehop-results .result.tab')).toHaveAttribute('aria-selected', 'true');
-    await expect(address).toHaveCount(0);
-    await input.press('Enter');
-    await expect(page.locator('.justonehop-frame')).toHaveCount(0);
-    await expect.poll(async () => worker.evaluate(async url => (await chrome.tabs.query({ active: true })).some(tab => tab.url === url), urls.tab)).toBe(true);
-    await expect(page).toHaveURL(`${origin}/Address-dedup-source`);
-  });
-
   test('Address navigation: overlay mouse keyboard and menu open the selected address in the intended tab', async () => {
     const page = await context.newPage(); await page.goto(`${origin}/Address-source`);
     const source = await worker.evaluate(async url => {
@@ -701,65 +520,59 @@ test.describe(() => {
 });
 
 test.describe('headed', { tag: '@headed' }, () => {
-test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
-test('Google search: native panel opens current and new tabs in its source window', async () => {
-    await context.route('https://www.google.com/search?**', route => route.fulfill({ contentType: 'text/html', body: '<title>Search destination</title>' }));
-    for (const newTab of [false, true]) {
-      const { source, palette } = await openNativePalette();
-      const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-      const terms = `NativeSearch ${newTab} 中文 & C++`;
-      await input.fill(`google ${terms}`);
-      await expect(palette.locator('#justonehop-results .result').first()).toContainText(`Search Google for “${terms}”`);
-      const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
-      await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
-      await expect.poll(() => palette.isClosed()).toBe(true);
-      await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toMatch(/^https:\/\/www.google.com\/search\?/);
-      const active = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0], source.windowId);
-      expect(new URL(active.url!).searchParams.get('q')).toBe(terms);
-      expect(active.id === source.tabId).toBe(!newTab);
-      if (newTab) expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).url).toBe('chrome://version/');
-    }
-  });
-});
-
-test.describe('headed', { tag: '@headed' }, () => {
-test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
-test('Address navigation: native panel navigates its source and opens new tabs in the source window', async () => {
-    for (const newTab of [false, true]) {
-      const { source, palette } = await openNativePalette();
-      const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-      const target = `${origin}/Address-native-${newTab ? 'new' : 'current'}?Q=A%2Bb#Part`;
-      const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), source.windowId);
-      await input.fill(target);
-      await expect(palette.locator('#justonehop-results .result').first()).toHaveAttribute('aria-selected', 'true');
-      const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
-      await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
-      await expect.poll(() => palette.isClosed()).toBe(true);
-      await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toBe(target);
-      const tabs = await worker.evaluate(windowId => chrome.tabs.query({ windowId }), source.windowId);
-      expect(tabs).toHaveLength(before.length + Number(newTab));
-      expect(tabs.find(tab => tab.id === source.tabId)?.url).toBe(newTab ? 'chrome://version/' : target);
-      expect(tabs.find(tab => tab.url === target)?.id === source.tabId).toBe(!newTab);
-    }
-  });
-});
-
-for (const mode of ['create', 'reuse'] as const) test.describe('headed', { tag: '@headed' }, () => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
-  test(`Chrome Pages: native standalone popup ${mode}s only in its source window and preserves other routes`, async () => {
+  test('Google search and Address navigation: native panel navigates its source and opens new tabs in the source window', async () => {
+    await test.step('Google search: native panel opens current and new tabs in its source window', async () => {
+      await context.route('https://www.google.com/search?**', route => route.fulfill({ contentType: 'text/html', body: '<title>Search destination</title>' }));
+      for (const newTab of [false, true]) {
+        const { source, palette } = await openNativePalette();
+        const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+        const terms = `NativeSearch ${newTab} 中文 & C++`;
+        await input.fill(`google ${terms}`);
+        await expect(palette.locator('#justonehop-results .result').first()).toContainText(`Search Google for “${terms}”`);
+        const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
+        await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
+        await expect.poll(() => palette.isClosed()).toBe(true);
+        await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toMatch(/^https:\/\/www.google.com\/search\?/);
+        const active = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0], source.windowId);
+        expect(new URL(active.url!).searchParams.get('q')).toBe(terms);
+        expect(active.id === source.tabId).toBe(!newTab);
+        if (newTab) {
+          expect((await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).url).toBe('chrome://version/');
+          await worker.evaluate(id => chrome.tabs.remove(id), active.id!);
+        }
+      }
+    });
+
+    await test.step('Address navigation: native panel navigates its source and opens new tabs in the source window', async () => {
+      for (const newTab of [false, true]) {
+        const { source, palette } = await openNativePalette();
+        const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+        const target = `${origin}/Address-native-${newTab ? 'new' : 'current'}?Q=A%2Bb#Part`;
+        const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), source.windowId);
+        await input.fill(target);
+        await expect(palette.locator('#justonehop-results .result').first()).toHaveAttribute('aria-selected', 'true');
+        const shortcut = newTab ? await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter') : 'Enter';
+        await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
+        await expect.poll(() => palette.isClosed()).toBe(true);
+        await expect.poll(async () => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, source.windowId)).toBe(target);
+        const tabs = await worker.evaluate(windowId => chrome.tabs.query({ windowId }), source.windowId);
+        expect(tabs).toHaveLength(before.length + Number(newTab));
+        expect(tabs.find(tab => tab.id === source.tabId)?.url).toBe(newTab ? 'chrome://version/' : target);
+        expect(tabs.find(tab => tab.url === target)?.id === source.tabId).toBe(!newTab);
+      }
+    });
+  });
+
+  test('Chrome Pages: native standalone popup creates and reuses only in its source window and preserves other routes', async () => {
     const owner = await ui.evaluate(async () => (await chrome.tabs.getCurrent())!.windowId);
-    // Finish all setup before launching the popup: a newly focused window after
-    // launch would correctly dismiss it and invalidate the interaction under test.
-    const seeded = await worker.evaluate(async ({ windowId, reuse }) => {
+    const seeded = await worker.evaluate(async ({ windowId }) => {
       const sibling = await chrome.tabs.create({ windowId, url: 'chrome://extensions/shortcuts', active: false });
-      const exact = reuse ? await chrome.tabs.create({ windowId, url: 'chrome://extensions/', active: false, pinned: true }) : undefined;
       const other = await chrome.windows.create({ url: 'chrome://extensions/', focused: false });
       await chrome.windows.update(windowId, { focused: true });
-      return { siblingId: sibling.id!, exactId: exact?.id, otherWindowId: other!.id!, otherTabId: other!.tabs![0].id! };
-    }, { windowId: owner, reuse: mode === 'reuse' });
-    for (const id of [seeded.siblingId, seeded.otherTabId, ...(seeded.exactId === undefined ? [] : [seeded.exactId])]) {
-      // Native WebUI tabs may defer loading in the background. Finish fixture
-      // navigation in the foreground before establishing the panel's source.
+      return { siblingId: sibling.id!, otherWindowId: other!.id!, otherTabId: other!.tabs![0].id! };
+    }, { windowId: owner });
+    for (const id of [seeded.siblingId, seeded.otherTabId]) {
       await worker.evaluate(async tabId => {
         await chrome.tabs.update(tabId, { active: true });
         const tab = await chrome.tabs.get(tabId);
@@ -767,45 +580,48 @@ for (const mode of ['create', 'reuse'] as const) test.describe('headed', { tag: 
       }, id);
       await expect.poll(() => worker.evaluate(async tabId => (await chrome.tabs.get(tabId)).status, id)).toBe('complete');
     }
-    // A completed WebUI navigation can still display a different client route.
-    // Establish the sibling route before testing exact-URL creation or reuse.
     const siblingPage = context.pages().find(page => page.url() === 'chrome://extensions/shortcuts');
     expect(siblingPage, 'The fixture must retain the shortcuts route before opening the panel').toBeDefined();
     await expectChromePageLoaded(siblingPage!, { url: 'chrome://extensions/shortcuts', root: 'extensions-keyboard-shortcuts' });
-    await worker.evaluate(windowId => chrome.windows.update(windowId, { focused: true }), owner);
-    const { source, palette } = await openNativePalette();
-    expect(source.windowId).toBe(owner);
-    const popupWindow = await palette.evaluate(() => chrome.windows.getCurrent());
-    expect(popupWindow.type).toBe('popup');
-    expect(popupWindow.id).not.toBe(owner);
-    const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner);
-    const search = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
-    await search.fill('extensions');
-    await expect(palette.locator('#justonehop-results [role="option"]').first()).toHaveAttribute('id', 'justonehop-command:openExtensions');
-    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.siblingId)).toMatchObject({ windowId: owner, url: 'chrome://extensions/shortcuts', status: 'complete' });
-    await search.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
-    await expect.poll(() => palette.isClosed()).toBe(true);
-    await expect.poll(() => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, owner)).toBe('chrome://extensions/');
-    const after = await worker.evaluate(async windowId => chrome.tabs.query({ windowId }), owner);
-    const matches = after.filter(tab => tab.url === 'chrome://extensions/');
-    expect(matches).toHaveLength(1);
-    expect(matches[0]).toMatchObject({ windowId: owner, active: true });
-    if (mode === 'reuse') {
-      expect(matches[0]).toMatchObject({ id: seeded.exactId, pinned: true });
-      expect(after.map(tab => tab.id!).sort((a, b) => a - b)).toEqual(before);
-    } else {
-      expect(before).not.toContain(matches[0].id);
-      expect(after.map(tab => tab.id!).sort((a, b) => a - b)).toEqual([...before, matches[0].id!].sort((a, b) => a - b));
-    }
-    expect(await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).toMatchObject({ windowId: owner, url: 'chrome://version/' });
-    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.siblingId)).toMatchObject({ windowId: owner, url: 'chrome://extensions/shortcuts' });
-    expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.otherTabId)).toMatchObject({ windowId: seeded.otherWindowId, url: 'chrome://extensions/', active: true });
-    expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), seeded.otherWindowId)).toEqual([seeded.otherTabId]);
-    // Both windows have this URL. Inspect both WebUIs so a loaded page in the
-    // other window cannot mask a failed navigation in the source window.
-    await expect.poll(() => context.pages().filter(page => page.url() === 'chrome://extensions/').length).toBe(2);
-    for (const page of context.pages().filter(page => page.url() === 'chrome://extensions/')) {
-      await expectChromePageLoaded(page, { url: 'chrome://extensions/', root: 'extensions-manager' });
-    }
+    let createdTabId: number | undefined;
+    for (const mode of ['create', 'reuse'] as const) await test.step(`mode: ${mode}`, async () => {
+      if (mode === 'reuse') {
+        await worker.evaluate(id => chrome.tabs.update(id, { pinned: true }), createdTabId!);
+      }
+      await worker.evaluate(windowId => chrome.windows.update(windowId, { focused: true }), owner);
+      const { source, palette } = await openNativePalette();
+      expect(source.windowId).toBe(owner);
+      const popupWindow = await palette.evaluate(() => chrome.windows.getCurrent());
+      expect(popupWindow.type).toBe('popup');
+      expect(popupWindow.id).not.toBe(owner);
+      const before = await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id!).sort((a, b) => a - b), owner);
+      const search = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+      await search.fill('extensions');
+      await expect(palette.locator('#justonehop-results [role="option"]').first()).toHaveAttribute('id', 'justonehop-command:openExtensions');
+      expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.siblingId)).toMatchObject({ windowId: owner, url: 'chrome://extensions/shortcuts', status: 'complete' });
+      await search.press('Enter').catch(error => { if (!palette.isClosed()) throw error; });
+      await expect.poll(() => palette.isClosed()).toBe(true);
+      await expect.poll(() => worker.evaluate(async windowId => (await chrome.tabs.query({ windowId, active: true }))[0]?.url, owner)).toBe('chrome://extensions/');
+      const after = await worker.evaluate(async windowId => chrome.tabs.query({ windowId }), owner);
+      const matches = after.filter(tab => tab.url === 'chrome://extensions/');
+      expect(matches).toHaveLength(1);
+      expect(matches[0]).toMatchObject({ windowId: owner, active: true });
+      if (mode === 'reuse') {
+        expect(matches[0]).toMatchObject({ id: createdTabId, pinned: true });
+        expect(after.map(tab => tab.id!).sort((a, b) => a - b)).toEqual(before);
+      } else {
+        createdTabId = matches[0].id!;
+        expect(before).not.toContain(matches[0].id);
+        expect(after.map(tab => tab.id!).sort((a, b) => a - b)).toEqual([...before, matches[0].id!].sort((a, b) => a - b));
+      }
+      expect(await worker.evaluate(id => chrome.tabs.get(id), source.tabId)).toMatchObject({ windowId: owner, url: 'chrome://version/' });
+      expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.siblingId)).toMatchObject({ windowId: owner, url: 'chrome://extensions/shortcuts' });
+      expect(await worker.evaluate(id => chrome.tabs.get(id), seeded.otherTabId)).toMatchObject({ windowId: seeded.otherWindowId, url: 'chrome://extensions/', active: true });
+      expect(await worker.evaluate(async windowId => (await chrome.tabs.query({ windowId })).map(tab => tab.id), seeded.otherWindowId)).toEqual([seeded.otherTabId]);
+      await expect.poll(() => context.pages().filter(page => page.url() === 'chrome://extensions/').length).toBe(2);
+      for (const page of context.pages().filter(page => page.url() === 'chrome://extensions/')) {
+        await expectChromePageLoaded(page, { url: 'chrome://extensions/', root: 'extensions-manager' });
+      }
+    });
   });
 });

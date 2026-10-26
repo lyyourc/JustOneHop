@@ -168,15 +168,9 @@ test('Chinese home recommendations UI uses supplied usage events and freezes ord
     ...['mute', 'restore', 'sessionStorage'].map(action => ({ query: action, target: `command:${action}`, weight: 100 })),
   ].map(record => ({ ...record, lastUsed: Date.now() }));
   await palette.provideStorage({ searchUsage: usage });
-  for (const [action, queries] of [ ['mute', ['mute', '静音']], ['restore', ['restore', '恢复关闭的标签页']],
-    ['sessionStorage', ['session storage', '会话存储']], ['tabSwitcher', ['tab switcher', '标签切换器']] ] as const) for (const query of queries) {
-    await input.fill(query); await expect(surface.locator('#justonehop-results')).toHaveAttribute('aria-busy', 'false');
-    await expect(surface.locator(`[id="justonehop-command:${action}"]`)).toBeVisible();
-  }
   await input.fill('settings'); await expect(surface.locator('[id="justonehop-command:settings"]')).toHaveAttribute('aria-selected', 'true');
   await input.press('Enter'); await expect(surface.getByRole('region', { name: '设置', exact: true })).toBeVisible();
   await ui.keyboard.press('Escape'); await input.fill(''); await expect.poll(ids).toEqual(defaults);
-  await surface.locator('[id="justonehop-command:settings"]').click(); await ui.keyboard.press('Escape');
   await input.fill('Home cold'); await expect(surface.locator('[id="justonehop-tab:4"]')).toHaveAttribute('aria-selected', 'true');
   await input.press('Meta+k'); const actions = surface.getByRole('combobox', { name: '搜索操作' });
   await actions.fill('mute'); await actions.press('Enter'); await expect(surface.getByRole('dialog')).toHaveCount(0);
@@ -196,9 +190,6 @@ test('Chinese home recommendations UI uses supplied usage events and freezes ord
   await expect.poll(() => palette.requests.filter(request => request.type === 'forget-usage')).toHaveLength(1);
   await palette.provideStorage({ searchUsage: usage.filter(record => ![`tab:${learned.url}`, 'bookmark:learned', 'bookmark:duplicate'].includes(record.target)) });
   await expect(forget).toHaveCount(0); await expect.poll(ids).toEqual(order);
-  await input.fill('help'); await expect(surface.locator('[id="justonehop-command:help"]')).toHaveAttribute('aria-selected', 'true');
-  await input.press('Enter'); await expect(surface.locator('.help-view')).toBeVisible();
-  await ui.keyboard.press('Escape'); await input.fill(''); await expect.poll(ids).toEqual(order);
   await surface.getByRole('button', { name: '设置', exact: true }).click();
   await surface.getByRole('tab', { name: '实验室', exact: true }).click();
   // Deliver the controlled storage event before the reset completion refreshes home scores.

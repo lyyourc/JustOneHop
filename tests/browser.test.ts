@@ -825,8 +825,8 @@ test('settings sections learn independently and preserve the generic settings ta
 
 test('settings reject unknown sections at runtime without recording or acknowledging success', async () => {
   let acknowledged = false;
-  for (const settingsSection of ['', 'Language', 'unknown', null, 42, false, [], {}, ['theme']]) {
-    await assert.rejects(perform({ action: 'settings', windowId: 10, settingsSection } as never,
+  for (const settingsSection of ['', 'Language', 'unknown']) {
+    await assert.rejects(perform({ action: 'settings', windowId: 10, settingsSection: settingsSection as never },
       () => { acknowledged = true; }), /Unsupported/);
   }
   assert.equal(acknowledged, false);

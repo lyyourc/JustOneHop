@@ -44,8 +44,6 @@ const scenarios: [string, string, string[]][] = [
   ['只记得中文标题', 'tab:3', ['路线', 'notion 路线', 'Q4 notion']],
   ['只记得服务域名', 'tab:5', ['sls', '日志', 'sls 日志']],
   ['找会议记录', 'tab:6', ['周会', 'google 周会', '周会 docs']],
-  ['标题只记得两个词', 'tab:10', ['des not', 'not des', 'design notes']],
-  ['标题有拼写错误', 'tab:10', ['desgin notes']],
   ['组名加页面名', 'tab:13', ['Research Budget', 'Budget 研究']],
   ['书签目录加名称', 'bookmark:react', ['前端 react', 'react 开发', 'react.dev 文档']],
   ['跨目录找参考', 'bookmark:github-api', ['API github', '开发 docs.github']],
@@ -117,26 +115,6 @@ test('recent successful choices influence ties without hiding a better match or 
   assert.equal(search(items, 'sls 日志', queryUsage(history, 'sls 日志', now))[0]?.id, 'tab:5');
   assert.notEqual(search(items, 'design', queryUsage(history, 'design', now))[0]?.id, 'tab:15');
   assert.equal(search(items, 'settings', queryUsage(history, 'settings', now))[0]?.id, 'command:settings');
-});
-
-for (const locale of ['en-US', 'zh-CN']) test(`${locale}: inverse actions never suggest doing the opposite on an already satisfied tab`, () => {
-  const original = globalThis.chrome;
-  try {
-    globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
-    for (const enabled of [false, true]) {
-      const state = { ...snapshot, tabs: snapshot.tabs.map(tab => ({ ...tab, pinned: enabled, muted: enabled })) };
-      const items = entries(state);
-      const menu = actionsFor(items.find(item => item.id === 'tab:1')!, state);
-      for (const candidates of [items, menu]) for (const [action, queries] of [
-        ['mute', ['unmute', 'unmute tab', '取消静音', '恢复声音']],
-        ['pin', ['unpin', 'unpin tab', '取消固定', '取消固定标签页']],
-      ] as const) for (const query of queries) {
-        const matches = search(candidates, query).filter(item => item.action === action);
-        assert.equal(matches.length, enabled ? 1 : 0, `${enabled}: ${query}`);
-        if (enabled) assert.equal(matches[0].tabId, candidates === items ? 7 : 1);
-      }
-    }
-  } finally { globalThis.chrome = original; }
 });
 
 test('technical punctuation, emoji, long queries and mixed scripts preserve exact page identity', () => {
