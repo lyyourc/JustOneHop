@@ -28,9 +28,10 @@ export async function historyWindow(sender: chrome.runtime.MessageSender, expect
   }
   const source = sender.tab?.id !== undefined ? await chrome.tabs.get(sender.tab.id)
     : (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+  // History reads are independent of the source page's current URL. Opening a
+  // result separately checks expectedUrl before changing the source tab.
   if (!source?.id || !source.active || source.incognito || sender.tab?.incognito ||
       (sender.tab && source.windowId !== sender.tab.windowId) ||
-      (!popup && source.url !== sender.url) ||
       (expectedWindowId !== undefined && source.windowId !== expectedWindowId)) throw new Error(t('errorHistorySearch'));
   const window = await chrome.windows.get(source.windowId);
   if (window.incognito) throw new Error(t('errorHistorySearch'));

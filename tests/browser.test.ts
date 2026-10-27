@@ -526,6 +526,26 @@ test('history reads sanitize result fields and report the raw API cap', async ()
   });
 });
 
+test('history queries do not depend on source URL snapshots, while opening still requires the expected page', async () => {
+  const page = { id: 'index', title: 'Agent Knowledge Index', url: 'https://docs.example/index', lastVisitTime: 1 };
+  chrome.history.search = async () => [page];
+  tabs[1].url = 'https://source.example/wiki/current?view=doc#section';
+  const sender = { id: 'justonehop', tab: { ...tabs[1], url: 'https://source.example/wiki/intermediate' }, url: 'https://source.example/wiki/original', frameId: 0 };
+  for (const url of [tabs[1].url, 'https://another.example/']) {
+    tabs[1].url = url;
+    for (const scope of ['week', 'all'] as const) {
+      assert.deepEqual((await searchHistory({ query: 'index', scope }, sender)).items, [page]);
+    }
+    assert.equal(await historyWindow(sender, 10), 10);
+    for (const newTab of [false, true]) {
+      await assert.rejects(perform({ action: 'openHistoryPage', windowId: 10, tabId: 2,
+        expectedUrl: sender.tab.url, url: page.url, newTab }), { message: t('errorTabChanged') });
+    }
+  }
+  assert.deepEqual(calls, []);
+  assert.deepEqual(usage, []);
+});
+
 test('history refuses malformed payloads and untrusted or non-palette senders before reading', async () => {
   chrome.history.search = async () => { calls.push(['history']); return []; };
   for (const request of [null, {}, { query: 4, scope: 'week' }, { query: '', scope: 'forever' }]) {
@@ -539,7 +559,8 @@ test('history refuses malformed payloads and untrusted or non-palette senders be
     { ...historySender(), url: 'chrome-extension://justonehop/help.html' },
     { ...historySender(), frameId: 1 },
     { ...overlay, frameId: 1 },
-    { ...overlay, url: 'https://unrelated.example/' },
+    { ...overlay, id: 'other-extension' },
+    { ...overlay, url: 'chrome-extension://justonehop/help.html' },
     { ...overlay, tab: { ...tabs[1], windowId: 20 } },
     { ...overlay, tab: undefined },
   ]) await assert.rejects(searchHistory({ query: 'guide', scope: 'week' }, sender));
@@ -549,6 +570,9 @@ test('history refuses malformed payloads and untrusted or non-palette senders be
 
 test('history rejects incognito, inactive and vanished source contexts', async () => {
   chrome.history.search = async () => { calls.push(['history']); return []; };
+  await assert.rejects(searchHistory({ query: 'guide', scope: 'week' }, {
+    ...historySender(), tab: { ...tabs[1], incognito: true },
+  }));
   for (const patch of [{ incognito: true }, { active: false }]) {
     Object.assign(tabs[1], patch);
     await assert.rejects(searchHistory({ query: 'guide', scope: 'week' }, historySender()));

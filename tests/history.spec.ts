@@ -7,6 +7,38 @@ registerPaletteFixture();
 
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
+  test('History search remains available after same-document navigation', async () => {
+    const savedUrl = `${origin}/Agent-Knowledge-Index`;
+    const visited = await context.newPage();
+    await visited.goto(savedUrl);
+    await expect.poll(() => worker.evaluate(async url => (await chrome.history.search({ text: 'index', startTime: 0 }))
+      .some(item => item.url === url && item.title === 'Agent Knowledge Index'), savedUrl)).toBe(true);
+    await visited.close();
+    const source = await context.newPage();
+    await source.goto(`${origin}/wiki/original`);
+    const tabId = await worker.evaluate(async url => {
+      const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
+      await chrome.scripting.executeScript({ target: { tabId: tab.id! }, files: ['content.js'] });
+      return tab.id!;
+    }, source.url());
+    await source.evaluate(() => history.pushState({}, '', '/wiki/another-document'));
+    await worker.evaluate(tabId => chrome.tabs.sendMessage(tabId, { source: 'justonehop', type: 'toggle' }), tabId);
+    const surface = source.frameLocator('.justonehop-frame');
+    const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    await input.fill('index');
+    await expect(surface.locator('.result.history')).toHaveCount(1);
+    await surface.locator('#justonehop-search-all-history').click();
+    await expect(surface.locator('.history-view .result.history')).toHaveCount(1);
+    await expect(surface.locator('.history-view .result.history .entry-title')).toHaveText('Agent Knowledge Index');
+    await surface.getByRole('combobox', { name: 'Search browsing history', exact: true }).press('Escape');
+    await expect(input).toBeFocused();
+    await expect(surface.locator('#justonehop-search-all-history')).toHaveAttribute('aria-selected', 'true');
+    await input.press('ArrowUp');
+    await expect(surface.locator('.result.history')).toHaveAttribute('aria-selected', 'true');
+    await input.press('Enter');
+    await expect(source).toHaveURL(savedUrl);
+  });
+
   test('History search: pinyin recall, seventh entry, real visits, and overlay navigation', async () => {
     await test.step('History pinyin recalls a visited Chinese title through main and all-history search', async () => {
       const url = `${origin}/pinyin-history-page`;
