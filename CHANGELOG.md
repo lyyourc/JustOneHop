@@ -2,6 +2,12 @@
 
 User-visible changes are grouped by release. Git tags use `v<version>`; extension manifests and store packages use `<version>`. GitHub release dates do not imply Chrome Web Store approval. See the [release guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单).
 
+## [0.3.1] - 2026-10-27
+
+### Fixed / 修复
+
+- Fix browsing-history searches failing after the source page's address changes, including Feishu documents. Main search and Search All History no longer require matching source URL snapshots; extension identity, incognito checks, and protection against opening results on a changed page remain in place. / 修复来源页面地址变化后（包括飞书文档）历史搜索读取失败的问题。主搜索和「搜索全部历史」不再要求来源地址快照一致，保留扩展身份、无痕检查及打开结果时的错页保护。
+
 ## [0.3.0] - 2026-10-24
 
 Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo); the developer dashboard confirmed `Published` and public availability on 2026-10-26. GitHub release published on 2026-10-24. / 已通过审核并在 Chrome Web Store 公开上架，2026-10-26 确认后台状态为 `Published`；GitHub Release 发布于 2026-10-24。
