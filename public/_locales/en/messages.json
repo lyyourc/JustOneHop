@@ -587,7 +587,7 @@
     "message": "Set Up Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "Switch tabs like in VS Code using the shortcut shown. Prefer Ctrl+Tab? Set it up once."
+    "message": "Switch recent tabs like Alt+Tab using the shortcut shown. Prefer Ctrl+Tab? Set it up once."
   },
   "bindingEffect": {
     "message": "Uses Chrome’s internal settings API to bind Ctrl+Tab and Ctrl+Shift+Tab to JustOneHop’s recent tab switcher."

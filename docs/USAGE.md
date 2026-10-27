@@ -2,9 +2,7 @@
 
 English · [简体中文](USAGE.zh-CN.md) · [Back to README](../README.md)
 
-Welcome to the **JustOneHop** (小范围瞬移) User Guide! JustOneHop is a human-first, Chrome-native command palette designed to make tab navigation, switching, decluttering, and site inspection fast and pleasant.
-
-Whether you prefer the speed of keyboard shortcuts, the comfort of your trackpad/mouse, or switching fluidly between both, JustOneHop meets you right where you are.
+**JustOneHop (小范围瞬移)** is a Chrome-native command palette designed for humans. Whether you prefer keyboard shortcuts, mouse clicks, trackpad gestures, or mixing them mid-flow, you can find pages, switch tabs, and tidy your browser from a single box.
 
 ---
 
@@ -12,31 +10,12 @@ Whether you prefer the speed of keyboard shortcuts, the comfort of your trackpad
 
 - [1. Quick Start](#1-quick-start)
 - [2. Unified Search: Find Anything in One Hop](#2-unified-search-find-anything-in-one-hop)
-  - [Search Tabs, Bookmarks & History](#search-tabs-bookmarks--history)
-  - [Real-World Query Examples](#real-world-query-examples)
-  - [Smart Aliases & Typo Tolerance](#smart-aliases--typo-tolerance)
-  - [Instant URL Navigation & Google Search](#instant-url-navigation--google-search)
-- [3. Tab Switcher: Recent Tabs like VS Code](#3-tab-switcher-recent-tabs-like-vs-code)
-  - [Hold, Cycle, and Release](#hold-cycle-and-release)
-  - [Setting Up Ctrl+Tab in 10 Seconds](#setting-up-ctrltab-in-10-seconds)
-  - [Filter Tabs on the Fly](#filter-tabs-on-the-fly)
+- [3. Tab Switcher: Switch Recent Tabs Like Alt+Tab](#3-tab-switcher-recent-tabs-like-vs-code)
 - [4. Tab Housekeeping & Quick Actions (`⌘K`)](#4-tab-housekeeping--quick-actions-k)
-  - [Continuous Multi-Tab Tidy](#continuous-multi-tab-tidy)
-  - [Manage Native Tab Groups](#manage-native-tab-groups)
-  - [Instant Bookmarking (`⌘D`)](#instant-bookmarking-d)
 - [5. Tab Tucking: Declutter without Closing](#5-tab-tucking-declutter-without-closing)
-  - [Manual Tucking](#manual-tucking)
-  - [Automatic Idle Tucking](#automatic-idle-tucking)
-  - [Restoring & Undoing](#restoring--undoing)
 - [6. Developer Inspection: LocalStorage, SessionStorage & Cookies](#6-developer-inspection-localstorage-sessionstorage--cookies)
-  - [Two-Pane Side-by-Side Preview](#two-pane-side-by-side-preview)
-  - [Permissions & Privacy](#permissions--privacy)
-- [7. Navigation, Gestures & Panel Placement](#7-navigation-gestures--panel-placement)
-  - [The 44px Footer & Navigation](#the-44px-footer--navigation)
-  - [Multi-Level Back & Trackpad Swiping](#multi-level-back--trackpad-swiping)
-  - [In-Page Overlay vs. Dedicated Window](#in-page-overlay-vs-dedicated-window)
-- [8. Local Learning & Habit Memory](#8-local-learning--habit-memory)
-- [9. Complete Keyboard & Mouse Shortcuts](#9-complete-keyboard--mouse-shortcuts)
+- [7. Navigation, Gestures & Personalization](#7-navigation-gestures--personalization)
+- [8. Keyboard & Mouse Shortcuts](#8-keyboard--mouse-shortcuts)
 
 ---
 
@@ -44,31 +23,19 @@ Whether you prefer the speed of keyboard shortcuts, the comfort of your trackpad
 
 <a id="使用帮助"></a>
 
-### Summon the Palette
+Press the shortcut anywhere in Chrome, or click the JustOneHop icon in your toolbar:
 
-Press **`⌘Shift+P`** on macOS or **`Ctrl+Shift+P`** on Windows/Linux anywhere in your browser (or simply click the JustOneHop icon in your Chrome toolbar).
-
-```
-macOS:         ⌘ + Shift + P
-Windows/Linux: Ctrl + Shift + P
-```
+- **macOS**: `⌘ + Shift + P`
+- **Windows / Linux**: `Ctrl + Shift + P`
 
 <picture>
   <img alt="Unified Search" src="store/en-1-search.png" width="100%">
 </picture>
 
-### What You See When Opened
-
-When you open JustOneHop without typing anything, you are greeted by the **Home View**—a curated list of useful entry points and recent favorites:
-
-- **Tab Switcher**: Jump straight to your most recently used tabs.
-- **Search All History**: Search beyond the past 7 days across your full browsing history.
-- **Quick Controls**: Access Settings, built-in Help, New Tab, Reload, or Pin/Mute.
-- **Storage Viewers**: Instant access to Local Storage, Session Storage, and Cookies.
+Before you even type, the **Home View** gives you one-click access to **Tab Switcher**, **Search All History**, common tab controls (**New Tab, Reload, Pin, Mute**), **Storage Viewers**, and **Settings & Help**.
 
 > [!TIP]
-> **Need help or want to rebind shortcuts?**
-> Right-click the JustOneHop icon in the Chrome toolbar at any time to check your active keyboard shortcut or open the built-in Help page.
+> Right-click the JustOneHop toolbar icon anytime to check your active shortcut or open the built-in Help guide.
 
 ---
 
@@ -76,112 +43,51 @@ When you open JustOneHop without typing anything, you are greeted by the **Home 
 
 <a id="搜索与导航"></a>
 
-Whether searching open tabs, bookmarks, history, or browser settings, simply type the words in your head—JustOneHop handles everyday phrases and common aliases naturally:
+Type whatever you are looking for: page titles, domains, or everyday commands in English, Chinese, or pinyin:
 
 ![Unified Search Demo](demo/en-search.gif)
 
-### Search Tabs, Bookmarks & History
+- **Open Tabs**: Type any word from the title or domain and press `Enter` (or click) to jump straight there.
+- **Bookmarks & History**: Shown right alongside open tabs. Press `Enter` to open in the current tab, or **`⌘Enter`** (`Alt+Enter` on Windows/Linux) to open in a new tab. Need older pages? Click **Search All History** or type `history`.
+- **Browser Actions & Chrome Pages**: Type plain words like `new tab`, `reopen`, `downloads`, `extensions`, `passwords`, or `dark mode` (switches to an existing tab if already open instead of creating duplicates).
+- **Direct URLs & Google Search**: Type any URL (e.g. `github.com` or `localhost:3000`) to go right there, or search Google in one keystroke when nothing local matches.
 
-- **Open Tabs**: Type a word from the title or domain, press `Enter`, and hop straight there.
-- **Bookmarks**: Matched seamlessly alongside open tabs. Press `Enter` to navigate in the current tab, or press **`⌘Enter`** (`Alt+Enter` on Windows/Linux) to open in a new active tab.
-- **Browsing History**: Automatically searches the past 7 days. Need older pages? Select **Search All History** (always available at row #7 or by typing `history`).
-- **Chrome Built-in Pages**: Type `extensions`, `passwords`, `downloads`, `bookmarks`, or `chrome settings` to jump directly to Chrome's native management pages.
+### Helpful Touches
 
-### Real-World Query Examples
-
-| What you want to do | What to type | What happens |
-| --- | --- | --- |
-| Jump to a pull request | `github pull` or `pr review` | Matches open GitHub tabs and recent history |
-| Find a Notion page | `notion roadmap` | Combines domain and page title |
-| Open a bookmark | `react docs` | Matches folder or bookmark title |
-| Switch themes | `dark mode` or `theme` | Navigates directly into Settings → Appearance |
-| Recover an accidentally closed tab | `reopen` or `undo close` | Restores the most recently closed tab or window |
-| Tidy open tabs | `close tabs to the right` | Safely closes eligible tabs to the right |
-
-Chinese content also supports **toneless pinyin and consecutive initials**: type `chanpinluxiantu`, `cplxt`, or `notion luxian` to find “产品路线图”. Use at least two letters, separate mixed Chinese, English, pinyin, and number terms with spaces, and type `v` for `ü`. Literal matches stay ahead of phonetic matches regardless of learned preferences. Tab Switcher supports the same matching and highlights the original Chinese characters.
-
-History keeps Chrome's literal search and supplements it with pinyin matches from the latest 1,000 pages in the selected time range. A notice appears when the search reaches its limit; use the original Chinese text to find older pages.
-
-#### Exact Project Matching
-
-When you type a project name like `justonehop`, JustOneHop recognizes when the word matches the final path segment of a URL. It prioritizes the repository root over deeper subpages. When you want a specific document, simply add another keyword like `justonehop testing`.
-
-### Complete a Previous Query
-
-After successfully using a query such as `github`, type `g` in the main search to see the remaining letters as a faint hint. Suggestions come from successful local selections, URL navigation, and web searches, with frequency and recency taken into account.
-
-- Press **Tab** or **→** at the end of the input, or click **Complete** in the footer, to fill the suggested query and keep typing.
-- **Continue Search**: After opening a tab, bookmark, or history result from a nonempty main search with at least two distinct available pages, reopening within 10 minutes in the same browser window suggests that query even when the input is empty. Accept with the usual completion keys or the footer’s **Continue Search** button. Matching prefixes prioritize it; unrelated input uses normal completion. Only the latest qualifying query per window is retained, until expiry, reset, or browser restart. Commands, direct URL navigation, Google searches, and incognito do not create this hint.
-- Until accepted, results match only what you typed. **Enter** still executes the selected result; **↑ / ↓** only changes the selected result.
-- Without a hint, Tab moves focus as usual; **Shift+Tab** always moves focus backward. Moving the caret, selecting text, composing with an IME, or deleting text keeps completion out of the way.
-- Suggestions stay on-device, exclude destructive commands, and are disabled in incognito. **Settings → Reset Ranking** clears the shared query and ranking history. Merely typing or accepting a hint does not save a query.
-
-### Smart Aliases & Typo Tolerance
-
-People type fast, and typos happen. JustOneHop includes a built-in alias dictionary for common browser actions:
-
-- **Settings**: `prefs`, `setings`, `options`
-- **Passwords**: `pwd`, `passowrd`
-- **Extensions**: `plugins`, `addons`, `extention`
-- **Bookmarks**: `favorites`, `favourites`
-- **History**: `histroy`, `recent`
-- **Reload**: `refesh`, `relaod`
-- **Brand Names**: `joh`, `justonehop`, `小范围瞬移`
-
-> [!NOTE]
-> Typo tolerance is strictly curated for browser commands and aliases. Dangerous destructive commands (such as closing tabs) always require explicit intent so you never trigger them accidentally.
-
-### Instant URL Navigation & Google Search
-
-Type a full or partial web address (such as `github.com/trending` or `localhost:3000`), and JustOneHop turns it into a direct navigation card at the top of the list:
-
-- Press **`Enter`** (or click **Open Here** in the footer) to navigate the current tab.
-- Press **`⌘Enter`** on macOS or **`Alt+Enter`** on Windows/Linux to open in a **new background/active tab**.
-
-If your query doesn't match local items, JustOneHop offers **Search Google for "…"**:
-- Press **`Enter`** to search in place.
-- Press **`⌘Enter`** / **`Alt+Enter`** to search in a new tab.
+- **Query Completion & Continue Search**: Type the start of a past search to see a faint suggestion. Accept it with **`Tab`**, **`→`**, or the footer button. If you just opened a page from a multi-result search, reopen the palette within 10 minutes to continue where you left off.
+- **Predictable Local Learning**: Frequently chosen results gently move up within their relevance tier and show a small clock badge. Click `×` on the badge or press **`Shift+Backspace`** anytime to forget a preference.
 
 ---
 
-## 3. Tab Switcher: Recent Tabs like VS Code
+## 3. Tab Switcher: Switch Recent Tabs Like Alt+Tab
 
+<a id="3-tab-switcher-recent-tabs-like-vs-code"></a>
 <a id="最近标签页切换"></a>
 
-If you love the `Ctrl+Tab` or `Alt+Tab` workflow in code editors like VS Code, you'll feel right at home with the **Tab Switcher**.
+Jumping back and forth between a few working tabs? **Tab Switcher** orders your open tabs by **most recently used (MRU)**:
 
 <picture>
   <img alt="Tab Switcher Dark Mode" src="store/en-2-switcher.png" width="100%">
 </picture>
 
-### Hold, Cycle, and Release
-
-1. **Press and hold the modifier key** (default: `Control` on macOS, `Ctrl` on Windows/Linux).
-2. **Tap the trigger key** (`J` on macOS, `,` on Windows/Linux; or configured to `Tab`) to open the switcher. The previous tab is selected immediately.
-3. Keep holding the modifier and tap the trigger key (or use `↑`/`↓`, `P`/`N`) to cycle through recent tabs in **MRU (Most Recently Used)** order.
-4. **Release the modifier key** to switch!
+1. **Hold the modifier key** (`Control` on macOS, `Ctrl` on Windows/Linux).
+2. **Tap the trigger key** (`J` on macOS, `,` on Windows/Linux) to open the switcher and cycle through recent tabs.
+3. **Release the modifier key** to jump to the selected tab!
 
 ![Tab Switcher Demo](demo/en-switcher.gif)
+
+- **Type to filter mid-switch**: Too many tabs? **Click the search bar** or press **`⌘F`** (`Ctrl+F`) to release the keys and filter by title or URL.
+- **Mouse-friendly**: You can also open `Tab Switcher` anytime by clicking it on the Home screen.
 
 ### Setting Up Ctrl+Tab in 10 Seconds
 
 <a id="ctrltab-配置"></a>
 
-Chrome reserves `Ctrl+Tab` by default and does not allow extensions to bind it directly in the normal extension shortcut UI. JustOneHop provides a clever 1-step setup helper:
+Chrome doesn't allow binding `Ctrl+Tab` directly in its normal shortcut input, so JustOneHop includes a 1-step setup helper:
 
-1. Open JustOneHop, type `ctrl tab`, and press `Enter` (or go to **Settings → Shortcuts → Tab Switcher**).
-2. Click **Copy & Open** in the footer. JustOneHop automatically copies the one-line configuration script tailored to your extension ID and opens `chrome://extensions/shortcuts`.
-3. Press **`⌘⌥J`** on macOS (or **`Ctrl+Shift+J`** on Windows/Linux) to reveal Chrome's DevTools Console.
-4. Paste and press `Enter`. Both `Ctrl+Tab` and `Ctrl+Shift+Tab` are configured instantly!
-
-> [!TIP]
-> The setup guide remains open on the original tab, so you can switch back and forth while setting it up without losing your place.
-
-### Filter Tabs on the Fly
-
-Need to jump to a tab from 20 steps ago? While holding the shortcut, simply click into the top search box or press **`⌘F`** (`Ctrl+F`). 
-
-This immediately pauses "release-to-switch", letting you release the modifier and type freely to filter tabs by title or URL. When found, press `Enter` to switch.
+1. Search `ctrl tab` in the palette (or open **Settings → Keyboard → Tab Switcher**).
+2. Click **Copy & Open** in the footer to copy the setup script and open `chrome://extensions/shortcuts`.
+3. Press **`⌘⌥J`** (`Ctrl+Shift+J` on Windows/Linux) to open the DevTools Console, paste, and press `Enter`. Both `Ctrl+Tab` and `Ctrl+Shift+Tab` will be bound immediately.
 
 ---
 
@@ -189,49 +95,17 @@ This immediately pauses "release-to-switch", letting you release the modifier an
 
 <a id="整理标签页与继续操作"></a>
 
-Most command palettes disappear the moment you perform an action. JustOneHop is built for **continuous tab housekeeping**:
+**Right-click** any tab result, click **Actions** in the footer, or press **`⌘K`** (`Ctrl+K` on Windows/Linux) to open the action menu:
 
 ![Tab Actions Demo](demo/en-actions.gif)
 
-### Continuous Multi-Tab Tidy
+- **Pin / Mute / Reload / Copy URL / Close Tab**
+- **Instant Bookmarking (`⌘D` / `Ctrl+D`)**<a id="收藏与取消收藏标签页"></a>: Bookmark or unbookmark any tab in the list without switching to it first.
+- **Native Tab Groups**: Search any group by name to view its tabs, expand/collapse, rename, ungroup (keeping pages open), or safely close the group (pinned tabs stay protected).
 
-Right-click any item in the search list, click **Actions** in the bottom bar, or press **`⌘K`** (`Ctrl+K` on Windows/Linux) to open the contextual action menu:
-
-<picture>
-  <img alt="Actions Menu" src="store/en-3-actions.png" width="100%">
-</picture>
-
-From here, you can:
-- **Pin / Unpin**
-- **Mute / Unmute**
-- **Reload Tab**
-- **Copy URL** (copies clean URL without closing the palette)
-- **Close Tab** (or Close Other Tabs / Close Tabs to the Right)
-- **Add / Remove from Tab Group**
-
-> [!IMPORTANT]
-> **Why it's called Continuous Housekeeping:**
-> When you close, pin, or mute a tab that isn't your current active tab, **JustOneHop stays open** and smoothly selects the adjacent item. You can close or pin 5 tabs in a row without reopening the palette!
-
-### Manage Native Tab Groups
-
-JustOneHop integrates seamlessly with Chrome's native Tab Groups:
-
-- Search any group by its name.
-- Press `Enter` or click **View Group Tabs** in the footer to inspect and search only members of that group.
-- In the Actions menu (`⌘K`), you can:
-  - **Expand / Collapse** the group.
-  - **Rename** the group with live feedback.
-  - **Ungroup (Keep Tabs)**: Dissolves the group while keeping all tabs intact.
-  - **Close Group**: Closes the entire group with a protective confirmation dialog displaying the exact number of tabs to be closed (pinned tabs are always protected).
-
-### Instant Bookmarking (`⌘D`)
-
-<a id="收藏与取消收藏标签页"></a>
-
-- In the search bar, type `bookmark tab` or `bookmark` to bookmark the current tab into Chrome's native bookmarks.
-- In any tab result's Action menu (`⌘K`), press **`⌘D`** (`Ctrl+D`) to bookmark that specific tab without having to switch to it first.
-- Search `unbookmark` to safely remove existing bookmarks.
+> [!TIP]
+> **Continuous Multi-Tab Tidy**
+> When you close, pin, or mute a background tab, **the palette stays open and automatically selects the next item**. This lets you tidy up several tabs in a row without reopening it.
 
 ---
 
@@ -239,29 +113,11 @@ JustOneHop integrates seamlessly with Chrome's native Tab Groups:
 
 <a id="收起标签页"></a>
 
-We all hoard tabs because we "might need them later", slowing down Chrome and cluttering the tab strip. **Tab Tucking** solves this by sliding tabs into a neat, native collapsed tab group named `Tuck Away` without closing them or losing form states.
+Have tabs you might need later, but hate a crowded tab strip? **Tab Tucking** slides them into a native collapsed Chrome group named `Tuck Away` without closing pages or losing page state:
 
-### Manual Tucking
-
-- Type `tuck tab` in the search box to tuck away your current tab.
-- Or select any tab in the list, press `⌘K`, and choose **Tuck Tab**.
-
-### Automatic Idle Tucking
-
-Go to **Settings → Experimental → Auto-tuck tabs**:
-
-- Choose an idle duration threshold: **1 hour, 12 hours, 1 day, 3 days, or 7 days** (default: 7 days). Previously saved durations, including 3 hours, remain until you select a new value.
-- Runs when your computer is idle (at least 60 seconds without input, or locked), or Chrome has remained unfocused for **30 minutes**. The unfocused path uses the regular five-minute check; returning to Chrome resets the wait and stops further tucking.
-- Settings distinguish tabs that are not yet due, protected tabs, eligible tabs waiting for a check, and recovery-blocked tabs. The last failed attempt appears separately from the last completed check and clears after a successful check.
-- **Safety first**: Never touches pinned tabs, playing audio, active tabs, split screens, or incognito tabs.
-- Turning the switch off immediately moves all tucked tabs back to your normal tab strip.
-
-Tabs tucked in separate batches keep their original left-to-right order from before the first tuck in that window. Manually reordering the tucked group establishes a new order; after a full browser restart, the restored tab strip becomes the new reference. Undo returns the latest batch without restoring historical positions across the whole window.
-
-### Restoring & Undoing
-
-- **Pick a single tab**: Simply search for the page in JustOneHop or the Tab Switcher and hop to it. It automatically untucks itself back to your active tab strip!
-- **Undo the entire batch**: Type `undo tuck` to immediately restore the last tucked batch.
+- **Tuck manually**: Search `tuck tab`, or press `⌘K` on any tab and choose **Tuck Tab**.
+- **Auto-Tuck when idle**: Enable **Auto-tuck tabs** in **Settings → Labs** to automatically tuck inactive tabs while your computer is idle (active, pinned, and audio-playing tabs are never touched).
+- **Restore anytime**: Search for a tucked tab and jump to it; it returns to your active tab strip automatically. You can also search `undo tuck` to restore the latest batch.
 
 ---
 
@@ -269,102 +125,41 @@ Tabs tucked in separate batches keep their original left-to-right order from bef
 
 <a id="页面存储"></a>
 
-Front-end developers and power users often open the heavy Chrome DevTools just to check a cookie value or copy a JWT token from LocalStorage. JustOneHop provides a lightning-fast, read-only viewer right from the palette:
+Need to check a token or cookie without opening heavy DevTools? Search:
 
-```
-Search: local storage
-Search: session storage
-Search: cookie
-```
+- `local storage`
+- `session storage`
+- `cookie`
 
-### Two-Pane Side-by-Side Preview
-
-- **Left Pane**: Clean, searchable list of storage keys or cookie names.
-- **Right Pane**: Instant preview of the formatted JSON, raw string, and cookie metadata (domain, path, expiration, HttpOnly, partition status).
-- Press **`Enter`** or click **Copy Value** in the footer to copy the clean raw value directly to your clipboard.
-
-### Permissions & Privacy
-
-- `localStorage` and `sessionStorage` use Chrome's temporary `activeTab` permission.
-- Cookie reading requests access **strictly on a per-site basis** when you choose to open the cookie viewer for that domain.
-- Values are read purely in memory for your inspection—nothing is ever stored or uploaded.
+Browse and filter keys on the left, preview formatted JSON and cookie attributes on the right, and press **`Enter`** to copy the clean raw value. Everything is read-only in memory, and cookie access is requested strictly per site.
 
 ---
 
-## 7. Navigation, Gestures & Panel Placement
+## 7. Navigation, Gestures & Personalization
 
 <a id="面板位置底栏与返回"></a>
 
-JustOneHop is crafted with obsessive attention to UI ergonomics.
-
-### Settings Categories & Search
-
-Open Settings by clicking **JustOneHop** in the main footer or searching for `settings`. Use the left sidebar to choose **Appearance**, **Keyboard**, **Labs**, or **Help**; on narrow screens, use the category selector. Appearance opens by default and contains Language, Theme, and Search Bar Icon. Help opens the help content directly. The top search stays available across categories and settings subpages, and searches all settings. Category switching does not add extra Back steps. Click the rotated badge at the left of Settings search or press `Esc` to return one level; an open menu or confirmation closes first. Click the input itself to search.
-
-Typing temporarily shows matching settings. Clear the query to restore the previous category or subpage and its draft; opening a result subpage and returning preserves your search context. To customize the search icon, open **Appearance → Search Bar Icon** and save explicitly. Temporary searches preserve the draft, while leaving the icon page through Back, category navigation, or another destination discards unsaved changes. Categories, search, fields, and actions are available by mouse or keyboard (`Tab` / `Shift+Tab` to move focus).
-
-### The 44px Footer & Navigation
-
-At the bottom of every view sits a 44px footer:
-- **Left**: The current location. Settings categories and subpages all show **Settings**; use the sidebar to switch categories and the rotated badge beside Settings search to return. History, storage, tab groups, and in-panel Help also use a rotated top Back badge, as do task pages. Click the footer bunny to show or hide navigation hints; hints disappear when the bunny retreats. Appearance settings can hide the bunny. The standalone Help window keeps its Close control, while Tab Switcher keeps its dedicated search and cancel actions.
-- **Right**: Contextual actions matching your current selection (e.g. `Open Here`, `New Tab`, `Actions (⌘K)`).
-
-### Multi-Level Back & Trackpad Swiping
-
-Navigating deep menus shouldn't feel like a trap:
-- Press **`Esc`** or click the view’s Back control to retreat exactly one level, perfectly restoring your previous query, cursor position, and scroll offset.
-- When the search box is empty, pressing **`Backspace`** also navigates back one level.
-- **Two-Finger Trackpad Swipe (macOS)**: Swipe right with two fingers on your trackpad to smoothly slide back to the previous screen.
-
-### In-Page Overlay vs. Dedicated Window
-
-JustOneHop automatically chooses the best display mode based on the current page:
-1. **In-Page Overlay**: On standard web pages, the panel sits horizontally centered near the top of the page viewport.
-2. **Dedicated Window**: On pages where Chrome forbids script injection (such as `chrome://` settings, the Chrome Web Store, or blank tabs), JustOneHop opens a lightweight companion window with its content horizontally centered near the top of the source browser window.
-
-The command palette and Tab Switcher share these rules. Each mode uses its own anchor, so their screen positions can differ; neither uses a fixed position on the display. Content size adapts to the source tab's viewport and page zoom, with the native title bar and borders taking additional space.
+- **Effortless Back Navigation**: Press **`Esc`**, click the top-left Back badge, press **`Backspace`** in an empty search box, or **swipe right with two fingers** on a macOS trackpad to step back one level with your previous query and selection intact.
+- **Personalize in Settings**: Click **JustOneHop** in the bottom-left footer (or press `⌘,` / search `settings`) to choose Light/Dark themes, customize the search bar icon with an Emoji or local image, or click the footer pet to toggle keyboard hints.
+- **Works Everywhere**: Opens as a centered overlay on normal webpages, and automatically switches to a lightweight companion window on restricted pages like `chrome://` or the Chrome Web Store.
 
 ---
 
-## 8. Local Learning & Habit Memory
+## 8. Keyboard & Mouse Shortcuts
 
-The more you use JustOneHop, the more attuned it becomes to your habits:
-
-- When you search for a term and select an item, JustOneHop remembers your preference.
-- Next time you type that term, that item gently moves up **within its relevance tier** (relevance always comes first—a loose URL match will never jump ahead of an exact title match).
-- **Clear & Transparent**: Any item promoted by local learning displays a subtle clock icon on the right. Hover over it to see why it ranked higher, click the `×`, or press **`Shift+Backspace`** to forget that preference instantly.
-- **100% On-Device**: Learning weights decay over 14 days and expire after 90 days. No usage data ever leaves your computer.
-
----
-
-## 9. Complete Keyboard & Mouse Shortcuts
-
-### Global & Palette Navigation
-
-| Action | Mouse | macOS Shortcut | Windows / Linux |
+| Action | Mouse / Trackpad | macOS | Windows / Linux |
 | --- | --- | --- | --- |
-| **Open / Close Palette** | Click toolbar icon | `⌘ + Shift + P` | `Ctrl + Shift + P` |
-| **Close or Step Back** | Click Back control / `esc` badge | `Esc` (or `Backspace` if search empty) | `Esc` (or `Backspace`) |
-| **Select Next / Previous** | Scroll or click row | `↓` / `↑` (or `Ctrl+N` / `Ctrl+P`) | `↓` / `↑` (or `Ctrl+N` / `Ctrl+P`) |
-| **Jump to Top / Bottom** | Click top/bottom | `⌘ + ↑` / `⌘ + ↓` | `Ctrl + Home` / `Ctrl + End` |
-| **Page Up / Page Down** | Scroll wheel | `⌥ + ↑` / `⌥ + ↓` (or `PageUp`/`Down`) | `Alt + ↑` / `Alt + ↓` |
-| **Execute Selected Item** | Click row | `Enter` | `Enter` |
-| **Open in New Tab** | Click "New Tab" in footer | `⌘ + Enter` | `Alt + Enter` |
-| **Open Actions Menu** | Right-click row / Click "Actions" | `⌘ + K` | `Ctrl + K` |
-| **Open Settings** | Click JustOneHop in the main footer | `⌘ + ,` | `Ctrl + ,` |
-| **Forget Search Preference** | Click `×` on history badge | `Shift + Backspace` | `Shift + Backspace` |
-| **Swipe Back (Trackpad)** | Two-finger swipe right | — | — |
-
-### Tab Switcher
-
-| Action | Mouse | macOS Shortcut | Windows / Linux |
-| --- | --- | --- | --- |
-| **Trigger Switcher** | Click "Tab Switcher" on Home | Hold `Control` + press `J` | Hold `Ctrl` + press `,` |
-| **Cycle Recent Tabs** | Click candidate | Tap trigger key / `↓` / `↑` / `N` / `P` | Tap trigger key / `↓` / `↑` / `N` / `P` |
-| **Confirm & Switch** | Click candidate | Release modifier key | Release modifier key |
-| **Cancel Switch** | Click outside or `esc` | `Esc` | `Esc` |
-| **Search / Filter Tabs** | Click search bar | `⌘ + F` | `Ctrl + F` |
+| **Open / Close Palette** | Click toolbar icon / `esc` | `⌘ + Shift + P` | `Ctrl + Shift + P` |
+| **Step Back One Level** | Click Back badge / 2-finger swipe right | `Esc` (`Backspace` when empty) | `Esc` (`Backspace` when empty) |
+| **Select Next / Previous** | Scroll or click row | `↓` / `↑` (or `Ctrl+N/P`) | `↓` / `↑` (or `Ctrl+N/P`) |
+| **Open Selected Result** | Click row | `Enter` | `Enter` |
+| **Open in New Tab** | Click **New Tab** in footer | `⌘ + Enter` | `Alt + Enter` |
+| **Open Actions Menu** | Right-click row / click **Actions** | `⌘ + K` | `Ctrl + K` |
+| **Open Settings** | Click **JustOneHop** in footer | `⌘ + ,` | `Ctrl + ,` |
+| **Forget Learned Ranking** | Click `×` on clock badge | `Shift + Backspace` | `Shift + Backspace` |
+| **Recent Tab Switcher (MRU)** | Click `Tab Switcher` on Home | Hold `Control` + `J` | Hold `Ctrl` + `,` |
+| **Filter Tabs in Switcher** | Click search bar | `⌘ + F` | `Ctrl + F` |
 
 ---
 
-*Thank you for using JustOneHop! If you encounter any issues or have ideas for improvement, feel free to open an issue on [GitHub](https://github.com/lyyourc/JustOneHop).*
+*Questions or feedback? Feel free to open an issue on [GitHub](https://github.com/lyyourc/JustOneHop).*

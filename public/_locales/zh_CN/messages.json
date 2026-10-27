@@ -587,7 +587,7 @@
     "message": "配置 Ctrl+Tab"
   },
   "bindingHint": {
-    "message": "使用右侧快捷键，像在 VS Code 中一样切换标签页。也可通过一次配置改用 Ctrl+Tab。"
+    "message": "使用右侧快捷键，像 Alt+Tab 一样切换最近标签页。也可通过一次配置改用 Ctrl+Tab。"
   },
   "bindingEffect": {
     "message": "借助 Chrome 内部设置接口，将 Ctrl+Tab 和 Ctrl+Shift+Tab 绑定到小范围瞬移的最近标签页切换。"

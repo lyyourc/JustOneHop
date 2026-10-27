@@ -32,43 +32,29 @@ JustOneHop
 
 ### Short Description (Paste-ready, within 128 characters)
 ```text
-A human-first command palette for Chrome. Search tabs, bookmarks, and history, and run actions naturally with keyboard or mouse.
+A human-first, Chrome-native command palette for tabs, bookmarks, history, and browser actions.
 ```
 
 ### Detailed Description (Paste-ready)
 ```text
-When dozens of tabs pile up and bookmarks or browsing history live in separate menus, finding what you need shouldn’t mean squinting at tiny tab titles. JustOneHop brings a fast, Chrome-native command palette to your browser—letting you search open tabs, bookmarks, history, tab groups, and everyday browser actions from a single box.
+A human-first, Chrome-native command palette.
 
-Click the toolbar icon or press Command+Shift+P on macOS (Ctrl+Shift+P on Windows/Linux). Every workflow is designed Human First: whether you prefer mouse clicking, keyboard shortcuts, trackpad gestures, or switching between them mid-flow, there are no cryptic prefixes or command modes to memorize.
+Press Command+Shift+P (Ctrl+Shift+P on Windows/Linux) or click the toolbar icon to search open tabs, bookmarks, history, and browser actions from one place. Works naturally whether you prefer a mouse, trackpad, or keyboard.
 
 1. One Search Box for Everything
-• Tabs, Bookmarks & History Together: Search open tabs in the current window, saved bookmarks, and recent 7-day history at once—or expand to Search All History with one click.
-• Plain-Language Browser Actions: Type everyday words like “new tab”, “reopen closed tab”, “downloads”, “extensions”, “passwords”, or “dark mode” to run commands or jump to Chrome pages (automatically switching to an existing tab instead of opening duplicates).
-• Bilingual & Chinese Pinyin Search: Find Chinese titles and commands using full pinyin, initials, or mixed Chinese/English queries across tabs, bookmarks, actions, and the latest 1,000 history pages in your selected time range (use literal text for older history).
-• Smart Query Completion & Continue Search: Accept inline suggestions from your past local searches with Tab, the right arrow, or the footer button. If you opened a page from a multi-result search, reopen the palette in the same window within 10 minutes to continue that search right where you left off.
-• Predictable Local Ranking: True relevance always comes first. Frequently chosen items move up smoothly within their relevance tier, show a clear learned-ranking badge, and can be forgotten anytime with one click or Shift+Backspace.
+• Tabs, bookmarks, and history together: Switch to an open tab, or open bookmarks and history (Enter here, Command+Enter / Alt+Enter in a new tab).
+• Search naturally: Type everyday words like “new tab”, “reopen”, “downloads”, “extensions”, or “dark mode” in English, Chinese, or pinyin. No command prefixes required.
+• Remembers your choices: Frequently picked items move up in search, and you can clear any learned ranking with one click.
 
 2. Switch Recent Tabs Like Alt+Tab
-• Most-Recently-Used (MRU) Order: Open the built-in Tab Switcher (Control+J on macOS / Ctrl+, on Windows & Linux) to cycle through open tabs in the exact order you viewed them.
-• Hold & Release, or Type to Filter: Hold the modifier key and release to jump immediately, or click the search bar / press Command+F (Ctrl+F) mid-switch to filter tabs by title, domain, or pinyin.
-• Ctrl+Tab Setup Guide: Prefer Ctrl+Tab? Follow the built-in step-by-step setup wizard in Settings.
+• Hold and release: Hold Control+J (Ctrl+, on Windows/Linux, or set up Ctrl+Tab with the built-in guide) to flip through tabs in order of recent use.
+• Type to filter anytime: Click the search box or press Command+F while cycling to release the keys and filter by title or URL.
 
-3. Tidy Tabs & Tab Groups Without Losing Your Place
-• Continuous Tab Actions (Command+K / Right-Click): Copy a URL, pin or unpin, mute, reload, add or remove a bookmark (Command+D), move to a group, or close any tab right from the results list. Most organizing actions keep the panel open and preserve or advance selection to the adjacent item, so you can clean up multiple tabs in a row.
-• Native Chrome Tab Groups: Search any tab group by name to inspect its tabs, expand or collapse, rename, ungroup while keeping pages open, or close the entire group with a clear confirmation dialog (pinned tabs stay protected).
-• Tuck Tabs Away (Declutter Without Closing): Move tabs you don’t need right now into the native collapsed group “Tuck Away” without closing pages. Search for a page to bring it back, or undo the latest batch. Optional Auto Tuck in Settings → Labs tidies inactive tabs while your computer is idle or after Chrome has remained unfocused for 30 minutes, preserving original tab order across batches.
+3. Clean Up Tabs Without Losing Your Flow
+• Tidy multiple tabs in a row (Right-click / Command+K): Pin, mute, bookmark, copy links, or close tabs. The panel stays open and selects the next item so you can clean up several tabs in one go.
+• Tuck inactive tabs away: Slide tabs you do not need right now into a collapsed group without closing them. You can also turn on auto-tuck when idle.
 
-4. Built-in Developer Tools & Personalization
-• Read-Only Site Storage & Cookie Viewer: Search “local storage”, “session storage”, or “cookies” to inspect keys, formatted JSON values, and cookie attributes side by side without opening heavy DevTools. Press Enter to copy the raw value. Cookie access is requested strictly per site.
-• Make It Yours: Follow system Light/Dark mode or choose a theme manually, customize your Hop Badge (search bar icon) with an Emoji or local image, and toggle footer keyboard hints via the companion pet control. All settings are organized into Appearance, Keyboard, Labs, and Help, and are searchable from the top bar.
-
-5. 100% Local & Private by Design
-• Zero Telemetry, Zero Cloud: All tab, bookmark, and history searches run locally on your device—no account, developer server, analytics, or tracking. Opening a URL or choosing Google Search navigates your browser to that website.
-• Transparent On-Device Storage: Preferences, custom icons, and search records stay on your device and are never synced to the cloud. Ranking and completion share up to 2,000 local records, which may include search terms and full URLs. Use “Reset search ranking” in Settings to clear learned rankings, completion history, and Continue Search hints at once.
-• In-Memory Storage Inspection: Site storage and cookie values are read only in memory while viewing; copied values are placed on your system clipboard. See the linked Privacy Policy for full details.
-
-How It Runs in Chrome:
-Regular webpages use a centered in-page overlay; restricted pages where Chrome blocks content scripts (such as chrome:// pages or the Chrome Web Store) automatically open in a lightweight companion window anchored to the source browser window. Shortcuts can be customized in chrome://extensions/shortcuts.
+100% Local & Private: No accounts, no backend servers, and no telemetry. Everything runs locally in your browser.
 ```
 
 ---
@@ -80,45 +66,31 @@ Regular webpages use a centered in-page overlay; restricted pages where Chrome b
 小范围瞬移
 ```
 
-### 简介（可直接复制，49 字符）
+### 简介（可直接复制）
 ```text
-一个让日常浏览器操作更顺手的命令面板。轻松搜索标签页、书签与历史，随时用快捷键或鼠标执行常用操作。
+Human-first，Chrome-native。在一个搜索框里找齐标签页、书签、历史与常用操作。
 ```
 
 ### 详细介绍（可直接复制）
 ```text
-网页开多了，想切回刚才看的页面总要在密密麻麻的标签栏里找半天？书签、历史记录和常用设置又散落在不同菜单？「小范围瞬移（JustOneHop）」为 Chrome 提供一个贴合原生视觉与直觉手感的命令面板，让你在一个搜索框里同时找齐已打开的标签页、书签、浏览历史、标签组和常用操作。
+Human-first，Chrome-native 的命令面板。
 
-点击工具栏图标，或按下 ⌘Shift+P（Windows/Linux 为 Ctrl+Shift+P）即可唤起。无论是习惯键盘快捷键、偏爱鼠标点选与触控板手势，还是在日常操作中随时混用，都不需要背诵任何隐晦的搜索前缀或命令语法。
+按 ⌘Shift+P（Windows/Linux 为 Ctrl+Shift+P）或点击工具栏图标，在一个搜索框里找齐已打开的标签页、书签、浏览历史和常用操作。用鼠标还是键盘都一样顺手。
 
-1. 一个搜索框，瞬移至任何内容
-• 标签页、书签与历史一体检索：同时检索当前窗口已打开的标签页、收藏夹书签与最近 7 天浏览历史，也可一键展开「搜索全部历史」。
-• 日常中英文口语直达命令：直接输入“新建标签页”“恢复关闭的标签页”“历史记录”“下载”“扩展”“深色模式”或“new tab”“downloads”“settings”即可执行；若目标内置页已打开则自动切换激活，不重复多开。
-• 中文拼音与中英混输：支持全拼、首字母及中英文混合搜索。历史拼音匹配覆盖所选时间范围最近 1000 个页面，更早的页面可用中文原文查找。
-• 本机查询补全与「继续搜索」：根据本机成功搜索提供输入前缀补全，支持按 Tab、右方向键或点击底栏按钮接受。通过主搜索从多个结果中打开页面后，同窗口 10 分钟内重新打开面板还可继续最近一次页面搜索。
-• 可解释的本地学习排序：搜索相关性始终优先，常用结果仅在同级内自然前移；右侧展示学习标记与推荐原因，可随时点击 × 或按 Shift+Backspace 单条遗忘。
+1. 一个搜索框，找齐所有内容
+• 标签页、书签与历史同框：切到已打开的标签页，或者直接打开书签和历史记录（Enter 当前页打开，⌘Enter / Alt+Enter 新标签页打开）。
+• 直接打字，不用记前缀：支持中英文或拼音，直接搜“新建标签”“恢复标签”“下载”“扩展”或“深色模式”。
+• 记住习惯：常用的结果会排在更前面，也可以随时一键清除记忆。
 
-2. 像 Alt+Tab 一样切换最近标签页（Tab Switcher）
-• 按最近访问顺序（MRU）排列：内置最近标签切换器（macOS 默认 Control+J，Windows/Linux 默认 Ctrl+,），按住修饰键点按即选、松手立刻切回刚才看的网页。
-• 配置专属 Ctrl+Tab：内置可视化配置向导，按向导复制脚本，在 Chrome 快捷键设置页的开发者工具 Console 中执行，以配置 Ctrl+Tab 与反向切换绑定。
-• 切换途中随时打字筛选：切换时点击顶部搜索框或按 ⌘F（Ctrl+F），即可松开按键，输入标题、域名或拼音快速缩小范围。
+2. Alt+Tab 式切最近标签
+• 按住选、松手即切：按住 Control+J（Windows/Linux 为 Ctrl+,，也可以按向导设为 Ctrl+Tab），按最近使用顺序翻选标签页。
+• 随时打字筛选：切标签时点一下搜索框或按 ⌘F，就能松开按键，打字搜标题或网址。
 
-3. 连续整理标签页与「收起来」减负
-• 右键或按 ⌘K 连续整理：在标签页结果上打开操作菜单，即可复制链接、固定／取消固定、静音、刷新、添加或移除书签（⌘D）、移入分组或关闭标签页。多数整理操作后面板保持打开并保留所选项；移除结果后自动选中相邻项，方便一口气连续整理多个页面。
-• 原生标签组管理：直接搜索组名进入成员列表，支持展开／折叠、重命名、解散分组（保留所有页面）或安全关闭整个分组（固定标签页始终受保护）。
-• 标签收起（Tab Tucking）：把暂时不看的页面移入 Chrome 原生折叠组「收起来」，不关闭网页。搜索页面即可找回，也可一键撤销最近一批收起。在「设置 → 实验室」开启自动收起后，当电脑空闲或 Chrome 连续失焦 30 分钟时会自动整理久未访问的标签页，并跨批次保持原有的左右顺序。
+3. 顺手整理标签页
+• 连续整理不打断（右键 / ⌘K）：固定、静音、收藏、复制链接或关闭标签。关闭或固定后，面板不会消失，还会自动选到下一项。
+• 暂时不看的页面先收起来：把用不到的网页放进折叠标签组，不用关掉网页，也能让标签栏变清爽。支持空闲时自动收起。
 
-4. 开发者利器与个性化外观
-• 免开 DevTools 查看网站存储：输入“local storage”“session storage”或“cookie”，直接在双栏视图中左侧检索键名、右侧预览格式化 JSON 与 Cookie 属性，按回车一键复制原始值；读取 Cookie 时仅按当前站点独立申请授权。
-• 定制「瞬移徽章」与分类设置：深浅色外观可跟随系统或手动切换，支持用 Emoji 或本地图片打造专属搜索栏瞬移徽章；设置按「外观、键盘、实验室、使用帮助」分类并支持全局搜索，点击底栏宠物可随时展开或隐藏键盘提示。
-
-5. 100% 本地运行与隐私保护
-• 零账号、零服务端、零遥测：标签页、书签和历史检索全部在本机完成，绝不向开发者收集或上传浏览数据。主动执行 Google 搜索或打开网址时，浏览器会直接访问相应网站。
-• 本地数据透明可控：偏好、瞬移徽章和搜索记录仅保存在本机，不通过云端同步。排序与补全共用最多 2000 条记录，可能包含搜索词和完整网址。设置中的「重置搜索排序」可同时清除排序习惯、补全历史与继续搜索提示。
-• 内存级只读查看：网站存储查看器中的内容仅在当前面板内存中只读展示，不写入持久存储；你主动复制的内容会进入系统剪贴板。完整说明请参阅隐私政策链接。
-
-使用说明：
-普通网页以居中偏上浮层展示；在 Chrome 内置页、应用商店等限制脚本注入的页面会自动切换为相对来源浏览器窗口定位的独立伴侣窗口。支持按 Esc、点击顶部返回徽章、空搜索框按 Backspace 或 macOS 触控板双指右滑逐层返回。
+100% 本地运行：没有账号，没有后台服务器，也不收集任何使用数据。
 ```
 
 ---

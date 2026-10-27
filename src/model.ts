@@ -94,7 +94,7 @@ export function entries(snapshot: Snapshot): Entry[] {
       aliases: ['help', 'user guide', '帮助', '使用帮助', '使用说明', '使用指南'] },
     { id: 'command:tabSwitcher', kind: 'command', category: 'justonehop', action: 'tabSwitcher', icon: 'others',
       title: t('recentSwitcher'), subtitle: t('tabSwitcherHint'), shortcut: snapshot.tabSwitcherShortcut || undefined, keywords: '',
-      aliases: ['tab switcher', 'switch tabs', 'recent tabs', 'Switch tabs like in VS Code', 'VSCode style tab switching', 'VSCode 风格标签切换', '最近标签页', '切换标签页', '标签切换器'] },
+      aliases: ['tab switcher', 'switch tabs', 'recent tabs', 'alt+tab', 'alt tab', 'Switch recent tabs like Alt+Tab', 'Switch tabs like in VS Code', 'VSCode style tab switching', 'VSCode 风格标签切换', '最近标签页', '切换标签页', '标签切换器'] },
     { id: 'command:reloadExtension', kind: 'command', category: 'justonehop', action: 'reloadExtension', icon: 'reload',
       title: t('reloadExtension'), subtitle: t('reloadExtensionHint'), searchOnly: true,
       keywords: 'reload restart justonehop extension extention 重载 重新加载 重启 扩展',
