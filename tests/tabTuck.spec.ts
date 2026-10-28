@@ -304,9 +304,9 @@ test('second automatic tuck reuses each window original group and ignores a same
   expect(await groupId(userTab)).toBe(userGroup);
 });
 
-test('second automatic tuck respects ownership after rename, foreign member, and worker restart', async () => {
+test('second automatic tuck respects name and window ownership after group edits and worker restart', async () => {
   const status = () => ui.evaluate(() => chrome.runtime.sendMessage({ source: 'justonehop', type: 'tuck-status' }));
-  for (const change of ['rename', 'foreign member', 'worker restart'] as const) await test.step(change, async () => {
+  for (const change of ['rename', 'color', 'foreign member', 'worker restart'] as const) await test.step(change, async () => {
     const [first] = await seed('Original-Batch');
     await enableAutomaticTucking();
     await runIdleScan();
@@ -316,6 +316,8 @@ test('second automatic tuck respects ownership after rename, foreign member, and
     let foreign: number | undefined;
     if (change === 'rename') {
       await worker.evaluate(id => chrome.tabGroups.update(id, { title: 'My reading', color: 'blue' }), originalGroup);
+    } else if (change === 'color') {
+      await worker.evaluate(id => chrome.tabGroups.update(id, { color: 'blue' }), originalGroup);
     } else if (change === 'foreign member') {
       [foreign] = await seed('User-Added');
       await worker.evaluate(({ id, groupId }) => chrome.tabs.group({ tabIds: [id], groupId }), { id: foreign, groupId: originalGroup });
@@ -336,15 +338,15 @@ test('second automatic tuck respects ownership after rename, foreign member, and
     const nextGroup = await groupId(second);
     expect(nextGroup).not.toBe(-1);
     expect(await groupId(first)).toBe(originalGroup);
-    if (change === 'worker restart') {
+    if (change !== 'rename') {
       expect(nextGroup).toBe(originalGroup);
       expect(await worker.evaluate(() => chrome.tabGroups.query({}))).toHaveLength(1);
     } else {
       expect(nextGroup).not.toBe(originalGroup);
       expect(await worker.evaluate(() => chrome.tabGroups.query({}))).toHaveLength(2);
-      if (change === 'rename') expect(await worker.evaluate(id => chrome.tabGroups.get(id), originalGroup)).toMatchObject({ title: 'My reading', color: 'blue' });
-      if (foreign !== undefined) expect(await groupId(foreign)).toBe(originalGroup);
+      expect(await worker.evaluate(id => chrome.tabGroups.get(id), originalGroup)).toMatchObject({ title: 'My reading', color: 'blue' });
     }
+    if (change === 'color') expect(await worker.evaluate(id => chrome.tabGroups.get(id), originalGroup)).toMatchObject({ color: 'blue' });
     await execute('undoTuck');
     expect(await groupId(second)).toBe(-1);
     expect(await groupId(first)).toBe(originalGroup);

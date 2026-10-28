@@ -200,11 +200,13 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ### 版本与上架状态
 
+**准备发布 `0.3.2`（2026-10-28）：** 放宽已管理收起组的归属条件，名称与所在窗口不变时继续复用，保留颜色与当前成员；撤销仍仅作用于最近批次。并包含底栏键盘提示展开时保留页面上下文的修复与中英文文案精简。权限与数据处理范围不变。发布候选待完整自动化验证，尚未上传或提交商店；GitHub Release 与商店状态将在完成后分别记录。
+
 **补丁版本 `0.3.1`（2026-10-27）：** 修复来源页面地址变化导致的历史搜索读取失败，权限与数据处理范围不变。发布文件使用 `0.3.1`，tag 为 `v0.3.1`，商店包为 `justonehop-0.3.1.zip`；完整类型检查、422 项单测和 126 项浏览器用例均已通过，无失败或跳过；ZIP 已与受测构建逐文件核对。GitHub 版本为 `v0.3.1`，具体发布记录见 [Release](https://github.com/lyyourc/JustOneHop/releases/tag/v0.3.1)。该版本已于 2026-10-27 提交 Chrome Web Store，后台状态为 `Pending review`，已选择审核通过后自动发布；以下 `0.3.0` 上架记录作为已发布版本的历史状态保留。
 
 **已公开的商店版本：`0.3.0` 已通过 Chrome Web Store 审核并公开上架。** 功能已冻结，沿用原标记 1.0.0 构建的完整自动化验证；0.3.0 仅修改版本元数据，其余包内文件逐字节一致，已通过打包校验（2026-10-24）。 本次准备已完成 `justonehop-0.3.0.zip` 及其逐文件审计（见 `releases/justonehop-0.3.0-package-audit.json` 与 `releases/justonehop-0.3.0-notes.md`），已于 2026-10-24 发布 GitHub Release（`v0.3.0`）并提交 Chrome Web Store 审核，2026-10-26 确认后台状态为 `Published`，并明确显示已向公众开放。[商店安装入口](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo)。发布范围为 Public / All regions / Free，当前分类为 Tools。
 
-`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 统一使用三段数字版本 `0.3.1`；Git tag 与 GitHub Release 使用 `v0.3.1`，发布包附件名为 `justonehop-0.3.1.zip`。后续新增功能递增次版本，修复递增补丁版本。上传前核对后台已有版本；待上传版本必须高于已发布版本。本次上传前原草稿为 0.1.0，彼时无已发布版本；当前已发布版本为 0.3.0。
+`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 统一使用三段数字版本 `0.3.2`；Git tag 与 GitHub Release 使用 `v0.3.2`，发布包附件名为 `justonehop-0.3.2.zip`。后续新增功能递增次版本，修复递增补丁版本。上传前核对后台已有版本；待上传版本必须高于已发布版本。本次上传前原草稿为 0.1.0，彼时无已发布版本；当前已发布版本为 0.3.0。
 
 [CHANGELOG](../CHANGELOG.md) 按版本维护用户可见变化。准备中的版本标记 `Unreleased`；正式发布时改为发布日期（`YYYY-MM-DD`）。GitHub Release 与 Chrome Web Store 审核状态相互独立：只有后台审核通过并公开可访问后，才将商店状态标记为已上线。
 

@@ -89,8 +89,7 @@ export async function resumeTuck(windowId: number, recoveryId: string, groupId: 
     await persist();
   });
 }
-// Group edits from justonehop preserve ownership; edits made outside justonehop still
-// follow the conservative reconciliation rule and relinquish ownership.
+// Renames from JustOneHop update the expected name; external renames end ownership.
 export async function updateManagedGroup(windowId: number, groupId: number, changes: { title?: string; color?: chrome.tabGroups.TabGroup['color']; collapsed?: boolean }) {
   await ready;
   return serial(async () => {
@@ -145,7 +144,7 @@ export async function tabTuckingReady() {
 const plain = (tab: chrome.tabs.Tab) => !tab.pinned && (tab.groupId ?? -1) === -1 &&
   !tab.incognito && (tab.splitViewId === undefined || tab.splitViewId === -1);
 export function tuckFlags(tab: chrome.tabs.Tab): { tucked: boolean; canTuck: boolean } {
-  return { tucked: state.groups.some(group => group.id === tab.groupId && group.windowId === tab.windowId && group.members.includes(tab.id!)),
+  return { tucked: !tab.pinned && state.groups.some(group => group.id === tab.groupId && group.windowId === tab.windowId && !invalidGroups.has(group.id)),
     canTuck: plain(tab) };
 }
 export function canUndoTuck(windowId: number) { return Boolean(state.undo[windowId]?.ids.length); }
@@ -220,10 +219,8 @@ async function normalTabs() { return chrome.tabs.query({ windowType: 'normal' })
 function prune(tabs: chrome.tabs.Tab[]) {
   const live = new Map(tabs.map(tab => [tab.id, tab]));
   for (const id of Object.keys(state.clocks)) if (!live.has(Number(id))) delete state.clocks[Number(id)];
-  for (const group of state.groups) group.members = group.members.filter(id => {
-    const tab = live.get(id);
-    return tab && tab.groupId === group.id && tab.windowId === group.windowId && !tab.pinned;
-  });
+  for (const group of state.groups) group.members = tabs
+    .filter(tab => tab.groupId === group.id && tab.windowId === group.windowId && !tab.pinned).map(tab => tab.id!);
   state.groups = state.groups.filter(group => group.members.length);
   for (const [windowId, order] of Object.entries(state.order || {})) {
     if (!state.groups.some(group => group.windowId === Number(windowId))) delete state.order![Number(windowId)];
@@ -274,7 +271,7 @@ async function persist(tabs?: chrome.tabs.Tab[]) {
 }
 function groupMetadataMatches(group: Group, native: chrome.tabGroups.TabGroup | null) {
   return !invalidGroups.has(group.id) && native && native.windowId === group.windowId &&
-    (native.title || '') === group.title && native.color === (group.color || 'grey');
+    (native.title || '') === group.title;
 }
 async function validGroup(group: Group): Promise<chrome.tabs.Tab[] | null> {
   const native = await chrome.tabGroups.get(group.id).catch(error => {
@@ -286,9 +283,8 @@ async function validGroup(group: Group): Promise<chrome.tabs.Tab[] | null> {
     group.title = native.title || ''; group.color = native.color;
     delete group.metadataPending;
   }
-  const members = new Set(group.members);
-  // A renamed/recolored group or one the user added pages to is now theirs.
-  if (!groupMetadataMatches(group, native) || tabs.some(tab => !members.has(tab.id!))) {
+  // Only an external rename or window change ends ownership of an existing group.
+  if (!groupMetadataMatches(group, native)) {
     // Deliberate edits end ownership. Missing groups from closing windows keep
     // their evidence so Chrome session restore can reconnect them later.
     if (native || (await chrome.tabs.query({ windowId: group.windowId }).catch(() => [])).length) forgetRecord(recordKey(group));
@@ -296,9 +292,10 @@ async function validGroup(group: Group): Promise<chrome.tabs.Tab[] | null> {
     delete state.undo[group.windowId];
     return null;
   }
-  const liveMembers = new Set(tabs.filter(tab => !tab.pinned).map(tab => tab.id));
-  group.members = group.members.filter(id => liveMembers.has(id));
-  return tabs;
+  group.color = native!.color;
+  const members = tabs.filter(tab => !tab.pinned && tab.windowId === group.windowId);
+  group.members = members.map(tab => tab.id!);
+  return members;
 }
 function groupCheck(group: Group) {
   let revision = membershipRevision;
@@ -367,10 +364,10 @@ async function label(group: Group, collapse = false) {
     ...(collapse && !tabs.some(tab => tab.active) ? { collapsed: true } : {}) });
 }
 async function releaseTab(tab: chrome.tabs.Tab) {
-  const group = state.groups.find(group => group.id === tab.groupId && group.windowId === tab.windowId && group.members.includes(tab.id!));
+  const group = state.groups.find(group => group.id === tab.groupId && group.windowId === tab.windowId);
   if (!group || !(await validGroup(group))) return;
   const live = await chrome.tabs.get(tab.id!).catch(() => null);
-  if (!live || live.groupId !== group.id || live.windowId !== group.windowId) return;
+  if (!live || live.pinned || live.groupId !== group.id || live.windowId !== group.windowId) return;
   if (invalidGroups.has(group.id)) { await validGroup(group); return; }
   await ungroupTab(live.id!);
   group.members = group.members.filter(id => id !== live.id);
@@ -582,6 +579,9 @@ async function preferencesChanged() {
             catch { if (await chrome.tabs.get(live.id!).catch(() => null)) failed = true; }
           }
         }
+        // Members added while releasing remain managed and are retried, rather
+        // than silently abandoned when the preference transition completes.
+        if (state.groups.includes(group) && (await validGroup(group))?.length) failed = true;
       }
       if (failed) {
         await chrome.alarms.create(ALARM, { delayInMinutes: 0.5, periodInMinutes: 0.5 });
@@ -727,7 +727,6 @@ export function startTabTucking(changed: () => void) {
       const expectedJoin = joiningTabs.has(id) || releasingTabs.has(id) || group?.members.includes(id);
       if (!expectedJoin) {
         membershipRevision++;
-        if (group) invalidGroups.add(group.id);
       }
     }
     if (change.pinned !== undefined) membershipRevision++;
@@ -738,8 +737,9 @@ export function startTabTucking(changed: () => void) {
   chrome.tabGroups.onUpdated.addListener(group => {
     const owned = state.groups.find(item => item.id === group.id);
     if (!owned && pendingRecovery.length) reconcile();
-    if (owned && ((group.title || '') !== owned.title || group.color !== (owned.color || 'grey'))) {
-      invalidGroups.add(group.id); reconcile();
+    if (owned) {
+      if ((group.title || '') !== owned.title || group.windowId !== owned.windowId) invalidGroups.add(group.id);
+      if (invalidGroups.has(group.id) || group.color !== owned.color) reconcile();
     }
   });
 }

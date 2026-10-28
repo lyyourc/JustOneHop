@@ -118,6 +118,7 @@ Have tabs you might need later, but hate a crowded tab strip? **Tab Tucking** sl
 - **Tuck manually**: Search `tuck tab`, or press `⌘K` on any tab and choose **Tuck Tab**.
 - **Auto-Tuck when idle**: Enable **Auto-tuck tabs** in **Settings → Labs** to automatically tuck inactive tabs while your computer is idle (active, pinned, and audio-playing tabs are never touched).
 - **Restore anytime**: Search for a tucked tab and jump to it; it returns to your active tab strip automatically. You can also search `undo tuck` to restore the latest batch.
+- **Edit the tuck group**: Changing its color or adding tabs keeps it managed and reused, as long as its name and window stay the same. Added tabs return to the ordinary tab strip when selected or when Auto-Tuck is turned off; undo only restores the latest tucked batch.
 
 ---
 

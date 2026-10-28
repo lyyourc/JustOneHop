@@ -173,8 +173,8 @@ test('undo tuck failure reports completed work and preserves the remaining undo 
   assert.equal(module.canUndoTuck(10), true);
 });
 
-for (const operation of ['undo', 'disable'] as const) for (const change of ['rename', 'color', 'foreign member'] as const) {
-  test(`${operation} stops releasing a group taken over by a user via ${change}`, async context => {
+for (const operation of ['undo', 'disable'] as const) for (const change of ['rename', 'window', 'color', 'foreign member'] as const) {
+  test(`${operation} respects name and window ownership during ${change}`, async context => {
     const module = await undoFixture();
     const ungroup = chrome.tabs.ungroup;
     context.mock.method(chrome.tabs, 'ungroup', async (id: number) => {
@@ -185,7 +185,10 @@ for (const operation of ['undo', 'disable'] as const) for (const change of ['ren
         tabUpdatedEvent.emit(99, { groupId: 7 }, structuredClone(tabs[2]));
       } else {
         if (change === 'rename') groups[0].title = 'My reading';
-        else groups[0].color = 'blue';
+        else if (change === 'window') {
+          groups[0].windowId = 20;
+          for (const member of tabs.filter(tab => tab.groupId === 7)) member.windowId = 20;
+        } else groups[0].color = 'blue';
         groupUpdatedEvent.emit(structuredClone(groups[0]));
       }
     });
@@ -193,8 +196,11 @@ for (const operation of ['undo', 'disable'] as const) for (const change of ['ren
     else { getPreferences().autoTuck = false; await module.getTuckStatus(); }
     await module.getTuckStatus();
     assert.equal(tabs[0].groupId, -1);
-    assert.equal(tabs[1].groupId, 7, 'the user-owned group must keep its remaining member');
-    if (change === 'foreign member') assert.equal(tabs[2].groupId, 7);
+    assert.equal(tabs[1].groupId, change === 'rename' || change === 'window' ? 7 : -1);
+    if (change === 'foreign member') {
+      assert.equal(tabs[2].groupId, operation === 'undo' ? 7 : -1);
+      assert.equal(module.tuckFlags(tabs[2]).tucked, operation === 'undo');
+    }
     assert.equal(module.tuckFlags(tabs[1]).tucked, false);
     assert.equal(module.canUndoTuck(10), false);
   });
@@ -584,7 +590,7 @@ test('coalesced reconciliation still relinquishes a group edited during a batch'
   assert.equal(module.canUndoTuck(10), false);
 });
 
-test('external membership changes invalidate batch reuse before another tab joins', async context => {
+test('external membership changes keep batch ownership and exclude added tabs from undo', async context => {
   getPreferences().autoTuckAfterHours = 1;
   tabs = [1, 2, 3].map(id => ({ ...tab, id }));
   tabs.push({ ...tab, id: 99, pinned: true });
@@ -600,14 +606,17 @@ test('external membership changes invalidate batch reuse before another tab join
   });
   alarmEvent.emit(alarm!);
   await module.getTuckStatus(); await module.getTuckStatus();
-  assert.deepEqual(moved, [1, 2]);
-  assert.equal(tabs[2].groupId, -1);
+  assert.deepEqual(moved, [1, 2, 3]);
+  assert.equal(tabs[2].groupId, groups[0].id);
   assert.equal(tabs[3].groupId, groups[0].id);
-  assert.equal(module.tuckFlags(tabs[0]).tucked, false);
-  assert.equal(module.canUndoTuck(10), false);
+  assert.equal(module.tuckFlags(tabs[0]).tucked, true);
+  assert.equal(module.tuckFlags(tabs[3]).tucked, true);
+  await module.undoTuck(10);
+  assert.ok(tabs.slice(0, 3).every(tab => tab.groupId === -1));
+  assert.equal(tabs[3].groupId, groups[0].id);
 });
 
-test('periodic membership checks stop a batch even if an external event is missing', async context => {
+test('membership refresh adopts added tabs even if an external event is missing', async context => {
   getPreferences().autoTuckAfterHours = 1;
   tabs = Array.from({ length: 100 }, (_, index) => ({ ...tab, id: index + 1 }));
   tabs.push({ ...tab, id: 999, pinned: true });
@@ -620,8 +629,10 @@ test('periodic membership checks stop a batch even if an external event is missi
   });
   alarmEvent.emit(alarm!);
   await module.getTuckStatus();
-  assert.ok(moved.length < 40);
-  assert.equal(module.tuckFlags(tabs[0]).tucked, false);
+  assert.equal(moved.length, 100);
+  assert.equal(module.tuckFlags(tabs[0]).tucked, true);
+  assert.equal(module.tuckFlags(tabs[100]).tucked, true);
+  assert.equal(local[recoveryKey].records[0].urls.length, 101);
 });
 
 test('events arriving during reconciliation schedule a fresh pass', async context => {
@@ -704,9 +715,16 @@ for (const interrupt of ['focus', 'system active', 'disable', 'rename', 'foreign
     await module.getTuckStatus(); await module.getTuckStatus();
     assert.deepEqual(moved, [1, 2]);
     assert.equal(tabs[2].groupId, -1);
-    if (interrupt === 'rename' || interrupt === 'foreign member') {
+    if (interrupt === 'rename') {
       assert.equal(module.tuckFlags(tabs[0]).tucked, false);
       assert.equal(module.canUndoTuck(10), false);
+    } else if (interrupt === 'foreign member') {
+      assert.equal(module.tuckFlags(tabs[3]).tucked, true);
+      assert.equal(module.canUndoTuck(10), true);
+      alarmEvent.emit(alarm!);
+      await module.getTuckStatus();
+      assert.equal(groups.length, 1);
+      assert.equal(tabs[2].groupId, groups[0].id);
     }
   });
 }
@@ -903,4 +921,59 @@ test('failed candidate checks do not stamp a successful scan', async context => 
   alarmEvent.emit(alarm!);
   assert.equal((await module.getTuckStatus()).lastFailureAt, undefined);
   assert.equal((await module.getTuckStatus()).lastScanAt, now);
+});
+
+for (const change of ['color', 'added member', 'replaced members'] as const) {
+  test(`same name and window retain one tuck group after ${change}`, async () => {
+    getPreferences().autoTuckAfterHours = 1;
+    tabs = [{ ...tab, groupId: 7 }, { ...tab, id: 2, pinned: true }];
+    groups = [{ id: 7, windowId: 10, title: 'Tuck Away', color: 'grey', shared: false, collapsed: true }];
+    session[sessionKey] = { version: 1, enabled: true,
+      clocks: { 2: { url: tab.url, usedAt: now - 2 * hour } },
+      groups: [{ ...groups[0], key: 'owned', members: [1] }], undo: {} };
+    let module = await start();
+    if (change === 'color') {
+      groups[0].color = 'blue';
+      groupUpdatedEvent.emit(structuredClone(groups[0]));
+    } else {
+      tabs.push({ ...tab, id: 3, groupId: 7 });
+      tabUpdatedEvent.emit(3, { groupId: 7 }, structuredClone(tabs[2]));
+      if (change === 'replaced members') {
+        tabs[0].groupId = -1; tabs[0].pinned = true;
+        tabUpdatedEvent.emit(1, { groupId: -1 }, structuredClone(tabs[0]));
+      }
+    }
+    await module.getTuckStatus(); await module.getTuckStatus();
+    const retained = change === 'color' ? tabs[0] : tabs[2];
+    assert.equal(module.tuckFlags(retained).tucked, true);
+    module = await start();
+    assert.equal(module.tuckFlags(retained).tucked, true, 'worker restart retains changed group');
+    tabs[1].pinned = false;
+    alarmEvent.emit(alarm!);
+    await module.getTuckStatus(); await module.getTuckStatus();
+    assert.equal(groups.length, 1, 'next batch must reuse the original group');
+    assert.equal(tabs[1].groupId, 7);
+    assert.equal(groups[0].color, change === 'color' ? 'blue' : 'grey');
+    assert.equal(local[recoveryKey].records[0].urls.length, change === 'added member' ? 3 : 2);
+    await module.undoTuck(10);
+    assert.equal(tabs[1].groupId, -1);
+    assert.equal(retained.groupId, 7, 'undo excludes members added outside the batch');
+    session = {};
+    module = await start();
+    assert.equal(module.tuckFlags(retained).tucked, true, 'new session restores updated evidence');
+    getPreferences().autoTuck = false;
+    await module.getTuckStatus();
+    assert.equal(retained.groupId, -1, 'disabling releases all current members');
+  });
+}
+
+test('activating a newly added member before reconciliation brings it out of the managed group', async () => {
+  const module = await undoFixture();
+  tabs.push({ ...tab, id: 3, groupId: 7, active: true });
+  // Activation can arrive before the membership reconciliation event.
+  activatedEvent.emit({ tabId: 3, windowId: 10 });
+  tabUpdatedEvent.emit(3, { groupId: 7 }, structuredClone(tabs[2]));
+  await module.getTuckStatus(); await module.getTuckStatus();
+  assert.equal(tabs[2].groupId, -1);
+  assert.equal(module.tuckFlags(tabs[0]).tucked, true);
 });

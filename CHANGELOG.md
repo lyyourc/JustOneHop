@@ -2,6 +2,17 @@
 
 User-visible changes are grouped by release. Git tags use `v<version>`; extension manifests and store packages use `<version>`. GitHub release dates do not imply Chrome Web Store approval. See the [release guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单).
 
+## [0.3.2] - 2026-10-28
+
+### Fixed / 修复
+
+- Keep reusing an existing tuck-away group when its name and window stay the same, including after color changes or manually adding tabs. Preserve its color, manage its current members, and keep undo limited to the latest tucked batch. / 收起组的名称与所在窗口不变时持续复用，改颜色或手动加入标签不再导致放弃管理并另建同名组；保留当前颜色、管理当前成员，撤销仍只影响最近收起批次。
+- Keep page context visible when footer keyboard hints expand. / 展开底栏键盘提示时保留页面上下文信息。
+
+### Changed / 改进
+
+- Simplify bilingual store and usage descriptions and use consistent Tab Switcher wording. / 精简中英文商店与使用说明，统一标签切换器文案。
+
 ## [0.3.1] - 2026-10-27
 
 ### Fixed / 修复
