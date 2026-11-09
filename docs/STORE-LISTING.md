@@ -39,6 +39,12 @@ A human-first, Chrome-native command palette for tabs, bookmarks, history, and b
 ```text
 A human-first, Chrome-native command palette.
 
+What's new in 0.4.0
+• Copy the current tab's full URL directly from search.
+• Open an existing tab's URL in a new tab with Command+Enter on macOS or Alt+Enter on Windows/Linux.
+• Find search more easily with the Tab Switcher's Ctrl+F footer hint; cancelling a switch now prevents late replies from closing a newly opened panel.
+• Cookie permission is requested only when you explicitly authorize the cookie viewer, together with the required website access. Local Storage and Session Storage viewing do not need Cookie permission.
+
 Press Command+Shift+P (Ctrl+Shift+P on Windows/Linux) or click the toolbar icon to search open tabs, bookmarks, history, and browser actions from one place. Works naturally whether you prefer a mouse, trackpad, or keyboard.
 
 1. One Search Box for Everything
@@ -74,6 +80,12 @@ Human-first，Chrome-native。在一个搜索框里找齐标签页、书签、�
 ### 详细介绍（可直接复制）
 ```text
 Human-first，Chrome-native 的命令面板。
+
+0.4.0 更新
+• 在主搜索中直接复制当前标签页的完整链接。
+• 已打开的标签页结果支持用 ⌘Enter（Windows/Linux 为 Alt+Enter）在新标签页打开同一网址。
+• 标签切换器底部新增 Ctrl+F 搜索提示；取消切换后，旧请求的延迟响应不会再误关新面板。
+• Cookie 权限改为明确授权查看时，与所需网站访问权限一并申请；查看 Local Storage 和 Session Storage 无需 Cookie 权限。
 
 按 ⌘Shift+P（Windows/Linux 为 Ctrl+Shift+P）或点击工具栏图标，在一个搜索框里找齐已打开的标签页、书签、浏览历史和常用操作。用鼠标还是键盘都一样顺手。
 
@@ -115,7 +127,7 @@ Provide a local command palette for finding and acting on browser content: searc
 | --- | --- |
 | `activeTab` | Temporarily access the active page after the user invokes the extension, to open the command palette and inspect that page's top-level Local Storage or Session Storage on request. |
 | `contextMenus` | Provide Help and keyboard shortcut settings from the extension toolbar icon's context menu. |
-| `cookies` | Read cookies matching the current page URL when the user explicitly opens the read-only cookie viewer. Reading also requires applicable website access. Cookie values are never persisted by the extension or uploaded to the developer. |
+| `cookies` (optional) | Requested together with required website access only when the user explicitly authorizes the cookie viewer. Read cookies matching the current page URL when the user explicitly opens the read-only cookie viewer. Reading also requires applicable website access. Cookie values are never persisted by the extension or uploaded to the developer. |
 | `scripting` | Inject the packaged command palette into the user-selected page and run packaged functions to read its top-level Local Storage or Session Storage when requested. No remote scripts are executed. |
 | `tabs` | Read tab titles, URLs, and state to search and switch tabs, and carry out requested tab actions such as pinning, muting, closing, and tucking. |
 | `bookmarks` | Search the user's bookmark titles, URLs, and folders, and create or remove native bookmarks when the user requests those actions. |
@@ -134,7 +146,7 @@ Provide a local command palette for finding and acting on browser content: searc
 ```text
 The packaged recent-keys.js content script runs at document_start in HTTP/HTTPS pages and their subframes where Chrome allows access. It tracks Control/Meta/Alt modifier state and reports modifier release during recent-tab switching. Subframe coverage allows release detection when focus is inside a frame. It does not record typed text, input field contents, or page contents, and does not persist or upload keyboard events.
 
-The optional host permission declaration allows the user to grant specific website access needed by the cookie viewer. The extension does not request the entire wildcard range for cookie viewing. When required access is missing, a user click requests exact current and ancestor hosts up to the registrable domain, covering HTTP/HTTPS and all paths, without wildcard sibling subdomains. This is website access, not a cookie-only permission. Existing applicable grants may mean no additional prompt is needed. Users can revoke website access in Chrome settings.
+Cookie permission is optional and requested only when the user explicitly authorizes the cookie viewer. The optional host permission declaration allows the user to grant specific website access needed by the cookie viewer. The extension does not request the entire wildcard range for cookie viewing. When required access is missing, a user click requests exact current and ancestor hosts up to the registrable domain, covering HTTP/HTTPS and all paths, without wildcard sibling subdomains. This is website access, not a cookie-only permission. Existing applicable grants may mean no additional prompt is needed. Users can revoke website access in Chrome settings.
 ```
 
 ### 远程代码合规声明 (Remote Code Policy)
@@ -200,13 +212,15 @@ Support & review contact: liangyida42@gmail.com (developer: lyyourc).
 
 ### 版本与上架状态
 
+**准备发布 `0.4.0`（2026-11-09）：** 新增主搜索复制当前页链接及 Tab Switcher 底栏 Ctrl+F 提示，修复已有标签页网址的新标签页打开操作和取消切换后旧响应误关新面板的问题；Cookie 权限改为按需申请。数据处理范围不变，不新增数据收集。完整发布验证、GitHub Release 与商店提审尚待完成；以上中英文详细介绍已包含本次更新说明。
+
 **补丁版本 `0.3.2`（2026-10-28）：** 放宽已管理收起组的归属条件，名称与所在窗口不变时继续复用，保留颜色与当前成员；撤销仍仅作用于最近批次。并包含底栏键盘提示展开时保留页面上下文的修复与中英文文案精简。权限与数据处理范围不变。类型检查、428 项单测和 128 项浏览器用例全部通过，无失败、跳过或重试；ZIP 从受测构建直接生成并逐文件核对。[GitHub Release v0.3.2](https://github.com/lyyourc/JustOneHop/releases/tag/v0.3.2) 已发布，main 与 tag 的 Validate CI 均通过。商店包 `justonehop-0.3.2.zip` 已于 2026-10-28 上传并提交审核，后台确认为 `Pending review`，选择审核通过后自动发布。英文与中文详细介绍已同步，zh-TW 保留目前使用简体中文的说明；当前公开版本仍为 0.3.1。
 
 **补丁版本 `0.3.1`（2026-10-27）：** 修复来源页面地址变化导致的历史搜索读取失败，权限与数据处理范围不变。发布文件使用 `0.3.1`，tag 为 `v0.3.1`，商店包为 `justonehop-0.3.1.zip`；完整类型检查、422 项单测和 126 项浏览器用例均已通过，无失败或跳过；ZIP 已与受测构建逐文件核对。GitHub 版本为 `v0.3.1`，具体发布记录见 [Release](https://github.com/lyyourc/JustOneHop/releases/tag/v0.3.1)。该版本于 2026-10-27 提交 Chrome Web Store 并选择审核通过后自动发布；2026-10-28 后台确认 `Published - public`。以下 `0.3.0` 上架记录作为历史状态保留。
 
 **已公开的商店版本：`0.3.0` 已通过 Chrome Web Store 审核并公开上架。** 功能已冻结，沿用原标记 1.0.0 构建的完整自动化验证；0.3.0 仅修改版本元数据，其余包内文件逐字节一致，已通过打包校验（2026-10-24）。 本次准备已完成 `justonehop-0.3.0.zip` 及其逐文件审计（见 `releases/justonehop-0.3.0-package-audit.json` 与 `releases/justonehop-0.3.0-notes.md`），已于 2026-10-24 发布 GitHub Release（`v0.3.0`）并提交 Chrome Web Store 审核，2026-10-26 确认后台状态为 `Published`，并明确显示已向公众开放。[商店安装入口](https://chromewebstore.google.com/detail/mbofggnjaoneioopfbpheapgphmkclbo)。发布范围为 Public / All regions / Free，当前分类为 Tools。
 
-`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 统一使用三段数字版本 `0.3.2`；Git tag 与 GitHub Release 使用 `v0.3.2`，发布包附件名为 `justonehop-0.3.2.zip`。后续新增功能递增次版本，修复递增补丁版本。上传前核对后台已有版本；待上传版本必须高于已发布版本。本次上传前原草稿为 0.1.0，彼时无已发布版本；当前最近确认的商店公开版本为 0.3.1（2026-10-28）。
+`package.json`、`package-lock.json`（顶层及根包）和 `public/manifest.json` 统一使用三段数字版本 `0.4.0`；Git tag 与 GitHub Release 使用 `v0.4.0`，发布包附件名为 `justonehop-0.4.0.zip`。后续新增功能递增次版本，修复递增补丁版本。上传前核对后台已有版本；待上传版本必须高于已发布版本。本次上传前原草稿为 0.1.0，彼时无已发布版本；当前最近确认的商店公开版本为 0.3.1（2026-10-28）。
 
 [CHANGELOG](../CHANGELOG.md) 按版本维护用户可见变化。准备中的版本标记 `Unreleased`；正式发布时改为发布日期（`YYYY-MM-DD`）。GitHub Release 与 Chrome Web Store 审核状态相互独立：只有后台审核通过并公开可访问后，才将商店状态标记为已上线。
 

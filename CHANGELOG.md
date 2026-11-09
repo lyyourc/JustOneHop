@@ -2,6 +2,23 @@
 
 User-visible changes are grouped by release. Git tags use `v<version>`; extension manifests and store packages use `<version>`. GitHub release dates do not imply Chrome Web Store approval. See the [release guide](docs/STORE-LISTING.md#5-本地打包与发布检查清单).
 
+## [0.4.0] - 2026-11-09
+
+### Added / 新增
+
+- Copy the current tab's full URL directly from main search using English or Chinese keywords. / 支持在主搜索中用中英文关键词查找并复制当前标签页的完整链接。
+- Show a Ctrl+F search hint beside the Tab Switcher footer navigation. / 标签切换器底部导航旁新增 Ctrl+F 搜索提示。
+
+### Fixed / 修复
+
+- Open an existing tab's URL in a new tab with Command+Enter on macOS or Alt+Enter on Windows/Linux, including the corresponding footer and menu actions. / 已打开的标签页结果可通过 macOS 的 ⌘Enter、Windows/Linux 的 Alt+Enter，以及对应底栏和菜单操作，在新标签页打开同一网址。
+- Ignore late confirmation replies after cancelling a tab-switcher overlay, so they cannot dismiss a newly opened panel. / 取消标签切换浮层后忽略旧确认请求的延迟响应，避免误关随后打开的新面板。
+
+### Changed / 改进
+
+- Request Cookie permission together with the required website access only when the user explicitly authorizes the cookie viewer. Local Storage and Session Storage viewing do not require Cookie permission. / Cookie 权限改为用户明确授权查看时，与所需网站访问权限一并申请；查看 Local Storage 和 Session Storage 无需 Cookie 权限。
+- Clarify internal page-navigation and switch-confirmation states while preserving existing keyboard, mouse, search and return behavior. / 整理内部页面导航与切换确认状态，保持现有键盘、鼠标、搜索和返回交互。
+
 ## [0.3.2] - 2026-10-28
 
 ### Fixed / 修复
