@@ -5,7 +5,7 @@
 - Product: JustOneHop (小范围瞬移), a Chrome extension
 - Developer: lyyourc
 - Privacy contact: [liangyida42@gmail.com](mailto:liangyida42@gmail.com)
-- Effective date: October 24, 2026 (2026-10-24)
+- Effective date: November 9, 2026 (2026-11-09)
 
 ## 1. Scope
 
@@ -41,11 +41,11 @@ The extension uses Chrome's local extension storage and session storage. It does
 
 ## 4. Website permissions and shortcut scripts
 
-The extension declares feature permissions such as tabs, bookmarks, history, and cookies at installation. Panel injection and Local Storage/Session Storage inspection use temporary `activeTab` access triggered by a user action.
+The extension declares feature permissions such as tabs, bookmarks, and history at installation. From version 0.4.0, Cookie permission is optional and requested when you explicitly authorize the cookie viewer. Panel injection and Local Storage/Session Storage inspection use temporary `activeTab` access triggered by a user action and do not require Cookie permission.
 
 A lightweight shortcut script runs automatically in HTTP/HTTPS pages and subframes where Chrome permits access, so recent-tab switching can detect modifier release. It does not wait for the cookie viewer's per-site authorization and does not record what you type into pages.
 
-The `cookies` API permission is declared at installation. Reading cookies also requires applicable website access. When that access is missing, the extension offers an authorization step and requests access from Chrome after your click. Requests cover the current host and the ancestor hosts needed to read parent-domain cookies, stopping at the registrable domain boundary. They cover both HTTP and HTTPS and all paths, without wildcard access to sibling subdomains. For example, a request for `a.b.example.com` may include `a.b.example.com`, `b.example.com`, and `example.com`.
+Reading cookies requires both the `cookies` API permission and applicable website access. When either is missing, the extension offers an authorization step and requests Cookie permission together with the required website access from Chrome after your click. Website requests cover the current host and the ancestor hosts needed to read parent-domain cookies, stopping at the registrable domain boundary. They cover both HTTP and HTTPS and all paths, without wildcard access to sibling subdomains. For example, a request for `a.b.example.com` may include `a.b.example.com`, `b.example.com`, and `example.com`.
 
 This is Chrome website access, not permission limited to cookies or one URL path. Existing applicable authorization may mean no new prompt is shown. You can inspect or revoke access in Chrome's extension details and site access settings. Revocation may prevent related features from working.
 

@@ -5,7 +5,7 @@
 - 产品：小范围瞬移（JustOneHop）Chrome 扩展
 - 开发者：lyyourc
 - 隐私联系邮箱：[liangyida42@gmail.com](mailto:liangyida42@gmail.com)
-- 生效日期：2026-10-24
+- 生效日期：2026-11-09
 
 ## 1. 适用范围
 
@@ -41,11 +41,11 @@
 
 ## 4. 网站权限和快捷键脚本
 
-扩展在安装时声明标签页、书签、历史、Cookie 等功能权限。面板注入及 Local Storage／Session Storage 读取使用用户操作触发的 `activeTab` 临时授权。
+扩展在安装时声明标签页、书签、历史等功能权限。自 0.4.0 起，Cookie 权限为可选权限，仅在你明确授权 Cookie 查看器时申请。面板注入及 Local Storage／Session Storage 读取使用用户操作触发的 `activeTab` 临时授权，无需 Cookie 权限。
 
 为识别最近标签切换期间修饰键的释放，轻量快捷键脚本会在 Chrome 允许访问的 HTTP／HTTPS 页面及子框架中自动运行。它不等待 Cookie 查看器的逐站授权，也不记录页面打字内容。
 
-`cookies` API 权限在安装时声明；读取 Cookie 还需要适用的网站访问权限。缺少所需权限时，扩展提供授权入口，由你点击后向 Chrome 请求。请求范围为当前主机以及读取父域 Cookie 所需的父主机，止于可注册域边界，覆盖 HTTP／HTTPS 和全部路径，不包含兄弟子域通配符。例如，`a.b.example.com` 的请求可包含 `a.b.example.com`、`b.example.com` 和 `example.com`。
+读取 Cookie 需要 `cookies` API 权限和适用的网站访问权限。缺少任一所需权限时，扩展提供授权入口，由你点击后一并向 Chrome 申请 Cookie 权限与所需网站访问权限。网站请求范围为当前主机以及读取父域 Cookie 所需的父主机，止于可注册域边界，覆盖 HTTP／HTTPS 和全部路径，不包含兄弟子域通配符。例如，`a.b.example.com` 的请求可包含 `a.b.example.com`、`b.example.com` 和 `example.com`。
 
 这是 Chrome 网站访问权限，不是仅适用于 Cookie 或某个网页路径的权限。已有适用授权时可能不再弹窗。你可以在 Chrome 的扩展详情和网站访问设置中查看或撤销授权；撤销后，相应功能可能无法继续使用。
 
