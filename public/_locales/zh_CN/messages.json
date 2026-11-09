@@ -485,6 +485,7 @@
     "message": "刷新"
   },
   "copyUrl": { "message": "复制 URL" },
+  "copyCurrentTabUrl": { "message": "复制当前标签页链接" },
   "urlCopied": { "message": "已复制 URL" },
   "errorCopyUrl": { "message": "未能复制 URL，请重试。" },
   "copiedValue": {

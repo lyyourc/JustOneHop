@@ -100,6 +100,7 @@ Chrome doesn't allow binding `Ctrl+Tab` directly in its normal shortcut input, s
 ![Tab Actions Demo](demo/en-actions.gif)
 
 - **Pin / Mute / Reload / Copy URL / Close Tab**
+- **Copy the current tab URL**: Search `copy url` or `copy current tab url` in the main palette, then click the command or press `Enter`. The full URL, including query parameters and fragment, is copied while the palette stays open.
 - **Instant Bookmarking (`⌘D` / `Ctrl+D`)**<a id="收藏与取消收藏标签页"></a>: Bookmark or unbookmark any tab in the list without switching to it first.
 - **Native Tab Groups**: Search any group by name to view its tabs, expand/collapse, rename, ungroup (keeping pages open), or safely close the group (pinned tabs stay protected).
 

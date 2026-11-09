@@ -17,8 +17,8 @@ const data: Snapshot = { windowId: 1, currentTabId: 2, shortcut: '⌘⇧P',
 
 test('one search index contains every source while cold home contains only eight safe defaults', () => {
   const items = entries(data);
-  assert.equal(items.length, 35);
-  assert.equal(items.filter(entry => entry.kind === 'command').length, 31);
+  assert.equal(items.length, 36);
+  assert.equal(items.filter(entry => entry.kind === 'command').length, 32);
   assert.equal(search(items, 'hide pet')[0].id, 'command:settings:hidePet');
   const home = homeEntries(items);
   assert.deepEqual(home.map(entry => entry.action), ['settings', 'help', 'tabSwitcher', 'newTab', 'reload', 'pin', 'localStorage', 'cookies']);
@@ -373,6 +373,33 @@ test('bookmark result menus offer removal of that bookmark, preserving open as t
   }
   for (const query of ['close', 'tab', 'bookmrak']) assert.ok(!search(menu, query).some(entry => entry.action === 'removeBookmark'), query);
   assert.ok(!entries(snapshot).some(entry => entry.action === 'removeBookmark'));
+});
+
+test('copy current tab URL is searchable in both languages and targets the source tab only', () => {
+  const original = globalThis.chrome;
+  try {
+    for (const locale of ['en-US', 'zh-CN']) {
+      globalThis.chrome = { i18n: { getUILanguage: () => locale } } as typeof chrome;
+      for (const url of ['https://example.com/docs?q=a%2Bb#section', 'chrome://settings/']) {
+        const snapshot = { ...data, tabs: [tab(1, 0), { ...tab(2, 1), active: false, url }] };
+        const items = entries(snapshot);
+        for (const query of ['copy current tab url', 'copy url', 'copy link', '复制当前标签页链接', '复制链接', '复制网址']) {
+          const command = search(items, query)[0];
+          assert.equal(command.id, 'command:copyUrl', `${locale}: ${query}`);
+          assert.equal(command.url, url);
+          assert.equal(command.tabId, 2);
+          assert.equal(command.title, locale === 'en-US' ? 'Copy Current Tab URL' : '复制当前标签页链接');
+          assert.equal(command.shortcut, undefined);
+          assert.equal(usageTarget(command), '');
+          assert.deepEqual(actionsFor(command, snapshot), [command]);
+        }
+        assert.ok(!homeEntries(items).some(entry => entry.action === 'copyUrl'));
+      }
+    }
+    for (const tabs of [[], [tab(1, 0)], [{ ...tab(2, 0), url: '' }]]) {
+      assert.ok(!entries({ ...data, tabs }).some(entry => entry.action === 'copyUrl'));
+    }
+  } finally { globalThis.chrome = original; }
 });
 
 test('URL actions preserve the selected URL and never inherit shortcuts or learning identity', () => {

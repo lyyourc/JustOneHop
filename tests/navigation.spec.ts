@@ -6,6 +6,61 @@ import { registerPaletteFixture } from './support/paletteFixture';
 
 registerPaletteFixture();
 
+for (const host of ['overlay', 'native'] as const) test.describe(() => {
+  test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', commands: true, headed: host === 'native' } });
+  test(`Copy current tab URL: ${host} command copies its source and preserves search`, { tag: host === 'native' ? ['@clipboard', '@headed'] : '@clipboard' }, async () => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const sourcePage = await context.newPage();
+    await sourcePage.goto(`${origin}/Copy-current-source?value=a%2Bb#fragment`);
+    const native = host === 'native' ? await openNativePalette() : undefined;
+    const surface = native?.palette ?? await openStorageOverlay(sourcePage);
+    const clipboardPage = native?.palette ?? sourcePage;
+    const expected = native ? 'chrome://version/' : sourcePage.url();
+    const tabs = () => worker.evaluate(async () => (await chrome.tabs.query({})).map(tab => ({ id: tab.id, url: tab.url, active: tab.active })));
+    const before = await tabs();
+    const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+    const row = surface.locator('[id="justonehop-command:copyUrl"]');
+    await input.pressSequentially('copy current tab url');
+    await expect(row).toHaveAttribute('aria-selected', 'true');
+    await input.press('Enter');
+    await expect(surface.getByText('URL copied', { exact: true })).toBeVisible();
+    expect(await clipboardPage.evaluate(() => navigator.clipboard.readText())).toBe(expected);
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue('copy current tab url');
+
+    // Exercise the menu in both hosts; inject clipboard failure in the native UI.
+    // Page-world overrides cannot replace the overlay extension's isolated-world APIs.
+    await input.fill('复制链接');
+    await surface.getByRole('button', { name: 'Open action menu' }).click();
+    const actions = surface.getByRole('combobox', { name: 'Search actions' });
+    await expect(actions).toBeFocused();
+    if (native) {
+      await actions.evaluate(node => {
+        const doc = node.ownerDocument, clipboard = doc.defaultView!.navigator.clipboard;
+        const exec = doc.execCommand.bind(doc), write = clipboard.writeText.bind(clipboard);
+        doc.execCommand = () => false;
+        clipboard.writeText = async () => {
+          doc.execCommand = exec; clipboard.writeText = write;
+          throw new Error('Clipboard fixture unavailable');
+        };
+      });
+      await surface.locator('.action-row').click();
+      await expect(surface.getByRole('alert')).toBeVisible();
+      await expect(actions).toBeVisible();
+    }
+    await actions.press('Enter');
+    await expect(surface.locator('.action-menu')).toHaveCount(0);
+    await expect(surface.getByRole('alert')).toHaveCount(0);
+    await expect(surface.getByText('URL copied', { exact: true })).toBeVisible();
+    expect(await clipboardPage.evaluate(() => navigator.clipboard.readText())).toBe(expected);
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue('复制链接');
+    await row.click();
+    expect(await clipboardPage.evaluate(() => navigator.clipboard.readText())).toBe(expected);
+    expect(await tabs()).toEqual(before);
+  });
+});
+
 async function dragResultText(page: Page, row: Locator) {
   const title = row.locator('.entry-title');
   await title.scrollIntoViewIfNeeded();

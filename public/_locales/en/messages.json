@@ -485,6 +485,7 @@
     "message": "Refresh"
   },
   "copyUrl": { "message": "Copy URL" },
+  "copyCurrentTabUrl": { "message": "Copy Current Tab URL" },
   "urlCopied": { "message": "URL copied" },
   "errorCopyUrl": { "message": "Could not copy the URL. Try again." },
   "copiedValue": {

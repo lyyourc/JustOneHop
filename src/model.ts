@@ -88,6 +88,12 @@ export function entries(snapshot: Snapshot): Entry[] {
       keywords: '恢复 收起 继续管理 检查 分组 recover resume tuck group', aliases: ['recover tucked tabs', 'resume tuck', '继续管理', '恢复收起组'],
     })),
     ...commands(current),
+    ...(current?.url ? [{
+      id: 'command:copyUrl', kind: 'command' as const, category: 'tab' as const, action: 'copyUrl' as const, icon: 'copy' as const,
+      title: t('copyCurrentTabUrl'), subtitle: current.title, url: current.url, tabId: current.id, searchOnly: true,
+      keywords: 'copy current tab url link address 复制 当前 标签页 链接 网址 地址',
+      aliases: ['copy current tab url', 'copy tab url', 'copy url', 'copy link', 'copy current tab link', '复制当前标签页链接', '复制当前标签页网址', '复制链接', '复制网址', '复制 URL'],
+    }] : []),
     ...(bookmark ? [bookmark] : []),
     { id: 'command:help', kind: 'command', category: 'justonehop', action: 'help', icon: 'help',
       title: t('help'), subtitle: t('helpHint'), keywords: 'help guide 帮助 使用说明 使用指南',
