@@ -560,6 +560,9 @@
   "recentSearch": {
     "message": "Search recent tabs…"
   },
+  "recentSearchAction": {
+    "message": "Search"
+  },
   "recentSearchHelp": {
     "message": "Click to search, or press Ctrl/Cmd+F. Then release the shortcut key and type."
   },

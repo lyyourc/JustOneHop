@@ -41,6 +41,16 @@ import type { Entry, Snapshot, StorageRead, SettingsSection, PaletteState, Execu
 
 const emptyScores: ReadonlyMap<string, number> = new Map();
 
+// Only the destination belongs here. Menus, confirmations and each page's
+// own navigation keep their existing owners and BackLayer hierarchy.
+type PalettePage =
+  | { kind: 'main' }
+  | { kind: 'settings'; section?: SettingsSection }
+  | { kind: 'history' | 'help' | 'binding' | 'tabSwitcher' }
+  | { kind: 'group'; id: number; editor?: 'name' }
+  | { kind: 'recovery'; id: string }
+  | { kind: 'storage'; request: StorageRead };
+
 type AppProps = { mode: 'overlay' | 'popup'; onClose: () => void; initialState?: PaletteState; initialBinding?: boolean };
 export function App(props: AppProps) {
   return <OperationFeedbackProvider><PaletteApp {...props} /></OperationFeedbackProvider>;
@@ -50,21 +60,16 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   const preferences = useSyncExternalStore(subscribePreferences, getPreferences);
   const feedback = useOperationFeedback();
   const [frozenRanking, setFrozenRanking] = useState<{ query: string; scores: ReadonlyMap<string, number> } | null>(null);
-  const [groupId, setGroupId] = useState<number | undefined>(initialState?.group?.id);
-  const [groupEditor, setGroupEditor] = useState<'name'>();
+  const [page, setPage] = useState<PalettePage>(() => initialState?.group
+    ? { kind: 'group', id: initialState.group.id }
+    : { kind: initialBinding ? 'binding' : 'main' });
+  const returnToMain = () => setPage({ kind: 'main' });
   const [groupRemoval, setGroupRemoval] = useState<Entry | null>(null);
-  const [recoveryId, setRecoveryId] = useState<string>();
   const usage = useSyncExternalStore(subscribeUsage, getUsage);
   const [homeSession, setHomeSession] = useState<{ sourceId: number; scores: ReadonlyMap<string, number> } | null>(null);
-  const [storage, setStorage] = useState<StorageRead | null>(null);
-  const [bindingOpen, setBindingOpen] = useState(initialBinding);
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>();
   const [bookmarkRemoval, setBookmarkRemoval] = useState<BookmarkRemoval | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false);
-  const pageOpen = settingsOpen || historyOpen || helpOpen || groupId !== undefined || !!recoveryId || bindingOpen || !!storage;
+  // The embedded switcher retains its existing return animation behavior.
+  const pageOpen = page.kind !== 'main' && page.kind !== 'tabSwitcher';
   const pageWasOpen = useRef(false);
   useLayoutEffect(() => { pageWasOpen.current = pageOpen; }, [pageOpen]);
   const [data, setData] = useState<Snapshot | null>(null);
@@ -89,7 +94,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   const items = useMemo(() => data ? entries(data).map(entry => pageNavigationEntry(entry, data)) : [], [data, preferences.language]);
   const safeCommands = useMemo(() => new Set(items.filter(item => item.kind === 'command' && !item.danger && item.action !== 'close').map(usageTarget)), [items]);
   const completion = useQueryCompletion(input, query, usage, safeCommands,
-    !!data && !data.incognito && !busy && !actionTarget && !bookmarkRemoval && !groupRemoval && !settingsOpen && !helpOpen && !historyOpen && !tabSwitcherOpen && !storage && !bindingOpen && !recoveryId && groupId === undefined,
+    !!data && !data.incognito && !busy && !actionTarget && !bookmarkRemoval && !groupRemoval && page.kind === 'main',
     value => { savedCaret.current = [value.length, value.length]; setQuery(value); setSelection(''); setError(''); }, data?.searchContinuation);
   const history = useHistoryQuery(query, 'week', !!data && !data.incognito);
   const committed = useRef<{ query: string; results: Entry[]; visible: Entry[]; ranking: Map<string, RankingInfo> }>({ query: '', results: [], visible: [], ranking: new Map() });
@@ -221,17 +226,17 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   }, [frozenRanking, query]);
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [selected?.id, nextResults, actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, bindingOpen, recoveryId, groupId]);
+  }, [selected?.id, nextResults, actionTarget, page]);
   useLayoutEffect(() => {
-    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || bindingOpen || recoveryId || groupId !== undefined) return;
+    if (busy || (page.kind !== 'main' && page.kind !== 'storage')) return;
     if (bookmarkRemoval || groupRemoval) return;
     if (!actionTarget) { input.current?.focus(); input.current?.setSelectionRange(...savedCaret.current); }
-  }, [actionTarget, settingsOpen, helpOpen, historyOpen, tabSwitcherOpen, storage, bindingOpen, bookmarkRemoval, groupRemoval, recoveryId, groupId, busy]);
+  }, [actionTarget, page, bookmarkRemoval, groupRemoval, busy]);
 
   function openSettings(section?: SettingsSection) {
-    if (busy || settingsOpen || helpOpen || historyOpen || tabSwitcherOpen || bindingOpen) return;
+    if (busy || page.kind !== 'main') return;
     if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-    closeActions(); setSettingsSection(section); setSettingsOpen(true); setError('');
+    closeActions(); setPage({ kind: 'settings', section }); setError('');
   }
   function closeActions() { setActionTarget(null); setActionQuery(''); setActionSelection(''); }
   useEffect(() => { if (actionTarget && !liveTarget && !busy) closeActions(); }, [actionTarget, liveTarget, busy]);
@@ -289,24 +294,24 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
     }
     if (entry.action === 'searchAllHistory') {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setError(''); setHistoryOpen(true); return;
+      closeActions(); setError(''); setPage({ kind: 'history' }); return;
     }
     if (entry.action === 'tabSwitcher') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setError('');setTabSwitcherOpen(true); return;
+      closeActions(); setError('');setPage({ kind: 'tabSwitcher' }); return;
     }
     if (entry.action === 'help') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setError('');setHelpOpen(true); return;
+      closeActions(); setError('');setPage({ kind: 'help' }); return;
     }
     if (entry.action === 'manageGroup' || entry.action === 'renameGroup') {
       if (!actionTarget) savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      setGroupEditor(entry.action === 'renameGroup' ? 'name' : undefined);
-      closeActions(); setError(''); setGroupId(entry.groupId); return;
+      closeActions(); setError('');
+      setPage(entry.groupId !== undefined ? { kind: 'group', id: entry.groupId, editor: entry.action === 'renameGroup' ? 'name' : undefined } : { kind: 'main' }); return;
     }
     if (entry.action === 'reviewTuck') {
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
-      closeActions(); setRecoveryId(entry.recoveryId); return;
+      closeActions(); setPage(entry.recoveryId ? { kind: 'recovery', id: entry.recoveryId } : { kind: 'main' }); return;
     }
     // A secondary tab operation (for example closing an IAM page) is not evidence
     // that the user prefers opening that page for the original root query.
@@ -316,8 +321,8 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
       if (!tab) return;
       savedCaret.current = [input.current?.selectionStart ?? query.length, input.current?.selectionEnd ?? query.length];
       closeActions();
-      setStorage({ kind: entry.action === 'localStorage' ? 'local' : entry.action === 'sessionStorage' ? 'session' : 'cookies',
-        tabId: tab.id, windowId: data.windowId, expectedUrl: tab.url, query: learningQuery ?? '' });
+      setPage({ kind: 'storage', request: { kind: entry.action === 'localStorage' ? 'local' : entry.action === 'sessionStorage' ? 'session' : 'cookies',
+        tabId: tab.id, windowId: data.windowId, expectedUrl: tab.url, query: learningQuery ?? '' } });
       return;
     }
     const execution = { continueSearch: !actionTarget && canContinueSearch(query, entry, visible), action: entry.action, groupId: entry.groupId, groupChanges: entry.groupChanges, groupTabIds: entry.groupTabIds, settingsSection: entry.settingsSection, tabId: entry.tabId, bookmarkId: entry.bookmarkId, newTab: entry.newTab, expectedUrl: entry.expectedUrl, bookmarkIds: entry.bookmarkIds, url: entry.url, windowId: data.windowId, query: learningQuery };
@@ -347,17 +352,17 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   }
   function keyboard(event: KeyboardEvent) {
     if (event.nativeEvent.isComposing || event.keyCode === 229 || bookmarkRemoval || groupRemoval) return;
-    if ((helpOpen || historyOpen || tabSwitcherOpen || bindingOpen || recoveryId || groupId !== undefined) && event.key !== 'Tab') return;
+    if ((page.kind !== 'main' && page.kind !== 'settings' && page.kind !== 'storage') && event.key !== 'Tab') return;
     const modifier = isMac ? event.metaKey : event.ctrlKey;
     if (modifier && !event.altKey && !event.shiftKey && event.key === ',') {
       event.preventDefault(); openSettings(); return;
     }
-    if (settingsOpen && event.key !== 'Tab') return;
+    if (page.kind === 'settings' && event.key !== 'Tab') return;
     if (modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'k') {
       event.preventDefault(); toggleActions(); return;
     }
     if (resultBusy && event.key !== 'Tab') return;
-    if (!storage && !actionTarget && event.key === 'Backspace' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && selected && ranking.get(selected.id)?.learned) {
+    if (page.kind !== 'storage' && !actionTarget && event.key === 'Backspace' && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && selected && ranking.get(selected.id)?.learned) {
       event.preventDefault(); event.stopPropagation();
       if (!event.repeat) void forget(selected);
       return;
@@ -385,7 +390,7 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
       setter(pool[next].id);
       if ((event.target as HTMLElement).closest('.ranking-forget')) input.current?.focus();
     } else if (event.key === 'Enter') {
-      if (!storage && newPageAction && (event.target as HTMLElement).tagName !== 'BUTTON'
+      if (page.kind !== 'storage' && newPageAction && (event.target as HTMLElement).tagName !== 'BUTTON'
         && matchesShortcut(event, addressNewTabShortcut(isMac), isMac)) {
         event.preventDefault();
         if (!event.repeat) void run(newPageAction);
@@ -419,10 +424,10 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   return <NavigationRoot><BackLayer onBack={dismiss}><div className={`justonehop-app ${mode} ${settled ? 'settled' : ''}`} data-theme={preferences.theme} lang={t('languageTag')} onKeyDown={keyboard} onMouseDown={event => {
     if (event.target === event.currentTarget) { if (groupRemoval) setGroupRemoval(null); else if (bookmarkRemoval) setBookmarkRemoval(null); else if (actionTarget) closeActions(); else dismiss(); }
   }}>
-    {tabSwitcherOpen && data ? <PaletteTabSwitcher data={data} theme={preferences.theme} onBack={() => setTabSwitcherOpen(false)} onClose={onClose} /> : historyOpen && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} data={data} isMac={isMac} onBack={() => setHistoryOpen(false)} onClose={onClose} /> : helpOpen ? <HelpView shortcut={data?.shortcut || ''} onBack={() => setHelpOpen(false)} /> : groupId !== undefined && data ? <TabGroupView groupId={groupId} data={data} isMac={isMac} onBack={() => setGroupId(undefined)} onClose={onClose}
-      initialEditor={groupEditor} initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : recoveryId && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === recoveryId)} windowId={data.windowId} isMac={isMac}
-      onBack={() => setRecoveryId(undefined)} onComplete={async () => { setData(await getSnapshot()); setRecoveryId(undefined); }} /> : bindingOpen ? <BindingGuide isMac={isMac} onBack={() => setBindingOpen(false)} /> : storage ? <StorageView request={storage} onBack={() => setStorage(null)} isMac={isMac} /> : settingsOpen ? <Settings initialSection={settingsSection} preferences={preferences} shortcut={data?.shortcut || ''} tabSwitcherShortcut={data?.tabSwitcherShortcut || ''} isMac={isMac}
-      onBack={() => setSettingsOpen(false)} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label={t('extensionName')} aria-busy={busy}>
+    {page.kind === 'tabSwitcher' && data ? <PaletteTabSwitcher data={data} theme={preferences.theme} onBack={returnToMain} onClose={onClose} /> : page.kind === 'history' && data ? <HistoryView initialQuery={isHistorySearchIntent(query) ? '' : query} data={data} isMac={isMac} onBack={returnToMain} onClose={onClose} /> : page.kind === 'help' ? <HelpView shortcut={data?.shortcut || ''} onBack={returnToMain} /> : page.kind === 'group' && data ? <TabGroupView groupId={page.id} data={data} isMac={isMac} onBack={returnToMain} onClose={onClose}
+      initialEditor={page.editor} initialState={initialState?.group} paletteState={paletteState()} onExecute={executeAction} executionBusy={executionBusy} refreshError={error} /> : page.kind === 'recovery' && data ? <TuckRecoveryView item={data.tuckRecoveries?.find(item => item.id === page.id)} windowId={data.windowId} isMac={isMac}
+      onBack={returnToMain} onComplete={async () => { setData(await getSnapshot()); returnToMain(); }} /> : page.kind === 'binding' ? <BindingGuide isMac={isMac} onBack={returnToMain} /> : page.kind === 'storage' ? <StorageView request={page.request} onBack={returnToMain} isMac={isMac} /> : page.kind === 'settings' ? <Settings initialSection={page.section} preferences={preferences} shortcut={data?.shortcut || ''} tabSwitcherShortcut={data?.tabSwitcherShortcut || ''} isMac={isMac}
+      onBack={returnToMain} onClose={onClose} onRankingReset={() => { setFrozenRanking(null); setHomeSession(data ? { sourceId: data.currentTabId, scores: emptyScores } : null); }} /> : <section tabIndex={-1} className="palette" aria-label={t('extensionName')} aria-busy={busy}>
       <span className="sr-only" id="justonehop-navigation">{t('navigationHelp')}</span>
       <div className={`main-surface ${actionTarget || bookmarkRemoval || groupRemoval ? 'subdued' : ''}`} inert={actionTarget || bookmarkRemoval || groupRemoval ? true : undefined}>
         <header className={`search-bar${pageWasOpen.current ? ' returning-from-page' : ''}`}>

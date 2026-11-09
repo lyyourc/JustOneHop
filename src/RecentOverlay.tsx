@@ -1,3 +1,4 @@
+import { SwitcherConfirmation } from './switcherConfirmation';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { RecentSwitcherView } from './RecentSwitcherView';
 import { NavigationRoot, BackLayer } from './Navigation';
@@ -13,35 +14,42 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
   const [revision, render] = useState(0);
   const state = useRef({ tabs: initial.tabs, query: '', composing: false, searching: false,
     index: initial.tabs.length ? (initial.offset % initial.tabs.length + initial.tabs.length) % initial.tabs.length : -1,
-    closing: false, error: '' });
+    confirmation: new SwitcherConfirmation(), error: '' });
   const changed = () => render(value => value + 1);
+  const dismiss = () => {
+    if (state.current.confirmation.closed) return;
+    state.current.confirmation.close();
+    onClose();
+  };
   const finish = async () => {
     const current = state.current;
-    if (current.closing || current.composing || !list.current?.ownerDocument.hasFocus()) return;
+    if (!current.confirmation.canSelect || current.composing || !list.current?.ownerDocument.hasFocus()) return;
     const tabId = filterRecentTabs(current.tabs, current.query)[current.index]?.id;
     if (tabId === undefined) return;
-    current.closing = true; current.error = ''; changed();
+    if (!current.confirmation.begin()) return;
+    current.error = ''; changed();
     try {
       const reply = await chrome.runtime.sendMessage({ source: 'justonehop-recent', type: 'accept-overlay', session: initial.session, tabId });
-      if (reply?.ok) onClose();
-      else { current.closing = false; current.error = errorMessage(new Error(reply?.error || t('errorGeneric'))); changed(); }
-    } catch (error) { current.closing = false; current.error = errorMessage(error); changed(); }
+      if (reply?.ok) dismiss();
+      else if (current.confirmation.fail()) { current.error = errorMessage(new Error(reply?.error || t('errorGeneric'))); changed(); }
+    } catch (error) { if (current.confirmation.fail()) { current.error = errorMessage(error); changed(); } }
   };
   useLayoutEffect(() => {
+    state.current.confirmation = new SwitcherConfirmation();
     const port = chrome.runtime.connect({ name: 'justonehop' });
     const element = list.current!;
     const view = element.ownerDocument.defaultView!;
     let alive = true;
-    port.onDisconnect.addListener(() => { if (alive) onClose(); });
+    port.onDisconnect.addListener(() => { if (alive) dismiss(); });
     const move = (direction: number) => {
       const current = state.current;
       const count = filterRecentTabs(current.tabs, current.query).length;
-      if (current.closing || current.composing || !count) return;
+      if (!current.confirmation.canSelect || current.composing || !count) return;
       current.index = current.index < 0 ? (direction > 0 ? 0 : count - 1) : (current.index + direction % count + count) % count; changed();
     };
     const keydown = (event: KeyboardEvent) => {
       const current = state.current;
-      if (!event.isTrusted || event.isComposing || event.keyCode === 229 || current.composing || current.closing) return;
+      if (!event.isTrusted || event.isComposing || event.keyCode === 229 || current.composing || !current.confirmation.canSelect) return;
       if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
         event.preventDefault(); current.searching = true; changed();
       } else if (event.key === 'Enter') {
@@ -63,7 +71,7 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
     const compositionEnd = () => { state.current.composing = false; };
     // A frame focus handoff can blur its parent. Only dismiss after checking
     // the actual document focus; switching to Chrome UI or another app cancels.
-    const blur = () => setTimeout(() => { if (alive && !element.ownerDocument.hasFocus()) onClose(); }, 0);
+    const blur = () => setTimeout(() => { if (alive && !element.ownerDocument.hasFocus()) dismiss(); }, 0);
     const message = (message: any, sender: chrome.runtime.MessageSender) => {
       if (sender.id !== chrome.runtime.id || message?.source !== 'justonehop-recent' || message.session !== initial.session) return;
       if (message.type === 'step') move(message.direction);
@@ -84,7 +92,7 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
     window.addEventListener('blur', blur);
     chrome.runtime.onMessage.addListener(message);
     return () => {
-      alive = false; port.disconnect();
+      alive = false; state.current.confirmation.close(); port.disconnect();
       view.removeEventListener('keydown', keydown); view.removeEventListener('keyup', keyup); view.removeEventListener('blur', blur);
       view.removeEventListener('compositionstart', compositionStart); view.removeEventListener('compositionend', compositionEnd);
       window.removeEventListener('blur', blur); chrome.runtime.onMessage.removeListener(message);
@@ -93,17 +101,17 @@ export function RecentOverlay({ initial, onClose }: { initial: RecentOverlaySess
   useLayoutEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [revision]);
   const current = state.current;
   const visible = filterRecentTabs(current.tabs, current.query);
-  return <NavigationRoot><BackLayer onBack={onClose}><div className="justonehop-app overlay recent-overlay" data-theme={getPreferences().theme} data-closing={current.closing}
-    onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+  return <NavigationRoot><BackLayer onBack={dismiss}><div className="justonehop-app overlay recent-overlay" data-theme={getPreferences().theme} data-closing={!current.confirmation.canSelect}
+    onMouseDown={event => { if (event.target === event.currentTarget) dismiss(); }}>
     <section className="palette" aria-label={t('extensionName')}>
       <RecentSwitcherView tabs={visible} index={current.index} query={current.query} searching={current.searching}
         onSearch={() => { current.searching = true; changed(); }} onQueryChange={query => {
-        if (current.closing) return;
+        if (!current.confirmation.canSelect) return;
         const selected = filterRecentTabs(current.tabs, current.query)[current.index]?.id;
         current.query = query; current.index = recentSelection(filterRecentTabs(current.tabs, query), selected); changed();
-      }} sourceId={initial.sourceId} loaded closing={current.closing}
+      }} sourceId={initial.sourceId} loaded closing={!current.confirmation.canSelect}
         error={current.error} shortcut={initial.shortcut} releaseKey={initial.modifier} theme={getPreferences().theme} listRef={list}
-        onSelect={index => { if (current.closing) return; current.index = index; changed(); void finish(); }} onConfirm={() => void finish()} onCancel={onClose} />
+        onSelect={index => { if (!current.confirmation.canSelect) return; current.index = index; changed(); void finish(); }} onConfirm={() => void finish()} onCancel={dismiss} />
     </section>
   </div></BackLayer></NavigationRoot>;
 }

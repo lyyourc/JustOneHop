@@ -1,3 +1,4 @@
+import { SwitcherConfirmation } from './switcherConfirmation';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { execute } from './api';
 import { errorMessage, t } from './i18n';
@@ -11,13 +12,14 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
   data: Snapshot; onBack: () => void; onClose: () => void; theme: string;
 }) {
   const list = useRef<HTMLDivElement>(null);
-  const alive = useRef(true);
-  const executing = useRef(false);
+  const confirmation = useRef(new SwitcherConfirmation());
   const composing = useRef(false);
   const [query, setQuery] = useState('');
   const [selection, setSelection] = useState<number | null>(() =>
     data.tabs.find(tab => tab.id !== data.currentTabId)?.id ?? data.tabs[0]?.id ?? null);
-  const [closing, setClosing] = useState(false);
+  const [, render] = useState(0);
+  const changed = () => render(value => value + 1);
+  const closing = !confirmation.current.canSelect;
   const feedback = useOperationFeedback();
   // Snapshot order already puts other tabs in MRU order and the source last.
   // The shared view only reads identity, title, URL and pinned state.
@@ -34,8 +36,8 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
   const selected = visible[index];
 
   useLayoutEffect(() => {
-    alive.current = true;
-    return () => { alive.current = false; };
+    confirmation.current = new SwitcherConfirmation();
+    return () => { confirmation.current.close(); };
   }, []);
   useLayoutEffect(() => {
     // Once a target disappears, only a visible source is a safe fallback. Keep
@@ -47,27 +49,25 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
   }, [index, visible]);
 
   function back() {
-    if (!alive.current) return;
-    alive.current = false;
+    if (confirmation.current.closed) return;
+    confirmation.current.close();
     onBack();
   }
   async function confirm(tabId = selected?.id) {
-    if (!alive.current || executing.current || composing.current || tabId === undefined) return;
+    if (!confirmation.current.canSelect || composing.current || tabId === undefined) return;
     const target = visible.find(tab => tab.id === tabId);
     if (!target) return;
-    executing.current = true;
-    setClosing(true);
+    if (!confirmation.current.begin()) return;
+    changed();
     const operation = feedback.begin(t('operationPending'));
     try {
       // Tab Switcher choices do not participate in query learning.
       await execute({ action: 'switch', tabId, windowId: target.windowId });
       feedback.success(operation, t('actionCompleted'));
-      if (alive.current) { alive.current = false; onClose(); }
+      if (!confirmation.current.closed) { confirmation.current.close(); onClose(); }
     } catch (failure) {
       feedback.error(operation, errorMessage(failure));
-      if (!alive.current) return;
-      executing.current = false;
-      setClosing(false);
+      if (confirmation.current.fail()) changed();
     }
   }
 
@@ -76,7 +76,7 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
     onKeyDown={event => {
       // App also handles keys: even ignored keys must stay in this child view.
       event.stopPropagation();
-      if (event.nativeEvent.isComposing || event.keyCode === 229 || composing.current || executing.current) return;
+      if (event.nativeEvent.isComposing || event.keyCode === 229 || composing.current || !confirmation.current.canSelect) return;
       if (event.key === 'Enter') {
         if ((event.target as HTMLElement).closest('button')) return;
         event.preventDefault();
@@ -88,12 +88,12 @@ export function PaletteTabSwitcher({ data, onBack, onClose, theme }: {
     }}>
     <RecentSwitcherView tabs={visible} index={index} query={query} searching onSearch={() => {}}
       onQueryChange={value => {
-        if (!alive.current || executing.current) return;
+        if (!confirmation.current.canSelect) return;
         const matches = filterRecentTabs(tabs, value);
         setQuery(value); setSelection(matches[recentSelection(matches, selected?.id)]?.id ?? null);
       }} sourceId={data.currentTabId} loaded closing={closing} error="" shortcut="" releaseKey="" theme={theme} listRef={list}
       onSelect={at => {
-        if (!alive.current || executing.current) return;
+        if (!confirmation.current.canSelect) return;
         const tabId = visible[at]?.id;
         if (tabId === undefined) return;
         setSelection(tabId); void confirm(tabId);

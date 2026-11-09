@@ -58,7 +58,9 @@ export function RecentSwitcherView({ tabs, index, query, onQueryChange, searchin
     </div>
     <PaletteFooter navigation={onBack ? { kind: 'back', label: `${t('back')} · ${t('recentSwitcher')}`, tooltip: `${t('back')} (Esc)`, onAction: onBack } : undefined}
       title={searching ? t('recentSwitcher') : t('recentRelease', releaseKey === 'Meta' ? '⌘' : releaseKey === 'Alt' ? '⌥' : 'Ctrl')}
-      context={<NavigationHint />}
+      context={<span className="navigation-hint"><NavigationHint /><span aria-hidden="true">·</span>
+        <span className="navigation-key" title={t('recentSearchHelp')}><kbd>Ctrl+F</kbd><span className="navigation-label">{t('recentSearchAction')}</span></span>
+      </span>}
       status={error ? <span role="alert" title={error}>{error}</span> : pending ? <span role="status">{t('operationPending')}</span> : undefined}
       primary={{ label: t('recentConfirm'), keys: ['↵'], disabled: !loaded || !tabs[index] || closing, onAction: onConfirm }}
       secondary={{ label: t('recentCancel'), keys: ['esc'], onAction: onCancel }} />

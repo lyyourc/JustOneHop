@@ -1,3 +1,4 @@
+import { SwitcherConfirmation } from './switcherConfirmation';
 import { RecentSwitcherView } from './RecentSwitcherView';
 import { alignPanelWindow } from './panelGeometry';
 import { filterRecentTabs, recentNavigation, recentSelection } from './recentSearch';
@@ -26,47 +27,46 @@ type NavigationKey = Parameters<typeof recentNavigation>[0];
 const startupNavigation: ({ kind: 'step'; direction: number } | { kind: 'key'; event: NavigationKey })[] = [];
 const pageSize = () => Math.max(1, Math.floor((document.querySelector('.recent-list')?.clientHeight || 400) / 40));
 let loaded = false;
-let closing = false;
-let aborted = false;
+const confirmation = new SwitcherConfirmation();
 let error = '';
 let shortcut = '';
 let releaseKey = params.get('modifier') || 'Control';
 let ownWindowId: number | undefined;
-let returningFocus = false;
 let revision = 0;
 let hadFocus = document.hasFocus();
 let acceptAfterLoad = false;
 const listeners = new Set<() => void>();
 const changed = () => { revision++; listeners.forEach(listener => listener()); };
-function dismiss() { aborted = true; closing = true; window.close(); }
+function dismiss() { confirmation.close(); window.close(); }
 function stepIndex(direction: number, count: number) {
   return !count ? -1 : index < 0 ? (direction > 0 ? 0 : count - 1) : (index + direction % count + count) % count;
 }
 function move(direction: number) {
-  if (closing || aborted || acceptAfterLoad || composing) return;
+  if (!confirmation.canSelect || acceptAfterLoad || composing) return;
   if (!loaded) startupNavigation.push({ kind: 'step', direction });
   else index = stepIndex(direction, visibleTabs().length);
   changed();
 }
 async function finish() {
-  if (closing || aborted || composing) return;
+  if (!confirmation.canSelect || composing) return;
   if (!loaded || startupNavigation.length) { acceptAfterLoad = true; return; }
   const targetId = visibleTabs()[index]?.id;
   if (targetId === undefined) return;
-  closing = true; error = ''; changed();
+  if (!confirmation.begin()) return;
+  error = ''; changed();
   try {
     const [source, target] = await Promise.all([chrome.tabs.get(sourceId), chrome.tabs.get(targetId)]);
     if (target.windowId !== windowId) throw new Error(t('errorMovedTab'));
     // Do not follow stale sessions or steal focus after an interrupted accept.
-    if (aborted || !document.hasFocus() || !source.active || source.windowId !== windowId) { dismiss(); return; }
+    if (confirmation.closed || !document.hasFocus() || !source.active || source.windowId !== windowId) { dismiss(); return; }
     await chrome.tabs.update(targetId, { active: true });
-    if (aborted || !document.hasFocus()) { dismiss(); return; }
-    returningFocus = true;
+    if (confirmation.closed || !document.hasFocus()) { dismiss(); return; }
+    if (!confirmation.returnFocus()) return;
     await chrome.windows.update(windowId, { focused: true });
     window.close();
   } catch (reason) {
-    if (aborted) return;
-    closing = false; returningFocus = false; acceptAfterLoad = false;
+    if (!confirmation.fail()) return;
+    acceptAfterLoad = false;
     error = errorMessage(reason); changed();
   }
 }
@@ -76,7 +76,7 @@ window.addEventListener('keyup', event => {
   if (event.key === releaseKey && !event.isComposing && event.keyCode !== 229 && !searching) { event.preventDefault(); void finish(); }
 });
 window.addEventListener('keydown', event => {
-  if (event.isComposing || event.keyCode === 229 || composing || closing || aborted) return;
+  if (event.isComposing || event.keyCode === 229 || composing || !confirmation.canSelect) return;
   if (event.key.toLowerCase() === 'f' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
     event.preventDefault(); searching = true; acceptAfterLoad = false; changed();
   } else if (event.key === 'Enter') {
@@ -98,8 +98,8 @@ window.addEventListener('keydown', event => {
   }
 });
 window.addEventListener('focus', () => { hadFocus = true; if (loaded && acceptAfterLoad && !searching) void finish(); });
-window.addEventListener('blur', () => { if (hadFocus && !returningFocus) dismiss(); });
-document.addEventListener('visibilitychange', () => { if (hadFocus && document.hidden && !returningFocus) dismiss(); });
+window.addEventListener('blur', () => { if (hadFocus && !confirmation.returningFocus) dismiss(); });
+document.addEventListener('visibilitychange', () => { if (hadFocus && document.hidden && !confirmation.returningFocus) dismiss(); });
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (sender.id !== chrome.runtime.id || message?.source !== 'justonehop-recent' || !session || message.session !== session) return;
   if (message.type === 'released' && !searching) void finish();
@@ -112,7 +112,7 @@ chrome.commands.onCommand.addListener(command => {
 });
 chrome.windows.onFocusChanged.addListener(id => {
   if (id === ownWindowId) { hadFocus = true; if (loaded && acceptAfterLoad && !searching) void finish(); }
-  else if (hadFocus && ownWindowId !== undefined && !returningFocus) dismiss();
+  else if (hadFocus && ownWindowId !== undefined && !confirmation.returningFocus) dismiss();
 });
 chrome.windows.onRemoved.addListener(id => { if (id === windowId) dismiss(); });
 function removeTab(id: number) {
@@ -129,7 +129,7 @@ function removeTab(id: number) {
 chrome.tabs.onRemoved.addListener(removeTab);
 chrome.tabs.onDetached.addListener(removeTab);
 const port = chrome.runtime.connect({ name: 'justonehop' });
-window.addEventListener('pagehide', () => { aborted = true; port.disconnect(); }, { once: true });
+window.addEventListener('pagehide', () => { confirmation.close(); port.disconnect(); }, { once: true });
 
 function Switcher() {
   useSyncExternalStore(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => revision);
@@ -137,12 +137,12 @@ function Switcher() {
   useEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [index, loaded, query, revision]);
   return <RecentSwitcherView tabs={visibleTabs()} index={index} query={query} searching={searching}
     onSearch={() => { searching = true; acceptAfterLoad = false; changed(); }} onQueryChange={value => {
-    if (closing || aborted) return;
+    if (!confirmation.canSelect) return;
     const selected = visibleTabs()[index]?.id;
     query = value; index = recentSelection(visibleTabs(), selected); changed();
-  }} sourceId={sourceId} loaded={loaded} closing={closing}
+  }} sourceId={sourceId} loaded={loaded} closing={!confirmation.canSelect}
     error={error} shortcut={shortcut} releaseKey={releaseKey} theme={getPreferences().theme} listRef={list}
-    onSelect={at => { if (closing) return; index = at; changed(); void finish(); }} onConfirm={() => void finish()} onCancel={dismiss} />;
+    onSelect={at => { if (!confirmation.canSelect) return; index = at; changed(); void finish(); }} onConfirm={() => void finish()} onCancel={dismiss} />;
 }
 function SwitcherRoot() {
   useSyncExternalStore(listener => { listeners.add(listener); return () => { listeners.delete(listener); }; }, () => revision);
@@ -156,15 +156,15 @@ void Promise.all([
   // handoff. Only the standalone fallback needs to fetch them here.
   preferencesReady, session ? Promise.resolve([] as chrome.tabs.Tab[]) : chrome.tabs.query({ windowId }), chrome.commands.getAll(), chrome.windows.getCurrent(),
 ]).then(async ([, all, bindings, own]) => {
-  if (aborted) return;
+  if (confirmation.closed) return;
   await alignPanelWindow(sourceId, windowId).catch(() => {});
-  if (aborted) return;
+  if (confirmation.closed) return;
   ownWindowId = own.id;
   shortcut = bindings.find(binding => binding.name === (Number(params.get('direction')) === -1 ? 'switch-recent-back' : 'switch-recent'))?.shortcut || '';
   releaseKey = /Command|⌘/.test(shortcut) ? 'Meta' : /Alt|Option|⌥/.test(shortcut) ? 'Alt' : 'Control';
   const handoff = session ? await chrome.runtime.sendMessage({ source: 'justonehop-recent', type: 'ready', session }) : undefined;
   if (session && !handoff) { dismiss(); return; }
-  if (aborted) return;
+  if (confirmation.closed) return;
   if (handoff) { offset += handoff.offset; acceptAfterLoad ||= handoff.released && !searching; }
   tabs = (handoff?.tabs as chrome.tabs.Tab[] || all).filter(tab => tab.id !== undefined).sort((a, b) => Number(b.id === sourceId) - Number(a.id === sourceId) || (b.lastAccessed || 0) - (a.lastAccessed || 0) || a.index - b.index);
   index = tabs.length ? (offset % tabs.length + tabs.length) % tabs.length : 0;
@@ -181,4 +181,4 @@ void Promise.all([
   }
   changed();
   if (acceptAfterLoad && !searching && document.hasFocus()) requestAnimationFrame(() => { if (!searching) void finish(); });
-}).catch(reason => { if (aborted) return; error = errorMessage(reason); loaded = true; changed(); });
+}).catch(reason => { if (confirmation.closed) return; error = errorMessage(reason); loaded = true; changed(); });

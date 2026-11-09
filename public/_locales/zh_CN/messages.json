@@ -560,6 +560,9 @@
   "recentSearch": {
     "message": "搜索最近标签页…"
   },
+  "recentSearchAction": {
+    "message": "搜索"
+  },
   "recentSearchHelp": {
     "message": "点击或按 Ctrl/Cmd+F 开始搜索，然后松开快捷键并输入。"
   },
