@@ -96,6 +96,9 @@ test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open' } });
   test('English storage cookies expose HttpOnly and same-name paths, refresh, empty and changed-page errors', { tag: '@clipboard' }, async () => {
+  // The fixture grants only website access; exercise Chrome's optional API grant.
+  expect(await ui.evaluate(() => chrome.permissions.contains({ permissions: ['cookies'] }))).toBe(false);
+  expect(await ui.evaluate(() => chrome.permissions.request({ permissions: ['cookies'] }))).toBe(true);
   const page = await context.newPage(); await page.goto(`${origin}/Storage/nested`);
   await context.addCookies([
     { name: 'token', value: 'root-token', url: origin, httpOnly: true },
@@ -120,6 +123,30 @@ test.describe(() => {
   await expect(surface.locator('.cookie-metadata')).toContainText('true / false');
   await surface.locator('.palette').screenshot({ path: test.info().outputPath('storage-cookie-detail.png') });
   await page.keyboard.press('Escape');
+  await test.step('revoking Cookie access offers authorization again on refresh', async () => {
+    expect(await ui.evaluate(() => chrome.permissions.remove({ permissions: ['cookies'] }))).toBe(true);
+    await page.keyboard.press('Meta+k'); await surface.locator('.action-search input').fill('refresh'); await page.keyboard.press('Enter');
+    const allow = surface.getByRole('button', { name: 'Allow Website Access' });
+    await expect(allow).toBeVisible();
+    await expect(surface.locator('.storage-row')).toHaveCount(0);
+    const opened = context.waitForEvent('page');
+    await allow.click();
+    const permission = await opened;
+    const confirm = permission.getByRole('button', { name: 'Continue to Chrome' });
+    await expect(confirm).toBeFocused();
+    // Existing website access means Chrome can grant cookies without a host prompt.
+    await confirm.click();
+    await expect.poll(() => permission.isClosed()).toBe(true);
+    expect(await ui.evaluate(() => chrome.permissions.contains({ permissions: ['cookies'] }))).toBe(true);
+    await page.bringToFront();
+    await surface.locator('.storage-search input').focus();
+    // Headless window closure does not guarantee the iframe's focus event.
+    // Use the visible refresh action; do not synthesize a successful focus return.
+    await page.keyboard.press('Meta+k'); await surface.locator('.action-search input').fill('refresh'); await page.keyboard.press('Enter');
+    await expect(surface.locator('.storage-row')).toHaveCount(2);
+    await expect(surface.locator('.storage-preview .preview-code')).toHaveValue('root-token');
+    await expect(allow).toHaveCount(0);
+  });
   await context.clearCookies();
   await page.keyboard.press('Meta+k'); await surface.locator('.action-search input').fill('refresh'); await page.keyboard.press('Enter');
   await expect(surface.locator('.empty')).toContainText('No entries');
@@ -227,6 +254,7 @@ for (const vimium of [false, true]) test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US' } });
   test('English cookie authorization handles missing grants, denial, navigation and exact website requests', async () => {
+  expect(await ui.evaluate(() => chrome.permissions.contains({ permissions: ['cookies'] }))).toBe(false);
   const source = await context.newPage(); await source.goto(`${origin}/Cookie-permission`);
   const target = await worker.evaluate(async url => {
     const tab = (await chrome.tabs.query({})).find(tab => tab.url === url)!;
@@ -254,9 +282,9 @@ test.describe(() => {
     (window as unknown as { requested: unknown[] }).requested = [];
     chrome.permissions.request = async args => { (window as unknown as { requested: unknown[] }).requested.push(args); return false; };
   });
-  await permission.getByRole('button', { name: 'Continue to Chrome' }).click();
+  await permission.getByRole('button', { name: 'Continue to Chrome' }).press('Enter');
   await expect(permission.getByRole('alert')).toContainText('Access was not granted');
-  expect(await permission.evaluate(() => (window as unknown as { requested: unknown[] }).requested)).toEqual([{ origins: ['*://127.0.0.1/*'] }]);
+  expect(await permission.evaluate(() => (window as unknown as { requested: unknown[] }).requested)).toEqual([{ permissions: ['cookies'], origins: ['*://127.0.0.1/*'] }]);
   await source.goto('about:blank');
   await expect(permission.getByRole('alert')).toContainText('The page changed');
   await expect(permission.getByRole('button', { name: 'Continue to Chrome' })).toBeDisabled();
@@ -266,7 +294,7 @@ test.describe(() => {
   await ui.evaluate(payload => chrome.runtime.sendMessage({ source: 'justonehop', type: 'open-cookie-access', payload }), target);
   const accepted = await reopened;
   await expect(accepted.getByRole('button', { name: 'Continue to Chrome' })).toBeEnabled();
-  await accepted.evaluate(() => { chrome.permissions.request = async args => args.origins?.length === 1 && args.origins[0] === '*://127.0.0.1/*'; });
+  await accepted.evaluate(() => { chrome.permissions.request = async args => args.permissions?.length === 1 && args.permissions[0] === 'cookies' && args.origins?.length === 1 && args.origins[0] === '*://127.0.0.1/*'; });
   await accepted.getByRole('button', { name: 'Continue to Chrome' }).click();
   await expect.poll(() => accepted.isClosed()).toBe(true);
   expect(await worker.evaluate(async () => (await chrome.storage.local.get<{ searchUsage?: UsageRecord[] }>('searchUsage')).searchUsage?.some(record => record.target === 'command:cookies') || false)).toBe(false);
@@ -276,6 +304,7 @@ test.describe(() => {
 test.describe(() => {
   test.use({ environment: { ...defaults, locale: 'en-US', pageAccess: true, shadow: 'open', cookieDomains: true } });
   test('English storage cookie domains include parent, Secure, ordinary and current-partition cookies only', async () => {
+  expect(await ui.evaluate(() => chrome.permissions.request({ permissions: ['cookies'] }))).toBe(true);
   const site = 'https://app.example.test/nested';
   await context.route('https://app.example.test/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Cookie domains fixture</title>' }));
   const source = await context.newPage(); await source.goto(site);
@@ -302,7 +331,7 @@ test.describe(() => {
   // Exercise Chrome itself: two separate scheme declarations do not authorize a
   // wildcard-scheme request, even though they appear to cover the same URLs.
   const result = await ui.evaluate(() => Promise.race([
-    chrome.permissions.request({ origins: ['*://127.0.0.1/*'] }).then(granted => ({ granted }), error => ({ error: error.message })),
+    chrome.permissions.request({ permissions: ['cookies'], origins: ['*://127.0.0.1/*'] }).then(granted => ({ granted }), error => ({ error: error.message })),
     new Promise<{ pending: true }>(resolve => setTimeout(() => resolve({ pending: true }), 750)),
   ]));
   expect(result).not.toHaveProperty('error');

@@ -25,7 +25,7 @@ export async function openCookieAccess(request: CookieAccessRequest, sender: chr
 export async function readPageStorage(request: StorageRead, sender: chrome.runtime.MessageSender): Promise<PageStorage> {
   if (!request || !['local', 'session', 'cookies'].includes(request.kind)) throw new Error(t('errorStorageTarget'));
   const tab = await storageTab(request, sender);
-  if (request.kind === 'cookies' && !await chrome.permissions.contains({ origins: cookiePatterns(tab.url!) })) {
+  if (request.kind === 'cookies' && !await chrome.permissions.contains({ permissions: ['cookies'], origins: cookiePatterns(tab.url!) })) {
     throw new Error(t('errorStoragePermission'));
   }
   let entries: StorageEntry[];

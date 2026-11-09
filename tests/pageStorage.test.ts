@@ -116,3 +116,15 @@ test('authorization opens only a trusted extension page for a validated target, 
   await assert.rejects(openCookieAccess(request, sender), /page changed/);
   assert.equal(calls.length, 1);
 });
+
+for (const missing of ['cookies', 'website']) test(`cookie reads require both grants when ${missing} access is missing or revoked`, async () => {
+  chrome.permissions.contains = async permissions =>
+    !(missing === 'cookies' ? permissions.permissions?.includes('cookies') : permissions.origins?.length);
+  chrome.cookies.getAllCookieStores = async () => { assert.fail('Cookie API must not run without both grants'); };
+  await assert.rejects(readPageStorage({ ...request, kind: 'cookies' }, sender), /Allow access/);
+  assert.deepEqual(saved, {});
+  for (const kind of ['local', 'session'] as const) {
+    const result = await readPageStorage({ ...request, kind, query: undefined }, sender);
+    assert.equal(result.entries.length, 2);
+  }
+});

@@ -42,13 +42,13 @@
 | --- | --- | --- |
 | **Local Storage** | `activeTab`, `scripting` | 仅读取当前标签页顶层 Frame 的 `origin`。使用临时脚本注入提取，无需声明全网 Host 权限。 |
 | **Session Storage** | `activeTab`, `scripting` | 仅读取当前标签页顶层 Frame 的 `sessionStorage`。不跨 Tab、不跨 Frame。 |
-| **Cookies** | `cookies`, 可选网站主机权限 | 匹配当前标签页 URL 的所属 Cookie Store（包含 `HttpOnly` 及顶层 Frame 的分区 Cookie）。区分同名、不同路径与分区的记录。 |
+| **Cookies** | 可选 `cookies` 权限、可选网站主机权限 | 两种权限均已授予才读取。匹配当前标签页 URL 的所属 Cookie Store（包含 `HttpOnly` 及顶层 Frame 的分区 Cookie）。区分同名、不同路径与分区的记录。 |
 
 ### Cookie 逐站授权机制
 
-- Manifest 中仅声明 `optional_host_permissions: ["*://*/*"]`，绝不在安装时申请全网权限。
+- Cookie 读取使用 `optional_permissions: ["cookies"]` 和 `optional_host_permissions: ["*://*/*"]`，安装时不要求 Cookie 权限；Cookie 授权流程只申请目标网站及必要父域。快捷键监听脚本的网页匹配范围是独立声明，不属于这里的 Cookie 授权。
 - 当目标站点的 Cookie 需要访问权限时，扩展通过 `open-cookie-access` 打开本地独立授权引导页（[`src/cookie-access.tsx`](../src/cookie-access.tsx)）。
-- 授权页利用 `tldts` 库严格计算当前域名及其可注册父域（Registrable Domain），仅向 Chrome 原生权限系统申请该站点及必要父域的 HTTP/HTTPS 权限，绝不申请同级兄弟子域的通配符。
+- 授权页利用 `tldts` 库严格计算当前域名及其可注册父域（Registrable Domain），一次申请 `cookies` 权限及该站点和必要父域的 HTTP/HTTPS 权限，绝不申请同级兄弟子域的通配符。每次读取同时检查 Cookie 与网站权限，缺失或被撤销时重新引导授权。
 - 用户授权后，授权页自动关闭，面板无缝重新读取 Cookie；用户拒绝可重试，用户可随时在 Chrome 设置中撤销该站点的授权。
 
 ### 内存隔离与零持久化

@@ -543,7 +543,7 @@
     "message": "View cookies on this website"
   },
   "cookieAccessHint": {
-    "message": "Chrome needs access to the listed website domains (HTTP and HTTPS) to read their cookies, including HttpOnly. You can revoke access in Chrome’s extension settings."
+    "message": "To read cookies, including HttpOnly, allow cookie access and access to the listed website domains (HTTP and HTTPS). These permissions are requested only when needed. You can revoke website access in Chrome’s extension settings."
   },
   "cookieAccessConfirm": {
     "message": "Continue to Chrome"

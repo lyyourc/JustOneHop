@@ -59,7 +59,9 @@ export function StorageView({ request, onBack, isMac }: { request: StorageRead; 
       if (sequence.current === revision) { setData(result); setError(''); if (learn) learned.current = true; }
       if (operation !== undefined) feedback.success(operation, t('storageRefreshed'));
     } catch (reason) {
-      if (sequence.current === revision && !report) { setData(null); setError(errorMessage(reason)); }
+      if (sequence.current === revision && (!report || errorMessage(reason) === t('errorStoragePermission'))) {
+        setData(null); setError(errorMessage(reason));
+      }
       if (operation !== undefined) feedback.error(operation, errorMessage(reason));
     } finally { if (sequence.current === revision) setBusy(false); }
   }

@@ -543,7 +543,7 @@
     "message": "查看此网站的 Cookie"
   },
   "cookieAccessHint": {
-    "message": "Chrome 需要访问上方列出的网站域名（HTTP 和 HTTPS），才能读取其 Cookie（包含 HttpOnly）。可随时在 Chrome 扩展设置中撤销授权。"
+    "message": "读取 Cookie（包含 HttpOnly）需要授权 Cookie 访问和上方列出的网站域名（HTTP 和 HTTPS）。这些权限仅在需要时申请，可随时在 Chrome 扩展设置中撤销网站授权。"
   },
   "cookieAccessConfirm": {
     "message": "继续授权"

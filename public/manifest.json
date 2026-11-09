@@ -7,7 +7,6 @@
   "permissions": [
     "activeTab",
     "contextMenus",
-    "cookies",
     "scripting",
     "tabs",
     "bookmarks",
@@ -62,6 +61,9 @@
     }
   },
   "default_locale": "en",
+  "optional_permissions": [
+    "cookies"
+  ],
   "optional_host_permissions": [
     "*://*/*"
   ],

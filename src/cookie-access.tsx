@@ -35,7 +35,7 @@ function CookieAccess() {
     if (!ready || busy) return;
     // Called directly from the button's user gesture in an extension page.
     setBusy(true); setError('');
-    try { if (await chrome.permissions.request({ origins: patterns })) window.close(); else setError(t('cookieAccessDenied')); }
+    try { if (await chrome.permissions.request({ permissions: ['cookies'], origins: patterns })) window.close(); else setError(t('cookieAccessDenied')); }
     catch { setError(t('cookieAccessError')); }
     finally { setBusy(false); }
   }
