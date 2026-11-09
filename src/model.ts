@@ -1,7 +1,7 @@
 import { brandAliases, categoryTerms, entrySearchQuery, entryTitle } from './entryPresentation';
 import { t } from './i18n';
 import { groupActions } from './groupActions';
-import { addressActions, pageNavigationEntry } from './addressPresentation';
+import { addressActions, pageNavigationEntry, tabNewTabAction } from './addressPresentation';
 import { chromePages } from './chromePages';
 import Fuse, { type Expression } from 'fuse.js';
 import { termMatches } from './searchMatch';
@@ -381,10 +381,11 @@ export function actionsFor(entry: Entry, snapshot: Snapshot, isMac = false): Ent
       bookmarkId: entry.bookmarkId, expectedUrl: entry.url, danger: true },
   ];
   const tab = snapshot.tabs.find(item => item.id === entry.tabId);
+  const openNew = tabNewTabAction(entry, snapshot, isMac);
   const available = commands(tab).filter(command => ['close', 'pin', 'mute', 'reload', 'closeOthers', 'closeRight', 'tuck'].includes(command.action));
   const bookmark = bookmarkTabAction(tab, snapshot.bookmarks);
   if (bookmark) available.push(bookmark);
-  return [{ ...entry, title: t('switchTab'), subtitle: entry.title, keywords: `${entry.keywords} switch tab 切换标签页` }, ...copyActions, ...available.map(command => ({
+  return [{ ...entry, title: t('switchTab'), subtitle: entry.title, keywords: `${entry.keywords} switch tab 切换标签页` }, ...(openNew ? [openNew] : []), ...copyActions, ...available.map(command => ({
     ...command, shortcut: tab?.id === snapshot.currentTabId ? command.shortcut : undefined, title: command.title.replace(t('current'), ''), id: `action:${command.action}`, tabId: entry.tabId,
   }))];
 }

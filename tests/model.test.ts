@@ -222,8 +222,17 @@ test('search finds bookmark folders and URLs', () => {
 });
 test('actions target the selected tab, not the active tab', () => {
   const selected = entries(data).find(entry => entry.tabId === 3)!;
-  assert.ok(actionsFor(selected, data).every(action => action.tabId === 3));
-  assert.equal(actionsFor(selected, data).length, 9);
+  const actions = actionsFor(selected, data, true);
+  assert.ok(actions.filter(action => action.action !== 'openAddressNewTab').every(action => action.tabId === 3));
+  assert.equal(actions[0].action, 'switch');
+  assert.equal(actions[1].action, 'openAddressNewTab');
+  assert.equal(actions[1].tabId, 2);
+  assert.equal(actions[1].expectedUrl, data.tabs[1].url);
+  assert.equal(actions[1].url, selected.url);
+  assert.equal(actions[1].shortcut, 'Mod+Enter');
+  for (const query of ['open in new tab', '新标签页']) {
+    assert.equal(search(actions, query)[0]?.action, 'openAddressNewTab', query);
+  }
 });
 test('bookmark actions use exact complete URLs and include every duplicate, including managed bookmarks', () => {
   const current = { ...tab(2, 1), url: 'https://example.com/docs?q=one#section' };

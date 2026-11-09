@@ -47,7 +47,7 @@ Type whatever you are looking for: page titles, domains, or everyday commands in
 
 ![Unified Search Demo](demo/en-search.gif)
 
-- **Open Tabs**: Type any word from the title or domain and press `Enter` (or click) to jump straight there.
+- **Open Tabs**: Type any word from the title or domain and press `Enter` (or click) to jump straight there. For a web page, press **`⌘Enter`** (`Alt+Enter` on Windows/Linux) to open the same URL in a new tab.
 - **Bookmarks & History**: Shown right alongside open tabs. Press `Enter` to open in the current tab, or **`⌘Enter`** (`Alt+Enter` on Windows/Linux) to open in a new tab. Need older pages? Click **Search All History** or type `history`.
 - **Browser Actions & Chrome Pages**: Type plain words like `new tab`, `reopen`, `downloads`, `extensions`, `passwords`, or `dark mode` (switches to an existing tab if already open instead of creating duplicates).
 - **Direct URLs & Google Search**: Type any URL (e.g. `github.com` or `localhost:3000`) to go right there, or search Google in one keystroke when nothing local matches.

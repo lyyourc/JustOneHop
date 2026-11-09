@@ -13,7 +13,7 @@ import { useResultSelection } from './useResultSelection';
 import { TuckRecoveryView } from './TuckRecoveryView';
 import { Favicon } from './Favicon';
 import { NavigationHint, matchesShortcut, shortcutKeys } from './Shortcut';
-import { addressEntry, addressActions, isPageNavigation, pageNavigationEntry } from './addressPresentation';
+import { addressEntry, addressActions, isPageNavigation, pageNavigationEntry, tabNewTabAction } from './addressPresentation';
 import { addressNewTabShortcut } from './address';
 import { googleSearchEntry, insertGoogleSearch } from './googleSearch';
 import { NavigationRoot, BackLayer } from './Navigation';
@@ -124,6 +124,9 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   const resultBusy = busy || history.pending;
   const grouped = !displayQuery.trim();
   const { selected, selection, setSelection } = useResultSelection(visible, displayQuery, data?.currentTabId, initialState?.selection);
+  const newPageAction = !actionTarget && selected && data
+    ? isPageNavigation(selected) ? addressActions(selected, isMac)[1] : tabNewTabAction(selected, data, isMac)
+    : undefined;
   const liveTarget = actionTarget && [...items, ...visible].find(item => item.id === actionTarget.id);
   const actionItems = useMemo(() => {
     if (!data || !liveTarget) return [];
@@ -382,10 +385,10 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
       setter(pool[next].id);
       if ((event.target as HTMLElement).closest('.ranking-forget')) input.current?.focus();
     } else if (event.key === 'Enter') {
-      if (!storage && !actionTarget && current && isPageNavigation(current) && (event.target as HTMLElement).tagName !== 'BUTTON'
+      if (!storage && newPageAction && (event.target as HTMLElement).tagName !== 'BUTTON'
         && matchesShortcut(event, addressNewTabShortcut(isMac), isMac)) {
         event.preventDefault();
-        if (!event.repeat) void run(addressActions(current, isMac)[1]);
+        if (!event.repeat) void run(newPageAction);
         return;
       }
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.repeat) { event.preventDefault(); return; }
@@ -410,7 +413,6 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
   const visibleShortcut = (entry: Entry) => entry.action === 'tabSwitcher' || (mode === 'popup' && ['close', 'reload'].includes(entry.action)) ? undefined : entry.shortcut;
   const current = actionTarget ? selectedAction : selected;
   const count = affected(current);
-  const newAddressAction = !actionTarget && selected && isPageNavigation(selected) ? addressActions(selected, isMac)[1] : undefined;
   const primaryLabel = current?.action === 'manageGroup' ? t('groupViewTabs') : current?.newTab || current?.action === 'openAddressNewTab' ? t('openNewTab') : isPageNavigation(current) ? t('openCurrentTab') : current?.kind === 'tab' && current.action === 'switch' ? t('switchTabPrimary')
     : current?.kind === 'history' ? t('openHistoryPage') : current?.kind === 'bookmark' ? t('openBookmark') : current?.title || t('runCommand');
 
@@ -468,12 +470,12 @@ function PaletteApp({ mode, onClose, initialState, initialBinding = false }: App
         title={t('extensionName')}
         navigation={{ kind: 'settings', label: t('settings'), tooltip: `${t('settings')} (${mod},)`, disabled: busy || !!bookmarkRemoval || !!groupRemoval, onAction: () => openSettings() }}
         hints={<NavigationHint />}
-        status={newAddressAction && selected?.disabled ? <span role="status">{t('addressPinned')}</span>
+        status={newPageAction && selected?.disabled ? <span role="status">{t('addressPinned')}</span>
           : selection === null ? <span role="status">{t('chooseNextTab')}</span>
           : count !== undefined ? <span className="footer-status">{countMessage('closeCountOne', 'closeCountMany', count)}</span>
           : undefined}
         primary={{ label: primaryLabel, shortLabel: current?.newTab || current?.action === 'openAddressNewTab' ? t('footerOpenNewTab') : isPageNavigation(current) ? t('footerOpenCurrentTab') : undefined, keys: ['↵'], disabled: !current || current.disabled || resultBusy || !!bookmarkRemoval || !!groupRemoval, danger: !!(current?.danger || current?.action === 'close'), onAction: () => void run(current) }}
-        secondary={completion.value ? { label: t(query ? 'completeQuery' : 'continueSearch'), keys: ['Tab'], onAction: completion.accept } : newAddressAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newAddressAction) } : undefined}
+        secondary={completion.value ? { label: t(query ? 'completeQuery' : 'continueSearch'), keys: ['Tab'], onAction: completion.accept } : newPageAction ? { label: t('openNewTab'), shortLabel: t('footerOpenNewTab'), keys: shortcutKeys(addressNewTabShortcut(isMac), isMac), icon: <ExternalLink size={15} />, disabled: resultBusy || !!bookmarkRemoval || !!groupRemoval, onAction: () => void run(newPageAction) } : undefined}
         actions={{ open: !!actionTarget, disabled: !selected || (selected.disabled && !isPageNavigation(selected)) || resultBusy || !!bookmarkRemoval || !!groupRemoval, onToggle: toggleActions }} />
       {data && !data.shortcut && !actionTarget ? <div className="shortcut-notice">{t('shortcutNotice')}</div> : null}
     </section>}

@@ -572,11 +572,59 @@ test.describe(() => {
       }))),
     );
   });
+
+  test('Open tab results switch with Enter and open the same URL with shortcut footer and menu', async () => {
+    const target = `${origin}/Already-open-result?Q=A%2Bb#Part`;
+    const existing = await context.newPage();
+    await existing.goto(target);
+    const page = await context.newPage();
+    const sourceUrl = `${origin}/Open-tab-result-source`;
+    await page.goto(sourceUrl);
+    const { id: sourceId, windowId } = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url)!, sourceUrl);
+    const tabs = () => worker.evaluate(id => chrome.tabs.query({ windowId: id }), windowId);
+    const original = (await tabs()).find(tab => tab.url === target)!;
+    const initialCount = (await tabs()).length;
+    const shortcut = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter');
+    for (const method of ['enter', 'shortcut', 'footer', 'menu'] as const) {
+      await test.step(method, async () => {
+        const surface = await openStorageOverlay(page);
+        const input = surface.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+        await input.fill(target);
+        const row = surface.locator('#justonehop-results .result.tab');
+        await expect(row).toHaveAttribute('aria-selected', 'true');
+        if (method === 'enter') await input.press('Enter');
+        else if (method === 'shortcut') await input.press(shortcut);
+        else if (method === 'footer') {
+          await page.setViewportSize({ width: 390, height: 640 });
+          await surface.getByRole('button', { name: 'Open in New Tab', exact: true }).click();
+        } else {
+          await row.click({ button: 'right' });
+          const actions = surface.getByRole('combobox', { name: 'Search actions' });
+          await actions.fill('新标签页');
+          await expect(surface.locator('.action-row[aria-selected="true"]')).toContainText('Open in New Tab');
+          await actions.press('Enter');
+        }
+        await expect(page.locator('.justonehop-frame')).toHaveCount(0);
+        await expect.poll(async () => (await tabs()).find(tab => tab.active)?.url).toBe(target);
+        const current = await tabs();
+        const active = current.find(tab => tab.active)!;
+        expect(current.find(tab => tab.id === sourceId)?.url).toBe(sourceUrl);
+        expect(current.find(tab => tab.id === original.id)?.url).toBe(target);
+        expect(current).toHaveLength(initialCount + Number(method !== 'enter'));
+        if (method === 'enter') expect(active.id).toBe(original.id);
+        else {
+          expect(active.id).not.toBe(original.id);
+          await worker.evaluate(id => chrome.tabs.remove(id), active.id!);
+        }
+        await page.setViewportSize({ width: 1100, height: 760 });
+      });
+    }
+  });
 });
 
 test.describe('headed', { tag: '@headed' }, () => {
   test.use({ environment: { ...defaults, locale: 'en-US', commands: true, headed: true } });
-  test('Google search and Address navigation: native panel navigates its source and opens new tabs in the source window', async () => {
+  test('Native panel opens Google searches, typed addresses and open tab results in its source window', async () => {
     await test.step('Google search: native panel opens current and new tabs in its source window', async () => {
       await context.route('https://www.google.com/search?**', route => route.fulfill({ contentType: 'text/html', body: '<title>Search destination</title>' }));
       for (const newTab of [false, true]) {
@@ -616,6 +664,28 @@ test.describe('headed', { tag: '@headed' }, () => {
         expect(tabs.find(tab => tab.id === source.tabId)?.url).toBe(newTab ? 'chrome://version/' : target);
         expect(tabs.find(tab => tab.url === target)?.id === source.tabId).toBe(!newTab);
       }
+    });
+
+    await test.step('Open tab result: the new-tab shortcut opens a second tab with the exact URL', async () => {
+      const target = `${origin}/Already-open-native?Q=A%2Bb#Part`;
+      const existing = await context.newPage();
+      await existing.goto(target);
+      const { source, palette } = await openNativePalette();
+      const tabs = () => worker.evaluate(windowId => chrome.tabs.query({ windowId }), source.windowId);
+      const before = await tabs();
+      const original = before.find(tab => tab.url === target)!;
+      const input = palette.getByRole('combobox', { name: 'Search commands, tabs, bookmarks, and history' });
+      await input.fill(target);
+      await expect(palette.locator('#justonehop-results .result.tab')).toHaveAttribute('aria-selected', 'true');
+      const shortcut = await palette.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform) ? 'Meta+Enter' : 'Alt+Enter');
+      await input.press(shortcut).catch(error => { if (!palette.isClosed()) throw error; });
+      await expect.poll(() => palette.isClosed()).toBe(true);
+      await expect.poll(async () => (await tabs()).find(tab => tab.active)?.url).toBe(target);
+      const after = await tabs();
+      expect(after).toHaveLength(before.length + 1);
+      expect(after.find(tab => tab.active)?.id).not.toBe(original.id);
+      expect(after.find(tab => tab.id === original.id)?.url).toBe(target);
+      expect(after.find(tab => tab.id === source.tabId)?.url).toBe('chrome://version/');
     });
   });
 
