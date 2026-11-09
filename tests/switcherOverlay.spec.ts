@@ -59,7 +59,7 @@ test.describe(() => {
         await expect(surface.getByRole('combobox')).toBeFocused();
         const paletteBounds = await surface.locator('.palette').boundingBox();
         const paletteFooter = await surface.locator('.palette-footer').boundingBox();
-        const navigationHint = await surface.locator('.navigation-hint').innerHTML();
+        const navigationHint = await surface.locator('.navigation-hint[aria-label]').innerHTML();
         const searchGeometry = () => surface.locator('.search-bar').evaluate(node => {
           const input = node.querySelector('input')!;
           // Compare the visible glyph; the focus-recovery button has a larger hit area.
@@ -81,7 +81,7 @@ test.describe(() => {
         const switcherBounds = await surface.locator('.palette').boundingBox();
         expect(switcherBounds).toEqual(paletteBounds);
         expect(await surface.locator('.palette-footer').boundingBox()).toEqual(paletteFooter);
-        expect(await surface.locator('.navigation-hint').innerHTML()).toBe(navigationHint);
+        expect(await surface.locator('.navigation-hint[aria-label]').innerHTML()).toBe(navigationHint);
         await expect.poll(async () => {
           const { bar, input, icon, close } = await searchGeometry();
           return { bar, input, icon, close };
