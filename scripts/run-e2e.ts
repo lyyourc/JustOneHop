@@ -63,6 +63,10 @@ export async function runE2E(args: string[], options: RunnerOptions = {}): Promi
     const index = playwrightArgs.findIndex(arg => arg === '--last-failed-file' || arg.startsWith('--last-failed-file='));
     playwrightArgs.splice(index, playwrightArgs[index] === '--last-failed-file' ? 2 : 1, `--last-failed-file=${copiedState}`);
   }
+  const requireVimium = playwrightArgs.includes('--require-vimium');
+  for (let index = playwrightArgs.indexOf('--require-vimium'); index >= 0; index = playwrightArgs.indexOf('--require-vimium')) {
+    playwrightArgs.splice(index, 1);
+  }
   const build = options.build ?? { executable: process.execPath, args: [join(root, 'build.mjs')] };
   const playwright = options.playwright ?? { executable: process.execPath, args: [join(root, 'node_modules', '@playwright', 'test', 'cli.js'), 'test'] };
   const mode = args.includes('--list') ? 'list' : args.some(arg => arg === '--help' || arg === '-h') ? 'help' : 'run';
@@ -119,6 +123,24 @@ export async function runE2E(args: string[], options: RunnerOptions = {}): Promi
       updateValidation(directory, { status: interrupted ? 'interrupted' : exitCode !== 0 ? 'failed' : mode === 'list' ? 'listed' : 'help',
         exitCode: finalExitCode, playwrightExitCode: exitCode });
       return finalExitCode;
+    }
+    if (requireVimium) {
+      try {
+        const path = process.env.JUSTONEHOP_VIMIUM_PATH;
+        if (!path?.trim()) throw new Error('JUSTONEHOP_VIMIUM_PATH is not set.');
+        const manifest = JSON.parse(readFileSync(join(resolve(path), 'manifest.json'), 'utf8'));
+        if (!/vimium/i.test(JSON.stringify(manifest)) || manifest.manifest_version !== 3
+          || typeof manifest.background?.service_worker !== 'string') {
+          throw new Error('Expected an unpacked Manifest V3 Vimium extension with a service worker.');
+        }
+        readFileSync(join(resolve(path), manifest.background.service_worker));
+        updateValidation(directory, { preflight: { status: 'passed', vimium: { path: resolve(path), version: manifest.version } } });
+      } catch (error) {
+        const message = `Full E2E requires Vimium: ${String(error)} Set JUSTONEHOP_VIMIUM_PATH to an unpacked Vimium extension directory, then rerun. No build or browser tests were started.`;
+        console.error(message);
+        updateValidation(directory, { status: 'preflight-failed', preflight: { status: 'failed', error: message }, exitCode: 2 });
+        return 2;
+      }
     }
     release = acquireLock(root, directory);
     const initialGit = await timed('sourceBeforeMs', () => gitState(root));

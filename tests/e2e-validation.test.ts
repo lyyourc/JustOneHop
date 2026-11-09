@@ -26,6 +26,58 @@ function reports(path: string) {
   return readdirSync(join(path, 'test-results', 'runs')).map(run => JSON.parse(readFileSync(join(path, 'test-results', 'runs', run, 'validation.json'), 'utf8')));
 }
 
+test('full-run preflight rejects missing or broken Vimium before building or launching browsers', async t => {
+  const path = temporary(t);
+  const previous = process.env.JUSTONEHOP_VIMIUM_PATH;
+  t.after(() => { if (previous === undefined) delete process.env.JUSTONEHOP_VIMIUM_PATH; else process.env.JUSTONEHOP_VIMIUM_PATH = previous; });
+  const vimium = join(path, 'vimium');
+  mkdirSync(vimium);
+  const reject = async () => {
+    assert.equal(await runE2E(['--require-vimium', '--max-failures=0'], { root: path, build,
+      playwright: command("require('fs').writeFileSync('browser-started', '')") }), 2);
+    assert.equal(existsSync(join(path, 'dist')), false);
+    assert.equal(existsSync(join(path, 'browser-started')), false);
+    assert.equal(existsSync(join(path, 'test-results', '.e2e.lock')), false);
+  };
+  delete process.env.JUSTONEHOP_VIMIUM_PATH;
+  await reject();
+  process.env.JUSTONEHOP_VIMIUM_PATH = vimium;
+  await reject();
+  for (const manifest of ['{', JSON.stringify({ name: 'Another extension', manifest_version: 3, background: { service_worker: 'worker.js' } }),
+    JSON.stringify({ name: 'Vimium', manifest_version: 3, background: { service_worker: 'missing.js' } })]) {
+    writeFileSync(join(vimium, 'manifest.json'), manifest);
+    await reject();
+  }
+  for (const report of reports(path)) {
+    assert.equal(report.status, 'preflight-failed');
+    assert.equal(report.build.status, 'not-started');
+    assert.match(report.preflight.error, /JUSTONEHOP_VIMIUM_PATH/);
+    assert.equal(report.timings.testsMs, undefined);
+  }
+});
+
+test('full-run preflight preserves discovery and forwards execution arguments after valid Vimium', async t => {
+  const path = temporary(t);
+  const previous = process.env.JUSTONEHOP_VIMIUM_PATH;
+  t.after(() => { if (previous === undefined) delete process.env.JUSTONEHOP_VIMIUM_PATH; else process.env.JUSTONEHOP_VIMIUM_PATH = previous; });
+  delete process.env.JUSTONEHOP_VIMIUM_PATH;
+  const playwright = command("if (process.argv.includes('--require-vimium')) process.exit(99)");
+  for (const mode of ['--list', '--help']) {
+    assert.equal(await runE2E(['--require-vimium', mode], { root: path, build: command('process.exit(99)'), playwright }), 0);
+  }
+  const vimium = join(path, 'vimium');
+  mkdirSync(vimium);
+  writeFileSync(join(vimium, 'manifest.json'), JSON.stringify({ name: 'Vimium', version: '2.4.2', manifest_version: 3, background: { service_worker: 'worker.js' } }));
+  writeFileSync(join(vimium, 'worker.js'), '');
+  process.env.JUSTONEHOP_VIMIUM_PATH = vimium;
+  const args = ['--require-vimium', '--max-failures=0', '--grep', 'literal selector'];
+  assert.equal(await runE2E(args, { root: path, build, playwright: command("const assert = require('node:assert/strict'); assert.deepEqual(process.argv.slice(1), ['--max-failures=0', '--grep', 'literal selector'])") }), 0);
+  const report = reports(path).find(report => report.mode === 'run');
+  assert.equal(report.preflight.status, 'passed');
+  assert.equal(report.preflight.vimium.version, '2.4.2');
+  assert.equal(report.status, 'completed');
+});
+
 test('failed build records failure, never launches Playwright, and releases the lock', async t => {
   const path = temporary(t);
   const result = await runE2E(['--grep', 'focused'], { root: path, build: command('process.exit(9)'),
@@ -317,7 +369,7 @@ test('list mode enumerates tests without claiming execution, skips or success', 
 test('formal validation uses the repository runner with fail-fast disabled', () => {
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   assert.ok(pkg.scripts.check.endsWith('npm run test:e2e:full'));
-  assert.deepEqual(pkg.scripts['test:e2e:full'].trim().split(/\s+/), ['tsx', 'scripts/run-e2e.ts', '--max-failures=0']);
+  assert.deepEqual(pkg.scripts['test:e2e:full'].trim().split(/\s+/), ['tsx', 'scripts/run-e2e.ts', '--require-vimium', '--max-failures=0']);
 });
 
 test('runner rejects browser concurrency above the local resource budget before building', async t => {

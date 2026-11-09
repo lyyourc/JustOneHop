@@ -2,7 +2,7 @@
 
 ## 按影响范围验证
 
-先按实际改动选择最小充分验证，执行前完成共享样式／组件调用方检查，避免测试后才发现影响范围而追加构建。
+先按实际改动选择最小充分验证，执行前完成共享样式／组件调用方检查，避免测试后才发现影响范围而追加构建。修改共享 UI 的 DOM、类名或提示结构时，同时用 `rg` 搜索测试中的相关定位器，将受影响的既有用例纳入本次定向验证；不能只选新增用例或另一种承载的用例。单元素断言须保持语义唯一，不用 `.first()` 隐藏歧义。
 
 | 改动 | 默认验证范围 |
 | --- | --- |
@@ -78,6 +78,8 @@ npm run test:e2e -- --grep 'storage and Tab Group layers preserve main palette g
 ## 正式发版验证
 
 正式发版先收齐版本号、CHANGELOG 日期和发布文档，提交为发布候选，再执行 `npm run release:check -- v<version>` 和 `npm run check`（类型检查、完整单元测试、构建与全量 E2E）。同一提交已有完整单测和类型检查的有效证据时，可补跑 `npm run test:e2e:full`，明确各轮证据来源。GitHub Validate CI 当前只覆盖版本检查、类型、单测与构建，不能替代浏览器验证。
+
+`npm run check` 使用的 `test:e2e:full` 入口在构建和启动浏览器前检查 Vimium：必须设置 `JUSTONEHOP_VIMIUM_PATH`，目录中的 manifest 须标识 Manifest V3 Vimium，且后台脚本可读取；失败立即退出并记录 `preflight-failed`。例如 `JUSTONEHOP_VIMIUM_PATH=/absolute/path/to/unpacked-vimium npm run check`。预检仅证明依赖文件可用，实际加载及兼容行为仍由用例验证。`--list` / `--help` 不要求此依赖；日常定向入口 `test:e2e` 保留原有行为。全量前先完成改动影响范围内的定向验证；已有对应证据则沿用，不固定重复一批冒烟用例。
 
 全量运行必须报告通过、失败、跳过及未执行项；失败或未执行项未解决前，不发布正式 Release 或提交商店。缺少依赖导致的跳过必须补齐环境后验证，或明确记录为经发布负责人接受的范围例外，不能计为通过。失败修复后先定向复验，再完成修复后候选的全量验证；定向通过不能替代全量通过。
 
